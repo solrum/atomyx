@@ -2,22 +2,30 @@
 
 > Drive real mobile devices from Claude (or any MCP client) to explore apps, record flows, and generate regression tests.
 >
-> **Cross-platform by design**: Android ships today (embedded control plane). iOS support is a **TODO** — the bridge approach has not been chosen yet. See [docs/ios.md](./docs/ios.md) for the open design questions. Self-contained, open source (Apache 2.0).
+> **Cross-platform by design**: Android ships today (embedded control plane). iOS support is a **TODO** — the bridge approach has not been chosen yet. See [docs/ios.md](./docs/ios.md). Self-contained, open source (Apache 2.0).
 
 ---
 
 ## What it does
 
-`adet` exposes a small set of MCP tools that let a language model (or a YAML test spec) drive a mobile device **directly** using stable selectors resolved live on the device:
+`adet` exposes **19 MCP tools** that let a language model (or a YAML test spec) drive a mobile device using stable selectors resolved live on the device:
 
-```
-tap({ contentDesc: "Login" })
-input_text({ resourceId: "com.example:id/email" }, "user@test.com")
-type_via_keyboard("123456")
-verify_state({ mustContain: ["Welcome", "Logout"] })
+```ts
+// Launch + discover selectors in one call
+const { inputs, initialTree } = await launch_app({ packageName: "com.example.app" });
+
+// Type into fields — selector OR coordinates, auto-clears by default
+await input_text({ selector: { contentDesc: "Email" }, text: "user@test.com" });
+await input_text({ x: inputs[1].center.x, y: inputs[1].center.y, text: "hunter2" });
+
+// Tap with transition verification for navigation / login / submit
+await tap_and_wait_transition({
+  selector: { contentDesc: "Login" },
+  waitForAbsent: { resourceId: "login_form" },
+});
 ```
 
-No test tree caching on the host. No ephemeral element IDs. One mental model for both platforms.
+No test-tree caching on the host. No ephemeral element IDs. One mental model for both platforms. Selector priority is **resourceId > contentDesc > text > textContains > hint** — and the tool layer auto-broadens across types so you don't have to know whether Android exposes a given label as `contentDesc` or `text`.
 
 Two modes:
 
@@ -33,84 +41,78 @@ Two modes:
 | Android  | ✅ stable    | Embedded APK — NanoHTTPD + AccessibilityService   | API 26+ (screenshots require API 30+) |
 | iOS      | 🟡 TODO      | **Approach not yet decided** — see [docs/ios.md](./docs/ios.md) | TBD         |
 
-**Android** uses a custom lightweight control plane that runs directly on the device. No Appium. A single `adet` APK exposes an HTTP server on `127.0.0.1:8765`, accessed from the host via `adb forward`. Tree dumps are served from a cache invalidated by accessibility events — typical tap latency is ~30ms.
+**Android** uses a lightweight control plane running directly on the device. No Appium. A single `adet` APK exposes an HTTP server on `127.0.0.1:8765`, accessed from the host via `adb forward`. Tree dumps are served from a cache invalidated by accessibility events — typical tap latency is ~30ms. Handles native Android, Flutter, Compose, and React Native transparently (walk fallbacks for non-qualified `resourceId`, structural input detection, custom keypad handling).
 
-**iOS** is an open design question. iOS sandboxing prevents the Android-style embedded HTTP server approach, so the control plane will have to live on the host Mac — but *how* it talks to the device is undecided. Candidate approaches (Appium + WebDriverAgent, direct WDA, custom XCTest runner, `idb`, Accessibility Inspector, etc.) each have unresolved tradeoffs. The TypeScript tool layer, runner, explorer, and storage are already platform-agnostic via the `DeviceController` interface, so whichever approach is chosen slots in as a single adapter. See [docs/ios.md](./docs/ios.md) for the full comparison and the questions that need answering before implementation.
-
-The MCP tool surface is designed to be **identical** between platforms once iOS lands — clients write one test spec, adet picks the right backend based on `select_device`.
+**iOS** is an open design question. iOS sandboxing prevents the Android-style embedded HTTP server, so the control plane must live on the host Mac. Candidates (Appium + WebDriverAgent, direct WDA, custom XCTest target, `simctl`, `idb`) have unresolved tradeoffs. The TypeScript tool layer is already platform-agnostic via `DeviceController`; whichever approach is chosen slots in as one adapter. See [docs/ios.md](./docs/ios.md).
 
 ---
 
-## Layout
+## Tool reference (19 tools)
+
+> For full signatures, response shapes, shared patterns, and invariants, see **[`docs/tools.md`](./docs/tools.md)** — the reference agents should read before modifying anything under `src/tools/`.
+
+
+| Category  | Tools                                                                 |
+| --------- | --------------------------------------------------------------------- |
+| Device    | `list_devices`, `select_device`                                       |
+| App       | `launch_app` *(forceStop=true default, returns `inputs[]` + tree)*, `list_apps` |
+| Screen    | `get_ui_tree`, `find_element`, `get_screenshot`                       |
+| Actions   | `tap`, `tap_and_wait_transition`, `input_text`, `swipe`, `press_key`  |
+| Wait      | `wait_for_element`                                                    |
+| Run       | `start_run`, `finish_run`, `report_bug`                               |
+| Guidance  | `get_playbook`, `add_case_study`, `get_case_studies`                  |
+
+### One tool per intent
+
+Each action has **exactly one** tool — agents don't have to choose between overlapping options:
+
+- **Type text**: `input_text` (accepts `{selector, text}` OR `{x, y, text}`). Handles native EditText (ACTION_SET_TEXT), structural `find-input` strategy chain when selector points at a label/container, custom Flutter keypads (on-screen keys scan), system IMEs with layout switching.
+- **Tap**: `tap` (accepts `{selector}` OR `{x, y}`). Use `tap_and_wait_transition` for any navigation / submit / login / network call — it verifies the transition, auto-extends on loading indicators, and classifies failures (dialog / loading / partial / no-change) with actionable hints.
+- **Find**: `find_element` unifies lookup. Accepts exact (`resourceId` / `contentDesc` / `text`), substring (`labelContains`), cross-language `keyword`, role filter, `nth` / `nthOfRole` for positional disambiguation, `inputField: true` for the find-input strategy chain, `all: true` for lists. 2s result cache.
+
+### Selector shape
+
+```json
+{
+  "resourceId": "com.example:id/btn_login",
+  "contentDesc": "Login",
+  "text": "Sign in",
+  "textContains": "ign",
+  "hint": "login",
+  "nth": 0
+}
+```
+
+Priority: **resourceId > contentDesc > text > textContains > hint**. On Android, Material/Compose buttons typically set `contentDesc` and leave `text` empty — agents don't need to know: `tap` auto-broadens across types internally (tries `contentDesc` first even when you pass `text`, etc).
+
+### Tree dump format
+
+`get_ui_tree` returns a compact list sorted by selector stability with inline center coords. Each line uses explicit JSON-like form so agents can copy values verbatim:
 
 ```
-adet/
-├── src/                           # MCP server (TypeScript) — platform-agnostic
-│   ├── index.ts                   # stdio entry point
-│   ├── server.ts                  # MCP request handler
-│   ├── registry.ts                # Tool registration via factory
-│   ├── types.ts                   # ToolDefinition generic
-│   ├── runtime/
-│   │   └── adet-context.ts        # DI container (history, results, controller)
-│   ├── adapters/                  # Per-platform DeviceController implementations
-│   │   ├── device-controller.port.ts  # Inspector + Actor + AppManager + Lifecycle interfaces
-│   │   ├── agent-direct.adapter.ts    # Android: HTTP client → adet APK
-│   │   ├── engine-appium.adapter.ts   # iOS: stub (approach TBD — filename is historical)
-│   │   ├── device-router.ts           # select_device picks the right adapter
-│   │   └── tree-diff.ts               # flattenText + treesEqual
-│   ├── runner/                    # Mode B — YAML spec runner
-│   │   ├── spec-schema.ts         # Zod schema
-│   │   ├── var-resolver.ts        # ${data.x} / ${env.X:-default}
-│   │   ├── spec-runner.ts         # Orchestrator (takes AdetContext)
-│   │   └── steps/                 # Strategy registry: one handler per step type
-│   │       ├── launch.handler.ts
-│   │       ├── tap.handler.ts
-│   │       ├── input.handler.ts
-│   │       ├── swipe.handler.ts
-│   │       ├── press-key.handler.ts
-│   │       ├── wait-for-idle.handler.ts
-│   │       ├── wait-for.handler.ts
-│   │       ├── assert.handler.ts
-│   │       └── sleep.handler.ts
-│   ├── explorer/                  # Mode C — Claude API agent loop
-│   │   ├── agent-loop.ts          # Anthropic SDK loop
-│   │   └── system-prompt.ts       # Cached system prompt
-│   ├── storage/                   # TestCase persistence (Strategy pattern)
-│   │   └── test-case-storage.ts   # LocalFileStorage | EngineHttpStorage | CompositeStorage
-│   ├── tools/                     # MCP tool categories
-│   │   ├── tool-factory.ts
-│   │   ├── devices.tools.ts
-│   │   ├── ui.tools.ts
-│   │   ├── actions.tools.ts
-│   │   ├── app.tools.ts
-│   │   ├── assertion.tools.ts
-│   │   ├── verification.tools.ts
-│   │   ├── runner.tools.ts
-│   │   └── test.tools.ts
-│   ├── cli/                       # Standalone CLI
-│   │   ├── main.ts                # `adet run` / `adet list-devices` / `adet explore`
-│   │   └── junit-reporter.ts      # CI-friendly output
-│   └── testing/
-│       └── mock-controller.ts     # In-memory mock for unit tests
-│
-├── android/                       # Android control plane (Kotlin APK)
-│   └── ...                        # Self-contained Gradle project — see android/README.md
-│
-├── ios/                           # iOS control plane — TODO, empty today
-│   └── README.md                  # Why it's empty + pointer to design doc
-│
-├── docs/
-│   └── ios.md                     # iOS open design questions (approach TBD)
-│
-├── scripts/
-│   ├── smoke-device.sh            # Device-layer smoke via curl (Android today)
-│   └── smoke-mcp.mjs              # MCP stdio smoke test
-│
-├── CLAUDE.md                      # Instructions for Claude Code contributors
-├── LICENSE                        # Apache 2.0
-├── package.json
-└── tsconfig.json
+resourceId="com.example:id/login_btn" button "Login" @540,1487
+contentDesc="ログイン" button @540,1442
+text="保存"  @100,200
+contentDesc="注文"  @540,157 (2×)          ← duplicate — disambiguate by coords or nth
+resourceId="G01-05-01/2"  @410,487
 ```
+
+- `(N×)` = duplicate selector marker — agent must disambiguate via coords or `nth`
+- `@cx,cy` = first-class selector — always valid, no resolver roundtrip
+- `resourceId=""` preserves the full id (Flutter ids like `G01-05-01/2` and Android `com.pkg:id/foo` both work)
+
+### `launch_app` returns `inputs[]` directly
+
+```ts
+const result = await launch_app({ packageName: "..." });
+// result.inputs[] = [
+//   { label: "口座番号", stableId: "acct_field", center: { x: 410, y: 990 }, currentValue: null },
+//   { label: "パスワード", stableId: "password_field", center: { x: 410, y: 1139 }, currentValue: "••••••" },
+// ]
+// result.initialTree = "..."  // stable-only compact tree for buttons / other elements
+```
+
+Labels come from a structural walk (preceding-sibling / parent / descendant strategy chain), not positional index — register / login / settings flows with different field orders all work by matching labels semantically.
 
 ---
 
@@ -130,21 +132,18 @@ npm install
 npm run build
 ```
 
-### 2. Enable on device
+### 2. Enable accessibility
 
-Open the **adet** app. Tap through the permission flow:
+Open the **adet** app and tap through the permission flow (Accessibility → toggle `adet` ON, Usage Access → grant).
 
-1. **Accessibility** → toggle `adet` ON
-2. **Usage Access** → grant `adet`
-3. Return to app → tap **Enable adet control server**
-4. Persistent notification appears: "adet — control server active"
-
-> **Developer note**: after an APK update, Android caches the old binding. If the tree dump returns empty, run:
+> **Developer note**: after an APK update, Android sometimes caches the old binding. If `get_ui_tree` returns empty:
 > ```bash
+> PKG=dev.solrum.adet.agent
+> SVC=$PKG/$PKG.service.AdetAccessibilityService
 > adb shell 'settings delete secure enabled_accessibility_services'
-> adb shell settings put secure enabled_accessibility_services "dev.solrum.adet.agent/dev.solrum.adet.agent.service.AdetAccessibilityService"
+> adb shell "settings put secure enabled_accessibility_services $SVC"
+> adb shell "am start-foreground-service -n $PKG/.control.AdetForegroundService"
 > ```
-> End users installing once won't hit this.
 
 ### 3. Connect
 
@@ -157,48 +156,13 @@ curl http://127.0.0.1:8765/health
 ### 4. Smoke test
 
 ```bash
-bash scripts/smoke-device.sh      # curl /health, /tree, /find, /screenshot directly
+bash scripts/smoke-device.sh      # curl /health, /tree, /resolve, /screenshot
 node scripts/smoke-mcp.mjs        # full MCP stdio → device round trip
 ```
 
 ## Quick start (iOS)
 
-🟡 **TODO — approach not yet decided.** The `DeviceController` interface is ready; the iOS adapter is a stub that throws. Before contributing code, read [docs/ios.md](./docs/ios.md) for the candidate approaches and open questions. A prototype + discussion is required before committing to an implementation path.
-
----
-
-## Tool reference
-
-| Category    | Tools                                                                                           |
-| ----------- | ----------------------------------------------------------------------------------------------- |
-| Devices     | `list_devices`, `select_device`                                                                 |
-| UI          | `get_ui_tree` (full/compact), `resolve_selector`, `get_keyboard`, `get_screenshot`              |
-| Actions     | `tap`, `tap_coordinates`, `swipe`, `input_text`, `type_via_keyboard`, `press_key`               |
-| App         | `list_apps`, `launch_app`, `current_activity`                                                   |
-| Assertions  | `wait_for_element`, `wait_for_idle`, `verify_state`                                             |
-| Diagnostics | `snapshot_tree`, `get_tree_diff`, `get_history`                                                 |
-| Run         | `start_run`, `finish_run`, `report_bug`, `report_finding`                                       |
-| Recording   | `start_test_session`, `get_recorded_actions`, `save_as_test_case`                               |
-| Automation  | `run_test_spec` (Mode B), `start_exploration` (Mode C, needs `ANTHROPIC_API_KEY`)               |
-
-### Selector shape
-
-```json
-{
-  "selector": {
-    "resourceId": "com.example:id/btn_login",
-    "contentDesc": "Login",
-    "text": "Sign in",
-    "textContains": "ign",
-    "hint": "login",
-    "nth": 0
-  }
-}
-```
-
-Strategies are tried in priority order on the device side (Android): `resourceId` → `text` → `contentDesc` → `textContains` → `hint`.
-
-> **iOS selector mapping**: how these fields map to iOS attributes (`name` / `label` / `value` / `identifier` / etc.) depends on the chosen iOS bridge approach. adet intends to normalize them losslessly at the adapter layer so specs run unchanged across platforms — the details are a TODO tracked in [docs/ios.md](./docs/ios.md).
+🟡 **TODO — approach not yet decided.** The `DeviceController` interface is ready; the iOS adapter is a stub that throws. Read [docs/ios.md](./docs/ios.md) before contributing code. A prototype + discussion is required before committing to an implementation path.
 
 ---
 
@@ -216,27 +180,16 @@ data:
 
 setup:
   - launch: ${target}
-  - wait_for_idle: { timeoutMs: 3000 }
 
 steps:
   - input:
-      find: { hint: "Email" }
+      find: { contentDesc: "Email" }
       text: ${data.email}
   - input:
-      find: { hint: "Password" }
+      find: { contentDesc: "Password" }
       text: ${data.password}
-  - tap: { text: "Login" }
-  - wait_for_idle: { timeoutMs: 5000 }
-
-verify:
-  mustContain: ["Welcome", "Logout"]
-  mustNotContain: ["error", "invalid"]
-
-bug_rules:
-  - if: step_failed
-    severity: critical
-  - if: verify_failed
-    severity: high
+  - tap: { contentDesc: "Login" }
+  - wait_for: { contentDesc: "Welcome", timeoutMs: 5000 }
 ```
 
 Run:
@@ -258,13 +211,11 @@ ANTHROPIC_API_KEY=sk-ant-... \
     --max-steps=30
 ```
 
-Also available as the `start_exploration` MCP tool, so you can run it from inside an MCP client without the standalone CLI.
-
 ---
 
 ## TestCase storage (Strategy pattern)
 
-`save_as_test_case` persists via one of 3 backends, auto-selected from env:
+Mutating actions are recorded into `ctx.recordedActions` and can be persisted via a storage strategy auto-selected from env:
 
 | Mode         | Trigger                              | Destination                              |
 | ------------ | ------------------------------------ | ---------------------------------------- |
@@ -272,9 +223,16 @@ Also available as the `start_exploration` MCP tool, so you can run it from insid
 | `engine`     | `ADET_STORAGE_MODE=engine`           | `POST ${ADET_ENGINE_URL}/...`            |
 | `composite`  | `ADET_ENGINE_URL` set                | **Both** local + engine (best-effort)    |
 
-Override local dir: `ADET_STORAGE_DIR=/path/to/dir`.
+Override local dir via `ADET_STORAGE_DIR=/path/to/dir`. adet does not ship any engine — run your own HTTP server accepting the `TestCaseRecord` shape in `src/storage/test-case-storage.ts`.
 
-adet does not ship any engine — if you want cloud persistence, run your own HTTP server accepting the `TestCaseRecord` shape defined in `src/storage/test-case-storage.ts`.
+---
+
+## Playbook + Case studies
+
+Tool-selection guidance lives in two places so it survives across sessions:
+
+- **`get_playbook`** — static decision tree (typing, tapping, waiting, cross-language, error recovery). Ship-versioned, loaded from code. Call at session start when unsure.
+- **`add_case_study({title, trigger, solution, example})`** — append a learned lesson to `.adet/case-studies/YYYY-MM.md`. Use after recovering from a non-obvious error. Reviewable by humans, picked up by future sessions via `get_case_studies`.
 
 ---
 
@@ -293,7 +251,12 @@ adet does not ship any engine — if you want cloud persistence, run your own HT
 │  │   └── iOS adapter (TODO)        │
 │  ├── runner/ (Mode B)              │
 │  ├── explorer/ (Mode C)            │
-│  └── storage/ (Strategy)           │
+│  ├── storage/ (Strategy)           │
+│  └── tools/                        │
+│      ├── tree-render (tokens)      │
+│      ├── find-input (strategy)     │
+│      ├── preflight (a11y health)   │
+│      └── playbook + case studies   │
 └────────────────┬───────────────────┘
                  │
      ┌───────────┴───────────────┐
@@ -304,20 +267,28 @@ adet does not ship any engine — if you want cloud persistence, run your own HT
 │ APK (Kotlin)    │   │  not yet implemented)   │
 │ — NanoHTTPD     │   │  see docs/ios.md        │
 │ — A11y service  │   │                         │
-│ — SelectorChain │   │                         │
+│ — ResourceId    │   │                         │
+│   strategy +    │   │                         │
+│   walk fallback │   │                         │
+│ — typeViaKeyb   │   │                         │
+│   with Flutter  │   │                         │
+│   keypad scan   │   │                         │
 └────────┬────────┘   └─────────────────────────┘
          │
          ▼
-    Android app
+    Target app
 ```
 
-Key design decisions:
+### Key design decisions
 
-- **Selector-first everywhere**. No ephemeral element IDs cross the MCP boundary. Actions take a selector, resolved live on the device.
-- **Platform-agnostic tool layer**. The MCP server, runner, explorer, and storage don't know about platforms — they talk to `DeviceController`. Adding iOS is implementing one adapter.
-- **Cached UI tree on device (Android)**. Invalidated by `TYPE_WINDOW_*` accessibility events. Static screens serve from cache, typical tap latency ~30ms.
-- **Strategy patterns throughout**. Step handlers, selector resolvers, storage backends, tool categories. Adding a new type = drop in a new file, no core edits.
-- **Zero external coupling**. adet is fully standalone. No workspace inheritance, no shared tsconfig, no hidden dependencies.
+- **One tool per intent**. After consolidation from ~40 to 19 tools, agents don't face ambiguous choices. `input_text` is the one input tool; `tap` is the one tap tool; `find_element` is the one query tool.
+- **Selector-first, coordinate-first-class**. Selectors cross the MCP boundary; ephemeral element IDs do not. But `@cx,cy` coords from `get_ui_tree` are ALSO first-class selectors — pass them directly to `tap` / `input_text` when no stable id exists.
+- **Priority broadening across selector types**. The tool layer tries selector types in priority order (resourceId → contentDesc → text → …) regardless of which the agent passed. `tap({text:"OK"})` auto-matches an element with `contentDesc="OK"` — agent doesn't need to know platform conventions.
+- **Flutter / Compose / RN first-class**. Non-qualified resourceIds (`G01-05-01/2`) resolve via a tree-walk fallback in `ResourceIdStrategy`. `clickable` flag is ignored when deciding whether to tap (unreliable for in-engine gesture dispatch). `dumpCompact` keeps elements with **any** addressable signal, not just clickable + text.
+- **Platform-agnostic tool layer**. Tools talk to `DeviceController`. Adding iOS = implementing one adapter.
+- **Cached UI tree on device (Android)**. Invalidated by accessibility events. Static screens serve from cache; typical tap latency ~30ms.
+- **Strategy patterns throughout**. Step handlers, selector resolvers, storage backends, input-finding strategies. Adding a new type = drop in a new file, no core edits.
+- **Zero external coupling**. adet is standalone. No workspace inheritance, no shared tsconfig, no hidden dependencies.
 
 ---
 
@@ -339,16 +310,18 @@ Create `.mcp.json` at your project root:
 {
   "mcpServers": {
     "adet": {
+      "type": "stdio",
       "command": "node",
-      "args": ["/absolute/path/to/adet/dist/index.js"]
+      "args": ["/absolute/path/to/adet/dist/index.js"],
+      "env": {}
     }
   }
 }
 ```
 
-Restart Claude Code → `/mcp` lists `adet` with all 30 tools.
+Restart Claude Code → `/mcp` lists `adet` with 19 tools. Prompt it:
 
-Then prompt: *"List connected devices, pick the first, launch com.example.app, open the login screen, and report a bug if the 'Sign in' button is not tappable."*
+> "List connected devices, pick the first, launch com.example.app, fill the login form with user@test.com / hunter2, tap Login, verify you land on the home screen."
 
 ---
 
@@ -356,13 +329,13 @@ Then prompt: *"List connected devices, pick the first, launch com.example.app, o
 
 | Symptom                                                    | Fix                                                                                                                   |
 | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `/health` returns 503 `accessibilityConnected: false`      | Toggle adet in Accessibility settings OFF → ON. After APK updates, use the shell snippet in §2.                       |
-| `/tree` returns empty list                                 | Accessibility service not bound to new APK. Toggle off + on.                                                          |
-| `/screenshot` returns 500                                  | Device must be API 30+. Older devices don't have `AccessibilityService.takeScreenshot()`.                             |
-| `/current-activity` returns empty                          | Grant Usage Access (`adb shell appops set dev.solrum.adet.agent android:get_usage_stats allow`).                      |
+| `/health` returns `accessibilityConnected: false`          | Rebind via the shell snippet in Quick start §2.                                                                       |
+| `get_ui_tree` returns empty + `currentActivity` empty      | Stale a11y binding after APK install. `launch_app` now preflights this and surfaces an actionable rebind hint.        |
+| Input fill appends instead of replacing                    | `input_text` clears by default (`clearFirst: true`). If you see append behavior, ensure you're using `input_text`, not manual tap + type_via_keyboard chaining. |
+| `tap({resourceId:"G01-05-01/2"})` reports NOT FOUND        | The Android native lookup requires `package:id/` prefix. `ResourceIdStrategy` has a walk fallback — should resolve automatically. If not, file an issue.       |
+| `tap({text:"OK"})` fails on Android                        | Material buttons often set only `contentDesc`. `tap` auto-broadens across selector types — should succeed. If not, the element isn't in the current tree.     |
+| `get_screenshot` returns 500                               | Device must be API 30+ for `AccessibilityService.takeScreenshot()`.                                                   |
 | Foreground notification disappears                         | Battery optimization killed the service. Add adet to "Don't optimize" in battery settings.                            |
-| `tap` silently fails when keyboard is visible              | adet auto-dismisses keyboard if the target intersects the IME bounds. If your target is a keyboard key, pass it directly. |
-| `type_via_keyboard` types wrong chars after a field focus  | The IME layout switches when you focus a different input type. adet re-fetches keyboard info before each type call.   |
 | iOS device returns "not implemented"                       | iOS is 🟡 TODO — approach not yet decided. See [docs/ios.md](./docs/ios.md).                                           |
 
 ---
@@ -371,7 +344,7 @@ Then prompt: *"List connected devices, pick the first, launch com.example.app, o
 
 See [CLAUDE.md](./CLAUDE.md) for architecture principles and extension patterns.
 
-**iOS support is an open design question** — see [docs/ios.md](./docs/ios.md). Before writing code, read the candidate approaches, prototype your preferred option for 2-3 days, and open a discussion issue with measurements + tradeoffs. Implementing the wrong approach is a multi-week rewrite; we want to decide before committing.
+**iOS support is an open design question** — see [docs/ios.md](./docs/ios.md). Before writing code, read the candidate approaches, prototype your preferred option, and open a discussion with measurements + tradeoffs.
 
 ---
 
