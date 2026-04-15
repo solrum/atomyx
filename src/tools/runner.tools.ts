@@ -1,14 +1,14 @@
 import { resolve as resolvePath } from "node:path";
 import { runExploration } from "../explorer/agent-loop.js";
 import { loadSpec, runSpec } from "../runner/spec-runner.js";
-import { requireController } from "../runtime/adet-context.js";
+import { requireController } from "../runtime/atomyx-context.js";
 import type { ToolCategory } from "./tool-factory.js";
 
 export const registerRunnerTools: ToolCategory = (factory, ctx) => {
   factory.register({
     name: "start_exploration",
     description:
-      "Run an autonomous exploratory test session. Spawns an in-process Claude API agent that explores the app via the same adet tools and reports bugs. " +
+      "Run an autonomous exploratory test session. Spawns an in-process Claude API agent that explores the app via the same Atomyx tools and reports bugs. " +
       "Requires ANTHROPIC_API_KEY env var. Returns summary with bugs, findings, token usage.",
     inputSchema: {
       type: "object",
@@ -36,7 +36,7 @@ export const registerRunnerTools: ToolCategory = (factory, ctx) => {
     description:
       "Load and execute a YAML test spec against the currently selected device. " +
       "Returns step-by-step results, verify outcome, and bug count. " +
-      "Local result JSON saved to /tmp/adet-results.",
+      "Local result JSON saved to /tmp/atomyx-results.",
     inputSchema: {
       type: "object",
       required: ["specPath"],

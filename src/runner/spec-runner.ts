@@ -9,7 +9,7 @@ import { load as loadYaml } from "js-yaml";
 
 import type { DeviceController } from "../adapters/device-controller.port.js";
 import { flattenText } from "../adapters/tree-diff.js";
-import type { AdetContext } from "../runtime/adet-context.js";
+import type { AtomyxContext } from "../runtime/atomyx-context.js";
 import { specSchema, type BugRule, type Spec, type Step } from "./spec-schema.js";
 import { stepHandlers, type StepResult } from "./steps/index.js";
 import { resolveDeep } from "./var-resolver.js";
@@ -50,7 +50,7 @@ async function executeStep(ctl: DeviceController, step: Step, index: number): Pr
 }
 
 function applyBugRules(
-  ctx: AdetContext,
+  ctx: AtomyxContext,
   rules: BugRule[],
   step: StepResult,
   kind: "step" | "verify",
@@ -83,7 +83,7 @@ function applyBugRules(
 }
 
 export async function runSpec(
-  ctx: AdetContext,
+  ctx: AtomyxContext,
   ctl: DeviceController,
   spec: Spec,
   specPath: string,

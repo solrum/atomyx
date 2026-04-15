@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Smoke test for adet MCP server via stdio protocol.
+// Smoke test for Atomyx MCP server via stdio protocol.
 // Spawns the server, sends a sequence of JSON-RPC requests, asserts results.
 //
-// Run: node apps/adet/scripts/smoke-mcp.mjs
+// Run: node scripts/smoke-mcp.mjs
 
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";

@@ -1,5 +1,5 @@
 import type { CompactElement } from "../adapters/device-controller.port.js";
-import { requireController, type AdetContext } from "../runtime/adet-context.js";
+import { requireController, type AtomyxContext } from "../runtime/atomyx-context.js";
 import type { JsonSchema } from "../types.js";
 import {
   FuzzyResourceMatcher,
@@ -81,7 +81,7 @@ export class FindElementTool extends Tool<{
     super();
   }
 
-  async execute(args: FindElementArgs, ctx: AdetContext): Promise<FindElementResult> {
+  async execute(args: FindElementArgs, ctx: AtomyxContext): Promise<FindElementResult> {
     const ctl = requireController(ctx);
 
     // Mode 1: structural input-field mode.

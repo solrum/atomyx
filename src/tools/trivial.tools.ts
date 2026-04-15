@@ -1,5 +1,5 @@
-import type { AdetContext } from "../runtime/adet-context.js";
-import { requireController } from "../runtime/adet-context.js";
+import type { AtomyxContext } from "../runtime/atomyx-context.js";
+import { requireController } from "../runtime/atomyx-context.js";
 import type { JsonSchema } from "../types.js";
 import { Tool } from "./core/tool.js";
 
@@ -16,19 +16,24 @@ import { Tool } from "./core/tool.js";
 
 export class PressKeyTool extends Tool<{
   args: { key: "back" | "home" | "enter" };
-  result: { ok: true };
+  result: { ok: boolean; reason?: string };
 }> {
   readonly name = "press_key";
-  readonly description = "Press a system key.";
+  readonly description =
+    "Press a system key. home returns to the home screen. enter types a newline " +
+    "into the focused input. back is best-effort: Android dispatches a system BACK " +
+    "intent (always ok:true); iOS tries nav bar back button then edge-swipe " +
+    "fallback. Always check the returned ok — on iOS a false ok means no verifiable " +
+    "affordance was used, and the caller should fall back to find_element on " +
+    "Cancel/Done/Close/Back button labels.";
   readonly schema: JsonSchema = {
     type: "object",
     required: ["key"],
     properties: { key: { type: "string", enum: ["back", "home", "enter"] } },
   };
 
-  async execute(args: { key: "back" | "home" | "enter" }, ctx: AdetContext) {
-    await requireController(ctx).pressKey(args.key);
-    return { ok: true as const };
+  async execute(args: { key: "back" | "home" | "enter" }, ctx: AtomyxContext) {
+    return requireController(ctx).pressKey(args.key);
   }
 }
 
@@ -56,7 +61,7 @@ export class SwipeTool extends Tool<{
 
   async execute(
     args: { fromX: number; fromY: number; toX: number; toY: number; durationMs?: number },
-    ctx: AdetContext,
+    ctx: AtomyxContext,
   ) {
     const ctl = requireController(ctx);
     const dx = Math.abs(args.toX - args.fromX);
@@ -85,7 +90,7 @@ export class ListAppsTool extends Tool<{
   readonly description = "List installed apps on the selected device.";
   readonly schema: JsonSchema = { type: "object", properties: {} };
 
-  async execute(_args: Record<string, never>, ctx: AdetContext) {
+  async execute(_args: Record<string, never>, ctx: AtomyxContext) {
     return requireController(ctx).listApps();
   }
 }
@@ -121,7 +126,7 @@ export class StartRunTool extends Tool<{
 
   async execute(
     args: { name: string; source?: "scripted" | "exploratory" | "interactive" },
-    ctx: AdetContext,
+    ctx: AtomyxContext,
   ) {
     const ctl = requireController(ctx);
     ctx.history.start();
@@ -159,7 +164,7 @@ export class FinishRunTool extends Tool<{
     },
   };
 
-  async execute(args: { status?: "passed" | "failed" | "error" }, ctx: AdetContext) {
+  async execute(args: { status?: "passed" | "failed" | "error" }, ctx: AtomyxContext) {
     const run = ctx.results.finishRun(args.status ?? "passed");
     const path = ctx.results.persistLocal();
     return {

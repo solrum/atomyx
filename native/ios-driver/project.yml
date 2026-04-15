@@ -1,0 +1,60 @@
+name: AtomyxDriver
+options:
+  bundleIdPrefix: dev.atomyx
+  deploymentTarget:
+    iOS: '16.0'
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: '5.9'
+    IPHONEOS_DEPLOYMENT_TARGET: '16.0'
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGNING_REQUIRED: 'NO'
+    CODE_SIGNING_ALLOWED: 'NO'
+
+targets:
+  AtomyxHostApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+    info:
+      path: App/Generated-Info.plist
+      properties:
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+    settings:
+      # Substituted from shell env at `xcodegen generate` time.
+      # Makefile exports BUNDLE_ID (default dev.atomyx.driver.host,
+      # overridable via device.env or CLI). Re-run `make generate`
+      # after changing BUNDLE_ID so the .xcodeproj gets the new value.
+      PRODUCT_BUNDLE_IDENTIFIER: ${BUNDLE_ID}
+      PRODUCT_NAME: AtomyxHostApp
+      TARGETED_DEVICE_FAMILY: '1,2'
+      GENERATE_INFOPLIST_FILE: 'NO'
+      INFOPLIST_FILE: App/Generated-Info.plist
+
+  AtomyxDriverUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: AtomyxHostApp
+    settings:
+      # Derived from host BUNDLE_ID — test bundle needs a distinct id.
+      PRODUCT_BUNDLE_IDENTIFIER: ${BUNDLE_ID}.tests
+      TEST_TARGET_NAME: AtomyxHostApp
+      GENERATE_INFOPLIST_FILE: 'YES'
+
+schemes:
+  AtomyxDriver:
+    build:
+      targets:
+        AtomyxHostApp: all
+        AtomyxDriverUITests: [test]
+    test:
+      targets:
+        - AtomyxDriverUITests
+      gatherCoverageData: false

@@ -3,7 +3,7 @@
  * from the class file so tooling / tests can import the raw markdown
  * without instantiating the tool.
  */
-export const PLAYBOOK = `# adet tool playbook — ~18 tools, one choice per action
+export const PLAYBOOK = `# Atomyx tool playbook — ~18 tools, one choice per action
 
 ## Core flow (login example, ~5 calls)
 

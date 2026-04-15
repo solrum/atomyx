@@ -2,18 +2,18 @@
  * TestCaseStorage — Strategy for persisting recorded test cases.
  *
  * Implementations:
- *   - LocalFileStorage: writes JSON to ~/.adet/test-cases/<id>.json (default)
+ *   - LocalFileStorage: writes JSON to ~/.atomyx/test-cases/<id>.json (default)
  *   - EngineHttpStorage: POSTs to a synapse engine endpoint
  *   - CompositeStorage: runs multiple storages in sequence (best-effort)
  *
  * Resolution:
  *   resolveTestCaseStorage() inspects env vars and returns the appropriate
- *   storage instance. This keeps adet self-contained for open source while
+ *   storage instance. This keeps Atomyx self-contained for open source while
  *   allowing synapse-internal users to push to their engine.
  *
- *   ADET_ENGINE_URL  → enables engine push (composite with local)
- *   ADET_STORAGE_DIR → override local persistence directory
- *   ADET_STORAGE_MODE → "local" | "engine" | "composite" (overrides auto-detection)
+ *   ATOMYX_ENGINE_URL  → enables engine push (composite with local)
+ *   ATOMYX_STORAGE_DIR → override local persistence directory
+ *   ATOMYX_STORAGE_MODE → "local" | "engine" | "composite" (overrides auto-detection)
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -89,7 +89,7 @@ export class EngineHttpStorage implements TestCaseStorage {
       };
     }
     try {
-      const url = `${this.engineUrl}/api/test-management/projects/${record.projectId}/cases/from-adet-recording`;
+      const url = `${this.engineUrl}/api/test-management/projects/${record.projectId}/cases/from-atomyx-recording`;
       const res = await fetch(url, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -149,9 +149,9 @@ export class CompositeStorage implements TestCaseStorage {
 // ────────────────────────────────────────────────────────────────────
 
 export function resolveTestCaseStorage(env: NodeJS.ProcessEnv = process.env): TestCaseStorage {
-  const mode = env.ADET_STORAGE_MODE;
-  const engineUrl = env.ADET_ENGINE_URL;
-  const baseDir = env.ADET_STORAGE_DIR;
+  const mode = env.ATOMYX_STORAGE_MODE;
+  const engineUrl = env.ATOMYX_ENGINE_URL;
+  const baseDir = env.ATOMYX_STORAGE_DIR;
   const local = new LocalFileStorage(baseDir);
 
   if (mode === "local" || (!mode && !engineUrl)) return local;
@@ -163,7 +163,7 @@ export function resolveTestCaseStorage(env: NodeJS.ProcessEnv = process.env): Te
 }
 
 function defaultLocalDir(): string {
-  return join(homedir(), ".adet", "test-cases");
+  return join(homedir(), ".atomyx", "test-cases");
 }
 
 function slugify(s: string): string {

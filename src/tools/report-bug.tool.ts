@@ -2,13 +2,13 @@ import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { BugSeverity } from "../state/results.js";
-import type { AdetContext } from "../runtime/adet-context.js";
-import { requireController } from "../runtime/adet-context.js";
+import type { AtomyxContext } from "../runtime/atomyx-context.js";
+import { requireController } from "../runtime/atomyx-context.js";
 import type { JsonSchema } from "../types.js";
 import { Tool } from "./core/tool.js";
 
 function saveBugScreenshot(base64: string, bugId: string): string {
-  const path = join(tmpdir(), `adet-bug-${bugId}-${Date.now()}.png`);
+  const path = join(tmpdir(), `atomyx-bug-${bugId}-${Date.now()}.png`);
   writeFileSync(path, Buffer.from(base64, "base64"));
   return path;
 }
@@ -47,7 +47,7 @@ export class ReportBugTool extends Tool<{
     },
   };
 
-  async execute(args: ReportBugArgs, ctx: AdetContext): Promise<ReportBugResult> {
+  async execute(args: ReportBugArgs, ctx: AtomyxContext): Promise<ReportBugResult> {
     const ctl = requireController(ctx);
     let screenshotPath: string | undefined;
     let treeSnapshot: unknown;

@@ -1,15 +1,15 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { buildToolRegistry, MUTATING_TOOLS as RECORDABLE } from "./registry.js";
-import { createAdetContext } from "./runtime/adet-context.js";
+import { createAtomyxContext } from "./runtime/atomyx-context.js";
 
 export function createServer() {
-  const ctx = createAdetContext();
+  const ctx = createAtomyxContext();
   const factory = buildToolRegistry(ctx);
   const tools = factory.build();
 
   const server = new Server(
-    { name: "synapse-adet", version: "0.1.0" },
+    { name: "atomyx", version: "0.1.0" },
     { capabilities: { tools: {} } },
   );
 

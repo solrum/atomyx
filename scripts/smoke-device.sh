@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# adet smoke test — direct HTTP against device (bypasses MCP layer).
+# Atomyx smoke test — direct HTTP against device (bypasses MCP layer).
 #
 # Prerequisites:
 #   1. SynapseAgent APK installed and accessibility enabled
-#   2. adet foreground service started ("Enable adet" button in app)
+#   2. Atomyx foreground service started ("Enable Atomyx" button in app)
 #   3. ANDROID_SERIAL env var set, OR exactly one device connected via USB
 #
-# Usage: bash apps/adet/scripts/smoke-device.sh
+# Usage: bash scripts/smoke-device.sh
 
 set -euo pipefail
 
@@ -56,12 +56,12 @@ assert_status() {
 req() {
   local method="$1" path="$2" body="${3:-}"
   if [[ -n "$body" ]]; then
-    curl -s -o /tmp/adet-resp.json -w "%{http_code}" \
+    curl -s -o /tmp/atomyx-resp.json -w "%{http_code}" \
       -X "$method" "${BASE}${path}" \
       -H "content-type: application/json" \
       -d "$body"
   else
-    curl -s -o /tmp/adet-resp.json -w "%{http_code}" -X "$method" "${BASE}${path}"
+    curl -s -o /tmp/atomyx-resp.json -w "%{http_code}" -X "$method" "${BASE}${path}"
   fi
 }
 
@@ -72,31 +72,31 @@ main() {
   blue "→ GET /health"
   status=$(req GET /health)
   assert_status "/health" "200" "$status"
-  cat /tmp/adet-resp.json && echo
+  cat /tmp/atomyx-resp.json && echo
 
   blue "→ GET /tree"
   status=$(req GET /tree)
   assert_status "/tree" "200" "$status"
-  el_count=$(grep -o '"elementId"' /tmp/adet-resp.json | wc -l | tr -d ' ')
+  el_count=$(grep -o '"elementId"' /tmp/atomyx-resp.json | wc -l | tr -d ' ')
   green "  elements in tree: ${el_count}"
 
   blue "→ POST /find {\"text\":\"Settings\"}"
   status=$(req POST /find '{"text":"Settings"}')
   assert_status "/find" "200" "$status"
-  cat /tmp/adet-resp.json && echo
+  cat /tmp/atomyx-resp.json && echo
 
   blue "→ GET /current-activity"
   status=$(req GET /current-activity)
   assert_status "/current-activity" "200" "$status"
-  cat /tmp/adet-resp.json && echo
+  cat /tmp/atomyx-resp.json && echo
 
-  blue "→ GET /screenshot (output: /tmp/adet-screenshot.png)"
+  blue "→ GET /screenshot (output: /tmp/atomyx-screenshot.png)"
   status=$(req GET /screenshot)
   if [[ "$status" == "200" ]]; then
     python3 -c "
 import json, base64, sys
-d = json.load(open('/tmp/adet-resp.json'))
-open('/tmp/adet-screenshot.png','wb').write(base64.b64decode(d['base64']))
+d = json.load(open('/tmp/atomyx-resp.json'))
+open('/tmp/atomyx-screenshot.png','wb').write(base64.b64decode(d['base64']))
 print('  saved', len(d['base64']), 'b64 chars')
 "
     green "✓ /screenshot OK"

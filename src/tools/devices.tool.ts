@@ -1,6 +1,6 @@
 import type { DeviceInfo } from "../adapters/device-controller.port.js";
 import { connectDevice, listAllDevices } from "../adapters/device-router.js";
-import type { AdetContext } from "../runtime/adet-context.js";
+import type { AtomyxContext } from "../runtime/atomyx-context.js";
 import type { JsonSchema } from "../types.js";
 import { Tool } from "./core/tool.js";
 import { preflight, type PreflightResult } from "./preflight.js";
@@ -15,7 +15,7 @@ export class ListDevicesTool extends Tool<{
   readonly description = "List all connected Android (ADB) and iOS devices.";
   readonly schema: JsonSchema = { type: "object", properties: {} };
 
-  async execute(_args: Record<string, never>, ctx: AdetContext) {
+  async execute(_args: Record<string, never>, ctx: AtomyxContext) {
     const devices = await listAllDevices();
     return { devices, selected: ctx.controller?.deviceId ?? null };
   }
@@ -47,7 +47,7 @@ export class SelectDeviceTool extends Tool<{
     },
   };
 
-  async execute(args: SelectDeviceArgs, ctx: AdetContext): Promise<SelectDeviceResult> {
+  async execute(args: SelectDeviceArgs, ctx: AtomyxContext): Promise<SelectDeviceResult> {
     if (ctx.controller) {
       await ctx.controller.dispose();
     }

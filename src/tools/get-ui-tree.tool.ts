@@ -1,6 +1,6 @@
 import type { CompactElement } from "../adapters/device-controller.port.js";
-import type { AdetContext } from "../runtime/adet-context.js";
-import { requireController } from "../runtime/adet-context.js";
+import type { AtomyxContext } from "../runtime/atomyx-context.js";
+import { requireController } from "../runtime/atomyx-context.js";
 import type { JsonSchema } from "../types.js";
 import { AmbiguityDetector, UiTreeCache } from "./core/index.js";
 import { Tool } from "./core/tool.js";
@@ -61,7 +61,7 @@ export class GetUiTreeTool extends Tool<{
     super();
   }
 
-  async execute(args: GetUiTreeArgs, ctx: AdetContext): Promise<GetUiTreeResult> {
+  async execute(args: GetUiTreeArgs, ctx: AtomyxContext): Promise<GetUiTreeResult> {
     const ctl = requireController(ctx);
 
     // Dedup spam: if the cache has a recent fresh dump AND no mutating

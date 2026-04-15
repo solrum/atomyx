@@ -143,8 +143,14 @@ export class AgentDirectController implements DeviceController {
     });
   }
 
-  async pressKey(key: "back" | "home" | "enter") {
+  async pressKey(key: "back" | "home" | "enter"): Promise<ActionResult> {
     await this.request("/actions/key", { method: "POST", body: JSON.stringify({ key }) });
+    // Android's KeyEvent dispatch is a system-level intent — it always
+    // "fires" regardless of whether the app handles it. We have no
+    // per-app consumption signal from the accessibility service, so
+    // report ok unconditionally. The guarantee we make here is
+    // "the key event was dispatched", not "the app reacted".
+    return { ok: true };
   }
 
   // ─── app ───────────────────────────────────────────────────────

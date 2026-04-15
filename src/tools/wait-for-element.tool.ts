@@ -1,6 +1,6 @@
 import type { Selector } from "../adapters/device-controller.port.js";
-import type { AdetContext } from "../runtime/adet-context.js";
-import { requireController } from "../runtime/adet-context.js";
+import type { AtomyxContext } from "../runtime/atomyx-context.js";
+import { requireController } from "../runtime/atomyx-context.js";
 import type { JsonSchema } from "../types.js";
 import { Tool } from "./core/tool.js";
 
@@ -53,7 +53,7 @@ export class WaitForElementTool extends Tool<{
     },
   };
 
-  async execute(args: WaitForElementArgs, ctx: AdetContext): Promise<WaitForElementResult> {
+  async execute(args: WaitForElementArgs, ctx: AtomyxContext): Promise<WaitForElementResult> {
     const ctl = requireController(ctx);
     const timeoutMs = args.timeoutMs ?? 5000;
     const intervalMs = args.intervalMs ?? 300;

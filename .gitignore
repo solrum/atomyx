@@ -72,7 +72,22 @@ ios/*.xcodeproj/project.xcworkspace/xcuserdata/
 Thumbs.db
 desktop.ini
 
-# ─── adet local state ──────────────────────────────────────────────
+# ─── Atomyx local state ────────────────────────────────────────────
 .adet/
-.claude/
+.atomyx/
 .mcp.json
+
+# ─── .claude/ — local-only config + cached state, EXCEPT docs/ ─────
+# .claude/docs/ holds contributor + AI-agent implementation
+# documentation that MUST be tracked (so collaborators and future
+# Claude sessions can read it). Settings, caches, and per-machine
+# state stay ignored.
+.claude/*
+!.claude/docs/
+!.claude/docs/**
+
+# ─── iOS driver per-contributor config ─────────────────────────────
+# device.env holds DEVICE_UDID / DEV_TEAM / BUNDLE_ID per contributor.
+# Template committed as device.env.example; real config is local only.
+native/ios-driver/device.env
+native/ios-driver/AtomyxDriver.xcodeproj/

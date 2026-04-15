@@ -1,6 +1,6 @@
 /**
- * Action history for an adet session. Per-context — instances are passed
- * through AdetContext, not used as a global singleton.
+ * Action history for an Atomyx session. Per-context — instances are passed
+ * through AtomyxContext, not used as a global singleton.
  */
 
 import type { RawElement } from "../adapters/device-controller.port.js";

@@ -3,7 +3,7 @@ import type {
   ResolvedElement,
   Selector,
 } from "../adapters/device-controller.port.js";
-import { requireController, type AdetContext } from "../runtime/adet-context.js";
+import { requireController, type AtomyxContext } from "../runtime/atomyx-context.js";
 import type { JsonSchema } from "../types.js";
 import {
   FuzzyResourceMatcher,
@@ -74,7 +74,7 @@ export class TapTool extends Tool<{ args: TapArgs; result: TapResult }> {
     super();
   }
 
-  async execute(args: TapArgs, ctx: AdetContext): Promise<TapResult> {
+  async execute(args: TapArgs, ctx: AtomyxContext): Promise<TapResult> {
     const ctl = requireController(ctx);
 
     // Coordinate path: no selector, just (x,y). IME geometric block only.

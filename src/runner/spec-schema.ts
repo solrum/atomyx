@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * YAML test spec schema for adet Mode B (scripted).
+ * YAML test spec schema for Atomyx Mode B (scripted).
  *
  * Shape:
  *   name: ...

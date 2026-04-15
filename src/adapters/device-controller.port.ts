@@ -2,6 +2,14 @@ export interface DeviceInfo {
   id: string;
   serial: string;
   platform: "android" | "ios";
+  /**
+   * For iOS, distinguishes a Simulator from a physical device. Affects
+   * transport strategy: simulators share the host network namespace so
+   * TCP localhost works directly; physical devices require `iproxy`
+   * (libimobiledevice) tunneling to reach the driver's listen port
+   * over USB. Undefined on Android (only physical devices via adb).
+   */
+  kind?: "sim" | "device";
   model?: string;
   state: string;
 }
@@ -73,7 +81,19 @@ export interface Selector {
 
 export interface ResolvedElement {
   found: boolean;
-  resolvedBy?: "resourceId" | "text" | "contentDesc" | "textContains" | "hint";
+  /**
+   * Which selector strategy produced the match. Adds `predicate` and
+   * `classChain` for iOS-native escape-hatch queries (Android ignores
+   * those fields so they never appear there).
+   */
+  resolvedBy?:
+    | "resourceId"
+    | "text"
+    | "contentDesc"
+    | "textContains"
+    | "hint"
+    | "predicate"
+    | "classChain";
   bounds?: { left: number; top: number; right: number; bottom: number };
   resourceId?: string | null;
   text?: string | null;
@@ -83,6 +103,21 @@ export interface ResolvedElement {
   enabled?: boolean;
   /** True if this element lives inside the IME window (soft keyboard). */
   isInIme?: boolean;
+  /**
+   * Populated by adapters that can detect view z-order — currently
+   * iOS only via snapshot walk. If the resolved element's midpoint is
+   * covered by another element (modal sheet, alert, toolbar), that
+   * obscuring element's identity is reported here. Tap/inputText
+   * callers use this to short-circuit with an actionable error
+   * instead of dispatching a coordinate tap that would hit the
+   * overlay. Absent on Android because accessibility click actions
+   * bypass coordinate hit-testing and are not affected by overlays.
+   */
+  obscuredBy?: {
+    role: string;
+    identifier: string;
+    label: string;
+  };
 }
 
 export interface CompactElement {
@@ -168,16 +203,32 @@ export interface DeviceActor {
   inputText(selector: Selector, text: string): Promise<ActionResult>;
   typeViaKeyboard(text: string, perKeyDelayMs?: number, clearFirst?: boolean): Promise<TypeKeyboardResult>;
   /**
-   * Press a system key.
+   * Press a system key. Returns an `ActionResult` because the "back"
+   * key is NOT a universal primitive — iOS has no system-level back,
+   * only per-screen affordances (nav bar button, modal cancel button,
+   * edge swipe, app-specific close button). Agents must check
+   * `result.ok` before assuming navigation happened.
    *
-   * TODO(ios): `"back"` is Android-only (hardware / software back button).
-   * iOS has no back button; the equivalent gesture is a swipe-from-left-edge.
-   * When iOS lands, either (a) rename to a platform-neutral `navigate({direction: "back"|"forward"})`
-   * that the iOS adapter maps to a swipe gesture, or (b) have the iOS
-   * adapter throw a clear "use swipe instead" error on pressKey("back").
-   * `"home"` maps cleanly on both platforms. `"enter"` is IME-specific.
+   * Semantics per key:
+   *
+   *   - `home`  → device-level home press (`XCUIDevice.shared.press(.home)`
+   *               on iOS, HOME keycode on Android). Always `ok: true`.
+   *   - `enter` → type `\n` into the currently-focused field. No way to
+   *               verify success (XCUITest / Android IME both swallow
+   *               silently if no field focused). Always `ok: true`.
+   *   - `back`  → **best-effort**. iOS adapter tries: (1) nav bar back
+   *               button, (2) edge-swipe-from-left fallback. Returns
+   *               `ok: true` only when a verifiable affordance was
+   *               tapped. Edge swipe is unverifiable → `ok: false` with
+   *               reason. Android adapter always returns `ok: true`
+   *               because the system back intent is guaranteed to fire
+   *               regardless of whether the app handles it.
+   *
+   * When `ok: false` on iOS back, agents should fall back to
+   * `find_element(label IN {"Back", "Cancel", "Done", "Close"}) + tap`
+   * to locate a screen-specific back affordance.
    */
-  pressKey(key: "back" | "home" | "enter"): Promise<void>;
+  pressKey(key: "back" | "home" | "enter"): Promise<ActionResult>;
 }
 
 /**

@@ -2,7 +2,7 @@ import type {
   Selector,
   TypeKeyboardResult,
 } from "../adapters/device-controller.port.js";
-import { requireController, type AdetContext } from "../runtime/adet-context.js";
+import { requireController, type AtomyxContext } from "../runtime/atomyx-context.js";
 import type { JsonSchema } from "../types.js";
 import { StructuralInputFinder } from "./core/index.js";
 import { Tool } from "./core/tool.js";
@@ -78,7 +78,7 @@ export class InputTextTool extends Tool<{
     super();
   }
 
-  async execute(args: InputTextArgs, ctx: AdetContext): Promise<InputTextResult> {
+  async execute(args: InputTextArgs, ctx: AtomyxContext): Promise<InputTextResult> {
     const ctl = requireController(ctx);
     const clearFirst = args.clearFirst ?? true;
 

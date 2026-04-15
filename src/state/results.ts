@@ -107,12 +107,12 @@ export class ResultStore {
   }
 
   /**
-   * Persist current run to a JSON file in tmpdir/adet-results.
+   * Persist current run to a JSON file in tmpdir/atomyx-results.
    * Returns the path. Caller may also POST to engine separately.
    */
   persistLocal(): string | null {
     if (!this.current) return null;
-    const dir = join(tmpdir(), "adet-results");
+    const dir = join(tmpdir(), "atomyx-results");
     mkdirSync(dir, { recursive: true });
     const path = join(dir, `${this.current.id}.json`);
     writeFileSync(path, JSON.stringify(this.current, null, 2));

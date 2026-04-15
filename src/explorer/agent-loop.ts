@@ -3,7 +3,7 @@
  *
  * Architecture:
  *   - Anthropic SDK directly (not via MCP)
- *   - Reuses the in-process tool registry (apps/adet/src/registry.ts)
+ *   - Reuses the in-process tool registry (src/registry.ts)
  *   - Uses prompt caching for the system prompt + tool definitions
  *   - Loops until: max steps reached, model returns no tool_use, or critical bug
  *
@@ -14,12 +14,12 @@ import Anthropic from "@anthropic-ai/sdk";
 
 import type { DeviceController } from "../adapters/device-controller.port.js";
 import { buildToolRegistry } from "../registry.js";
-import { createAdetContext } from "../runtime/adet-context.js";
+import { createAtomyxContext } from "../runtime/atomyx-context.js";
 import type { Bug, Finding } from "../state/results.js";
 import type { JsonSchema } from "../types.js";
 import { EXPLORER_SYSTEM_PROMPT } from "./system-prompt.js";
 
-const MODEL = process.env.ADET_EXPLORE_MODEL ?? "claude-sonnet-4-6";
+const MODEL = process.env.ATOMYX_EXPLORE_MODEL ?? "claude-sonnet-4-6";
 const MAX_TOKENS = 4096;
 
 // Tools the explorer is NOT allowed to call. These would distract from
@@ -93,7 +93,7 @@ export async function runExploration(
 
   // Build a private context + tool factory for this exploration. Pre-populate
   // with the controller so handlers can use it without needing select_device.
-  const explorerCtx = createAdetContext();
+  const explorerCtx = createAtomyxContext();
   explorerCtx.controller = ctl;
   const factory = buildToolRegistry(explorerCtx);
   const allTools = factory.build();

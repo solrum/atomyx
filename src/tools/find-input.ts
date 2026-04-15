@@ -74,6 +74,7 @@ export function isEditText(el: RawElement): boolean {
     cls.includes("textfield") ||
     cls.includes("textinput") ||
     cls.includes("securetextfield") ||
+    cls.includes("searchfield") ||
     cls.includes("editable")
   );
 }
