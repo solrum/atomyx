@@ -13,7 +13,7 @@
  * `Tool<TShape>`, construct it here, call `registerTool`.
  */
 
-import type { AdetContext } from "./runtime/adet-context.js";
+import type { AtomyxContext } from "./runtime/atomyx-context.js";
 import {
   AmbiguityDetector,
   FuzzyResourceMatcher,
@@ -47,7 +47,7 @@ import {
 } from "./tools/trivial.tools.js";
 import { WaitForElementTool } from "./tools/wait-for-element.tool.js";
 
-export function buildToolRegistry(ctx: AdetContext): ToolFactory {
+export function buildToolRegistry(ctx: AtomyxContext): ToolFactory {
   const factory = new ToolFactory(ctx);
 
   // ── Strategy singletons ─────────────────────────────────────────

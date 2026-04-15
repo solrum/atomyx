@@ -1,4 +1,4 @@
-import type { AdetContext } from "../../runtime/adet-context.js";
+import type { AtomyxContext } from "../../runtime/atomyx-context.js";
 import type { JsonSchema, ToolDefinition } from "../../types.js";
 
 /**
@@ -45,14 +45,14 @@ export abstract class Tool<TShape extends ToolShape> {
   abstract readonly description: string;
   abstract readonly schema: JsonSchema;
 
-  abstract execute(args: TShape["args"], ctx: AdetContext): Promise<TShape["result"]>;
+  abstract execute(args: TShape["args"], ctx: AtomyxContext): Promise<TShape["result"]>;
 
   /**
    * Compile this Tool instance into a MCP-compatible ToolDefinition.
    * Called by the ToolFactory at registration time — binds `ctx` into a
    * closure so the MCP dispatcher can invoke the handler with args only.
    */
-  toDefinition(ctx: AdetContext): ToolDefinition<TShape["args"], TShape["result"]> {
+  toDefinition(ctx: AtomyxContext): ToolDefinition<TShape["args"], TShape["result"]> {
     return {
       name: this.name,
       description: this.description,

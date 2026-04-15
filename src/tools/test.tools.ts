@@ -1,4 +1,4 @@
-import { requireController } from "../runtime/adet-context.js";
+import { requireController } from "../runtime/atomyx-context.js";
 import { resolveTestCaseStorage } from "../storage/test-case-storage.js";
 import type { ToolCategory } from "./tool-factory.js";
 
@@ -27,7 +27,7 @@ export const registerTestTools: ToolCategory = (factory, ctx) => {
     name: "save_as_test_case",
     description:
       "Persist the recorded action sequence as a TestCase. Default storage writes a JSON file " +
-      "to ~/.adet/test-cases/. Set ADET_ENGINE_URL env var to ALSO POST to a synapse engine. " +
+      "to ~/.atomyx/test-cases/. Set ATOMYX_ENGINE_URL env var to ALSO POST to a synapse engine. " +
       "If both are configured, the case is saved to both targets (composite).",
     inputSchema: {
       type: "object",
@@ -35,8 +35,8 @@ export const registerTestTools: ToolCategory = (factory, ctx) => {
       properties: {
         title: { type: "string" },
         description: { type: "string" },
-        projectId: { type: "string", description: "Required when ADET_ENGINE_URL is set" },
-        suiteId: { type: "string", description: "Required when ADET_ENGINE_URL is set" },
+        projectId: { type: "string", description: "Required when ATOMYX_ENGINE_URL is set" },
+        suiteId: { type: "string", description: "Required when ATOMYX_ENGINE_URL is set" },
       },
     },
     handler: async (args: { title: string; description?: string; projectId?: string; suiteId?: string }) => {

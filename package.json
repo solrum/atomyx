@@ -1,21 +1,28 @@
 {
-  "name": "adet",
+  "name": "atomyx",
   "version": "0.1.0",
   "private": false,
-  "description": "AI-driven exploratory testing — MCP server bridging Claude to Android devices",
+  "description": "Atomyx — Agentic Test Orchestration Module. Cross-platform mobile test framework driven by Claude (or any MCP client).",
   "license": "Apache-2.0",
+  "author": "Solrum",
+  "homepage": "https://atomyx.dev",
   "type": "module",
   "bin": {
-    "adet": "./dist/cli/main.js",
-    "adet-mcp": "./dist/index.js"
+    "atomyx": "./dist/cli/main.js",
+    "atomyx-mcp": "./dist/index.js"
   },
   "main": "./dist/index.js",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "dev": "tsc -w -p tsconfig.json",
     "lint": "eslint \"src/**/*.ts\"",
-    "test": "node --import tsx --test $(find src -name '*.test.ts')"
+    "test": "node --import tsx --test $(find src -name '*.test.ts')",
+    "test:all": "for d in packages/core-driver*; do (cd \"$d\" && [ -f tsconfig.json ] && npm test); done",
+    "depcruise": "depcruise --config .dependency-cruiser.cjs packages/"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",

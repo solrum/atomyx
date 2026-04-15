@@ -1,5 +1,5 @@
-import type { AdetContext } from "../runtime/adet-context.js";
-import { requireController } from "../runtime/adet-context.js";
+import type { AtomyxContext } from "../runtime/atomyx-context.js";
+import { requireController } from "../runtime/atomyx-context.js";
 import type { JsonSchema } from "../types.js";
 import { StructuralInputFinder } from "./core/index.js";
 import { Tool } from "./core/tool.js";
@@ -61,7 +61,7 @@ export class LaunchAppTool extends Tool<{
     super();
   }
 
-  async execute(args: LaunchAppArgs, ctx: AdetContext): Promise<LaunchAppResult> {
+  async execute(args: LaunchAppArgs, ctx: AtomyxContext): Promise<LaunchAppResult> {
     const ctl = requireController(ctx);
     if (args.forceStop !== false) {
       await ctl.forceStopApp(args.appId);

@@ -20,11 +20,11 @@ export function writeJUnitXml(summaries: RunSummary[], outputPath: string): void
     .map((s) => {
       const time = (s.durationMs / 1000).toFixed(3);
       if (s.status === "passed") {
-        return `    <testcase name="${escape(s.spec)}" classname="adet" time="${time}"/>`;
+        return `    <testcase name="${escape(s.spec)}" classname="atomyx" time="${time}"/>`;
       }
       const failed = s.steps.filter((st) => st.status === "failed");
       const failureMessage = failed.map((f) => `step ${f.index} (${f.kind}): ${f.error ?? ""}`).join("\n");
-      return `    <testcase name="${escape(s.spec)}" classname="adet" time="${time}">
+      return `    <testcase name="${escape(s.spec)}" classname="atomyx" time="${time}">
       <failure message="${escape(failed[0]?.error ?? "verify failed")}">${escape(failureMessage)}</failure>
     </testcase>`;
     })
@@ -32,7 +32,7 @@ export function writeJUnitXml(summaries: RunSummary[], outputPath: string): void
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <testsuites tests="${totalTests}" failures="${totalFailures}" errors="${totalErrors}" time="${totalTime.toFixed(3)}">
-  <testsuite name="adet" tests="${totalTests}" failures="${totalFailures}" errors="${totalErrors}" time="${totalTime.toFixed(3)}">
+  <testsuite name="atomyx" tests="${totalTests}" failures="${totalFailures}" errors="${totalErrors}" time="${totalTime.toFixed(3)}">
 ${testcases}
   </testsuite>
 </testsuites>

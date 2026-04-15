@@ -1,0 +1,8 @@
+{
+  "name": "@atomyx/studio",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Atomyx Studio — GUI client for Power User persona (skeleton, not yet implemented). See README.md for the planned package surface and composition pattern.",
+  "license": "Apache-2.0",
+  "type": "module"
+}

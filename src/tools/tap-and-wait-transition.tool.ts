@@ -4,8 +4,8 @@ import type {
   ResolvedElement,
   Selector,
 } from "../adapters/device-controller.port.js";
-import type { AdetContext } from "../runtime/adet-context.js";
-import { requireController } from "../runtime/adet-context.js";
+import type { AtomyxContext } from "../runtime/atomyx-context.js";
+import { requireController } from "../runtime/atomyx-context.js";
 import type { JsonSchema } from "../types.js";
 import type {
   OverlayAnalysis,
@@ -101,7 +101,7 @@ export class TapAndWaitTransitionTool extends Tool<{
 
   async execute(
     args: TapAndWaitTransitionArgs,
-    ctx: AdetContext,
+    ctx: AtomyxContext,
   ): Promise<TapAndWaitTransitionResult> {
     const hasAbsent = args.waitForAbsent && Object.keys(args.waitForAbsent).length > 0;
     const hasAppear = args.waitForAppear && Object.keys(args.waitForAppear).length > 0;

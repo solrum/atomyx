@@ -6,10 +6,10 @@ async function main() {
   const server = createServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("[adet] MCP server connected via stdio");
+  console.error("[atomyx] MCP server connected via stdio");
 }
 
 main().catch((err) => {
-  console.error("[adet] fatal:", err);
+  console.error("[atomyx] fatal:", err);
   process.exit(1);
 });

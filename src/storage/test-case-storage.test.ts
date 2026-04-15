@@ -23,7 +23,7 @@ function sampleRecord(overrides: Partial<TestCaseRecord> = {}): TestCaseRecord {
 }
 
 test("LocalFileStorage — writes JSON with slugified id", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "adet-storage-test-"));
+  const dir = mkdtempSync(join(tmpdir(), "atomyx-storage-test-"));
   try {
     const storage = new LocalFileStorage(dir);
     const result = await storage.save(sampleRecord());
@@ -52,7 +52,7 @@ test("EngineHttpStorage — fails fast without projectId/suiteId", async () => {
 });
 
 test("CompositeStorage — combines results from all storages", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "adet-composite-"));
+  const dir = mkdtempSync(join(tmpdir(), "atomyx-composite-"));
   try {
     const local = new LocalFileStorage(dir);
     const broken = new EngineHttpStorage("http://example.test");
@@ -71,15 +71,15 @@ test("resolveTestCaseStorage — defaults to local when no env", () => {
   assert.equal(storage.name, "local");
 });
 
-test("resolveTestCaseStorage — composite when ADET_ENGINE_URL set", () => {
-  const storage = resolveTestCaseStorage({ ADET_ENGINE_URL: "http://x" });
+test("resolveTestCaseStorage — composite when ATOMYX_ENGINE_URL set", () => {
+  const storage = resolveTestCaseStorage({ ATOMYX_ENGINE_URL: "http://x" });
   assert.equal(storage.name, "composite");
 });
 
 test("resolveTestCaseStorage — engine-only mode", () => {
   const storage = resolveTestCaseStorage({
-    ADET_STORAGE_MODE: "engine",
-    ADET_ENGINE_URL: "http://x",
+    ATOMYX_STORAGE_MODE: "engine",
+    ATOMYX_ENGINE_URL: "http://x",
   });
   assert.equal(storage.name, "engine");
 });

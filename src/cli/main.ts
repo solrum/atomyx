@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 /**
- * adet CLI — standalone test spec runner for CI / local use.
+ * Atomyx CLI — standalone test spec runner for CI / local use.
  *
  * Usage:
- *   adet run tests/adet/login.yaml
- *   adet run "tests/adet/*.yaml" --device=auto --report=junit.xml
- *   adet explore --app=com.example --goal="find login bugs"
- *   adet list-devices
+ *   atomyx run tests/atomyx/login.yaml
+ *   atomyx run "tests/atomyx/*.yaml" --device=auto --report=junit.xml
+ *   atomyx explore --app=com.example --goal="find login bugs"
+ *   atomyx list-devices
  */
 
 import { connectDevice, listAllDevices } from "../adapters/device-router.js";
 import { loadSpec, runSpec, type RunSummary } from "../runner/spec-runner.js";
-import { createAdetContext } from "../runtime/adet-context.js";
+import { createAtomyxContext } from "../runtime/atomyx-context.js";
 import { writeJUnitXml } from "./junit-reporter.js";
 
 interface Args {
@@ -82,7 +82,7 @@ async function pickDevice(deviceFlag: string | boolean | undefined): Promise<str
 async function cmdRun(args: Args) {
   const patterns = args.positional;
   if (patterns.length === 0) {
-    console.error(red("usage: adet run <spec.yaml> [<spec.yaml> ...] [--device=<id>] [--report=junit.xml]"));
+    console.error(red("usage: atomyx run <spec.yaml> [<spec.yaml> ...] [--device=<id>] [--report=junit.xml]"));
     process.exit(2);
   }
 
@@ -92,13 +92,13 @@ async function cmdRun(args: Args) {
     process.exit(2);
   }
 
-  console.log(blue(`adet: running ${specPaths.length} spec(s)`));
+  console.log(blue(`atomyx: running ${specPaths.length} spec(s)`));
 
   const deviceId = await pickDevice(args.flags.device);
   console.log(dim(`device: ${deviceId}`));
 
   const ctl = await connectDevice(deviceId);
-  const ctx = createAdetContext();
+  const ctx = createAtomyxContext();
   ctx.controller = ctl;
   const summaries: RunSummary[] = [];
 
@@ -162,13 +162,13 @@ async function cmdListDevices() {
 }
 
 async function cmdExplore(args: Args) {
-  // Loaded lazily so users without ANTHROPIC_API_KEY can still use `adet run`
+  // Loaded lazily so users without ANTHROPIC_API_KEY can still use `atomyx run`
   const { runExploration } = await import("../explorer/agent-loop.js");
   const goal = args.flags.goal as string;
   const app = args.flags.app as string;
   const maxSteps = args.flags["max-steps"] ? Number(args.flags["max-steps"]) : 30;
   if (!goal || !app) {
-    console.error(red("usage: adet explore --app=<package> --goal=\"<description>\" [--max-steps=N]"));
+    console.error(red("usage: atomyx explore --app=<package> --goal=\"<description>\" [--max-steps=N]"));
     process.exit(2);
   }
   const deviceId = await pickDevice(args.flags.device);
@@ -195,7 +195,7 @@ async function main() {
       await cmdExplore(args);
       break;
     default:
-      console.error("usage: adet <run|explore|list-devices> [args]");
+      console.error("usage: atomyx <run|explore|list-devices> [args]");
       process.exit(2);
   }
 }

@@ -1,0 +1,24 @@
+{
+  "name": "@atomyx/core-driver-android",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Atomyx Android driver — thin Driver implementation talking to the Kotlin APK over adb-forwarded HTTP",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test $(find src -name '*.test.ts')"
+  },
+  "dependencies": {
+    "@atomyx/core-driver": "0.1.0",
+    "@atomyx/core-driver-wire": "0.1.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

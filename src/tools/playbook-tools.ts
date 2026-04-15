@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
 import { join } from "node:path";
-import type { AdetContext } from "../runtime/adet-context.js";
+import type { AtomyxContext } from "../runtime/atomyx-context.js";
 import type { JsonSchema } from "../types.js";
 import { Tool } from "./core/tool.js";
 import { PLAYBOOK } from "./playbook-content.js";
@@ -35,7 +35,7 @@ export class AddCaseStudyTool extends Tool<{
 }> {
   readonly name = "add_case_study";
   readonly description =
-    "Append a learned lesson to .adet/case-studies/YYYY-MM.md.";
+    "Append a learned lesson to .atomyx/case-studies/YYYY-MM.md.";
   readonly schema: JsonSchema = {
     type: "object",
     required: ["title", "trigger", "solution"],
@@ -47,8 +47,8 @@ export class AddCaseStudyTool extends Tool<{
     },
   };
 
-  async execute(args: AddCaseStudyArgs, _ctx: AdetContext) {
-    const dir = join(process.cwd(), ".adet", "case-studies");
+  async execute(args: AddCaseStudyArgs, _ctx: AtomyxContext) {
+    const dir = join(process.cwd(), ".atomyx", "case-studies");
     mkdirSync(dir, { recursive: true });
     const d = new Date();
     const file = join(
@@ -65,7 +65,7 @@ export class AddCaseStudyTool extends Tool<{
     if (!existsSync(file)) {
       writeFileSync(
         file,
-        `# adet case studies — ${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}\n`,
+        `# Atomyx case studies — ${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}\n`,
       );
     }
     appendFileSync(file, entry);
@@ -90,7 +90,7 @@ export class GetCaseStudiesTool extends Tool<{
   };
 
   async execute(args: { month?: string }) {
-    const dir = join(process.cwd(), ".adet", "case-studies");
+    const dir = join(process.cwd(), ".atomyx", "case-studies");
     const d = new Date();
     const month =
       args.month ?? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;

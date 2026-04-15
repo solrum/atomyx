@@ -22,8 +22,8 @@ const REBIND_HINTS: Record<string, string> = {
   android:
     "Run these three adb commands from the host shell:\n" +
     "  adb shell \"settings delete secure enabled_accessibility_services\"\n" +
-    "  adb shell \"settings put secure enabled_accessibility_services dev.solrum.adet.agent/dev.solrum.adet.agent.service.AdetAccessibilityService\"\n" +
-    "  adb shell \"am start-foreground-service -n dev.solrum.adet.agent/.control.AdetForegroundService\"",
+    "  adb shell \"settings put secure enabled_accessibility_services dev.atomyx.agent/dev.atomyx.agent.service.AtomyxAccessibilityService\"\n" +
+    "  adb shell \"am start-foreground-service -n dev.atomyx.agent/.control.AtomyxForegroundService\"",
   ios:
     "iOS rebind path is platform-specific and depends on the chosen bridge. " +
     "See docs/ios.md for the current approach (WDA restart / simctl bootstrap / ...).",
@@ -42,6 +42,28 @@ const REBIND_HINTS: Record<string, string> = {
  * stale and needs the platform-specific rebind procedure.
  */
 export async function preflight(ctl: DeviceController): Promise<PreflightResult> {
+  // iOS semantics differ fundamentally from Android. On Android, a
+  // healthy AccessibilityService always exposes SOMETHING (home
+  // screen, launcher, current foreground app) — empty tree +
+  // unknown foreground genuinely signals stale binding.
+  //
+  // On iOS, XCUITest can only query apps it has launched. Right
+  // after `select_device`, the driver's `state.currentApp` is nil
+  // and `getUiSummary` / `currentForeground` legitimately return
+  // empty. Applying the Android heuristic here would flag every
+  // fresh iOS session as "stale". This is the one place we
+  // intentionally platform-branch at the tool-layer helper level —
+  // the alternative (per-adapter preflight method) adds port
+  // surface for a single cross-cutting health check. Pragmatic
+  // exception documented in docs/pitfalls.md.
+  //
+  // If the iOS driver is unreachable, `IosXctestController.connect()`
+  // has already failed upstream during the select_device call — the
+  // tool dispatcher never reaches this point.
+  if (ctl.platform === "ios") {
+    return { ok: true };
+  }
+
   const summary = await ctl.getUiSummary().catch(() => []);
   const foreground = await ctl
     .currentForeground()
