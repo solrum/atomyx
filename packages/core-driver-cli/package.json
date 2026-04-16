@@ -1,0 +1,27 @@
+{
+  "name": "@atomyx/core-driver-cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Atomyx core-driver utility CLI — `atomyx-driver` binary. Utility subcommands (list-devices, version, help) only. The MCP stdio server is a SIBLING transport shipped as `atomyx-mcp` from @atomyx/core-driver-mcp per the architecture contract.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/main.js",
+  "types": "./dist/main.d.ts",
+  "bin": {
+    "atomyx-driver": "./dist/main.js"
+  },
+  "exports": {
+    ".": "./dist/main.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test $(find src -name '*.test.ts')"
+  },
+  "dependencies": {
+    "@atomyx/core-driver": "0.1.0",
+    "@atomyx/core-driver-android": "0.1.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

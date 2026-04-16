@@ -1,0 +1,96 @@
+# ─── Node / TypeScript ─────────────────────────────────────────────
+node_modules/
+**/node_modules/
+dist/
+build/
+out/
+.next/
+.nuxt/
+.cache/
+.parcel-cache/
+.turbo/
+.swc/
+coverage/
+*.tsbuildinfo
+.eslintcache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.npm/
+.yarn/
+*.log
+
+# ─── Android / Kotlin / Gradle ─────────────────────────────────────
+# Gradle build outputs (anywhere in tree)
+**/build/
+**/.gradle/
+**/.kotlin/
+**/.cxx/
+**/captures/
+**/.externalNativeBuild/
+**/local.properties
+# Android-specific
+android/app/release/
+android/app/debug/
+android/keystores/
+android/key.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+*.aar
+*.so
+hs_err_pid*
+# Kotlin compiler / KMP
+kotlin-js-store/
+.kotlintest/
+
+# ─── iOS / Xcode (when iOS support lands) ──────────────────────────
+ios/build/
+ios/Pods/
+ios/DerivedData/
+ios/*.xcworkspace/xcuserdata/
+ios/*.xcodeproj/xcuserdata/
+ios/*.xcodeproj/project.xcworkspace/xcuserdata/
+
+# ─── IDE / Editor ──────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+*.swp
+*.swo
+*~
+
+# ─── OS ────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Atomyx local state ────────────────────────────────────────────
+.adet/
+.atomyx/
+.mcp.json
+
+# ─── .claude/ — local-only config + cached state, EXCEPT docs/ ─────
+# .claude/docs/ holds contributor + AI-agent implementation
+# documentation that MUST be tracked (so collaborators and future
+# Claude sessions can read it). Settings, caches, and per-machine
+# state stay ignored.
+.claude/*
+!.claude/docs/
+!.claude/docs/**
+
+# ─── iOS driver per-contributor config ─────────────────────────────
+# device.env holds DEVICE_UDID / DEV_TEAM / BUNDLE_ID per contributor.
+# Template committed as device.env.example; real config is local only.
+native/ios-driver/device.env
+native/ios-driver/AtomyxDriver.xcodeproj/
+
+# local-development
+atomyx-local/

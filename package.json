@@ -1,0 +1,31 @@
+{
+  "name": "atomyx",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Atomyx — Agentic Test Orchestration Module. Cross-platform mobile test framework driven by Claude (or any MCP client). This is the workspace root; the shipping binary lives in packages/core-driver-cli as `atomyx-driver`.",
+  "license": "Apache-2.0",
+  "author": "Solrum",
+  "homepage": "https://atomyx.dev",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "for d in packages/core-driver*; do (cd \"$d\" && [ -f tsconfig.json ] && npm run build); done",
+    "test": "for d in packages/core-driver*; do (cd \"$d\" && [ -f tsconfig.json ] && npm test); done",
+    "test:all": "for d in packages/core-driver*; do (cd \"$d\" && [ -f tsconfig.json ] && npm test); done",
+    "depcruise": "depcruise --config .dependency-cruiser.cjs packages/"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
