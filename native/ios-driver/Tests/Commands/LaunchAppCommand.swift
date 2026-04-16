@@ -3,11 +3,11 @@ import Foundation
 /// Launch an app by bundle id and update driver state so subsequent
 /// inspect / action commands know which `XCUIApplication` to use.
 ///
-/// Week 1 finding #1: XCUITest cannot query arbitrary foreground apps.
-/// Every inspect or tap must run against an `XCUIApplication` reference
-/// the driver has already launched. `launchApp` is therefore not just a
-/// convenience — it's the state-setting operation that makes the rest
-/// of the driver work.
+/// XCUITest cannot query arbitrary foreground apps — every inspect or
+/// tap must run against an `XCUIApplication` reference the driver has
+/// already launched. `launchApp` is therefore not just a convenience:
+/// it's the state-setting operation that makes the rest of the driver
+/// work. See `.claude/docs/ios.md` for the full rationale.
 final class LaunchAppCommand: CommandHandler {
     let type = "launchApp"
 

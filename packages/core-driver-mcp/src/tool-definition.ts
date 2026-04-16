@@ -1,21 +1,83 @@
 import type { z } from "zod";
-import type { Orchestra, Logger } from "@atomyx/core-driver";
+import type {
+  Orchestra,
+  Logger,
+  Storage,
+  RunStore,
+  Clock,
+} from "@atomyx/core-driver";
+import type { DeviceSession } from "./device-session.js";
 
 /**
  * Common context every MCP tool receives at execution time.
- * Built once per `createMcpServer({orchestra,logger})` call and
- * passed into every tool's handler. Keeping it small forces
- * tools to depend only on what they actually need — no magic
- * service locator.
+ * Built once per `createMcpServer({session, ...})` call and
+ * passed into every tool's handler.
  *
- * Why Orchestra is the only mutator dependency: every action
- * the framework can perform on a device goes through Orchestra.
- * Tools that bypass it would re-introduce the god-class
- * coupling the framework refactor exists to eliminate.
+ * ## Device access
+ *
+ * Tools that need device I/O read `ctx.session.current()`:
+ *
+ *   - Returns the active `{ platform, id, orchestra, driver }`
+ *     when the agent has selected a device via `select_device`
+ *   - Returns `null` when no device is bound — in that case the
+ *     tool should return `{ok: false, reason: "no active
+ *     device — call select_device first"}` instead of throwing
+ *
+ * This replaces the earlier `ctx.orchestra` model where the
+ * server committed to a single driver at startup. The new model
+ * lets one MCP process drive multiple devices in sequence (or
+ * start idle and pick one at first use), matching the
+ * pre-refactor legacy MCP server ergonomics.
+ *
+ * The `orchestraOrFail()` helper throws a consistent error when
+ * a tool absolutely needs a device — tool handlers can call it
+ * at the top and let the server's catch-all convert the throw
+ * into an `{isError: true}` response. Prefer returning
+ * `{ok: false, reason}` when the failure is agent-actionable
+ * (agent can call select_device and retry), and use
+ * `orchestraOrFail()` only for tools where the absence of a
+ * device is a flat-out usage error.
+ *
+ * ## Non-device services
+ *
+ * `storage`, `runStore`, `clock`, and `logger` are host-side
+ * services that never touch the device. They persist across
+ * device switches within a single MCP session — a test run
+ * started on Android can be finished on iOS, which is useful
+ * for cross-platform regression flows.
+ *
+ * All services are provided by `createMcpServer` with sensible
+ * defaults. Tool authors should not construct their own
+ * instances — always use what the context provides.
  */
 export interface ToolContext {
-  readonly orchestra: Orchestra;
+  readonly session: DeviceSession;
   readonly logger: Logger;
+  readonly storage: Storage;
+  readonly runStore: RunStore;
+  readonly clock: Clock;
+}
+
+/**
+ * Helper: resolve the current Orchestra or throw an actionable
+ * error. Use from a tool handler like:
+ *
+ *     const orchestra = orchestraOrFail(ctx);
+ *     return orchestra.tap(selector);
+ *
+ * The thrown error message is safe to surface to the agent as-
+ * is; `server.setRequestHandler(CallToolRequestSchema)` catches
+ * and wraps it as `{isError: true, content: [{text: message}]}`.
+ */
+export function orchestraOrFail(ctx: ToolContext): Orchestra {
+  const active = ctx.session.current();
+  if (!active) {
+    throw new Error(
+      "no active device. Call `select_device` with a platform + id " +
+        "from `list_devices` before driving the UI.",
+    );
+  }
+  return active.orchestra;
 }
 
 /**

@@ -1,4 +1,4 @@
-import { defineTool } from "../tool-definition.js";
+import { defineTool, orchestraOrFail } from "../tool-definition.js";
 import { SelectorSchema, compileSelectorInput } from "../selector-schema.js";
 import { AttrKeys, parseBounds, boundsCenter } from "@atomyx/core-driver";
 
@@ -23,8 +23,9 @@ export const findElementTool = defineTool({
     "value > hint, with role/enabled/clickable/focused as constraints.",
   inputSchema: FindElementArgs,
   async execute(args, ctx) {
+    const orchestra = orchestraOrFail(ctx);
     const selector = compileSelectorInput(args);
-    const cursor = await ctx.orchestra.findOne(selector);
+    const cursor = await orchestra.findOne(selector);
     if (!cursor) {
       return { found: false };
     }

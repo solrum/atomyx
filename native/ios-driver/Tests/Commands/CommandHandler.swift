@@ -3,8 +3,16 @@ import XCTest
 
 /// Mutable driver state shared across commands. Holds the currently
 /// launched app reference — XCUITest has no system-wide foreground
-/// query, so the driver tracks this itself. See docs/ios.md Week 1
-/// finding #1 for the rationale.
+/// query, so the driver tracks this itself. See `.claude/docs/ios.md`
+/// for the rationale.
+///
+/// **Thread safety:** `DriverState` is NOT internally synchronized. It
+/// relies on `CommandServer` serializing all handler dispatches on the
+/// main thread via `DispatchQueue.main.sync` (see
+/// `CommandServer.serveClient`) — XCUITest API calls also require the
+/// main thread, so the two constraints happen to coincide. If
+/// `CommandServer` is ever changed to fan out work to multiple queues,
+/// this class must gain a lock or be refactored into an actor.
 final class DriverState {
     var currentApp: XCUIApplication?
     var currentBundleId: String = ""

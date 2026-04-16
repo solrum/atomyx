@@ -19,7 +19,31 @@ import { z } from "zod";
 export type JsonSchema = Record<string, unknown>;
 
 export function zodToJsonSchema(schema: z.ZodType<unknown>): JsonSchema {
-  return convert(schema);
+  const result = convert(schema);
+  // Claude API rejects `anyOf`/`oneOf` at the top level of
+  // inputSchema entirely. If a top-level union of objects slips
+  // through, flatten it into a single object with all properties
+  // optional as a safety net. Tool-level schemas should avoid
+  // top-level unions in the first place (use z.object + refine).
+  if (!result.type && (result.anyOf || result.oneOf)) {
+    const branches = (result.anyOf || result.oneOf) as JsonSchema[];
+    if (branches.every((b) => b.type === "object")) {
+      const merged: Record<string, JsonSchema> = {};
+      for (const branch of branches) {
+        const props = (branch.properties ?? {}) as Record<string, JsonSchema>;
+        for (const [k, v] of Object.entries(props)) {
+          merged[k] = v;
+        }
+      }
+      delete result.anyOf;
+      delete result.oneOf;
+      result.type = "object";
+      result.properties = merged;
+    } else {
+      result.type = "object";
+    }
+  }
+  return result;
 }
 
 function convert(schema: z.ZodType<unknown>): JsonSchema {
@@ -93,11 +117,16 @@ function convert(schema: z.ZodType<unknown>): JsonSchema {
     };
   }
 
-  // Union → oneOf
+  // Union → anyOf (NOT oneOf). Zod unions match the first
+  // succeeding branch which maps to anyOf semantics ("at least
+  // one matches"), not oneOf ("exactly one matches"). More
+  // importantly, Claude Code's MCP client silently rejects tool
+  // schemas containing `oneOf` at the top level — bisected via
+  // A/B testing against a minimal MCP server.
   if (schema instanceof z.ZodUnion) {
     const options = (schema as z.ZodUnion<readonly [z.ZodType<unknown>, ...z.ZodType<unknown>[]]>).options;
     return {
-      oneOf: options.map((o) => convert(o)),
+      anyOf: options.map((o) => convert(o)),
     };
   }
   if (schema instanceof z.ZodDiscriminatedUnion) {
@@ -105,7 +134,7 @@ function convert(schema: z.ZodType<unknown>): JsonSchema {
       schema as z.ZodDiscriminatedUnion<string, z.ZodObject<z.ZodRawShape>[]>
     ).options;
     return {
-      oneOf: options.map((o) => convert(o)),
+      anyOf: options.map((o) => convert(o)),
     };
   }
 

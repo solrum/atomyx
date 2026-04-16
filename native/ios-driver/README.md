@@ -9,14 +9,13 @@ tunnel for device) and drives the target through the framework's
 
 ## Command surface
 
-15 commands cover the full `Driver` primitive set:
+13 commands cover the full `Driver` primitive set:
 
 | Command | Purpose |
 |---|---|
 | `ping` | Liveness / handshake |
 | `launchApp` | Bring an app to foreground |
 | `forceStopApp` | Kill a running app |
-| `dumpTree` | Compact element list (legacy shape) |
 | `dumpRawTree` | Full hierarchy for host-side normalization |
 | `tapAt` | Coordinate tap |
 | `longPressAt` | Coordinate long-press |
@@ -25,7 +24,6 @@ tunnel for device) and drives the target through the framework's
 | `screenshot` | PNG base64 |
 | `typeText` | Native `typeText` into focused field |
 | `clearFocusedInput` | Bulk delete keys into focused field |
-| `resolveSelector` | Legacy selector resolve (unused by new framework) |
 | `getKeyboard` | Inspect visible keyboard |
 | `getScreenSize` | `app.frame` in points |
 
@@ -103,7 +101,7 @@ native/ios-driver/
     ├── Bridge/
     │   └── XCUIBridge.swift              Protocol + DefaultXCUIBridge
     │                                       (Swift-side bridge to XCUI APIs)
-    └── Commands/                          15 command files
+    └── Commands/                          13 command files
 ```
 
 ## Makefile targets

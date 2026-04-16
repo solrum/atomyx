@@ -1,50 +1,51 @@
 import Foundation
 import XCTest
 
-/// Press a system or keyboard key.
+/// Press a system or keyboard key via a strategy registered in
+/// `PressKeyRegistry`. The command is pure orchestration:
 ///
-/// Returns an affordance-reporting response so the host adapter can map
-/// to a truthful `ActionResult`. See `DeviceActor.pressKey` docs in the
-/// TS port for the semantics of each key.
+///   1. Validate the `key` argument.
+///   2. Resolve the strategy (registered name → fallback).
+///   3. Guard `state.currentApp` iff `strategy.requiresApp`.
+///   4. Dispatch `strategy.execute(key:app:)` and forward the result
+///      onto the wire.
 ///
-/// Strategy chain for "back" (in order):
-///   1. Nav bar back button (verifiable) → affordanceFound=true
-///   2. Edge swipe fallback (unverifiable) → affordanceFound=false
-///
-/// `home` is app-independent; short-circuits before the `currentApp`
-/// check so agents can call it from the home screen / cold state.
-/// `back` and `enter` require a tracked app (coordinate space /
-/// keyboard context).
+/// All key-specific logic (home/enter/back chain/typed-raw) lives in
+/// per-strategy files under `Tests/PressKey/`. Adding a new key = drop
+/// in a new strategy file + register in the composition root. This
+/// command never needs to change again.
 ///
 /// Response data:
 ///   - `key`: echoed back for correlation
 ///   - `affordanceFound`: true iff a verifiable control was used
 ///   - `strategy`: which path was taken (nav_bar_back | edge_swipe_best_effort
-///                 | home | enter | typed_raw)
+///                 | home | enter | typed_raw | ...)
 final class PressKeyCommand: CommandHandler {
     let type = "pressKey"
+    private let registry: PressKeyRegistry
 
-    func handle(_ request: Request, bridge: XCUIBridge, state: DriverState) -> Response {
+    init(registry: PressKeyRegistry) {
+        self.registry = registry
+    }
+
+    func handle(_ request: Request, bridge _: XCUIBridge, state: DriverState) -> Response {
         guard let key = request.args["key"] as? String, !key.isEmpty else {
             return .error(id: request.id, message: "missing key")
         }
 
-        // `home` is device-wide — short-circuit before the currentApp
-        // check. Pass a dummy XCUIApplication reference; DefaultXCUIBridge
-        // ignores it for the home key path.
-        if key == "home" {
-            let result = bridge.pressKey(app: XCUIApplication(), key: "home")
-            return .ok(id: request.id, data: [
-                "key": "home",
-                "affordanceFound": result.affordanceFound,
-                "strategy": result.strategy,
-            ])
+        let strategy = registry.resolve(key)
+
+        let app: XCUIApplication?
+        if strategy.requiresApp {
+            guard let tracked = state.currentApp else {
+                return .error(id: request.id, message: "no app launched — call launchApp first")
+            }
+            app = tracked
+        } else {
+            app = nil
         }
 
-        guard let app = state.currentApp else {
-            return .error(id: request.id, message: "no app launched — call launchApp first")
-        }
-        let result = bridge.pressKey(app: app, key: key)
+        let result = strategy.execute(key: key, app: app)
         return .ok(id: request.id, data: [
             "key": key,
             "affordanceFound": result.affordanceFound,

@@ -189,42 +189,53 @@ describe("IosDriver input + keys", () => {
     }
   });
 
-  it("eraseText dispatches clearFocusedInput", async () => {
+  it("eraseText dispatches clearFocusedInput with maxDeletes arg", async () => {
     const { driver, calls, close } = await setup(okHandler);
     try {
-      await driver.eraseText(100);
-      assert.ok(calls.some((c) => c.type === "clearFocusedInput"));
+      await driver.eraseText(25);
+      const clear = calls.find((c) => c.type === "clearFocusedInput");
+      assert.ok(clear);
+      // Arg name must match Swift's `ClearFocusedInputCommand`
+      // which reads `maxDeletes`. A prior version sent `maxKeys`
+      // which Swift silently ignored, falling back to the
+      // default 100 — regression test for that contract slip.
+      assert.equal(clear!.args.maxDeletes, 25);
     } finally {
       await close();
     }
   });
 
-  it("pressKey maps driver {ok} response into KeyResult", async () => {
+  it("pressKey maps affordanceFound+strategy into KeyResult (verifiable path)", async () => {
     const { driver, close } = await setup((call) => {
       if (call.type === "ping") return { ok: true, data: {} };
       if (call.type === "pressKey") {
-        return { ok: true, data: { ok: true, reason: "used: nav_bar_back" } };
+        // Real Swift PressKeyCommand response shape.
+        return {
+          ok: true,
+          data: { key: "back", affordanceFound: true, strategy: "nav_bar_back" },
+        };
       }
       return { ok: true, data: {} };
     });
     try {
       const result = await driver.pressKey("back");
       assert.equal(result.ok, true);
-      assert.equal(result.reason, "used: nav_bar_back");
+      assert.equal(result.reason, "nav_bar_back");
     } finally {
       await close();
     }
   });
 
-  it("pressKey honors ok:false reason on iOS no-back-primitive", async () => {
+  it("pressKey maps affordanceFound=false to ok=false (edge-swipe fallback)", async () => {
     const { driver, close } = await setup((call) => {
       if (call.type === "ping") return { ok: true, data: {} };
       if (call.type === "pressKey") {
         return {
           ok: true,
           data: {
-            ok: false,
-            reason: "no system back on iOS — use find_element on Close/Cancel",
+            key: "back",
+            affordanceFound: false,
+            strategy: "edge_swipe_best_effort",
           },
         };
       }
@@ -233,7 +244,27 @@ describe("IosDriver input + keys", () => {
     try {
       const result = await driver.pressKey("back");
       assert.equal(result.ok, false);
-      assert.match(result.reason ?? "", /no system back/);
+      assert.equal(result.reason, "edge_swipe_best_effort");
+    } finally {
+      await close();
+    }
+  });
+
+  it("pressKey home reports home strategy with affordanceFound=true", async () => {
+    const { driver, close } = await setup((call) => {
+      if (call.type === "ping") return { ok: true, data: {} };
+      if (call.type === "pressKey") {
+        return {
+          ok: true,
+          data: { key: "home", affordanceFound: true, strategy: "home" },
+        };
+      }
+      return { ok: true, data: {} };
+    });
+    try {
+      const result = await driver.pressKey("home");
+      assert.equal(result.ok, true);
+      assert.equal(result.reason, "home");
     } finally {
       await close();
     }

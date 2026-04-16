@@ -13,8 +13,7 @@ import dev.atomyx.agent.service.AtomyxAccessibilityService
 class AtomyxServices(val accessibility: AtomyxAccessibilityService) {
 
     val uiTree: UiTreeService = UiTreeService(accessibility)
-    val resolver: SelectorResolver = SelectorResolver(accessibility)
-    val gestures: GestureDispatcher = GestureDispatcher(accessibility, uiTree, resolver)
+    val gestures: GestureDispatcher = GestureDispatcher(accessibility, uiTree)
 
     init {
         // Cache invalidation hook — fires when the accessibility service sees

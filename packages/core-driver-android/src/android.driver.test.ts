@@ -84,20 +84,32 @@ async function setup(): Promise<{
       return;
     }
     if (call.path === "/tree") {
+      // Matches the real `UiTreeService.dumpTree` shape: synthetic
+      // `el_root` wrapper has NO bounds (it's just a container),
+      // the real window root is the first child with its own bounds.
+      // A previous test fake lied by injecting bounds on the root,
+      // which hid a production bug where `screenSize()` threw
+      // "root has no bounds attribute" on real devices.
       res.end(
         JSON.stringify({
-          elementId: "root",
-          className: "android.widget.FrameLayout",
-          bounds: { left: 0, top: 0, right: 1080, bottom: 2400 },
+          elementId: "el_root",
+          className: "Root",
           children: [
             {
-              elementId: "btn",
-              className: "android.widget.Button",
-              resourceId: "com.app:id/login",
-              text: "Sign in",
-              bounds: { left: 100, top: 500, right: 900, bottom: 620 },
-              clickable: true,
-              enabled: true,
+              elementId: "window_root",
+              className: "android.widget.FrameLayout",
+              bounds: { left: 0, top: 0, right: 1080, bottom: 2400 },
+              children: [
+                {
+                  elementId: "btn",
+                  className: "android.widget.Button",
+                  resourceId: "com.app:id/login",
+                  text: "Sign in",
+                  bounds: { left: 100, top: 500, right: 900, bottom: 620 },
+                  clickable: true,
+                  enabled: true,
+                },
+              ],
             },
           ],
         }),
@@ -135,9 +147,16 @@ describe("AndroidDriver.hierarchy", () => {
     const { driver, cleanup } = await setup();
     try {
       const tree = await driver.hierarchy();
-      assert.equal(tree.attributes["role"], "container");
+      // The synthetic el_root wrapper has className="Root" which
+      // the classNameToRole heuristic maps to "other" (it's not a
+      // FrameLayout/LinearLayout/etc). The window_root child IS the
+      // container.
+      assert.equal(tree.attributes["role"], "other");
       assert.equal(tree.children.length, 1);
-      const btn = tree.children[0]!;
+      const windowRoot = tree.children[0]!;
+      assert.equal(windowRoot.attributes["role"], "container");
+      assert.equal(windowRoot.children.length, 1);
+      const btn = windowRoot.children[0]!;
       assert.equal(btn.attributes["id"], "com.app:id/login");
       assert.equal(btn.attributes["text"], "Sign in");
       assert.equal(btn.attributes["role"], "button");
@@ -196,13 +215,43 @@ describe("AndroidDriver.longPress", () => {
   });
 });
 
-describe("AndroidDriver.inputText + pressKey", () => {
-  it("posts inputText to /actions/type_keyboard", async () => {
+describe("AndroidDriver.inputText + eraseText + pressKey", () => {
+  it("posts inputText to /actions/type_keyboard with clearFirst:false", async () => {
+    // Regression: the APK's `/actions/type_keyboard` route defaults
+    // `clearFirst` to true when the caller omits the field, which
+    // used to silently override Orchestra's "append" contract.
+    // The adapter now explicitly sends `clearFirst: false` so the
+    // APK never double-clears — Orchestra drives clearing via
+    // `eraseText` when it wants to clear.
     const { driver, server, cleanup } = await setup();
     try {
       await driver.inputText("hello");
       const call = server.calls.find((c) => c.path === "/actions/type_keyboard");
-      assert.deepEqual(call!.body, { text: "hello" });
+      assert.deepEqual(call!.body, { text: "hello", clearFirst: false });
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("eraseText uses /actions/clear_focused_input, one RPC regardless of count", async () => {
+    // Regression: previous implementation looped N times posting
+    // {key: "delete"} to /actions/key, which on a default
+    // Orchestra call (count=999) meant 999 serial HTTP roundtrips.
+    // The APK has a native bulk-clear route — use it once.
+    const { driver, server, cleanup } = await setup();
+    try {
+      await driver.eraseText(999);
+      const clears = server.calls.filter(
+        (c) => c.path === "/actions/clear_focused_input",
+      );
+      assert.equal(clears.length, 1);
+      // And we did NOT fan out into individual delete key presses.
+      const deletes = server.calls.filter(
+        (c) =>
+          c.path === "/actions/key" &&
+          (c.body as { key?: string } | undefined)?.key === "delete",
+      );
+      assert.equal(deletes.length, 0);
     } finally {
       await cleanup();
     }
@@ -298,11 +347,11 @@ describe("AndroidDriver.screenSize", () => {
 });
 
 describe("AndroidDriver.capabilities", () => {
-  it("reports canEraseText=false and canWaitForIdle=false for legacy APK", async () => {
+  it("reports canEraseText=true (backed by /actions/clear_focused_input)", async () => {
     const { driver, cleanup } = await setup();
     try {
       const caps = driver.capabilities;
-      assert.equal(caps.canEraseText, false);
+      assert.equal(caps.canEraseText, true);
       assert.equal(caps.canWaitForIdle, false);
       assert.equal(caps.canScreenshot, true);
     } finally {

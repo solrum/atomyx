@@ -6,8 +6,10 @@ import Darwin
 /// to the provided handler closure, write line-delimited JSON responses.
 ///
 /// Runs accept loop on a background queue. Each incoming client is
-/// served sequentially (one connection at a time is adequate for Week 2;
-/// an agent never issues parallel commands).
+/// served sequentially — one connection at a time, no parallel
+/// dispatch. Agents drive the session through a single TCP connection,
+/// and XCUITest primitives must run on the main thread, so adding
+/// concurrency would only serialize back onto main anyway.
 ///
 /// XCUITest API calls must run on the main thread. The server detects
 /// this and dispatches handler execution via `DispatchQueue.main.sync`

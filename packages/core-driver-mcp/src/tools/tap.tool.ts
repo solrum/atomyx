@@ -1,17 +1,18 @@
 import { z } from "zod";
-import { defineTool } from "../tool-definition.js";
+import { defineTool, orchestraOrFail } from "../tool-definition.js";
 import { SelectorSchema, compileSelectorInput } from "../selector-schema.js";
 
 const TapArgs = z
-  .union([
-    z.object({
-      selector: SelectorSchema,
-    }),
-    z.object({
-      x: z.number(),
-      y: z.number(),
-    }),
-  ])
+  .object({
+    selector: SelectorSchema.optional(),
+    x: z.number().optional(),
+    y: z.number().optional(),
+  })
+  .refine(
+    (a) =>
+      a.selector !== undefined || (a.x !== undefined && a.y !== undefined),
+    "Provide either {selector} or {x, y}.",
+  )
   .describe(
     "Either {selector} for selector-based tap (with auto scroll-into-view " +
       "and obscurement check), or {x,y} for raw coordinate tap.",
@@ -36,11 +37,12 @@ export const tapTool = defineTool({
     "ok=false with a reason and optional obscurer info on failure.",
   inputSchema: TapArgs,
   async execute(args, ctx) {
-    if ("selector" in args) {
+    const orchestra = orchestraOrFail(ctx);
+    if (args.selector) {
       const selector = compileSelectorInput(args.selector);
-      return ctx.orchestra.tap(selector);
+      return orchestra.tap(selector);
     }
-    await ctx.orchestra.tapAt({ x: args.x, y: args.y });
+    await orchestra.tapAt({ x: args.x!, y: args.y! });
     return { ok: true, detail: `tapped at (${args.x},${args.y})` };
   },
 });

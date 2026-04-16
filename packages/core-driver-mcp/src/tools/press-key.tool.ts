@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineTool } from "../tool-definition.js";
+import { defineTool, orchestraOrFail } from "../tool-definition.js";
 
 const PressKeyArgs = z
   .object({
@@ -21,6 +21,7 @@ export const pressKeyTool = defineTool({
     "the response includes a hint to find a Cancel/Close button instead.",
   inputSchema: PressKeyArgs,
   async execute(args, ctx) {
-    return ctx.orchestra.pressKey(args.key);
+    const orchestra = orchestraOrFail(ctx);
+    return orchestra.pressKey(args.key);
   },
 });

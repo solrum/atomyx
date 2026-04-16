@@ -37,9 +37,29 @@ class AtomyxAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val TAG = "AtomyxA11y"
+
+        /** Max width or height for screenshots sent to the MCP channel. */
+        private const val MAX_SCREENSHOT_DIM = 540
+        /** JPEG quality (0–100). 80 is a good trade-off: ~5–10× smaller than PNG. */
+        private const val SCREENSHOT_QUALITY = 80
+
         @Volatile
         var instance: AtomyxAccessibilityService? = null
             private set
+
+        /**
+         * Down-scale a bitmap so its longest side is at most [maxDim] px.
+         * Returns the original bitmap unchanged if it already fits.
+         */
+        private fun scaleBitmap(src: Bitmap, maxDim: Int): Bitmap {
+            val w = src.width
+            val h = src.height
+            if (w <= maxDim && h <= maxDim) return src
+            val scale = maxDim.toFloat() / maxOf(w, h)
+            val newW = (w * scale).toInt()
+            val newH = (h * scale).toInt()
+            return Bitmap.createScaledBitmap(src, newW, newH, true)
+        }
     }
 
     override fun onServiceConnected() {
@@ -94,7 +114,7 @@ class AtomyxAccessibilityService : AccessibilityService() {
      * Requires API 30+ (AccessibilityService.takeScreenshot) and
      * canTakeScreenshot=true in accessibility config.
      */
-    fun takeScreenshotPng(): ByteArray? {
+    fun takeScreenshotJpeg(): ByteArray? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             Log.w(TAG, "takeScreenshot requires API 30+")
             return null
@@ -113,9 +133,11 @@ class AtomyxAccessibilityService : AccessibilityService() {
                                 screenshot.colorSpace,
                             )
                             if (bitmap != null) {
+                                val scaled = scaleBitmap(bitmap, MAX_SCREENSHOT_DIM)
                                 val baos = ByteArrayOutputStream()
-                                bitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
+                                scaled.compress(Bitmap.CompressFormat.JPEG, SCREENSHOT_QUALITY, baos)
                                 result = baos.toByteArray()
+                                if (scaled !== bitmap) scaled.recycle()
                                 bitmap.recycle()
                             }
                         } finally {
@@ -131,7 +153,7 @@ class AtomyxAccessibilityService : AccessibilityService() {
             )
             latch.await(2, TimeUnit.SECONDS)
         } catch (e: Exception) {
-            Log.e(TAG, "takeScreenshotPng error", e)
+            Log.e(TAG, "takeScreenshotJpeg error", e)
         }
         return result
     }

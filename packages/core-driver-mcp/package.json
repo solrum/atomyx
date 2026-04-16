@@ -2,11 +2,14 @@
   "name": "@atomyx/core-driver-mcp",
   "version": "0.1.0",
   "private": true,
-  "description": "Atomyx MCP server — exposes the Atomyx framework as MCP tools over stdio. Library factory; CLI binary lives in @atomyx/cli (future).",
+  "description": "Atomyx MCP server — exposes the Atomyx framework as MCP tools over stdio. Ships both a library (createMcpServer) and the atomyx-mcp binary, the latter being the end-user deployment entry point parallel to the atomyx-driver CLI.",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "atomyx-mcp": "./dist/bin.js"
+  },
   "exports": {
     ".": "./dist/index.js",
     "./tools": "./dist/tools/index.js"
@@ -17,6 +20,8 @@
   },
   "dependencies": {
     "@atomyx/core-driver": "0.1.0",
+    "@atomyx/core-driver-android": "0.1.0",
+    "@atomyx/core-driver-ios": "0.1.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "zod": "^3.23.0"
   },

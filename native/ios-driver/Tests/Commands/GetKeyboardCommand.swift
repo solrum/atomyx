@@ -12,7 +12,7 @@ import Foundation
 ///     keyboards (Flutter GestureDetector grids, RN TouchableOpacity
 ///     key views) are regular app views and return `visible=false`.
 ///     Agent must handle the "focused field + invisible keyboard"
-///     case via dumpTree inspection (Phase 6 hardening).
+///     case via `dumpRawTree` inspection on the host side.
 ///   - Layout classification is heuristic, not exact. See
 ///     `DefaultXCUIBridge.detectKeyboardLayout`.
 ///

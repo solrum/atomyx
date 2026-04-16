@@ -67,9 +67,12 @@ A hexagonal-architecture framework split into the following codebases:
    `core-driver-ios`, `core-driver-mcp` — same module, different
    roles, all under `packages/core-driver-*/`.
 
-2. **Legacy MCP server** (TypeScript, `src/`) — the pre-refactor
-   runtime exposing 19 MCP tools. Mid-migration onto `@atomyx/core`;
-   both coexist while the refactor lands in batches.
+2. **CLI binary** (`@atomyx/core-driver-cli`) — `atomyx-driver`
+   command, shipped from `packages/core-driver-cli/`. Wires
+   `@atomyx/core-driver` + a driver adapter + `@atomyx/core-driver-mcp`
+   into a single entry point. This is the sole shipping runtime —
+   the pre-refactor legacy MCP server that used to live in `src/`
+   was retired once parity with the new framework landed.
 
 3. **Android control plane** (Kotlin, `native/android-agent/`) — standalone APK,
    HTTP server on `127.0.0.1:8765`, reached via `adb forward`.
@@ -106,9 +109,11 @@ how agents reintroduce bugs the team already fixed.
    tool can absorb the intent via a parameter. Overlap causes measurable
    agent confusion.
 3. **Never inline business logic in a tool handler.** Extract it to a
-   strategy class in `src/tools/core/` and constructor-inject it. All 19
-   tools extend `Tool<TShape>` and their `execute()` is pure orchestration.
-   Inline logic is a regression even if it's "just a few lines".
+   strategy class alongside the tool file in
+   `packages/core-driver-mcp/src/tools/` and constructor-inject it.
+   Every tool uses `defineTool` and its `execute()` is pure
+   orchestration. Inline logic is a regression even if it's "just a
+   few lines".
 4. **Never import from `@synapse/*` or any parent-repo path.** Atomyx is
    standalone — Synapse will eventually integrate via `@atomyx/core`
    port implementations, not the other way around.
@@ -147,9 +152,9 @@ these principles:
    never modifying existing ones.
 5. **SOLID.** One responsibility per file. Constructor injection over
    singletons. Extensions are additions, not modifications.
-6. **No unit-testable code requires a device.** `MockController` in
-   `src/testing/` runs everything under `node:test` without ADB or Xcode.
-   Strategy classes have their own unit tests.
+6. **No unit-testable code requires a device.** `MockDriver` in
+   `@atomyx/core-driver/testing` runs everything under `node:test`
+   without ADB or Xcode. Strategy classes have their own unit tests.
 
 ## Before you act
 
@@ -157,7 +162,7 @@ these principles:
 | ----------------------------------------- | -------------------------------------------- |
 | Understand the architectural contract     | [`.claude/docs/architecture.md`](./.claude/docs/architecture.md) |
 | Locate a package or trace the repo layout | [`.claude/docs/repo-map.md`](./.claude/docs/repo-map.md)      |
-| Edit anything in `src/tools/`             | [`.claude/docs/tools.md`](./.claude/docs/tools.md)            |
+| Edit anything under `packages/core-driver-mcp/src/tools/` | [`.claude/docs/tools.md`](./.claude/docs/tools.md) |
 | Run build / test / smoke / add a new tool | [`.claude/docs/development.md`](./.claude/docs/development.md) |
 | Edit Android, tool layer, or iOS stub     | [`.claude/docs/pitfalls.md`](./.claude/docs/pitfalls.md)      |
 | Touch anything iOS-related                | [`.claude/docs/ios.md`](./.claude/docs/ios.md)                |
@@ -168,10 +173,11 @@ optional reference.
 
 ## When in doubt
 
-- If the user's request would create a 20th tool, **stop and ask** whether an
-  existing tool should be extended instead.
-- If a change would require a platform branch in `src/tools/`, **stop and
-  ask** — the adapter is the right place.
+- If the user's request would expand the tool surface past the current
+  DEFAULT_TOOLS list, **stop and ask** whether an existing tool should
+  be extended instead.
+- If a change would require a platform branch inside a tool handler,
+  **stop and ask** — the driver adapter is the right place.
 - If you are about to start iOS implementation without explicit direction,
   **stop**. The bridge strategy is an open design question.
 - If a pitfall in `.claude/docs/pitfalls.md` conflicts with what the user asked for,

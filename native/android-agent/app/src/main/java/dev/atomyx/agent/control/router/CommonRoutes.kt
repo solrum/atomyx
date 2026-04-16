@@ -3,7 +3,6 @@ package dev.atomyx.agent.control.router
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import dev.atomyx.agent.control.AtomyxServices
-import dev.atomyx.agent.control.SelectorResolver
 import fi.iki.elonen.NanoHTTPD
 
 private val gson = Gson()
@@ -13,18 +12,6 @@ private fun toJson(payload: Any) = gson.toJson(payload)
 private fun parseBody(body: String): JsonObject =
     runCatching { gson.fromJson(body, JsonObject::class.java) }.getOrNull() ?: JsonObject()
 
-private fun parseSelector(body: JsonObject): SelectorResolver.Selector {
-    val sel = body.getAsJsonObject("selector") ?: body
-    return SelectorResolver.Selector(
-        resourceId = sel.get("resourceId")?.takeIf { !it.isJsonNull }?.asString,
-        contentDesc = sel.get("contentDesc")?.takeIf { !it.isJsonNull }?.asString,
-        text = sel.get("text")?.takeIf { !it.isJsonNull }?.asString,
-        textContains = sel.get("textContains")?.takeIf { !it.isJsonNull }?.asString,
-        hint = sel.get("hint")?.takeIf { !it.isJsonNull }?.asString,
-        nth = sel.get("nth")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
-    )
-}
-
 // ────────────────────────────────────────────────────────────────────
 // Read-only routes
 // ────────────────────────────────────────────────────────────────────
@@ -33,12 +20,13 @@ class TreeRoute : Route {
     override val method = NanoHTTPD.Method.GET
     override val path = "/tree"
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
-        val format = request.queryParams["format"]?.firstOrNull() ?: "full"
-        val payload = if (format == "compact") {
-            mapOf("elements" to services.uiTree.dumpCompact())
-        } else {
-            services.uiTree.dumpTree()
-        }
+        // Always returns the hierarchical RawElementDto tree. The
+        // `format=compact` flat-list variant was removed when the
+        // legacy `src/adapters/agent-direct.adapter.ts` caller was
+        // retired — `dumpCompact` stays on `UiTreeService` because
+        // GestureDispatcher's on-screen-key fallback still uses it
+        // internally, but it is no longer exposed on the wire.
+        val payload = services.uiTree.dumpTree()
         return RouteResponse.ok(toJson(payload))
     }
 }
@@ -72,10 +60,10 @@ class ScreenshotRoute : Route {
     override val method = NanoHTTPD.Method.GET
     override val path = "/screenshot"
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
-        val bytes = services.accessibility.takeScreenshotPng()
+        val bytes = services.accessibility.takeScreenshotJpeg()
             ?: return RouteResponse.internalError("screenshot failed")
         val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
-        return RouteResponse.ok(toJson(mapOf("base64" to base64, "format" to "png")))
+        return RouteResponse.ok(toJson(mapOf("base64" to base64, "format" to "jpeg")))
     }
 }
 
@@ -102,57 +90,8 @@ class AppsRoute : Route {
 }
 
 // ────────────────────────────────────────────────────────────────────
-// Resolve / debug
-// ────────────────────────────────────────────────────────────────────
-
-class ResolveRoute : Route {
-    override val method = NanoHTTPD.Method.POST
-    override val path = "/resolve"
-    override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
-        val selector = parseSelector(parseBody(request.body))
-        val resolved = services.resolver.resolve(selector)
-        if (resolved == null) return RouteResponse.ok(toJson(mapOf("found" to false)))
-        try {
-            val isInIme = try {
-                resolved.node.window?.type ==
-                    android.view.accessibility.AccessibilityWindowInfo.TYPE_INPUT_METHOD
-            } catch (_: Exception) { false }
-            return RouteResponse.ok(toJson(mapOf(
-                "found" to true,
-                "resolvedBy" to resolved.resolvedBy,
-                "bounds" to mapOf(
-                    "left" to resolved.bounds.left,
-                    "top" to resolved.bounds.top,
-                    "right" to resolved.bounds.right,
-                    "bottom" to resolved.bounds.bottom,
-                ),
-                "resourceId" to resolved.node.viewIdResourceName,
-                "text" to resolved.node.text?.toString(),
-                "contentDesc" to resolved.node.contentDescription?.toString(),
-                "className" to resolved.node.className?.toString(),
-                "clickable" to resolved.node.isClickable,
-                "enabled" to resolved.node.isEnabled,
-                "isInIme" to isInIme,
-            )))
-        } finally {
-            try { resolved.node.recycle() } catch (_: Exception) {}
-        }
-    }
-}
-
-// ────────────────────────────────────────────────────────────────────
 // Action routes
 // ────────────────────────────────────────────────────────────────────
-
-class TapRoute : Route {
-    override val method = NanoHTTPD.Method.POST
-    override val path = "/actions/tap"
-    override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
-        val selector = parseSelector(parseBody(request.body))
-        val result = services.gestures.tap(selector)
-        return RouteResponse.ok(toJson(mapOf("ok" to result.success, "reason" to result.reason)))
-    }
-}
 
 class TapCoordsRoute : Route {
     override val method = NanoHTTPD.Method.POST
@@ -201,18 +140,6 @@ class SwipeRoute : Route {
             durationMs = body.get("durationMs")?.takeIf { !it.isJsonNull }?.asLong ?: 300L,
         )
         return RouteResponse.ok(toJson(mapOf("ok" to true)))
-    }
-}
-
-class InputRoute : Route {
-    override val method = NanoHTTPD.Method.POST
-    override val path = "/actions/input"
-    override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
-        val body = parseBody(request.body)
-        val selector = parseSelector(body)
-        val text = body.get("text").asString
-        val result = services.gestures.inputText(selector, text)
-        return RouteResponse.ok(toJson(mapOf("ok" to result.success, "reason" to result.reason)))
     }
 }
 

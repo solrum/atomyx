@@ -230,27 +230,24 @@ core maps both to the canonical `AttrKeys.Label` at the driver
 boundary, and any content field the agent supplies is tried in
 priority order.
 
-## Legacy `src/tools/` (being phased out)
+## History: legacy `src/` retire
 
-The pre-refactor runtime in `src/tools/` still exists and still ships
-19 tools via the legacy `src/server.ts` entry point. It coexists with
-the new `@atomyx/core-driver-mcp` during the strangler-fig
-transition. Tools-in-legacy are NOT actively developed — new tool work
-goes into `packages/core-driver-mcp/src/tools/`.
+The pre-refactor `src/` runtime shipped a 19-tool MCP server built
+around a legacy `DeviceController` port. It coexisted with
+`@atomyx/core-driver-mcp` during the strangler-fig transition and
+was deleted once the new framework reached parity:
 
-Deletion of `src/` is planned after `@atomyx/core-driver-cli` has been
-validated against real-device sessions. Legacy tools that have no
-equivalent in the new 9-tool surface yet:
+- `tap_and_wait_transition`, `report_bug`, `start_run` / `finish_run`,
+  `add_case_study` / `get_case_studies`, `list_apps`, `list_devices`
+  were ported to `packages/core-driver-mcp/src/tools/` in earlier
+  batches.
+- `get_playbook` was replaced by the `prompts/` capability — see
+  `packages/core-driver-mcp/src/prompts/` for the methodology
+  templates (`atomyx/playbook`, `atomyx/exploratory`, etc).
+- `select_device` has no equivalent on purpose: device selection now
+  happens per-session at CLI argv parsing time, not via an in-session
+  tool call. The per-session model is simpler and eliminates an
+  ambient-state footgun.
 
-- `tap_and_wait_transition` — transition verification after tap
-- `report_bug` — bug reporting with screenshot
-- `start_run` / `finish_run` — run lifecycle
-- `add_case_study` / `get_case_studies` — playbook
-- `get_playbook` — static playbook content
-- `list_apps` / `list_devices` / `select_device` — device management
-
-These will land in `packages/core-driver-mcp/src/tools/` incrementally
-as real usage demands them. They are not missing on purpose; they're
-deferred until the new framework proves out end-to-end with the core
-9, then pulled in one by one with updated implementations that go
-through Orchestra rather than the legacy DeviceController port.
+The final MCP surface is 21 tools, all living in
+`packages/core-driver-mcp/src/tools/`.

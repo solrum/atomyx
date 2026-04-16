@@ -1,38 +1,27 @@
 {
   "name": "atomyx",
   "version": "0.1.0",
-  "private": false,
-  "description": "Atomyx — Agentic Test Orchestration Module. Cross-platform mobile test framework driven by Claude (or any MCP client).",
+  "private": true,
+  "description": "Atomyx — Agentic Test Orchestration Module. Cross-platform mobile test framework driven by Claude (or any MCP client). This is the workspace root; the shipping binary lives in packages/core-driver-cli as `atomyx-driver`.",
   "license": "Apache-2.0",
   "author": "Solrum",
   "homepage": "https://atomyx.dev",
   "type": "module",
-  "bin": {
-    "atomyx": "./dist/cli/main.js",
-    "atomyx-mcp": "./dist/index.js"
-  },
-  "main": "./dist/index.js",
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js",
-    "dev": "tsc -w -p tsconfig.json",
-    "lint": "eslint \"src/**/*.ts\"",
-    "test": "node --import tsx --test $(find src -name '*.test.ts')",
+    "build": "for d in packages/core-driver*; do (cd \"$d\" && [ -f tsconfig.json ] && npm run build); done",
+    "test": "for d in packages/core-driver*; do (cd \"$d\" && [ -f tsconfig.json ] && npm test); done",
     "test:all": "for d in packages/core-driver*; do (cd \"$d\" && [ -f tsconfig.json ] && npm test); done",
     "depcruise": "depcruise --config .dependency-cruiser.cjs packages/"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.65.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "js-yaml": "^4.1.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "@types/js-yaml": "^4.0.9",
     "tsx": "^4.19.0",
     "typescript": "^5.3.0"
   },

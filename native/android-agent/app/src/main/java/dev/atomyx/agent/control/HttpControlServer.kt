@@ -5,12 +5,10 @@ import dev.atomyx.agent.control.router.AppsRoute
 import dev.atomyx.agent.control.router.ClearFocusedInputRoute
 import dev.atomyx.agent.control.router.CurrentActivityRoute
 import dev.atomyx.agent.control.router.ForceStopRoute
-import dev.atomyx.agent.control.router.InputRoute
 import dev.atomyx.agent.control.router.KeyRoute
 import dev.atomyx.agent.control.router.KeyboardRoute
 import dev.atomyx.agent.control.router.LaunchRoute
 import dev.atomyx.agent.control.router.LongPressRoute
-import dev.atomyx.agent.control.router.ResolveRoute
 import dev.atomyx.agent.control.router.Route
 import dev.atomyx.agent.control.router.RouteRequest
 import dev.atomyx.agent.control.router.RouteResponse
@@ -18,7 +16,6 @@ import dev.atomyx.agent.control.router.Router
 import dev.atomyx.agent.control.router.ScreenshotRoute
 import dev.atomyx.agent.control.router.SwipeRoute
 import dev.atomyx.agent.control.router.TapCoordsRoute
-import dev.atomyx.agent.control.router.TapRoute
 import dev.atomyx.agent.control.router.TreeRoute
 import dev.atomyx.agent.control.router.TypeKeyboardRoute
 import dev.atomyx.agent.service.AtomyxAccessibilityService
@@ -77,13 +74,10 @@ class HttpControlServer(
         ScreenshotRoute(),
         CurrentActivityRoute(),
         AppsRoute(),
-        ResolveRoute(),
-        TapRoute(),
         TapCoordsRoute(),
         LongPressRoute(),
         ClearFocusedInputRoute(),
         SwipeRoute(),
-        InputRoute(),
         TypeKeyboardRoute(),
         KeyRoute(),
         LaunchRoute(),

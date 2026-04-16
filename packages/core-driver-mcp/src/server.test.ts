@@ -1,9 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { Orchestra, FakeClock, NoopLogger } from "@atomyx/core-driver";
+import { FakeClock, NoopLogger } from "@atomyx/core-driver";
 import { MockDriver, node } from "@atomyx/core-driver/testing";
 import { Roles, AttrKeys } from "@atomyx/core-driver";
 import { createMcpServer } from "./server.js";
+import { DeviceSession } from "./device-session.js";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -52,23 +53,37 @@ function loginScreen() {
   });
 }
 
-function buildServer() {
+async function buildServer() {
   const driver = new MockDriver();
   driver.stageHierarchyRepeated(loginScreen(), 100);
-  const orchestra = new Orchestra({
-    driver,
-    clock: new FakeClock(),
-    logger: new NoopLogger(),
+  const logger = new NoopLogger();
+  const clock = new FakeClock();
+  // DeviceSession takes a factory map; tests use MockDriver for
+  // both platforms so the same driver instance is returned
+  // regardless of which platform the test passes to select().
+  const session = new DeviceSession({
+    factories: {
+      ios: () => driver,
+      android: () => driver,
+    },
+    clock,
+    logger,
   });
-  const server = createMcpServer({ orchestra });
-  return { server, driver };
+  // Pre-bind the mock device so existing tests that immediately
+  // call device-touching tools don't need a `select_device` setup
+  // step. A "mock-device" id + "android" platform is arbitrary —
+  // tests that exercise multi-device flows can call session.select
+  // again.
+  await session.select({ platform: "android", id: "mock-device" });
+  const server = createMcpServer({ session, logger, clock });
+  return { server, driver, session };
 }
 
 async function callTool(
   server: ReturnType<typeof createMcpServer>,
   name: string,
   args: Record<string, unknown>,
-): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> {
+): Promise<{ content: Array<{ type: string; text: string; data?: string; mimeType?: string }>; isError?: boolean }> {
   // The MCP SDK populates _requestHandlers with method-name
   // keys, but uses the schema's `method` literal as the key.
   // CallToolRequestSchema's method is "tools/call".
@@ -100,7 +115,7 @@ async function listTools(
 
 describe("createMcpServer / tools/list", () => {
   it("lists all DEFAULT_TOOLS with name + description + JSON schema", async () => {
-    const { server } = buildServer();
+    const { server } = await buildServer();
     const result = await listTools(server);
     assert.ok(result.tools.length >= 9);
     const names = result.tools.map((t) => t.name);
@@ -113,17 +128,17 @@ describe("createMcpServer / tools/list", () => {
     assert.ok(names.includes("press_key"));
     assert.ok(names.includes("screenshot"));
     assert.ok(names.includes("wait_for_element"));
-    // Every tool has a JSON schema with `type` field.
+    // Every tool has a JSON schema with `type: "object"`.
     for (const t of result.tools) {
-      const schema = t.inputSchema as { type?: string; oneOf?: unknown };
-      assert.ok(schema.type === "object" || schema.oneOf !== undefined);
+      const schema = t.inputSchema as { type?: string };
+      assert.equal(schema.type, "object", `${t.name} schema must have type:"object"`);
     }
   });
 });
 
 describe("tools/call dispatch — happy path", () => {
   it("launch_app dispatches to Orchestra.launchApp", async () => {
-    const { server, driver } = buildServer();
+    const { server, driver } = await buildServer();
     const result = await callTool(server, "launch_app", { appId: "com.example.app" });
     assert.equal(result.isError, undefined);
     const launches = driver.calls.filter((c) => c.method === "launchApp");
@@ -132,7 +147,7 @@ describe("tools/call dispatch — happy path", () => {
   });
 
   it("find_element returns element details", async () => {
-    const { server } = buildServer();
+    const { server } = await buildServer();
     const result = await callTool(server, "find_element", { id: "login_btn" });
     assert.equal(result.isError, undefined);
     const parsed = JSON.parse(result.content[0]!.text);
@@ -144,14 +159,14 @@ describe("tools/call dispatch — happy path", () => {
   });
 
   it("find_element returns found:false when no match", async () => {
-    const { server } = buildServer();
+    const { server } = await buildServer();
     const result = await callTool(server, "find_element", { id: "nope" });
     const parsed = JSON.parse(result.content[0]!.text);
     assert.equal(parsed.found, false);
   });
 
   it("tap with selector dispatches the full pipeline", async () => {
-    const { server, driver } = buildServer();
+    const { server, driver } = await buildServer();
     const result = await callTool(server, "tap", {
       selector: { id: "login_btn" },
     });
@@ -166,7 +181,7 @@ describe("tools/call dispatch — happy path", () => {
   });
 
   it("tap with coordinates bypasses the selector pipeline", async () => {
-    const { server, driver } = buildServer();
+    const { server, driver } = await buildServer();
     const result = await callTool(server, "tap", { x: 100, y: 200 });
     const parsed = JSON.parse(result.content[0]!.text);
     assert.equal(parsed.ok, true);
@@ -175,7 +190,7 @@ describe("tools/call dispatch — happy path", () => {
   });
 
   it("get_ui_tree returns flat node list with depth", async () => {
-    const { server } = buildServer();
+    const { server } = await buildServer();
     const result = await callTool(server, "get_ui_tree", {});
     const parsed = JSON.parse(result.content[0]!.text);
     assert.equal(parsed.total, 3); // root + button + textfield
@@ -186,7 +201,7 @@ describe("tools/call dispatch — happy path", () => {
   });
 
   it("get_ui_tree honors limit", async () => {
-    const { server } = buildServer();
+    const { server } = await buildServer();
     const result = await callTool(server, "get_ui_tree", { limit: 2 });
     const parsed = JSON.parse(result.content[0]!.text);
     assert.equal(parsed.returned, 2);
@@ -194,51 +209,90 @@ describe("tools/call dispatch — happy path", () => {
   });
 
   it("swipe direction dispatches Orchestra.swipeDirection", async () => {
-    const { server, driver } = buildServer();
+    const { server, driver } = await buildServer();
     await callTool(server, "swipe", { direction: "up" });
     assert.equal(driver.calls.filter((c) => c.method === "swipe").length, 1);
   });
 
   it("swipe coordinates dispatches Orchestra.swipeAt", async () => {
-    const { server, driver } = buildServer();
+    const { server, driver } = await buildServer();
     await callTool(server, "swipe", { fromX: 10, fromY: 20, toX: 30, toY: 40 });
     assert.equal(driver.calls.filter((c) => c.method === "swipe").length, 1);
   });
 
   it("press_key returns ActionResult", async () => {
-    const { server, driver } = buildServer();
+    const { server, driver } = await buildServer();
     const result = await callTool(server, "press_key", { key: "back" });
     const parsed = JSON.parse(result.content[0]!.text);
     assert.equal(parsed.ok, true);
     assert.equal(driver.calls.filter((c) => c.method === "pressKey").length, 1);
   });
 
-  it("screenshot returns base64 envelope", async () => {
-    const { server } = buildServer();
+  it("screenshot saves file and returns path", async () => {
+    const { server } = await buildServer();
     const result = await callTool(server, "screenshot", {});
     const parsed = JSON.parse(result.content[0]!.text);
-    assert.equal(parsed.format, "png");
-    assert.equal(typeof parsed.base64, "string");
+    assert.equal(typeof parsed.path, "string");
+    assert.ok(parsed.path.includes(".atomyx/screenshots/screenshot-"));
+    assert.equal(typeof parsed.sizeBytes, "number");
+    assert.equal(parsed.format, "png"); // MockDriver returns PNG
   });
+
+  it("wait_for_element returns find_element-shaped success payload", async () => {
+    // Regression test for the Batch 15 audit finding: wait_for_element
+    // used to return only {id, text, label, role, bounds: rawString}
+    // — agents had to call find_element again to get `center`,
+    // `enabled`, `clickable`, and `value`. Normalize to the
+    // find_element shape so poll-then-use-coordinates is one call.
+    const { server } = await buildServer();
+    const result = await callTool(server, "wait_for_element", {
+      selector: { id: "login_btn" },
+      timeoutMs: 1000,
+    });
+    const parsed = JSON.parse(result.content[0]!.text);
+    assert.equal(parsed.found, true);
+    assert.equal(parsed.id, "login_btn");
+    assert.equal(parsed.text, "Sign in");
+    assert.equal(parsed.label, "Login button");
+    assert.equal(parsed.role, "button");
+    // bounds is now parsed (Bounds object), not a raw "l,t,r,b" string.
+    assert.equal(typeof parsed.bounds, "object");
+    assert.equal(parsed.bounds.left, 100);
+    assert.equal(parsed.bounds.right, 330);
+    // center is provided so agents can pass it straight to tap({x,y}).
+    assert.deepEqual(parsed.center, { x: 215, y: 430 });
+    // enabled + clickable flags come through.
+    assert.equal(parsed.enabled, true);
+    assert.equal(parsed.clickable, true);
+  });
+
+  // Note: no timeout-path test here. `buildServer` injects a
+  // `FakeClock` into Orchestra's Finder, which means `waitFor` on a
+  // never-matching selector would block forever waiting on a
+  // `clock.sleep` that never resolves. Driving the clock forward in
+  // parallel is doable (see the `tap_and_wait_transition` FakeClock
+  // test in new-tools.test.ts for the pattern) but overkill here —
+  // the positive test above proves the shape normalization which is
+  // the actual Batch 15 audit fix.
 });
 
 describe("tools/call validation + errors", () => {
   it("rejects unknown tool with isError", async () => {
-    const { server } = buildServer();
+    const { server } = await buildServer();
     const result = await callTool(server, "nope", {});
     assert.equal(result.isError, true);
     assert.match(result.content[0]!.text, /Unknown tool/);
   });
 
   it("rejects invalid arguments with isError", async () => {
-    const { server } = buildServer();
+    const { server } = await buildServer();
     const result = await callTool(server, "launch_app", {});
     assert.equal(result.isError, true);
     assert.match(result.content[0]!.text, /Invalid arguments/);
   });
 
   it("input_text refines: must have selector OR x+y", async () => {
-    const { server } = buildServer();
+    const { server } = await buildServer();
     const result = await callTool(server, "input_text", { text: "hi" });
     assert.equal(result.isError, true);
   });
@@ -267,12 +321,15 @@ describe("tools/call when Orchestra returns ok:false", () => {
       ],
     });
     driver.stageHierarchyRepeated(obscuredTree, 5);
-    const orchestra = new Orchestra({
-      driver,
-      clock: new FakeClock(),
-      logger: new NoopLogger(),
+    const logger = new NoopLogger();
+    const clock = new FakeClock();
+    const session = new DeviceSession({
+      factories: { ios: () => driver, android: () => driver },
+      clock,
+      logger,
     });
-    const server = createMcpServer({ orchestra });
+    await session.select({ platform: "android", id: "mock" });
+    const server = createMcpServer({ session, logger, clock });
 
     const result = await callTool(server, "tap", {
       selector: { id: "target" },
@@ -290,26 +347,29 @@ describe("tools/call when Orchestra returns ok:false", () => {
 
 describe("custom tool surface + duplicate detection", () => {
   it("createMcpServer accepts a custom tools list", async () => {
-    const { driver } = (() => {
-      const d = new MockDriver();
-      d.stageHierarchyRepeated(loginScreen(), 5);
-      return { driver: d };
-    })();
-    const orchestra = new Orchestra({ driver, clock: new FakeClock() });
+    const driver = new MockDriver();
+    driver.stageHierarchyRepeated(loginScreen(), 5);
+    const session = new DeviceSession({
+      factories: { ios: () => driver, android: () => driver },
+      clock: new FakeClock(),
+    });
+    await session.select({ platform: "android", id: "mock" });
     const server = createMcpServer({
-      orchestra,
+      session,
       tools: [], // empty surface
     });
     const result = await listTools(server);
     assert.equal(result.tools.length, 0);
+    void driver; // silence unused
   });
 
   it("throws on duplicate tool names", () => {
-    const driver = new MockDriver();
-    const orchestra = new Orchestra({ driver, clock: new FakeClock() });
+    const session = new DeviceSession({
+      factories: { ios: () => new MockDriver(), android: () => new MockDriver() },
+    });
     assert.throws(() =>
       createMcpServer({
-        orchestra,
+        session,
         tools: [
           {
             name: "dup",

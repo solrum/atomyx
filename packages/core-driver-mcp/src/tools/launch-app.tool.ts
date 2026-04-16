@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineTool } from "../tool-definition.js";
+import { defineTool, orchestraOrFail } from "../tool-definition.js";
 
 const LaunchAppArgs = z
   .object({
@@ -12,10 +12,12 @@ export const launchAppTool = defineTool({
   description:
     "Launch an app on the connected device. Pass the bundle id (iOS) or " +
     "package name (Android). The driver brings the app to the foreground; " +
-    "subsequent tool calls operate on its UI.",
+    "subsequent tool calls operate on its UI. Requires an active device — " +
+    "call `select_device` first.",
   inputSchema: LaunchAppArgs,
   async execute(args, ctx) {
-    await ctx.orchestra.launchApp(args.appId);
+    const orchestra = orchestraOrFail(ctx);
+    await orchestra.launchApp(args.appId);
     return { ok: true, appId: args.appId };
   },
 });

@@ -199,7 +199,7 @@ export const ScreenshotRoute = {
   request: z.undefined(),
   response: z.object({
     base64: z.string(),
-    format: z.literal("png"),
+    format: z.union([z.literal("png"), z.literal("jpeg")]),
   }),
 };
 

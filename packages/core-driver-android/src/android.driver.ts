@@ -75,7 +75,7 @@ export class AndroidDriver implements Driver {
   readonly platform = "android" as const;
   readonly capabilities: Capabilities = {
     canScreenshot: true,
-    canEraseText: false, // legacy APK doesn't expose a native erase route; core falls back
+    canEraseText: true, // backed by APK's /actions/clear_focused_input route
     canWaitForIdle: false, // host-side tree-diff fallback only
     canSetLocation: false,
     canSetOrientation: false,
@@ -161,17 +161,29 @@ export class AndroidDriver implements Driver {
   // ── Input ────────────────────────────────────────────────────
 
   async inputText(text: string): Promise<void> {
-    await this.http.post("/actions/type_keyboard", { text });
+    // Explicit `clearFirst: false` prevents the APK from silently
+    // clearing the focused field before typing. The APK's
+    // `/actions/type_keyboard` route defaults `clearFirst` to true
+    // when the field is missing, which used to silently break
+    // Orchestra's `clearFirst: false` contract on Android — the
+    // framework said "append" but the APK cleared anyway. The
+    // clear-then-type flow now goes through `eraseText` + this
+    // call as two distinct steps, driven by Orchestra, matching
+    // the iOS semantics.
+    await this.http.post("/actions/type_keyboard", {
+      text,
+      clearFirst: false,
+    });
   }
 
-  async eraseText(count: number): Promise<void> {
-    // Legacy APK has no native erase route — fall back to
-    // pressing back/delete via /actions/key. Core should route
-    // around this via `capabilities.canEraseText === false`;
-    // here we honor a direct call anyway.
-    for (let i = 0; i < count; i++) {
-      await this.http.post("/actions/key", { key: "delete" });
-    }
+  async eraseText(_count: number): Promise<void> {
+    // APK's native `/actions/clear_focused_input` bulk-deletes the
+    // focused field in one RPC. The `count` parameter is ignored:
+    // the route clears the entire current value regardless (good
+    // enough for the framework's "erase before type" flow — any
+    // caller that needed partial delete would use pressKey(delete)
+    // in a loop explicitly).
+    await this.http.post("/actions/clear_focused_input", {});
   }
 
   async pressKey(key: KeyCode): Promise<KeyResult> {
@@ -220,7 +232,7 @@ export class AndroidDriver implements Driver {
   // ── Media + device info ─────────────────────────────────────
 
   async screenshot(): Promise<Uint8Array> {
-    const raw = await this.http.get<{ base64: string; format: "png" }>("/screenshot");
+    const raw = await this.http.get<{ base64: string; format: string }>("/screenshot");
     return Buffer.from(raw.base64, "base64");
   }
 
@@ -237,21 +249,61 @@ export class AndroidDriver implements Driver {
   }
 
   async screenSize(): Promise<Size> {
-    // Legacy APK doesn't expose /screen-size. Derive from the
-    // root bounds of the current hierarchy — every Android tree
-    // has a root with screen-sized bounds in the accessibility
-    // service.
+    // Legacy APK doesn't expose /screen-size. The `/tree` response
+    // has a synthetic `el_root` wrapper with no bounds of its own —
+    // it's just a container that holds the actual window roots
+    // (status bar excluded, main window, optional IME window).
+    //
+    // The main window's root is the first top-level child with
+    // bounds populated. Using its width/height gives us screen
+    // dimensions without adding a new route to the APK or shelling
+    // out to `adb shell wm size`.
+    //
+    // Prior versions of this method read `tree.attributes.bounds`
+    // directly, which worked only against test fakes that injected
+    // bounds on the root DTO — on real devices it threw
+    // "root has no bounds attribute" because the Kotlin
+    // `UiTreeService.dumpTree` builds the root without bounds.
     const tree = await this.hierarchy();
-    const bounds = tree.attributes.bounds;
+    const bounds = findScreenBounds(tree);
     if (!bounds) {
       throw new Error(
-        "screenSize: root node has no bounds attribute — cannot derive screen dimensions",
+        "screenSize: no child of the root has bounds — cannot derive screen dimensions",
       );
     }
-    const [l, t, r, b] = bounds.split(",").map((n) => Number(n));
-    if (!Number.isFinite(l) || !Number.isFinite(t) || !Number.isFinite(r) || !Number.isFinite(b)) {
-      throw new Error(`screenSize: invalid bounds string "${bounds}"`);
-    }
-    return { width: (r ?? 0) - (l ?? 0), height: (b ?? 0) - (t ?? 0) };
+    return {
+      width: bounds.right - bounds.left,
+      height: bounds.bottom - bounds.top,
+    };
   }
+}
+
+/**
+ * Walk the first layer of children looking for bounds. Returns the
+ * LARGEST child bounds by area — the main window dominates over any
+ * IME or overlay child — or null if none have bounds. The wire
+ * format stores bounds as a "l,t,r,b" string on the `bounds`
+ * attribute; we parse inline instead of importing the core
+ * `parseBounds` helper to keep this package's dependency surface
+ * minimal (driver packages deliberately avoid cross-package runtime
+ * imports; types only).
+ */
+function findScreenBounds(
+  tree: TreeNode,
+): { left: number; top: number; right: number; bottom: number } | null {
+  let best: { left: number; top: number; right: number; bottom: number } | null = null;
+  let bestArea = 0;
+  for (const child of tree.children) {
+    const raw = child.attributes["bounds"];
+    if (!raw) continue;
+    const parts = raw.split(",").map((n) => Number(n));
+    if (parts.length !== 4 || parts.some((n) => !Number.isFinite(n))) continue;
+    const [l, t, r, b] = parts as [number, number, number, number];
+    const area = (r - l) * (b - t);
+    if (area > bestArea) {
+      bestArea = area;
+      best = { left: l, top: t, right: r, bottom: b };
+    }
+  }
+  return best;
 }

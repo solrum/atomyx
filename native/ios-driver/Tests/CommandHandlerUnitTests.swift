@@ -70,17 +70,6 @@ final class CommandHandlerUnitTests: XCTestCase {
         XCTAssertEqual(resp.data["bundleId"] as? String, "com.example.app")
     }
 
-    // MARK: - DumpTreeCommand
-
-    func testDumpTreeRejectsWhenNoAppLaunched() {
-        let cmd = DumpTreeCommand()
-        let req = Request(id: 1, type: "dumpTree", args: [:])
-        let resp = cmd.handle(req, bridge: MockXCUIBridge(), state: DriverState())
-
-        XCTAssertFalse(resp.ok)
-        XCTAssertTrue(resp.error?.contains("no app launched") == true)
-    }
-
     // MARK: - TapAtCommand
 
     func testTapAtRejectsMissingCoordinates() {
@@ -183,8 +172,28 @@ final class CommandHandlerUnitTests: XCTestCase {
 
     // MARK: - PressKeyCommand
 
+    /// Build a PressKeyCommand wired to a registry of `FakePressKeyStrategy`
+    /// instances. Each test composes the registry it needs — no mocks
+    /// on the bridge side (bridge.pressKey no longer exists).
+    private func makePressKeyCommand(
+        strategies: [FakePressKeyStrategy],
+        fallback: FakePressKeyStrategy = FakePressKeyStrategy(
+            key: "",
+            requiresApp: true,
+            result: PressKeyResult(affordanceFound: true, strategy: "typed_raw")
+        )
+    ) -> (PressKeyCommand, [String: FakePressKeyStrategy]) {
+        let registry = PressKeyRegistry(fallback: fallback)
+        var byKey: [String: FakePressKeyStrategy] = ["": fallback]
+        for s in strategies {
+            registry.register(s)
+            byKey[s.key] = s
+        }
+        return (PressKeyCommand(registry: registry), byKey)
+    }
+
     func testPressKeyRejectsMissingKey() {
-        let cmd = PressKeyCommand()
+        let (cmd, _) = makePressKeyCommand(strategies: [])
         let req = Request(id: 1, type: "pressKey", args: [:])
         let resp = cmd.handle(req, bridge: MockXCUIBridge(), state: DriverState())
 
@@ -192,156 +201,127 @@ final class CommandHandlerUnitTests: XCTestCase {
         XCTAssertEqual(resp.error, "missing key")
     }
 
-    func testPressKeyHomeDoesNotRequireTrackedApp() {
-        let cmd = PressKeyCommand()
-        let bridge = MockXCUIBridge()
+    func testPressKeyDeviceWideStrategyDoesNotRequireTrackedApp() {
+        let home = FakePressKeyStrategy(
+            key: "home",
+            requiresApp: false,
+            result: PressKeyResult(affordanceFound: true, strategy: "home")
+        )
+        let (cmd, byKey) = makePressKeyCommand(strategies: [home])
+
         let req = Request(id: 1, type: "pressKey", args: ["key": "home"])
-        let resp = cmd.handle(req, bridge: bridge, state: DriverState())
+        let resp = cmd.handle(req, bridge: MockXCUIBridge(), state: DriverState())
 
         XCTAssertTrue(resp.ok)
-        XCTAssertEqual(bridge.pressKeyCalls, ["home"])
         XCTAssertEqual(resp.data["affordanceFound"] as? Bool, true)
         XCTAssertEqual(resp.data["strategy"] as? String, "home")
+        // Command invoked the strategy exactly once, with nil app.
+        XCTAssertEqual(byKey["home"]?.callCount, 1)
+        XCTAssertEqual(byKey["home"]?.lastAppWasNonNil, false)
     }
 
-    func testPressKeyBackRequiresTrackedApp() {
-        let cmd = PressKeyCommand()
+    func testPressKeyAppScopedStrategyRequiresTrackedApp() {
+        let back = FakePressKeyStrategy(
+            key: "back",
+            requiresApp: true,
+            result: PressKeyResult(affordanceFound: true, strategy: "nav_bar_back")
+        )
+        let (cmd, byKey) = makePressKeyCommand(strategies: [back])
+
         let req = Request(id: 1, type: "pressKey", args: ["key": "back"])
         let resp = cmd.handle(req, bridge: MockXCUIBridge(), state: DriverState())
 
         XCTAssertFalse(resp.ok)
         XCTAssertTrue(resp.error?.contains("no app launched") == true)
+        // Strategy must NOT have been invoked when app is missing.
+        XCTAssertEqual(byKey["back"]?.callCount, 0)
     }
 
-    func testPressKeyBackReportsAffordanceFoundFromNavBar() {
-        let cmd = PressKeyCommand()
-        let bridge = MockXCUIBridge()
-        // Default behavior: back → nav_bar_back, affordanceFound=true
-        let state = mockState()
+    func testPressKeyForwardsAffordanceResultFromStrategy() {
+        let back = FakePressKeyStrategy(
+            key: "back",
+            requiresApp: true,
+            result: PressKeyResult(affordanceFound: true, strategy: "nav_bar_back")
+        )
+        let (cmd, byKey) = makePressKeyCommand(strategies: [back])
 
         let req = Request(id: 1, type: "pressKey", args: ["key": "back"])
-        let resp = cmd.handle(req, bridge: bridge, state: state)
+        let resp = cmd.handle(req, bridge: MockXCUIBridge(), state: mockState())
 
         XCTAssertTrue(resp.ok)
         XCTAssertEqual(resp.data["affordanceFound"] as? Bool, true)
         XCTAssertEqual(resp.data["strategy"] as? String, "nav_bar_back")
-        XCTAssertEqual(bridge.pressKeyCalls, ["back"])
+        XCTAssertEqual(byKey["back"]?.callCount, 1)
+        XCTAssertEqual(byKey["back"]?.lastAppWasNonNil, true)
     }
 
-    func testPressKeyBackReportsAffordanceNotFoundOnEdgeSwipeFallback() {
-        let cmd = PressKeyCommand()
-        let bridge = MockXCUIBridge()
-        // Override: simulate nav bar absent → edge-swipe fallback.
-        // Exercises the `affordanceFound=false` wire response path and
-        // proves PressKeyCommand faithfully passes the bridge's result
-        // through without rewriting it.
-        bridge.pressKeyBehavior = { _ in
-            PressKeyResult(affordanceFound: false, strategy: "edge_swipe_best_effort")
-        }
-        let state = mockState()
+    func testPressKeyForwardsAffordanceFalseForEdgeSwipeFallback() {
+        // Exercises the `affordanceFound=false` wire response path.
+        let back = FakePressKeyStrategy(
+            key: "back",
+            requiresApp: true,
+            result: PressKeyResult(affordanceFound: false, strategy: "edge_swipe_best_effort")
+        )
+        let (cmd, _) = makePressKeyCommand(strategies: [back])
 
         let req = Request(id: 1, type: "pressKey", args: ["key": "back"])
-        let resp = cmd.handle(req, bridge: bridge, state: state)
+        let resp = cmd.handle(req, bridge: MockXCUIBridge(), state: mockState())
 
         XCTAssertTrue(resp.ok) // wire-level ok; affordance outcome is in data
         XCTAssertEqual(resp.data["affordanceFound"] as? Bool, false)
         XCTAssertEqual(resp.data["strategy"] as? String, "edge_swipe_best_effort")
     }
 
-    // MARK: - ResolveSelectorCommand
-
-    func testResolveSelectorRequiresTrackedApp() {
-        let cmd = ResolveSelectorCommand()
-        let req = Request(id: 1, type: "resolveSelector", args: ["resourceId": "foo"])
-        let resp = cmd.handle(req, bridge: MockXCUIBridge(), state: DriverState())
-
-        XCTAssertFalse(resp.ok)
-        XCTAssertTrue(resp.error?.contains("no app launched") == true)
-    }
-
-    func testResolveSelectorReturnsNotFoundByDefault() {
-        let cmd = ResolveSelectorCommand()
-        let bridge = MockXCUIBridge() // default resolveBehavior = .notFound
-        let state = mockState()
-
-        let req = Request(id: 1, type: "resolveSelector", args: ["resourceId": "nope"])
-        let resp = cmd.handle(req, bridge: bridge, state: state)
-
-        XCTAssertTrue(resp.ok)
-        XCTAssertEqual(resp.data["found"] as? Bool, false)
-    }
-
-    func testResolveSelectorPassesQueryThroughAndEmitsFullResponse() {
-        let cmd = ResolveSelectorCommand()
-        let bridge = MockXCUIBridge()
-        bridge.resolveBehavior = { _ in
-            ResolvedResult(
-                found: true,
-                resolvedBy: "resourceId",
-                frame: CGRect(x: 20, y: 100, width: 400, height: 44),
-                identifier: "com.example.row",
-                label: "Settings",
-                value: nil,
-                enabled: true,
-                obscuredBy: nil
+    func testPressKeyFallsBackToRegistryFallbackForUnknownKey() {
+        let (cmd, byKey) = makePressKeyCommand(
+            strategies: [],
+            fallback: FakePressKeyStrategy(
+                key: "",
+                requiresApp: true,
+                result: PressKeyResult(affordanceFound: true, strategy: "typed_raw")
             )
-        }
-        let state = mockState()
+        )
 
-        let req = Request(id: 1, type: "resolveSelector", args: [
-            "resourceId": "com.example.row",
-            "nth": 0,
-        ])
-        let resp = cmd.handle(req, bridge: bridge, state: state)
+        let req = Request(id: 1, type: "pressKey", args: ["key": "volume_up"])
+        let resp = cmd.handle(req, bridge: MockXCUIBridge(), state: mockState())
 
         XCTAssertTrue(resp.ok)
-        XCTAssertEqual(resp.data["found"] as? Bool, true)
-        XCTAssertEqual(resp.data["resolvedBy"] as? String, "resourceId")
-        XCTAssertEqual(resp.data["identifier"] as? String, "com.example.row")
-        XCTAssertEqual(resp.data["label"] as? String, "Settings")
-        XCTAssertEqual(resp.data["enabled"] as? Bool, true)
-        // Midpoint: x=220, y=122; size 400×44
-        XCTAssertEqual(resp.data["x"] as? Int, 220)
-        XCTAssertEqual(resp.data["y"] as? Int, 122)
-        XCTAssertEqual(resp.data["w"] as? Int, 400)
-        XCTAssertEqual(resp.data["h"] as? Int, 44)
-        // Not obscured → no obscuredBy field in response
-        XCTAssertNil(resp.data["obscuredBy"])
-        // Bridge recorded the query with the resourceId passed through
-        XCTAssertEqual(bridge.resolveCalls.count, 1)
-        XCTAssertEqual(bridge.resolveCalls.first?.resourceId, "com.example.row")
+        XCTAssertEqual(resp.data["strategy"] as? String, "typed_raw")
+        // Fallback received the raw key so it could type it.
+        XCTAssertEqual(byKey[""]?.lastKey, "volume_up")
     }
 
-    func testResolveSelectorPassesObscuredByThrough() {
-        let cmd = ResolveSelectorCommand()
-        let bridge = MockXCUIBridge()
-        bridge.resolveBehavior = { _ in
-            ResolvedResult(
-                found: true,
-                resolvedBy: "resourceId",
-                frame: CGRect(x: 20, y: 400, width: 400, height: 44),
-                identifier: "com.example.row",
-                label: "Settings",
-                value: nil,
-                enabled: true,
-                obscuredBy: ObscurerInfo(
-                    role: "other",
-                    identifier: "modal-sheet",
-                    label: "Notification Settings"
-                )
-            )
-        }
-        let state = mockState()
+    // MARK: - PressKeyRegistry
 
-        let req = Request(id: 1, type: "resolveSelector", args: ["resourceId": "com.example.row"])
-        let resp = cmd.handle(req, bridge: bridge, state: state)
+    func testPressKeyRegistryResolvesRegisteredStrategy() {
+        let home = FakePressKeyStrategy(
+            key: "home",
+            requiresApp: false,
+            result: PressKeyResult(affordanceFound: true, strategy: "home")
+        )
+        let fallback = FakePressKeyStrategy(
+            key: "",
+            requiresApp: true,
+            result: PressKeyResult(affordanceFound: true, strategy: "typed_raw")
+        )
+        let registry = PressKeyRegistry(fallback: fallback)
+        registry.register(home)
 
-        XCTAssertTrue(resp.ok)
-        let obscuredBy = resp.data["obscuredBy"] as? [String: Any]
-        XCTAssertNotNil(obscuredBy)
-        XCTAssertEqual(obscuredBy?["role"] as? String, "other")
-        XCTAssertEqual(obscuredBy?["identifier"] as? String, "modal-sheet")
-        XCTAssertEqual(obscuredBy?["label"] as? String, "Notification Settings")
+        let resolved = registry.resolve("home")
+        XCTAssertTrue(resolved is FakePressKeyStrategy)
+        XCTAssertEqual(resolved.key, "home")
+    }
+
+    func testPressKeyRegistryRoutesUnknownKeyToFallback() {
+        let fallback = FakePressKeyStrategy(
+            key: "",
+            requiresApp: true,
+            result: PressKeyResult(affordanceFound: true, strategy: "typed_raw")
+        )
+        let registry = PressKeyRegistry(fallback: fallback)
+
+        let resolved = registry.resolve("never_registered")
+        XCTAssertEqual(resolved.key, "")
     }
 
     // MARK: - GetScreenSizeCommand
@@ -369,20 +349,6 @@ final class CommandHandlerUnitTests: XCTestCase {
         XCTAssertTrue(resp.ok)
         XCTAssertEqual(resp.data["width"] as? Int, 430)
         XCTAssertEqual(resp.data["height"] as? Int, 932)
-    }
-
-    func testSelectorQueryIgnoresEmptyStrings() {
-        // Empty strings must NOT populate the query — otherwise the
-        // snapshot walker treats empty-matches as "match any element
-        // with empty identifier", which would return every wrapper.
-        let query = SelectorQuery.fromArgs([
-            "resourceId": "",
-            "contentDesc": "General",
-            "text": "",
-        ])
-        XCTAssertNil(query.resourceId)
-        XCTAssertEqual(query.contentDesc, "General")
-        XCTAssertNil(query.text)
     }
 
     // MARK: - ClearFocusedInputCommand
@@ -606,12 +572,12 @@ final class CommandHandlerUnitTests: XCTestCase {
     // MARK: - Wire protocol
 
     func testRequestDecodeRoundTrip() {
-        let json = "{\"id\":7,\"type\":\"dumpTree\",\"args\":{\"limit\":50}}"
+        let json = "{\"id\":7,\"type\":\"dumpRawTree\",\"args\":{\"limit\":50}}"
         let req = Request.decode(json)
 
         XCTAssertNotNil(req)
         XCTAssertEqual(req?.id, 7)
-        XCTAssertEqual(req?.type, "dumpTree")
+        XCTAssertEqual(req?.type, "dumpRawTree")
         XCTAssertEqual(req?.args["limit"] as? Int, 50)
     }
 
@@ -648,25 +614,14 @@ final class CommandHandlerUnitTests: XCTestCase {
 /// with that ref are fine because `MockXCUIBridge` ignores the `app`
 /// parameter on every method. Tests must NOT call `.launch()` on the
 /// returned ref — that would require a real simulator.
-///
-/// `pressKey` uses a closure-based behavior override
-/// (`pressKeyBehavior`) so tests can simulate `affordanceFound=false`
-/// without adding mock subclasses.
 final class MockXCUIBridge: XCUIBridge {
     var tapCalls: [(CGFloat, CGFloat)] = []
     var terminateCalls: [String] = []
     var longPressCalls: [(CGFloat, CGFloat, TimeInterval)] = []
     var swipeCalls: [(CGFloat, CGFloat, CGFloat, CGFloat, TimeInterval)] = []
-    var pressKeyCalls: [String] = []
     var screenshotCallCount = 0
     var typeTextCalls: [String] = []
     var launchCalls: [String] = []
-    var resolveCalls: [SelectorQuery] = []
-
-    /// Override to simulate selector resolution outcomes. Default
-    /// returns `.notFound` — tests set this to an explicit
-    /// `ResolvedResult` when they want a happy path.
-    var resolveBehavior: (SelectorQuery) -> ResolvedResult = { _ in .notFound }
 
     /// Override to simulate keyboard presence / layout. Default
     /// returns `.notVisible` so tests that don't care about the
@@ -684,22 +639,6 @@ final class MockXCUIBridge: XCUIBridge {
         CGSize(width: 430, height: 932)
     }
 
-    /// Override to simulate alternate affordance outcomes (e.g.
-    /// edge-swipe-fallback). Default returns `affordanceFound=true`
-    /// with a plausible strategy per key.
-    var pressKeyBehavior: (String) -> PressKeyResult = { key in
-        switch key {
-        case "home":
-            return PressKeyResult(affordanceFound: true, strategy: "home")
-        case "enter":
-            return PressKeyResult(affordanceFound: true, strategy: "enter")
-        case "back":
-            return PressKeyResult(affordanceFound: true, strategy: "nav_bar_back")
-        default:
-            return PressKeyResult(affordanceFound: true, strategy: "typed_raw")
-        }
-    }
-
     func launchApp(bundleId: String) -> XCUIApplication {
         launchCalls.append(bundleId)
         // Returns a reference WITHOUT launching. Safe for unit tests
@@ -709,10 +648,6 @@ final class MockXCUIBridge: XCUIBridge {
 
     func terminateApp(bundleId: String) {
         terminateCalls.append(bundleId)
-    }
-
-    func dumpElements(app _: XCUIApplication, limit _: Int) -> DumpResult {
-        DumpResult(total: 0, elements: [])
     }
 
     func tapAt(app _: XCUIApplication, x: CGFloat, y: CGFloat) {
@@ -732,11 +667,6 @@ final class MockXCUIBridge: XCUIBridge {
         swipeCalls.append((fromX, fromY, toX, toY, durationSeconds))
     }
 
-    func pressKey(app _: XCUIApplication, key: String) -> PressKeyResult {
-        pressKeyCalls.append(key)
-        return pressKeyBehavior(key)
-    }
-
     func screenshot() -> String {
         screenshotCallCount += 1
         return "ZmFrZS1wbmc=" // base64("fake-png")
@@ -744,11 +674,6 @@ final class MockXCUIBridge: XCUIBridge {
 
     func typeText(app _: XCUIApplication, text: String) {
         typeTextCalls.append(text)
-    }
-
-    func resolveSelector(app _: XCUIApplication, query: SelectorQuery) -> ResolvedResult {
-        resolveCalls.append(query)
-        return resolveBehavior(query)
     }
 
     func getKeyboard(app _: XCUIApplication) -> KeyboardInfoResult {
@@ -771,4 +696,31 @@ private func mockState(bundleId: String = "com.example.mock") -> DriverState {
     state.currentApp = XCUIApplication(bundleIdentifier: bundleId)
     state.currentBundleId = bundleId
     return state
+}
+
+/// Test double for `PressKeyStrategy`. Records call count, last `key`
+/// passed, and whether the `app` parameter was non-nil — enough for
+/// command-level tests to prove routing and guard behavior without
+/// touching XCUI primitives. Returns a canned `PressKeyResult`.
+final class FakePressKeyStrategy: PressKeyStrategy {
+    let key: String
+    let requiresApp: Bool
+    private let result: PressKeyResult
+
+    private(set) var callCount = 0
+    private(set) var lastKey: String?
+    private(set) var lastAppWasNonNil: Bool = false
+
+    init(key: String, requiresApp: Bool, result: PressKeyResult) {
+        self.key = key
+        self.requiresApp = requiresApp
+        self.result = result
+    }
+
+    func execute(key: String, app: XCUIApplication?) -> PressKeyResult {
+        callCount += 1
+        lastKey = key
+        lastAppWasNonNil = app != nil
+        return result
+    }
 }

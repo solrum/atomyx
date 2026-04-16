@@ -4,67 +4,27 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.content.Intent
 import android.graphics.Path
-import android.graphics.Rect
 import android.os.Bundle
 import android.view.accessibility.AccessibilityNodeInfo
 
 /**
  * Dispatches gestures and node actions through the AccessibilityService.
  *
- * SELECTOR-FIRST design (Phase G):
- *   - tap(selector): resolves selector to live node via SelectorResolver,
- *                    auto-dismisses keyboard if the target is occluded,
- *                    dispatches a gesture at the resolved bounds.
- *   - inputText(selector, text): resolves to live node, performAction(SET_TEXT).
- *   - typeViaKeyboard(text): taps individual keyboard keys for secure fields.
+ * Coordinate-first contract: the host-side TS adapter
+ * (`@atomyx/core-driver-android`) runs selector resolution on the
+ * canonical `TreeNode` it builds from `/tree`, then calls coordinate
+ * primitives here. The APK never receives a `Selector` — it only
+ * speaks points + the text-input helpers below.
  *
- * No more elementId-based actions. Selector is the only contract.
+ * Keyboard / typing helpers (`typeViaKeyboard`, `clearFocusedInput`)
+ * are kept on the device side because they need multiple tightly
+ * sequenced reads of the focused-node state that would cost too
+ * many adb roundtrips to orchestrate host-side.
  */
 class GestureDispatcher(
     private val service: AccessibilityService,
     private val uiTree: UiTreeService,
-    private val resolver: SelectorResolver,
 ) {
-
-    fun tap(selector: SelectorResolver.Selector): TapResult {
-        val resolved = resolver.resolve(selector)
-            ?: return TapResult(success = false, reason = "selector did not match any element: $selector")
-
-        val rect = resolved.bounds
-        try {
-            // Validate bounds
-            if (rect.left < 0 || rect.top < 0 || rect.width() <= 0 || rect.height() <= 0) {
-                return TapResult(success = false, reason = "invalid bounds for ${selector}: $rect")
-            }
-
-            // Auto-dismiss keyboard if the target is visually occluded.
-            val isInIme = isNodeInImeWindow(resolved.node)
-            if (!isInIme) {
-                val kb = uiTree.getKeyboardInfo()
-                if (kb.visible && kb.bounds != null && Rect.intersects(rect, kb.bounds)) {
-                    service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
-                    try { Thread.sleep(500) } catch (_: InterruptedException) {}
-                    uiTree.markDirty()
-                    // Re-resolve after layout shift
-                    val refreshed = resolver.resolve(selector)
-                    if (refreshed != null) {
-                        try {
-                            tapAt(refreshed.bounds.exactCenterX(), refreshed.bounds.exactCenterY())
-                            return TapResult(true, "ok (after auto-dismiss keyboard)")
-                        } finally {
-                            try { refreshed.node.recycle() } catch (_: Exception) {}
-                        }
-                    }
-                    // fall through and tap original bounds
-                }
-            }
-
-            tapAt(rect.exactCenterX(), rect.exactCenterY())
-            return TapResult(true, "ok via ${resolved.resolvedBy}")
-        } finally {
-            try { resolved.node.recycle() } catch (_: Exception) {}
-        }
-    }
 
     fun tapAt(x: Float, y: Float) {
         require(x >= 0 && y >= 0) { "tap coordinates must be non-negative: ($x, $y)" }
@@ -83,24 +43,6 @@ class GestureDispatcher(
         }
         val stroke = GestureDescription.StrokeDescription(path, 0L, durationMs)
         service.dispatchGesture(GestureDescription.Builder().addStroke(stroke).build(), null, null)
-    }
-
-    fun inputText(selector: SelectorResolver.Selector, text: String): TapResult {
-        val resolved = resolver.resolve(selector)
-            ?: return TapResult(false, "selector did not match any element: $selector")
-        try {
-            val args = Bundle().apply {
-                putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
-            }
-            val ok = resolved.node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
-            return if (ok) {
-                TapResult(true, "ok via ${resolved.resolvedBy}")
-            } else {
-                TapResult(false, "ACTION_SET_TEXT rejected — field may be in a secure keyboard, use type_via_keyboard instead")
-            }
-        } finally {
-            try { resolved.node.recycle() } catch (_: Exception) {}
-        }
     }
 
     fun typeViaKeyboard(text: String, perKeyDelayMs: Long = 80L, clearFirst: Boolean = true): TypeResult {
@@ -477,15 +419,6 @@ class GestureDispatcher(
             m.invoke(am, packageName)
         } catch (_: Exception) {
             am.killBackgroundProcesses(packageName)
-        }
-    }
-
-    private fun isNodeInImeWindow(node: AccessibilityNodeInfo): Boolean {
-        return try {
-            val win = node.window ?: return false
-            win.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_INPUT_METHOD
-        } catch (_: Exception) {
-            false
         }
     }
 

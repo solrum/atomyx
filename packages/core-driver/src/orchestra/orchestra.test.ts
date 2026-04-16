@@ -84,6 +84,46 @@ describe("Orchestra.tap with selector", () => {
     if (r.ok) assert.equal(r.resolvedBy, "label");
   });
 
+  it("obscurement ancestor check works across fresh hierarchy instances", async () => {
+    // Regression: Orchestra.prepareSelectorForAction used to call
+    // driver.hierarchy() twice — once via scroll.ensureVisible and
+    // once explicitly for the obscurement check — then compared
+    // TreeNode references between the two results. On real
+    // drivers that rebuild the TreeNode graph from JSON per call,
+    // the two trees are referentially distinct even when
+    // structurally identical, so detectObscurement's `topmost ===
+    // target` + `containsNode(reference walk)` both silently
+    // returned false. The algorithm then fell through to generic-
+    // container suppression, which does NOT suppress nodes with
+    // distinctive role or non-empty id — so every tap on an
+    // ordinary element that happened to be its own pre-order
+    // topmost (i.e. any interior leaf) reported "obscured by
+    // [itself]".
+    //
+    // The bug stayed hidden because MockDriver.stageHierarchyRepeated
+    // pushes the SAME TreeNode instance N times, which
+    // accidentally satisfies the reference equality. Stage two
+    // DEEP COPIES here so each hierarchy() call returns a fresh
+    // object graph — that's what real IosDriver / AndroidDriver
+    // produce.
+    const tree1 = loginTree();
+    const tree2 = JSON.parse(JSON.stringify(tree1)) as ReturnType<typeof loginTree>;
+    const driver = new MockDriver();
+    driver.stageHierarchy(tree1);
+    driver.stageHierarchy(tree2);
+    driver.stageHierarchyRepeated(tree2, 5);
+    const orchestra = new Orchestra({ driver, clock: new FakeClock() });
+
+    const result = await orchestra.tap({ id: "login_btn" });
+    assert.equal(
+      result.ok,
+      true,
+      result.ok
+        ? ""
+        : `tap should succeed on unobscured element but got: ${result.reason}`,
+    );
+  });
+
   it("returns ok:false with obscurer info when element is covered by a modal", async () => {
     const { root, target } = modalObscuredTree();
     const treeWithEnabled = {

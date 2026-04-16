@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineTool } from "../tool-definition.js";
+import { defineTool, orchestraOrFail } from "../tool-definition.js";
 import type { TreeNode } from "@atomyx/core-driver";
 
 const GetUiTreeArgs = z
@@ -39,11 +39,15 @@ export const getUiTreeTool = defineTool({
   description:
     "Capture the current UI hierarchy as a flat depth-annotated list of " +
     "elements. Each entry includes role, id, text, label, bounds, and " +
-    "interactive state. Use as the first call after launch_app or after a " +
-    "navigation action to orient yourself before tapping.",
+    "interactive state. THIS IS YOUR PRIMARY OBSERVATION TOOL — call it " +
+    "FIRST after launch_app, after every navigation action (tap, back, " +
+    "swipe), and whenever you need to understand the current screen. " +
+    "Prefer this over screenshot — it is faster, cheaper, and gives you " +
+    "actionable selectors for tap/input_text directly.",
   inputSchema: GetUiTreeArgs,
   async execute(args, ctx) {
-    const tree = await ctx.orchestra.hierarchy();
+    const orchestra = orchestraOrFail(ctx);
+    const tree = await orchestra.hierarchy();
     const flat = flatten(tree, 0);
     const limited = args.limit ? flat.slice(0, args.limit) : flat;
     return {

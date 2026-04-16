@@ -36,15 +36,15 @@ describe("zodToJsonSchema", () => {
     assert.equal(props.items!.items.type, "string");
   });
 
-  it("converts unions to oneOf", () => {
+  it("converts unions to anyOf", () => {
     const s = z.object({
       v: z.union([z.string(), z.number()]),
     });
     const j = zodToJsonSchema(s);
-    const props = j.properties as Record<string, { oneOf: Array<{ type: string }> }>;
-    assert.equal(props.v!.oneOf.length, 2);
-    assert.equal(props.v!.oneOf[0]!.type, "string");
-    assert.equal(props.v!.oneOf[1]!.type, "number");
+    const props = j.properties as Record<string, { anyOf: Array<{ type: string }> }>;
+    assert.equal(props.v!.anyOf.length, 2);
+    assert.equal(props.v!.anyOf[0]!.type, "string");
+    assert.equal(props.v!.anyOf[1]!.type, "number");
   });
 
   it("preserves description from Zod .describe()", () => {
@@ -77,16 +77,20 @@ describe("zodToJsonSchema", () => {
     assert.equal(j.type, "object");
   });
 
-  it("union of object literals (e.g. tap args)", () => {
+  it("union of object literals flattened to single object (safety net)", () => {
     const s = z.union([
       z.object({ selector: z.object({ id: z.string() }) }),
       z.object({ x: z.number(), y: z.number() }),
     ]);
     const j = zodToJsonSchema(s);
-    const oneOf = j.oneOf as Array<{ type: string }>;
-    assert.equal(oneOf.length, 2);
-    assert.equal(oneOf[0]!.type, "object");
-    assert.equal(oneOf[1]!.type, "object");
+    // Top-level anyOf is forbidden by Claude API — safety net
+    // merges all object branches into a single type:"object".
+    assert.equal(j.type, "object");
+    assert.equal(j.anyOf, undefined);
+    const props = j.properties as Record<string, { type: string }>;
+    assert.equal(props.selector!.type, "object");
+    assert.equal(props.x!.type, "number");
+    assert.equal(props.y!.type, "number");
   });
 
   it("literals become const", () => {

@@ -27,3 +27,10 @@ export * from "./ios.driver.js";
 export * from "./tree-normalizer.js";
 export { TcpClient, TcpClientError, type TcpClientOptions } from "./tcp-client.js";
 export { Iproxy, IproxyError, type IproxyOptions } from "./iproxy.js";
+export {
+  XctestLauncher,
+  XctestLauncherError,
+  type XctestLauncherOptions,
+  canConnect,
+  probeDriverPing,
+} from "./xctest-launcher.js";

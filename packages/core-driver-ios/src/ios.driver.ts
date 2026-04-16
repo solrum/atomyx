@@ -13,6 +13,7 @@ import type {
 } from "@atomyx/core-driver";
 import { TcpClient } from "./tcp-client.js";
 import { Iproxy } from "./iproxy.js";
+import { XctestLauncher } from "./xctest-launcher.js";
 import { normalizeIosTree, type IosRawElement } from "./tree-normalizer.js";
 
 /**
@@ -36,10 +37,12 @@ import { normalizeIosTree, type IosRawElement } from "./tree-normalizer.js";
  *
  * What this driver deliberately does NOT do:
  *
- *   - Selector resolution. The Swift `resolveSelector` command
- *     still exists on the driver side (legacy), but this host
- *     adapter never calls it. All selector logic lives in
- *     `@atomyx/core` via `compileSelector` + `Finder`.
+ *   - Selector resolution. The Swift driver used to ship a
+ *     `resolveSelector` command; that was removed in the iOS
+ *     refactor so the driver speaks ONLY coordinates. All
+ *     selector logic lives in `@atomyx/core-driver` via
+ *     `compileSelector` + `Finder` operating on the canonical
+ *     `TreeNode` this adapter emits from `dumpRawTree`.
  *
  *   - Scroll-into-view. Core's `ScrollController` drives this
  *     host-side by composing `hierarchy()` + `swipe()`
@@ -78,6 +81,21 @@ export interface IosDriverOptions {
   readonly connectTimeoutMs?: number;
   /** Per-call request timeout. Default 15s. */
   readonly requestTimeoutMs?: number;
+
+  /**
+   * When true, `connect()` will auto-detect and spawn the
+   * XCUITest runner if it is not already listening. Requires the
+   * native iOS driver project to be present on disk (either in
+   * the repo tree or via ATOMYX_IOS_DRIVER_DIR env var).
+   *
+   * Default: false (preserve backward compat with manual
+   * `make serve`).
+   */
+  readonly autoLaunch?: boolean;
+  /** Path to `native/ios-driver/` directory. Used when autoLaunch is true. */
+  readonly projectDir?: string;
+  /** Apple Development Team ID. Required for autoLaunch on real devices. */
+  readonly devTeam?: string;
 }
 
 export class IosDriver implements Driver {
@@ -94,6 +112,7 @@ export class IosDriver implements Driver {
   private readonly port: number;
   private readonly tcp: TcpClient;
   private readonly iproxy: Iproxy | null;
+  private readonly launcher: XctestLauncher | null;
   private lastLaunchedBundleId = "";
 
   constructor(private readonly opts: IosDriverOptions) {
@@ -112,11 +131,30 @@ export class IosDriver implements Driver {
             devicePort: this.port,
           })
         : null;
+    this.launcher =
+      opts.autoLaunch
+        ? new XctestLauncher({
+            udid: opts.udid,
+            kind: opts.kind,
+            port: this.port,
+            projectDir: opts.projectDir,
+            devTeam: opts.devTeam ?? process.env.ATOMYX_DEV_TEAM,
+            log: (msg) =>
+              process.stderr.write(`[atomyx/ios] ${msg}\n`),
+          })
+        : null;
   }
 
   // ── Lifecycle ────────────────────────────────────────────────
 
   async connect(): Promise<void> {
+    // Auto-launch: detect-or-spawn the XCUITest runner before
+    // opening the transport. Must happen before iproxy — the
+    // driver process must be running before the tunnel has
+    // anything to connect to.
+    if (this.launcher) {
+      await this.launcher.ensureRunning();
+    }
     if (this.iproxy) {
       await this.iproxy.start();
     }
@@ -130,6 +168,11 @@ export class IosDriver implements Driver {
     await this.tcp.disconnect();
     if (this.iproxy) {
       await this.iproxy.stop();
+    }
+    // Only shut down the launcher if WE spawned the child.
+    // If we detected a pre-existing runner, shutdown() is a no-op.
+    if (this.launcher) {
+      await this.launcher.shutdown();
     }
     this.lastLaunchedBundleId = "";
   }
@@ -185,20 +228,28 @@ export class IosDriver implements Driver {
 
   async eraseText(count: number): Promise<void> {
     // Swift driver has `clearFocusedInput` which bulk-sends
-    // delete keys to the focused field. Ignores the explicit
-    // count — always clears everything. Close enough for the
-    // framework's "erase before type" flow.
-    await this.tcp.call("clearFocusedInput", { maxKeys: count });
+    // delete keys to the focused field. The arg name on the
+    // wire is `maxDeletes` — Swift caps it at 500 to avoid
+    // runaway repeat counts.
+    await this.tcp.call("clearFocusedInput", { maxDeletes: count });
   }
 
   async pressKey(key: KeyCode): Promise<KeyResult> {
     const data = await this.tcp.call("pressKey", { key });
-    // Swift driver returns {ok, reason?} in the data envelope
-    // for iOS `pressKey("back")` specifically — iOS has no
-    // system back, the driver tries on-screen affordances.
+    // Swift `PressKeyCommand` returns `{key, affordanceFound,
+    // strategy}`. `affordanceFound=true` means a verifiable
+    // control was used (nav_bar_back, home device press, enter
+    // into focused field); `false` means a best-effort gesture
+    // was dispatched but the driver cannot confirm any effect
+    // (e.g. edge_swipe_best_effort for iOS back gesture). We
+    // surface that directly as the `KeyResult` ok flag, and
+    // pass the strategy name through as `reason` for agent
+    // observability.
+    const affordanceFound = data.affordanceFound === true;
+    const strategy = typeof data.strategy === "string" ? data.strategy : undefined;
     return {
-      ok: data.ok !== false,
-      reason: typeof data.reason === "string" ? data.reason : undefined,
+      ok: affordanceFound,
+      reason: strategy,
     };
   }
 

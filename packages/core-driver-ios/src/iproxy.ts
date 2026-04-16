@@ -1,5 +1,5 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import net from "node:net";
+import { canConnect, probeDriverPing } from "./xctest-launcher.js";
 
 /**
  * `iproxy` (libimobiledevice) tunnel lifecycle. The Swift driver
@@ -179,65 +179,4 @@ export class Iproxy {
   }
 }
 
-/**
- * One-shot TCP connect with timeout. Used by Iproxy for both
- * the pre-spawn occupancy check and the post-spawn reachability
- * poll. Pure probe — no data sent.
- */
-function canConnect(port: number, timeoutMs: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const sock = net.createConnection({ host: "127.0.0.1", port });
-    let done = false;
-    const finish = (ok: boolean) => {
-      if (done) return;
-      done = true;
-      sock.destroy();
-      resolve(ok);
-    };
-    sock.once("connect", () => finish(true));
-    sock.once("error", () => finish(false));
-    setTimeout(() => finish(false), timeoutMs);
-  });
-}
-
-/**
- * Handshake probe — opens a throwaway socket, sends a `ping`
- * request, and checks whether the response matches an Atomyx
- * driver's shape (`{ok:true, data:{pong:true}}`). Used to
- * distinguish "existing Atomyx driver tunnel we can reuse" from
- * "unrelated process squatting the port".
- */
-function probeDriverPing(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const sock = net.createConnection({ host: "127.0.0.1", port });
-    let done = false;
-    let buf = "";
-    const finish = (ok: boolean) => {
-      if (done) return;
-      done = true;
-      sock.removeAllListeners();
-      sock.destroy();
-      resolve(ok);
-    };
-    sock.setEncoding("utf8");
-    sock.once("connect", () => {
-      sock.write(JSON.stringify({ id: 0, type: "ping", args: {} }) + "\n");
-    });
-    sock.on("data", (chunk: string) => {
-      buf += chunk;
-      const nl = buf.indexOf("\n");
-      if (nl < 0) return;
-      try {
-        const msg = JSON.parse(buf.slice(0, nl)) as {
-          ok?: boolean;
-          data?: { pong?: boolean };
-        };
-        finish(msg.ok === true && msg.data?.pong === true);
-      } catch {
-        finish(false);
-      }
-    });
-    sock.once("error", () => finish(false));
-    setTimeout(() => finish(false), 1000);
-  });
-}
+// canConnect and probeDriverPing imported from xctest-launcher.ts

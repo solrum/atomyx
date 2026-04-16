@@ -99,6 +99,22 @@ export function ancestorsOf(cursor: TreeCursor): TreeCursor[] {
 }
 
 /**
+ * Walk the parent chain of a cursor up to the root and return the
+ * root's `node`. Useful when a consumer holds a cursor into a tree
+ * and needs the tree root without fetching a fresh `hierarchy()` —
+ * e.g. Orchestra's obscurement pass wants to detect blockers in
+ * the SAME tree the cursor points into, so that
+ * `detectObscurement`'s reference-identity checks work.
+ *
+ * Cheap — O(depth), no tree walk, no allocation.
+ */
+export function rootNodeOf(cursor: TreeCursor): TreeNode {
+  let c: TreeCursor = cursor;
+  while (c.parent) c = c.parent;
+  return c.node;
+}
+
+/**
  * Collect every descendant of a cursor (NOT including itself),
  * in pre-order. Produces fresh `TreeCursor` instances with this
  * cursor as their common ancestor chain root — parents are NOT

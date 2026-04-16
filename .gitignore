@@ -91,3 +91,6 @@ desktop.ini
 # Template committed as device.env.example; real config is local only.
 native/ios-driver/device.env
 native/ios-driver/AtomyxDriver.xcodeproj/
+
+# local-development
+atomyx-local/

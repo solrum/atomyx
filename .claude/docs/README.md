@@ -37,6 +37,16 @@ BUILT.
 - [`ios.md`](./ios.md) — iOS implementation deep dive: bridge
   decision log, Phase tracking, Swift driver internals, real
   device setup, CI matrix.
+- [`android-shrink.md`](./android-shrink.md) — completed Android
+  APK shrink record (executed alongside the legacy `src/` retire).
+  Dead-code inventory that survived kept here for the historical
+  record and the next platform shrink.
+- [`cli-ios-simulator.md`](./cli-ios-simulator.md) — **deferred
+  batch plan**: make `atomyx-driver mcp --platform ios --kind
+  simulator` spawn the Swift XCUITest runner itself instead of
+  requiring `make serve` in a second terminal. Can't execute in
+  a sandbox without Xcode — plan doc is the deliverable until a
+  contributor with a local Mac picks it up.
 
 ## Why under `.claude/`?
 

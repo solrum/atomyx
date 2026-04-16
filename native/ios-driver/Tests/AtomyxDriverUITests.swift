@@ -36,18 +36,24 @@ final class AtomyxDriverUITests: XCTestCase {
     func testServeCommands() throws {
         let bridge = DefaultXCUIBridge()
         let state = DriverState()
+
+        // Press-key strategy composition root. Adding a new key =
+        // drop in a new `PressKeyStrategy` file and register it here.
+        let pressKeyRegistry = PressKeyRegistry(fallback: FallbackTypeStrategy())
+        pressKeyRegistry.register(HomeKeyStrategy())
+        pressKeyRegistry.register(EnterKeyStrategy())
+        pressKeyRegistry.register(BackKeyStrategy())
+
         let registry = CommandRegistry()
         registry.register(PingCommand())
         registry.register(LaunchAppCommand())
         registry.register(ForceStopAppCommand())
-        registry.register(DumpTreeCommand())
         registry.register(TapAtCommand())
         registry.register(LongPressAtCommand())
         registry.register(SwipeCommand())
-        registry.register(PressKeyCommand())
+        registry.register(PressKeyCommand(registry: pressKeyRegistry))
         registry.register(ScreenshotCommand())
         registry.register(TypeTextCommand())
-        registry.register(ResolveSelectorCommand())
         registry.register(ClearFocusedInputCommand())
         registry.register(GetKeyboardCommand())
         registry.register(DumpRawTreeCommand())

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineTool } from "../tool-definition.js";
+import { defineTool, orchestraOrFail } from "../tool-definition.js";
 import { SelectorSchema, compileSelectorInput } from "../selector-schema.js";
 
 const InputTextArgs = z
@@ -37,25 +37,26 @@ export const inputTextTool = defineTool({
     "clearFirst=false to append instead of overwrite (default clears).",
   inputSchema: InputTextArgs,
   async execute(args, ctx) {
+    const orchestra = orchestraOrFail(ctx);
     if (args.selector) {
       const selector = compileSelectorInput(args.selector);
-      return ctx.orchestra.inputText(selector, args.text, {
+      return orchestra.inputText(selector, args.text, {
         clearFirst: args.clearFirst,
       });
     }
     // Coordinate path: tap to focus, then type. No selector
     // pipeline — caller already knows where the field is.
-    await ctx.orchestra.tapAt({ x: args.x!, y: args.y! });
+    await orchestra.tapAt({ x: args.x!, y: args.y! });
     if (args.clearFirst !== false) {
       // Try to clear via Orchestra's eraseText primitive when
       // the driver supports it. Otherwise fall through silently.
       try {
-        await ctx.orchestra.eraseText(999);
+        await orchestra.eraseText(999);
       } catch {
         // Driver lacks canEraseText — caller may need to clear manually.
       }
     }
-    await ctx.orchestra.typeText(args.text);
+    await orchestra.typeText(args.text);
     return {
       ok: true,
       detail: `typed ${args.text.length} char(s) at (${args.x},${args.y})`,

@@ -141,47 +141,6 @@ class UiTreeService(
     }
 
     @Synchronized
-    fun findEntry(elementId: String): RegistryEntry? = registry[elementId]
-
-    /**
-     * Re-find a live AccessibilityNodeInfo by stable selector. Used by
-     * GestureDispatcher.inputText to get a FRESH (non-stale) node for
-     * performAction(SET_TEXT).
-     */
-    fun findLiveNode(elementId: String): AccessibilityNodeInfo? {
-        val entry = registry[elementId] ?: return null
-
-        // Try by resourceId first (most stable)
-        if (!entry.resourceId.isNullOrBlank()) {
-            for (win in (service.windows ?: emptyList())) {
-                val root = try { win.root } catch (_: Exception) { null } ?: continue
-                try {
-                    val matches = root.findAccessibilityNodeInfosByViewId(entry.resourceId)
-                    if (matches != null && matches.isNotEmpty()) return matches.first()
-                } finally {
-                    root.recycle()
-                }
-            }
-        }
-
-        // Fallback: find by text
-        val text = entry.text
-        if (!text.isNullOrBlank()) {
-            for (win in (service.windows ?: emptyList())) {
-                val root = try { win.root } catch (_: Exception) { null } ?: continue
-                try {
-                    val matches = root.findAccessibilityNodeInfosByText(text)
-                    if (matches != null && matches.isNotEmpty()) return matches.first()
-                } finally {
-                    root.recycle()
-                }
-            }
-        }
-
-        return null
-    }
-
-    @Synchronized
     fun recycleRegistry() {
         registry.clear()
         cachedDto = null

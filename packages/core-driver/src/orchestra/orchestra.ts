@@ -4,6 +4,7 @@ import type { Logger } from "../infra/logger.port.js";
 import { NoopLogger } from "../infra/logger.port.js";
 import type { TreeNode } from "../tree/tree-node.js";
 import type { TreeCursor } from "../tree/tree-cursor.js";
+import { rootNodeOf } from "../tree/tree-cursor.js";
 import { AttrKeys, getAttr } from "../tree/tree-node.js";
 import { parseBounds, boundsCenter } from "../tree/bounds.js";
 import type { Selector } from "../selectors/selector.js";
@@ -279,6 +280,21 @@ export class Orchestra {
     await this.driver.killApp(appId);
   }
 
+  /** Enumerate installed apps on the current device. */
+  async listApps(): Promise<readonly import("../driver/driver.port.js").InstalledApp[]> {
+    return this.driver.listApps();
+  }
+
+  /** Foreground app info (bundleId + optional activity). */
+  async currentForeground(): Promise<import("../driver/driver.port.js").ForegroundInfo> {
+    return this.driver.currentForeground();
+  }
+
+  /** Device info (platform, version, model, udid, kind). */
+  async deviceInfo(): Promise<import("../driver/driver.port.js").DeviceInfo> {
+    return this.driver.deviceInfo();
+  }
+
   // ── Media ────────────────────────────────────────────────────
 
   async screenshot(): Promise<Uint8Array> {
@@ -347,12 +363,29 @@ export class Orchestra {
       throw err;
     }
 
-    // Obscurement check — uses the tree we just worked with via
-    // `ScrollController`, so we do one more hierarchy call. The
-    // alternative is threading the tree through the ensureVisible
-    // return value; keeping it simple for now, can optimize with a
-    // shared snapshot cache later.
-    const tree = await this.driver.hierarchy();
+    // Obscurement check against the SAME tree the cursor points
+    // into. We walk the cursor's parent chain up to the root and
+    // pass that `TreeNode` to `detectObscurement` — NOT a fresh
+    // `driver.hierarchy()` call.
+    //
+    // Why not fetch a fresh hierarchy here: `detectObscurement`
+    // uses reference identity (`topmost === target` +
+    // `containsNode(reference walk)`) for the ancestor
+    // disambiguation path. On real drivers that rebuild the
+    // TreeNode graph from JSON per call, two successive
+    // `hierarchy()` calls produce referentially-distinct node
+    // instances even for identical screen state. Passing a fresh
+    // root + the cursor's stale node would make every reference
+    // check fail, collapsing the ancestor path into dead code and
+    // falling through to the generic-container suppression
+    // (which only covers role=container/other with empty
+    // id/label). Any interior leaf would then get flagged
+    // "obscured by itself".
+    //
+    // By reusing the cursor's own tree we keep reference identity
+    // valid, detect real obscurers correctly, AND save one
+    // hierarchy RPC per selector action.
+    const tree = rootNodeOf(cursor);
     const ob = detectObscurement(tree, cursor.node);
     if (ob.obscured) {
       return {

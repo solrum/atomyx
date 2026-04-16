@@ -2,8 +2,11 @@
 /**
  * Atomyx core-driver CLI entry point.
  *
- * `atomyx-driver` binary. Parses argv, dispatches to subcommand
- * handlers, prints structured errors on failure.
+ * `atomyx-driver` binary — utility commands for the core-driver
+ * module. Does NOT host the MCP server; that's a PARALLEL
+ * transport shipped as `atomyx-mcp` from
+ * `@atomyx/core-driver-mcp`. See `.claude/docs/architecture.md`
+ * §3 for the "CLI and MCP are sibling transports" contract.
  *
  * The shebang line above lets npm install this as a global
  * binary (npm i -g @atomyx/core-driver-cli) and have it
@@ -12,7 +15,6 @@
  */
 
 import { ArgvError, parseArgv, printHelp } from "./argv.js";
-import { runMcp } from "./commands/mcp.js";
 import { runListDevices } from "./commands/list-devices.js";
 
 const VERSION = "0.1.0";
@@ -31,9 +33,6 @@ async function main(): Promise<void> {
   }
 
   switch (argv.command) {
-    case "mcp":
-      await runMcp(argv);
-      return;
     case "list-devices":
       await runListDevices();
       return;

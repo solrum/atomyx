@@ -22,12 +22,11 @@ for tool-specific implementation details see [`tools.md`](./tools.md).
 5. **Native drivers** — Swift XCUITest bundle (`native/ios-driver/`)
    and Kotlin APK (`native/android-agent/`). They speak the TCP /
    HTTP wire protocol the TS driver adapters consume.
-6. **Legacy `src/`** — the pre-refactor TS runtime with 19 MCP
-   tools. Still functional; slated for deletion once the new
-   framework is validated end-to-end against real devices.
-
 Adding a new platform = implement the `Driver` port from
 `@atomyx/core-driver`. No core changes needed.
+
+The pre-refactor `src/` runtime was retired when the new
+framework reached parity — see the "retire legacy" commit.
 
 ## Repo map
 
@@ -64,7 +63,7 @@ atomyx/
 │   │                            TCP client to Swift driver +
 │   │                            tree normalizer + iproxy lifecycle
 │   ├── core-driver-mcp/       @atomyx/core-driver-mcp
-│   │                            createMcpServer factory + 9 tools
+│   │                            createMcpServer factory + 21 tools
 │   ├── core-driver-cli/       @atomyx/core-driver-cli
 │   │                            bin: atomyx-driver — the end-user
 │   │                            entry point
@@ -98,19 +97,11 @@ atomyx/
 │   ├── tools.md               tool implementation reference
 │   ├── development.md         build / test / extend workflow
 │   ├── pitfalls.md            known traps for contributors
-│   └── ios.md                 iOS bridge decision log + internals
+│   ├── ios.md                 iOS bridge decision log + internals
+│   └── android-shrink.md      completed Android APK shrink record
 │
-├── src/                       ← LEGACY (19-tool server) — delete after
-│                                   the new CLI is validated against real
-│                                   devices in a smoke run
 └── .github/workflows/
 ```
-
-The legacy `src/` MCP server still exists alongside the new
-packages during the strangler-fig transition.
-`packages/core-driver-cli/` now ships the replacement entry
-point (`atomyx-driver mcp`); once it is validated against real
-devices, `src/` is deleted in one atomic commit.
 
 **Module conceptual grouping**: a "module" in Atomyx is the
 set of packages sharing a name prefix. `core-driver` module =
@@ -120,31 +111,22 @@ The grouping is implicit in naming, not explicit in directory
 structure — keeps paths shallow and matches Playwright /
 Maestro / React monorepo conventions.
 
-## Tool surfaces
+## Tool surface
 
-Atomyx has two parallel tool surfaces during the strangler-fig
-transition:
-
-**New — `@atomyx/core-driver-mcp` (9 tools)**. The current
-active surface. Every tool is a thin `defineTool` wrapper that
-calls Orchestra methods. See [`tools.md`](./tools.md) for the
-full contract.
+`@atomyx/core-driver-mcp` ships 21 tools, every one a thin
+`defineTool` wrapper that calls Orchestra methods. See
+[`tools.md`](./tools.md) for the full contract.
 
 | Category | Tools |
 |---|---|
-| App | `launch_app` |
+| Device + app lifecycle | `list_devices`, `list_apps`, `launch_app` |
 | Screen | `get_ui_tree`, `find_element`, `screenshot` |
-| Actions | `tap` (selector/coords), `input_text`, `swipe`, `press_key` |
+| Actions | `tap`, `tap_and_wait_transition`, `input_text`, `swipe`, `press_key` |
 | Wait | `wait_for_element` |
+| Run lifecycle + reporting | `start_run`, `finish_run`, `report_bug` |
+| Run + bug queries | `list_runs`, `get_run`, `list_bugs`, `get_bug` |
+| Guidance | `add_case_study`, `get_case_studies` |
 
-**Legacy — `src/` (19 tools)**. Still running, slated for
-deletion. Adds `list_devices`, `select_device`, `list_apps`,
-`tap_and_wait_transition`, `start_run`, `finish_run`,
-`report_bug`, `get_playbook`, `add_case_study`,
-`get_case_studies`. These will migrate into
-`@atomyx/core-driver-mcp` incrementally as real usage demands
-them through the new Orchestra-backed pipeline.
-
-The tool surface was consolidated from ~40 to 19 because agents were confused
-by overlapping intents. Before adding a tool, ask whether an existing tool can
-absorb the new intent via a parameter.
+The surface was consolidated so each tool has exactly one
+intent. Before adding a tool, ask whether an existing tool
+can absorb the new intent via a parameter.
