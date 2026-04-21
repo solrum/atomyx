@@ -4,5 +4,23 @@
   "private": true,
   "description": "Atomyx test management module — case + report manager (skeleton, not yet implemented). See README.md for the planned package surface and persona.",
   "license": "Apache-2.0",
-  "type": "module"
+  "type": "module",
+  "author": "Solrum",
+  "homepage": "https://atomyx.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/solrum/atomyx.git",
+    "directory": "packages/test-mgmt"
+  },
+  "bugs": {
+    "url": "https://github.com/solrum/atomyx/issues"
+  },
+  "keywords": [
+    "atomyx",
+    "mobile",
+    "testing",
+    "automation",
+    "test-management",
+    "reporting"
+  ]
 }

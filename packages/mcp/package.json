@@ -29,5 +29,26 @@
   },
   "engines": {
     "node": ">=20.0.0"
-  }
+  },
+  "author": "Solrum",
+  "homepage": "https://atomyx.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/solrum/atomyx.git",
+    "directory": "packages/mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/solrum/atomyx/issues"
+  },
+  "keywords": [
+    "atomyx",
+    "mobile",
+    "testing",
+    "automation",
+    "mcp",
+    "model-context-protocol",
+    "agent",
+    "ai",
+    "claude"
+  ]
 }
