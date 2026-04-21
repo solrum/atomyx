@@ -31,5 +31,25 @@
   },
   "engines": {
     "node": ">=20.0.0"
-  }
+  },
+  "author": "Solrum",
+  "homepage": "https://atomyx.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/solrum/atomyx.git",
+    "directory": "packages/driver"
+  },
+  "bugs": {
+    "url": "https://github.com/solrum/atomyx/issues"
+  },
+  "keywords": [
+    "atomyx",
+    "mobile",
+    "testing",
+    "automation",
+    "driver",
+    "orchestra",
+    "selector",
+    "ui-tree"
+  ]
 }

@@ -239,11 +239,10 @@ describe("tools/call dispatch — happy path", () => {
   });
 
   it("wait_for_element returns find_element-shaped success payload", async () => {
-    // Regression test for the Batch 15 audit finding: wait_for_element
-    // used to return only {id, text, label, role, bounds: rawString}
-    // — agents had to call find_element again to get `center`,
-    // `enabled`, `clickable`, and `value`. Normalize to the
-    // find_element shape so poll-then-use-coordinates is one call.
+    // wait_for_element returns the same shape as find_element —
+    // `center`, `enabled`, `clickable`, `value` included — so agents
+    // can poll and pass `center` straight to `tap({x, y})` without
+    // a follow-up find_element call.
     const { server } = await buildServer();
     const result = await callTool(server, "wait_for_element", {
       selector: { id: "login_btn" },
@@ -272,8 +271,8 @@ describe("tools/call dispatch — happy path", () => {
   // `clock.sleep` that never resolves. Driving the clock forward in
   // parallel is doable (see the `tap_and_wait_transition` FakeClock
   // test in new-tools.test.ts for the pattern) but overkill here —
-  // the positive test above proves the shape normalization which is
-  // the actual Batch 15 audit fix.
+  // the positive test above proves the shape normalization that
+  // callers depend on.
 });
 
 describe("tools/call validation + errors", () => {

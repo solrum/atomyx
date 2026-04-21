@@ -4,5 +4,24 @@
   "private": true,
   "description": "Atomyx Studio — GUI client for Power User persona (skeleton, not yet implemented). See README.md for the planned package surface and composition pattern.",
   "license": "Apache-2.0",
-  "type": "module"
+  "type": "module",
+  "author": "Solrum",
+  "homepage": "https://atomyx.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/solrum/atomyx.git",
+    "directory": "packages/studio"
+  },
+  "bugs": {
+    "url": "https://github.com/solrum/atomyx/issues"
+  },
+  "keywords": [
+    "atomyx",
+    "mobile",
+    "testing",
+    "automation",
+    "studio",
+    "gui",
+    "tauri"
+  ]
 }

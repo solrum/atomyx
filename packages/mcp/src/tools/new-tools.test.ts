@@ -646,11 +646,9 @@ describe("tap_and_wait_transition", () => {
   });
 
   it("uses ctx.clock for polling — FakeClock makes the tool deterministic", async () => {
-    // Regression test for Batch 15 audit finding: the tool used to
-    // call Date.now() + setTimeout directly, which forced wall-clock
-    // delays under FakeClock-driven tests. After the refactor it goes
-    // through ctx.clock, so a shared FakeClock injected into both
-    // Orchestra AND createMcpServer lets us fast-forward completely.
+    // The tool polls via ctx.clock, so a shared FakeClock injected
+    // into both Orchestra AND createMcpServer lets tests fast-forward
+    // completely without wall-clock delays.
     //
     // The test drives the clock forward in a microtask-yielding loop
     // to simulate real polling: each iteration flushes pending
