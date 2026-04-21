@@ -1,0 +1,76 @@
+name: AtomyxDriver
+options:
+  bundleIdPrefix: dev.atomyx
+  deploymentTarget:
+    iOS: '16.0'
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: '5.9'
+    IPHONEOS_DEPLOYMENT_TARGET: '16.0'
+    CODE_SIGN_STYLE: ${CODE_SIGN_STYLE}
+    CODE_SIGNING_REQUIRED: 'NO'
+    CODE_SIGNING_ALLOWED: 'NO'
+
+targets:
+  AtomyxHostApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+    info:
+      path: App/Generated-Info.plist
+      properties:
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: ${BUNDLE_ID}
+      PRODUCT_NAME: AtomyxHostApp
+      TARGETED_DEVICE_FAMILY: '1,2'
+      GENERATE_INFOPLIST_FILE: 'NO'
+      INFOPLIST_FILE: App/Generated-Info.plist
+      PROVISIONING_PROFILE_SPECIFIER: ${PROVISIONING_PROFILE_SPECIFIER}
+      DEVELOPMENT_TEAM: ${DEV_TEAM}
+
+  AtomyxDriverAgent:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      # Link host app as build dependency only — NOT as test host.
+      # This prevents XcodeGen from injecting BUNDLE_LOADER and
+      # TEST_TARGET_NAME, which would make the runner load into
+      # the host app process. We want a standalone runner so it
+      # can be installed + launched without re-verifying host app
+      # signing every time — critical for proxy-on scenarios.
+      - target: AtomyxHostApp
+        embed: false
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: ${BUNDLE_ID}
+      PRODUCT_NAME: $(TARGET_NAME)
+      GENERATE_INFOPLIST_FILE: 'NO'
+      INFOPLIST_FILE: Tests/Info.plist
+      ENABLE_TESTING_SEARCH_PATHS: 'YES'
+      SWIFT_OBJC_BRIDGING_HEADER: Tests/Bridge/AtomyxBridgingHeader.h
+      PROVISIONING_PROFILE_SPECIFIER: ${PROVISIONING_PROFILE_SPECIFIER}
+      DEVELOPMENT_TEAM: ${DEV_TEAM}
+      CODE_SIGN_IDENTITY: "Apple Development"
+      # Explicitly clear to prevent injection into the host app
+      # process. XcodeGen auto-infers these from the dependency —
+      # override with empty values so the runner stays standalone.
+      TEST_HOST: ""
+      BUNDLE_LOADER: ""
+      TEST_TARGET_NAME: ""
+
+schemes:
+  AtomyxDriver:
+    build:
+      targets:
+        AtomyxHostApp: all
+        AtomyxDriverAgent: [test]
+    test:
+      targets:
+        - AtomyxDriverAgent
+      gatherCoverageData: false

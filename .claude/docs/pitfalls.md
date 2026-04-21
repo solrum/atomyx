@@ -13,14 +13,16 @@ area. For the high-level map see [`repo-map.md`](./repo-map.md).
   it. Replacing clobbers XML-declared capabilities and causes
   `service.windows` to return empty.
 - **Never dispatch gestures at coordinates behind the IME.**
-  `GestureDispatcher.tap()` auto-dismisses the IME if the target intersects
-  the keyboard bounds. Additionally, `tap_coordinates`-via-`tap({x,y})`
-  rejects coords inside the IME window via the `coordInIme` geometric check.
+  Orchestra's `tap(selector)` pipeline auto-dismisses the keyboard when
+  obscurement flags a keyboard-role node blocking the target AND the
+  session flag `maybeKeyboardOpen` was set by a prior `inputText`.
+  The agent-side `tap({x,y})` path also rejects coords inside the IME
+  window via a geometric check.
 - **Never call `typeViaKeyboard` without accounting for IME layout switches.**
   When focus moves from a numeric field to a text field, the keyboard
-  re-renders; the handler polls via `waitForKeyboardReady` with a fast path.
-  It also has a `typeViaOnScreenKeys` fallback for custom in-app keypads
-  (Flutter banking apps).
+  re-renders; the handler polls internally before per-key dispatch and
+  falls through to `typeViaOnScreenKeys` for custom in-app keypads
+  (banking apps, OTP entry widgets).
 - **`ResourceIdStrategy` has a walk fallback for Flutter / Compose / RN.**
   Android's `findAccessibilityNodeInfosByViewId` requires fully qualified
   `package:id/name` — Flutter exposes ids like `G01-05-01/2` without a
@@ -35,6 +37,72 @@ area. For the high-level map see [`repo-map.md`](./repo-map.md).
   setting the a11y clickable flag. The tool layer ignores the flag when
   deciding whether to tap; do not add a clickable filter.
 
+- **Never run gesture commands on the accessibility-service main
+  thread.** `AccessibilityService.dispatchGesture(g, callback,
+  handler=null)` delivers its `GestureResultCallback` on the
+  service's main thread. Calling `GestureRunner.dispatch` from
+  main would block main waiting on a latch that only the main
+  thread can fire — indistinguishable from a 30s hang. NanoHTTPD
+  worker threads are off-main, which is the supported entry
+  point. If a new code path dispatches gestures from a non-route
+  context, route it through a background executor first. Same
+  class of bug as iOS's main-thread completion-block deadlock.
+- **Two-tier capability gate for `dispatchGesture`.** The host
+  adapter validates `canMultiPointer` / `canPressure` /
+  pressure-range / empty before leaving the driver; the APK's
+  `GestureRunner.validatePointers` re-validates everything on
+  arrival. Either tier alone is insufficient — a bypassed host
+  (direct HTTP poke) or a bypassed device (older APK build)
+  would leak unsafe gestures. Removing a rule from one side is
+  a regression even when the other still catches it.
+- **`GestureDescription.StrokeDescription` requires `duration > 0`
+  and non-decreasing timestamps.** `GestureRunner.validatePointers`
+  enforces monotonic-non-decreasing offsets at parse time; zero-
+  duration taps survive because `buildStroke` floors each stroke
+  at `MIN_PRESS_MS` (50ms). Any new stroke-building path must
+  apply the same floor or the platform rejects the gesture with
+  `IllegalArgumentException` — caught as an uncaught exception
+  in the route handler rather than a structured rejection.
+- **`canPressure` is permanently false on Android.** The
+  accessibility gesture surface has no per-touch pressure API at
+  any current Android level. Do not add a "maybe supported on
+  device X" flip — the entire backend is pressure-less, and the
+  host validator relies on this being a hard no. If Google ever
+  ships a pressure-carrying `StrokeDescription` constructor,
+  flip in one place: `GestureRunner.GestureCapabilities.DEFAULT`.
+- **Long-press-then-drag must flow through the multi-phase
+  dispatcher, not a single `GestureDescription`.**
+  `GestureRunner` already routes single-pointer paths through
+  `dispatchMultiPhase`: each adjacent waypoint pair becomes one
+  `GestureDescription` with `willContinue=true` on its stroke,
+  hold segments emit a minimal stroke and sleep the remainder
+  at Kotlin level, move segments emit their full duration. The
+  pointer stays DOWN between dispatches because
+  `willContinue=true` preserves the touch across calls (the
+  `AccessibilityService.dispatchGesture` contract).
+
+  The reason a single-description approach is wrong: a
+  `GestureDescription` stroke whose Path is zero-length still
+  emits periodic same-coordinate `ACTION_MOVE` events (the
+  platform interpolates at roughly 10ms inside every stroke's
+  active window regardless of path length). That stream defeats
+  any recogniser that uses a null-check on "have we received a
+  move yet?" instead of a slop threshold — Flutter's
+  `DelayedMultiDragGestureRecognizer`, which backs
+  `ReorderableListView`, is one such recogniser. Slop-based
+  long-press (`LongPressGestureRecognizer`) tolerates the
+  zero-delta MOVEs, which is why `onLongPress` works with a
+  single-description hold but reorder does not.
+
+  Do NOT try to fix this by collapsing the hold stroke to
+  `MIN_PRESS_MS` and pushing the next stroke's `startTime` to
+  the real hold offset in hope of a silent gap within ONE
+  description. `continueStroke` requires adjacent start times
+  inside a single `GestureDescription`; gaps are silently
+  compressed and the author's 1.4s timeline dispatches in tens
+  of milliseconds. The silent hold only works as a Kotlin-level
+  sleep BETWEEN dispatch calls.
+
 ## Tool layer (cross-platform)
 
 - **Never import anything from `@synapse/*` or any parent-repo path.** Atomyx
@@ -45,8 +113,9 @@ area. For the high-level map see [`repo-map.md`](./repo-map.md).
   iOS uses a host-side bridge. Design tools against `DeviceController`, not
   against the Android HTTP API.
 - **Never add a tool that duplicates an existing tool's intent.** The
-  consolidation from 40 → 19 fixed a measurable agent-confusion problem. If
-  your new tool overlaps `input_text` / `tap` / `find_element`, extend the
+  surface is deliberately small (27 tools) — overlapping tools cause
+  measurable agent confusion. If your new tool overlaps `input_text` /
+  `tap` / `find_element`, extend the
   existing tool with a new param instead.
 - **Do not render resourceId as a path-like short form** (e.g.
   `#G01-05-01/2`). Agents misparse the `/` as a path separator. Use explicit
@@ -56,19 +125,59 @@ area. For the high-level map see [`repo-map.md`](./repo-map.md).
   `ctx.invalidateUiCache()` first (`server.ts` dispatches this automatically
   for mutating tools).
 - **Do not inline business logic in a tool handler.** Tools under
-  `packages/core-driver-mcp/src/tools/` must delegate to `Orchestra`
-  methods from `@atomyx/core-driver`. If you need new behavior, add
+  `packages/mcp/src/tools/` must delegate to `Orchestra`
+  methods from `@atomyx/driver`. If you need new behavior, add
   it to `Orchestra` / `Finder` / `ScrollController` and call it from
-  the tool — never paste logic into `execute()`. The previous
-  `src/tools/core/` strategy-class pattern is being phased out; new
-  work uses the functional filter composition in
-  `packages/core-driver/src/filters/` + the `compileSelector`
-  priority broadening policy.
+  the tool — never paste logic into `execute()`. Filter composition
+  lives in `packages/driver/src/filters/` and the
+  `compileSelector` priority-broadening policy lives in
+  `packages/driver/src/selectors/`.
+
+## Observation-driven input + waits
+
+- **Never introduce hardcoded sleeps in Orchestra action pipelines.**
+  Fixed sleeps (`sleep(300)` after tap, `stepDelay: 500` between
+  steps, `Thread.sleep(100)` verify windows) are fragile across
+  Flutter / RN / iOS. Driver adapters self-synchronize on focus +
+  keyboard; Orchestra should not add its own waits without a
+  concrete observable justifying them.
+- **The `maybeKeyboardOpen` session flag controls the tap keyboard-
+  gate.** It is set after every `inputText`; if you invent a new
+  Orchestra action that implicitly opens the keyboard, set the flag
+  too or subsequent taps will not dismiss correctly on obscurement.
+  Clear the flag in `launchApp` / `stopApp` / `hideKeyboard` to avoid
+  stale state.
+- **Selector ranking respects `nth` as an opt-out.** Without `nth`,
+  `compileSelector` sorts candidates by `clickable + focused` score.
+  With `nth: N` it preserves document order and picks the Nth match.
+  When recording a script where positional selection matters, keep
+  the `nth:` in place.
+- **Waits live in `packages/driver/src/waits/`, not Orchestra.**
+  `waitForFocus`, `waitForText`, `waitForInputReady`,
+  `waitForInputCommitted`, `waitForKeyboard`, `waitForTreeStable`
+  are free functions that take `Clock` for unit-test determinism.
+  Add new waits here (following the same signature pattern), not
+  inside Orchestra.
+- **Script `handle` polls — do not insert `sleep:` before it.** The
+  `handle` command polls the UI tree at 100 ms intervals up to its
+  `timeout` (default 5 s) waiting for a branch `when` condition to
+  hold. Scripts that padded a `sleep: 3000` before `handle` just
+  waste wall-clock now; remove them.
+
+## iOS clear-input
+
+- **`ClearFocusedInputCommand` uses ⌘A + ⌫ first, then an exact-
+  length delete-loop fallback.** The fast path requires simulator
+  hardware-keyboard pairing (`xcrun simctl keyboard <udid> enable
+  hardware`, or Simulator I/O → Keyboard menu); without it ⌘A types
+  a literal "a" then ⌫ deletes it, and the fallback loop reads the
+  focused value length from `app.snapshot()` to delete exactly that
+  many characters. When the field is already empty the command
+  short-circuits with `strategy: "already-empty"`.
 
 ## iOS control plane
 
-Traps surfaced while shipping Phase 3. Order = severity (most likely
-to bite a new contributor first).
+Order = severity (most likely to bite a new contributor first).
 
 ### Process / state
 
@@ -112,11 +221,11 @@ to bite a new contributor first).
   one — see `IosXctestController.toCompactElement`).
 
 - **`XCUIElementQuery.waitForExistence(timeout:)` can false-negative
-  even on short timeouts.** Verified against kabuappStation where
-  `app.keyboards.element(boundBy: 0).waitForExistence(timeout: 0.2)`
-  returned false despite the keyboard being present in the same
-  tick's `app.snapshot()`. For anything requiring reliable detection,
-  prefer snapshot walk over element-query polling.
+  even on short timeouts.** On app screens with a custom keyboard
+  mounted, `app.keyboards.element(boundBy: 0).waitForExistence(
+  timeout: 0.2)` returns false despite the keyboard being present in
+  the same tick's `app.snapshot()`. For anything requiring reliable
+  detection, prefer snapshot walk over element-query polling.
 
 - **Unbounded recursion on deeply-nested trees.** Flutter / React
   Native apps routinely nest 30+ `other` wrapper layers. Any tree
@@ -158,20 +267,19 @@ to bite a new contributor first).
   `"type20"` in tree dumps — unreadable for agents doing role
   filtering. `DefaultXCUIBridge.elementTypeName` covers 70+ cases
   with `@unknown default` for forward compat. When bumping the
-  Xcode matrix (Phase 4), grep for `"type\d+"` in smoke outputs
-  to catch new element types Apple added.
+  Xcode support matrix, grep for `"type\d+"` in smoke outputs to
+  catch new element types Apple added.
 
 ### Flutter / cross-platform assumptions
 
-- **Flutter apps do NOT universally use custom keypads.** Week 1
-  assumption (banking apps always draw their own `GestureDetector`
-  keypads) was invalidated by `inc.guide.kabuappStation.dev` which
-  uses the iOS system keyboard and native `typeText()` works fine.
-  When designing a custom-keypad fallback, do NOT assume all
-  Flutter apps need it — check `getKeyboard()` first, branch on
-  visibility. The fallback path (host-side compose: dumpTree key
-  scan → per-char tap) remains unvalidated until a real
-  custom-keypad fixture surfaces.
+- **Flutter apps do NOT universally use custom keypads.** Some
+  banking apps use the iOS
+  system keyboard and native `typeText()` works directly. When
+  designing a custom-keypad fallback, do NOT assume every Flutter
+  app needs it — check `getKeyboard()` first, branch on
+  visibility. The host-side compose fallback (dumpTree key scan →
+  per-char tap) is only exercised when a real custom-keypad
+  surface is present.
 
 - **Interactive-type empty wrappers are noise.** Some `button` /
   `cell` elements in Flutter trees have empty
@@ -187,10 +295,10 @@ to bite a new contributor first).
   suspends the process within seconds of backgrounding. All our
   transport is TCP from the XCUITest process (host-side).
 
-- **Never commit to a new bridge approach without discussion.** The
-  current Swift-driver path was chosen after evaluating Appium, WDA,
-  idb, and Maestro (see `ios.md` decision log). Switching the
-  bridge is a multi-week rewrite — propose in an issue first.
+- **Never change the iOS bridge strategy without discussion.** The
+  Swift XCUITest driver is a multi-week commitment; switching would
+  be a full rewrite of the iOS transport layer. Propose in an issue
+  first so the operational impact is scoped before any code moves.
 
 - **Always design features to reuse the `DeviceController`
   interface.** If you find yourself adding iOS-specific methods to
@@ -202,17 +310,15 @@ to bite a new contributor first).
   simultaneously.** Simulator shares the host network namespace;
   its driver binds `127.0.0.1:22087` directly. A physical device
   needs `iproxy` to tunnel the same port via USB, but iproxy can't
-  bind the host side if the sim is already on it. Early Phase 5
-  had a race-condition bug where the adapter silently routed
-  `select_device(<real-device-udid>)` to the sim driver when both
-  were running — iproxy failed bind, the timeout-based "success"
-  heuristic resolved anyway, and the subsequent TCP connect hit
-  the sim's listener. Fix: adapter now explicitly probes the host
-  port BEFORE spawning iproxy and polls for real tunnel
-  connectivity AFTER, with hard deadlines and actionable errors.
-  **Contributors must stop one driver before starting the other**:
-  Ctrl+C the sim `make serve` terminal, or `pkill -f "xcodebuild.*AtomyxDriver"`,
-  before `make serve-device`.
+  bind the host side if the sim is already on it. The adapter
+  probes the host port with a `ping` handshake BEFORE spawning
+  iproxy and polls for real tunnel connectivity AFTER, with hard
+  deadlines and actionable errors. If the existing listener is
+  another Atomyx driver responding to `ping`, the adapter reuses
+  it rather than refusing. Contributors switching between sim and
+  device must still stop one driver before starting the other:
+  Ctrl+C the sim `make serve` terminal, or `pkill -f
+  "xcodebuild.*AtomyxDriver"`, before `make serve-device`.
 
 - **A device UDID selected via MCP does NOT automatically start the
   driver on that device.** `select_device(<device-udid>)` only
@@ -227,7 +333,7 @@ to bite a new contributor first).
 
 - **`make serve-device` uses `test-without-building` and does NOT
   rebuild the Swift driver.** After changing any Swift source under
-  `native/ios-driver/Tests/`, you MUST `make build-device` (or
+  `platforms/ios-agent/Tests/`, you MUST `make build-device` (or
   `make setup-device`) before `make serve-device`, otherwise the
   running process is the stale binary from the last build. Symptom:
   you write a Swift fix, restart the driver, and the exact same
@@ -238,7 +344,7 @@ to bite a new contributor first).
   Xcode's precompiled headers embed ABSOLUTE paths to the module
   cache location (`.../build/ModuleCache.noindex/...`). If the
   driver directory is renamed (e.g. `ios/driver/` →
-  `native/ios-driver/` during the modules-layout migration), the
+  `platforms/ios-agent/` during the modules-layout migration), the
   next build fails with:
 
       error: PCH was compiled with module cache path '/...old path...'
@@ -247,14 +353,130 @@ to bite a new contributor first).
 
   Fix: nuke the `build/` directory entirely and re-run `make setup`:
 
-      cd native/ios-driver
+      cd platforms/ios-agent
       rm -rf build/
       make setup
 
   There is no incremental migration — the PCH embeds the old path
   in binary form and xcodebuild re-uses it. Document this in any
-  commit that moves `native/ios-driver/` so contributors don't lose
+  commit that moves `platforms/ios-agent/` so contributors don't lose
   an afternoon debugging the obscure error message.
+
+- **Private XCTest symbol drift falls back silently to the
+  coordinate backend.** `EventRecordSynthesizer` looks up
+  `XCSynthesizedEventRecord`, `XCPointerEventPath`, and
+  `XCTRunnerDaemonSession` via `NSClassFromString`. When
+  Apple changes a selector signature between Xcode major
+  versions (observed 14→15 and 15→16), the probe at init
+  catches it and the factory returns `CoordinateSynthesizer`
+  instead. Multi-pointer gestures then start failing with
+  `POINTER_MULTI_NOT_SUPPORTED` right after the Xcode
+  upgrade — which reads like "my script broke" to a
+  confused user. Mitigations: the weekly cron CI job runs
+  the smoke against Xcode beta; the `ping` response carries
+  `probeLog` so contributor support can see exactly which
+  symbol drifted. When adding new private-symbol access,
+  always: (a) keep it inside `EventRecordSynthesizer.swift`
+  (the single choke point), (b) probe for it in the dry-
+  run, (c) document the expected signature in a comment
+  next to the call so version bumps can diff against the
+  current expectation. Grep rule:
+
+      grep -r 'NSClassFromString("XCSynth\|NSClassFromString("XCPointer\|NSClassFromString("XCTRunner' platforms/ios-agent/
+
+  must return exactly the lines inside
+  `EventRecordSynthesizer.swift`. Any other match is an
+  isolation violation and a review blocker.
+
+- **iOS private synthesize completion block — never declare
+  it in Swift.** The completion block on
+  `_XCT_synthesizeEvent:completion:` must be built in
+  Objective-C, not Swift. Two failure modes if you skip
+  the bridge:
+
+  1. Swift `@convention(block) (NSError?) -> Void` produces
+     a thunk that calls `objc_retain` on the argument before
+     running the body. The XCTest daemon's XPC reply is
+     observed (Xcode 16.2 / iOS 18.3) to invoke the block
+     with a sentinel pointer (0x1) instead of nil or a real
+     `NSError*`; the auto-retain crashes. Switching the
+     argument to `(AnyObject?)` only changes the crash
+     symbol from `objc_retain` to `swift_unknownObjectRetain`.
+  2. Even with an Objective-C block, ARC will emit
+     `objc_retain` on `id`-typed parameters at block entry.
+     Declare the parameter as
+     `__unsafe_unretained id _Nullable` — the daemon's
+     sentinel pointer never gets retained.
+
+  Capture rule: the block must NOT close over Swift values.
+  XPC marshalling calls `_Block_copy` on the block, and a
+  Swift-captured closure breaks that copy path with a
+  segfault inside `_Block_object_assign`. Pass everything
+  the callback needs as Objective-C parameters
+  (`dispatch_semaphore_t` is fine — it's a true ObjC type).
+
+  Reference impl in `platforms/ios-agent/Tests/Bridge/AtomyxBlockHelper.{h,m}`
+  with the bridging header at
+  `Tests/Bridge/AtomyxBridgingHeader.h` and the project.yml
+  setting `SWIFT_OBJC_BRIDGING_HEADER` pointing at it. The
+  Swift call site reads:
+
+  ```swift
+  let semaphore = DispatchSemaphore(value: 0)
+  let block: Any = atomyxMakeSemaphoreSignalingBlock(semaphore)
+  _ = session.perform(
+      NSSelectorFromString("synthesizeEvent:completion:"),
+      with: record, with: block,
+  )
+  _ = semaphore.wait(timeout: .now() + 30)
+  ```
+
+  Threading: the call MUST run on a background queue.
+  `synthesizeEvent:completion:` posts the completion block
+  to the main queue; if the dispatch is on main, main
+  blocks on `wait` and the completion can never fire.
+  `CommandServer` routes synthesizer-using commands
+  (`tapAt`, `dispatchPointer`) to the background accept
+  queue specifically for this reason — see the threading
+  policy comment in `CommandServer.swift`.
+
+- **Nested-Scrollable gesture arbitration is unreliable
+  with synthesized swipes.** A vertical `ListView` sitting
+  inside another vertical `ListView` (or any
+  `Scrollable`-in-`Scrollable` arrangement) routes
+  XCUITest-synthesized swipes intermittently to the outer
+  scrollable, even when the swipe coordinates land inside
+  the inner one. Manual MCP `swipe` commands work; rapid-
+  succession `dispatchGesture` calls do not. Until a
+  higher-level `scrollIntoView` drives nested scrollables
+  explicitly, prefer flat scrollable hierarchies in test
+  fixtures, or use MCP-level swipe (which routes through
+  `SwipeCommand` and works consistently for single
+  dispatches).
+
+- **Multi-pointer dispatch fails mid-inertia.** iOS rejects
+  `XCSynthesizedEventRecord` multi-pointer dispatches that
+  arrive while a page-scroll inertia animation is still
+  running. Symptom: pinch / rotate / two-finger gestures
+  silently fail — no error, but Flutter `onScale*` /
+  `onScaleStart` never fires. Fix: settle wait of ≥1 s
+  between any page scroll and the next multi-pointer
+  dispatch. Single-pointer dispatches do not require this
+  wait.
+
+- **Synthesizer-using commands MUST set
+  `requiresMainThread = false`.** `EventRecordSynthesizer`
+  guards against main-thread dispatch (the completion
+  block lands on main, so waiting on it from main
+  deadlocks). The default for `CommandHandler.requiresMainThread`
+  is `true`, so any new gesture command that calls
+  `synthesizer.dispatch` must explicitly opt out. Forgetting
+  this returns a hard error from the synthesizer rather
+  than a deadlock — the test suite catches it on the
+  first dispatch — but it's the kind of bug a contributor
+  trips over silently when adding a new gesture command.
+  See `TapAtCommand`, `LongPressAtCommand`, `SwipeCommand`,
+  and `DispatchPointerCommand` for the pattern.
 
 ### Agent ergonomics — selector actions
 
@@ -293,7 +515,7 @@ to bite a new contributor first).
   reports `found:false`, but the canonical agent workflow is
   "selector-first, fallback to coords" — the adapter should not
   force the agent to scroll manually when a recycled cell is the
-  root cause. `ensureVisible` has a Phase 0 `scrollSearchForSelector`
+  root cause. `ensureVisible` has a `scrollSearchForSelector` path
   that swipes the screen center column UP for N iterations (most
   anchor items live near list start), then DOWN for N iterations,
   probing `resolveSelector` between each swipe. Budget is
@@ -301,11 +523,12 @@ to bite a new contributor first).
   fallback, not the primary workflow, and runaway scrolling is
   worse than a clear "couldn't find element" error.
 
-- **Search bars ARE editable text inputs.** `find-input.ts#isEditText`
-  substring-matches `className` against a whitelist (`edittext`,
-  `textfield`, `textinput`, `securetextfield`, `editable`). iOS
-  `XCUIElementTypeSearchField` serializes as `className == "searchField"`
-  which does NOT contain `"textfield"` — so without an explicit
-  `searchfield` entry, `input_text(selector)` on iOS search UIs
-  falls back to coord-only. Added to the whitelist; any new iOS
-  editable-element class name should join the same list.
+- **Search bars ARE editable text inputs.** Any editable-element
+  whitelist that substring-matches class names (`edittext`,
+  `textfield`, `textinput`, `securetextfield`, `editable`) must
+  also include `searchfield` — iOS serializes
+  `XCUIElementTypeSearchField` as `className == "searchField"`,
+  which does NOT contain `"textfield"`. Missing it makes
+  `input_text(selector)` on iOS search UIs fall back to coord-
+  only. Any new iOS editable-element class name should join the
+  same list.

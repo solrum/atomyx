@@ -1,0 +1,56 @@
+format: atomyx/v1
+appId: dev.atomyx.demo
+name: Login flow — with OTP branching
+description: Test login with handle for OTP vs direct dashboard
+tags:
+  - login
+  - branching
+env:
+  email: otp@example.com
+  password: secret123
+  otp_code: "123456"
+---
+- launchApp
+- sleep: 1000
+- waitFor: "Sign in"
+
+# Use type with into selector — ACTION_SET_TEXT targets the correct
+# field via selector resolution instead of relying on focus state.
+- type:
+    into:
+      role: text-field
+      nth: 0
+    text: ${email}
+- type:
+    into:
+      role: text-field
+      nth: 1
+    text: ${password}
+- tap: "Login"
+
+# Handle: OTP screen or Dashboard. `when: visible` polls the tree so
+# there's no need for an explicit sleep after tapping Login — the
+# branch that lights up fires as soon as the transition renders.
+- handle:
+    - when:
+        visible: "Enter OTP"
+      do:
+        - type:
+            into:
+              role: text-field
+              nth: 0
+            text: ${otp_code}
+        - tap:
+            label: "Verify"
+            role: button
+        - waitFor:
+            text: "Dashboard"
+            timeout: 10000
+    - when:
+        visible: "Dashboard"
+      do:
+        - screenshot: direct_login
+    - otherwise: fail
+
+- assertVisible: "Welcome"
+- screenshot: login_complete

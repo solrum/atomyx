@@ -1,0 +1,26 @@
+{
+  "name": "@atomyx/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Atomyx core — generic infrastructure: Clock, Logger, Storage, Sessions, script execution contracts.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./infra": "./dist/infra/index.js",
+    "./storage": "./dist/storage/index.js",
+    "./sessions": "./dist/sessions/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test $(find src -name '*.test.ts')"
+  },
+  "dependencies": {
+    "@atomyx/shared": "0.1.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

@@ -1,120 +1,104 @@
 # Atomyx
 
-> **AI agents that test mobile apps.** Your agent thinks in user actions — open the app, tap the button, type the email, verify the screen. Atomyx handles the platform.
+> AI agents driving real mobile apps — cross-platform, selector-first,
+> open source.
 
-```ts
-await launch_app({ appId: "com.example.app" });
-await tap({ selector: { text: "Login", role: "button" } });
-await input_text({ selector: { hint: "Email" }, text: "user@test.com" });
-```
+![License](https://img.shields.io/badge/license-Apache%202.0-blue)
+![Status](https://img.shields.io/badge/status-pre--release-orange)
+![Node](https://img.shields.io/badge/node-%E2%89%A5%2020-brightgreen)
 
-Same code drives iOS and Android. By [Solrum](https://atomyx.dev) · Apache 2.0.
+Atomyx lets an AI agent drive iOS and Android apps the way a human QA
+would — discover screens, try flows, report bugs — through a small,
+stable set of high-intent tools. The same agent code drives both
+platforms; device selection, selector resolution, scroll-into-view,
+and z-order obscurement checking are handled for you.
 
+By [Solrum](https://atomyx.dev) · Apache 2.0.
+
+## What it feels like
+
+```yaml
+format: atomyx/v1
+appId: com.android.settings
+name: Settings smoke test
 ---
-
-## Install
-
-```bash
-npm install -g @atomyx/core-driver-cli
+- launchApp
+- tap: "Connections"
+- waitFor: "Wi-Fi"
+- screenshot: connections_screen
+- back
 ```
 
-Requires Node.js 20+. Platform prerequisites:
-
-- **Android**: `adb` on PATH (Android platform-tools)
-- **iOS simulator**: Xcode + booted simulator
-- **iOS device**: Xcode + Apple Developer team + `libimobiledevice` (`brew install libimobiledevice`)
-
-## Quick start
-
-### 1. Start the MCP server
-
-iOS simulator:
-
-```bash
-atomyx-driver mcp --platform ios --kind simulator
-```
-
-Android device or emulator:
-
-```bash
-atomyx-driver mcp --platform android --device emulator-5554
-```
-
-iOS physical device:
-
-```bash
-atomyx-driver mcp --platform ios --kind device --device <udid>
-```
-
-### 2. Connect from your MCP client
-
-Add to your client's MCP config (Claude Code example):
-
-```json
-{
-  "mcpServers": {
-    "atomyx": {
-      "command": "atomyx-driver",
-      "args": ["mcp", "--platform", "ios", "--kind", "simulator"]
-    }
-  }
-}
-```
-
-Restart the client → the Atomyx tools appear (`launch_app`, `tap`, `find_element`, `input_text`, `swipe`, `screenshot`, `get_ui_tree`, `wait_for_element`, `press_key`).
-
-### 3. Drive a device
-
-In a chat with your agent:
-
-> Open com.example.app, find the Login button, tap it, then type user@test.com into the email field.
-
-The agent calls the tools; Atomyx handles selector resolution, scroll-into-view, and obscurement checking automatically.
-
-## Tools
-
-| Tool | Purpose |
-|---|---|
-| `launch_app` | Bring an app to foreground |
-| `get_ui_tree` | Snapshot the current screen as a flat element list |
-| `find_element` | Resolve a selector to coordinates + metadata |
-| `tap` | Tap by selector or coordinates |
-| `input_text` | Type into a field by selector or coordinates |
-| `swipe` | Directional or two-point swipe |
-| `press_key` | Press back / home / enter / etc. |
-| `screenshot` | PNG snapshot |
-| `wait_for_element` | Polling wait with timeout |
+One YAML, same script for iOS and Android. An agent can also call the
+same underlying primitives through the MCP tool surface — the two
+front-ends share one `Driver` port.
 
 ## Status
 
-| Platform | Status | Notes |
-|---|---|---|
-| iOS simulator | 🟢 Preview | Xcode 15+ |
-| iOS physical device | 🟢 Preview | Requires Apple Developer team + iproxy |
-| Android device + emulator | 🟢 Preview | API 26+, screenshots require API 30+ |
-| Web (browser) | 🟡 Roadmap | — |
-| Desktop | 🟡 Roadmap | — |
+Pre-1.0 (current: `v0.1.0`).
 
-## Architecture
+### Platforms
 
-Atomyx ships as opt-in npm packages — install only what you need:
+| OS | State |
+|---|---|
+| Android (device + emulator) | Preview |
+| iOS (simulator + physical device) | Preview |
+| Web (browser) | Planned |
 
+### App UI frameworks
+
+| Framework | State |
+|---|---|
+| Native Android (Views + Jetpack Compose) | Preview |
+| Native iOS — UIKit | Preview |
+| Native iOS — SwiftUI | Preview (verified against Apple system apps only; custom SwiftUI apps untested) |
+| Flutter | Preview — known edge cases (custom keypads, unreliable `clickable` flag) |
+| React Native | Untested — bug reports welcome |
+
+### Features
+
+| Feature | State |
+|---|---|
+| MCP tool surface (27 tools) | First release — `@atomyx/mcp` |
+| YML script engine (17 commands) | Preview — `@atomyx/script` |
+| API capture (mitmproxy integration) | Preview |
+| Unified CLI binary (`atomyx`) | Planned |
+| Studio (GUI) | Planned |
+
+## Getting started
+
+Atomyx ships as a set of opt-in npm packages. The first published
+module is `@atomyx/mcp` — the MCP server that exposes the 27-tool
+surface to any MCP-compatible client (Claude Code, Cursor, Continue,
+custom agents).
+
+Build from source while pre-registry:
+
+```bash
+git clone https://github.com/solrum/atomyx.git
+cd atomyx && npm install && npm run build
 ```
-@atomyx/core-driver-cli         ← end-user binary (this README's install)
-  └─ depends on:
-     @atomyx/core-driver        ← framework primitives
-     @atomyx/core-driver-ios    ← iOS driver
-     @atomyx/core-driver-android   ← Android driver
-     @atomyx/core-driver-mcp    ← MCP server
-```
 
-Library consumers can skip the CLI and import the packages directly. See [`.claude/docs/architecture.md`](./.claude/docs/architecture.md) for the full architectural contract.
+Wire the built `@atomyx/mcp` binary into your MCP client's config
+(`.mcp.json` or equivalent) with a driver kind (`ios` or `android`)
+and device selector. Device prerequisites are covered in the
+contributor docs under [`.claude/docs/`](./.claude/docs/).
 
 ## Documentation
 
-- [`docs/`](./docs/) — user guides (install, MCP setup, recipes)
-- [`.claude/docs/`](./.claude/docs/) — contributor + AI-agent reference
+| Audience | Entry point |
+|---|---|
+| End users (install, run, script) | [`docs/`](./docs/) |
+| Contributors (architecture, internals, pitfalls) | [`.claude/docs/`](./.claude/docs/) |
+
+## Contributing
+
+Issues and PRs welcome. Start with
+[`.claude/docs/development.md`](./.claude/docs/development.md) for
+build, test, and extension workflows; and
+[`.claude/docs/architecture.md`](./.claude/docs/architecture.md) for
+the design contract.
 
 ## License
 
-Apache 2.0. See [LICENSE](./LICENSE).
+Apache 2.0. See [`LICENSE`](./LICENSE).

@@ -1,0 +1,35 @@
+{
+  "name": "@atomyx/driver",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Atomyx driver — device interaction framework: Driver port, Orchestra, TreeNode, Filters, Scroll, Obscurement.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./driver": "./dist/driver/index.js",
+    "./tree": "./dist/tree/index.js",
+    "./filters": "./dist/filters/index.js",
+    "./selectors": "./dist/selectors/index.js",
+    "./finder": "./dist/finder/index.js",
+    "./scroll": "./dist/scroll/index.js",
+    "./obscurement": "./dist/obscurement/index.js",
+    "./orchestra": "./dist/orchestra/index.js",
+    "./transitions": "./dist/transitions/index.js",
+    "./testing": "./dist/testing/index.js",
+    "./script": "./dist/script/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test $(find src -name '*.test.ts')"
+  },
+  "dependencies": {
+    "@atomyx/shared": "0.1.0",
+    "@atomyx/core": "0.1.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

@@ -7,36 +7,37 @@ for tool-specific implementation details see [`tools.md`](./tools.md).
 
 ## Layers
 
-1. **`@atomyx/core-driver`** (TypeScript, `packages/core-driver/`)
-   — framework primitives. Driver port, Orchestra command layer,
-   filter composition, selector priority broadening, scroll-into-view,
-   obscurement detection, infra (Clock, Logger), testing kit
-   (MockDriver). Single source of truth for cross-platform logic.
-2. **Driver adapters** — `@atomyx/core-driver-ios` and
-   `@atomyx/core-driver-android` implement the `Driver` port. Each
+1. **`@atomyx/core`** (TypeScript, `packages/core/`) — generic infra
+   (Clock, Logger, Storage, Sessions).
+   **`@atomyx/driver`** (TypeScript, `packages/driver/`) — device
+   interaction: Driver port, Orchestra command layer, filter
+   composition, selector priority broadening, scroll-into-view,
+   obscurement detection, testing kit (MockDriver). `@atomyx/driver`
+   re-exports `@atomyx/core` for convenience. Single source of truth
+   for cross-platform logic.
+2. **Driver adapters** — `@atomyx/ios-driver` and
+   `@atomyx/android-driver` implement the `Driver` port. Each
    is a thin transport + tree normalizer; no business logic.
-3. **MCP server** (`@atomyx/core-driver-mcp`) — agent-facing tool
+3. **MCP server** (`@atomyx/mcp`) — agent-facing tool
    surface. Composes Orchestra + driver + MCP stdio transport.
-4. **CLI** (`@atomyx/core-driver-cli`) — `atomyx-driver` binary
+4. **CLI** (`@atomyx/cli`) — `atomyx driver` subcommand
    that wires everything for end-user install.
-5. **Native drivers** — Swift XCUITest bundle (`native/ios-driver/`)
-   and Kotlin APK (`native/android-agent/`). They speak the TCP /
+5. **Platform drivers** — Swift XCUITest bundle (`platforms/ios-agent/`)
+   and Kotlin APK (`platforms/android-agent/`). They speak the TCP /
    HTTP wire protocol the TS driver adapters consume.
 Adding a new platform = implement the `Driver` port from
-`@atomyx/core-driver`. No core changes needed.
-
-The pre-refactor `src/` runtime was retired when the new
-framework reached parity — see the "retire legacy" commit.
+`@atomyx/driver`. No core changes needed.
 
 ## Repo map
 
 Atomyx is organized as an opt-in package ecosystem (see
 `.claude/docs/architecture.md` for the contract). All TS packages live flat
 under `packages/`. Module ownership is encoded in the package
-NAME PREFIX — `core-driver-*` for the device interaction module,
-`test-mgmt-*` for test management, `studio-*` for the GUI
-client, `cloud-*` for scale workers. Platform-native projects
-(Swift, Kotlin) live separately under `native/`.
+name convention: plain `@atomyx/<name>` for the device-interaction
+module, `@atomyx/test-mgmt-*` for test management, `@atomyx/studio-*`
+for the GUI client, `@atomyx/cloud-*` for scale workers.
+Platform-native projects (Swift, Kotlin) live separately under
+`platforms/`.
 
 ```
 atomyx/
@@ -48,24 +49,31 @@ atomyx/
 │
 ├── packages/                  ← all TS packages, flat
 │   │
-│   │── ── core-driver MODULE (Persona: Pure Developer) ──
-│   ├── core-driver/           @atomyx/core-driver
+│   │── ── driver MODULE (Persona: Pure Developer) ──
+│   ├── core/                  @atomyx/core
+│   │                            Generic infra (Clock, Logger,
+│   │                            Storage, Sessions)
+│   ├── driver/                @atomyx/driver
 │   │                            Driver port + Orchestra + filters +
 │   │                            selectors + scroll + obscurement +
-│   │                            finder + infra (clock, logger) +
-│   │                            testing utilities (MockDriver)
-│   ├── core-driver-wire/      @atomyx/core-driver-wire
+│   │                            finder + transitions + state
+│   │                            inspection + observation-driven wait
+│   │                            primitives + testing (MockDriver).
+│   │                            Re-exports @atomyx/core.
+│   ├── driver-wire/           @atomyx/driver-wire
 │   │                            Zod wire-protocol schemas
-│   ├── core-driver-android/   @atomyx/core-driver-android
+│   ├── android-driver/        @atomyx/android-driver
 │   │                            HTTP client to Kotlin APK +
 │   │                            tree normalizer + adb lifecycle
-│   ├── core-driver-ios/       @atomyx/core-driver-ios
+│   ├── ios-driver/            @atomyx/ios-driver
 │   │                            TCP client to Swift driver +
 │   │                            tree normalizer + iproxy lifecycle
-│   ├── core-driver-mcp/       @atomyx/core-driver-mcp
-│   │                            createMcpServer factory + 21 tools
-│   ├── core-driver-cli/       @atomyx/core-driver-cli
-│   │                            bin: atomyx-driver — the end-user
+│   ├── mcp/                   @atomyx/mcp
+│   │                            createMcpServer factory + 27 tools
+│   ├── script/                @atomyx/script
+│   │                            Parser + 17 commands + runner + network
+│   ├── cli/                   @atomyx/cli
+│   │                            bin: atomyx driver — the end-user
 │   │                            entry point
 │   │
 │   │── ── test-mgmt MODULE (Persona: QC Manager) ──
@@ -77,8 +85,8 @@ atomyx/
 │   └── ── cloud MODULE (Persona: Scale Operator) ──
 │       cloud/                 @atomyx/cloud (skeleton)
 │
-├── native/                    ← non-npm platform projects
-│   ├── ios-driver/            Swift XCUITest runner
+├── platforms/                 ← non-npm platform projects
+│   ├── ios-agent/             Swift XCUITest runner
 │   │                            project.yml + Tests/ + App/ + Makefile
 │   └── android-agent/         Kotlin APK
 │                                app/src/main/java/dev/atomyx/agent/
@@ -97,36 +105,26 @@ atomyx/
 │   ├── tools.md               tool implementation reference
 │   ├── development.md         build / test / extend workflow
 │   ├── pitfalls.md            known traps for contributors
-│   ├── ios.md                 iOS bridge decision log + internals
-│   └── android-shrink.md      completed Android APK shrink record
+│   ├── ios.md                 iOS driver internals
+│   └── status.md              current version + per-package test counts
 │
 └── .github/workflows/
 ```
 
 **Module conceptual grouping**: a "module" in Atomyx is the
-set of packages sharing a name prefix. `core-driver` module =
-{`core-driver`, `core-driver-wire`, `core-driver-android`,
-`core-driver-ios`, `core-driver-mcp`, `core-driver-cli`}.
+set of packages related to a feature area. Driver module =
+{`core`, `driver`, `driver-wire`, `android-driver`,
+`ios-driver`, `mcp`, `script`, `cli`}.
 The grouping is implicit in naming, not explicit in directory
-structure — keeps paths shallow and matches Playwright /
-Maestro / React monorepo conventions.
+structure — keeps paths shallow and lets `dependency-cruiser`
+enforce module boundaries at CI time rather than relying on a
+nested directory layout.
 
 ## Tool surface
 
-`@atomyx/core-driver-mcp` ships 21 tools, every one a thin
+`@atomyx/mcp` ships 27 tools, every one a thin
 `defineTool` wrapper that calls Orchestra methods. See
 [`tools.md`](./tools.md) for the full contract.
 
-| Category | Tools |
-|---|---|
-| Device + app lifecycle | `list_devices`, `list_apps`, `launch_app` |
-| Screen | `get_ui_tree`, `find_element`, `screenshot` |
-| Actions | `tap`, `tap_and_wait_transition`, `input_text`, `swipe`, `press_key` |
-| Wait | `wait_for_element` |
-| Run lifecycle + reporting | `start_run`, `finish_run`, `report_bug` |
-| Run + bug queries | `list_runs`, `get_run`, `list_bugs`, `get_bug` |
-| Guidance | `add_case_study`, `get_case_studies` |
-
-The surface was consolidated so each tool has exactly one
-intent. Before adding a tool, ask whether an existing tool
-can absorb the new intent via a parameter.
+Each tool has exactly one intent. Before adding a tool, confirm
+no existing tool can absorb the new intent via a parameter.

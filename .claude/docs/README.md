@@ -15,38 +15,42 @@ BUILT.
 
 ## Contents
 
-- [`architecture.md`](./architecture.md) — opt-in modular
-  ecosystem **contract**: persona-driven module split,
-  cross-package boundary rules, interface layering (CLI / MCP
-  / HTTP), feature-discovery via npm. The WHY and the RULES.
-  Read this first to understand how Atomyx is supposed to be
-  built.
-- [`repo-map.md`](./repo-map.md) — concrete repo layout
-  reference: which package lives where, the current 19-tool
-  surface, design tenet implementations, decision log pointers.
-  The WHAT and the WHERE. Read this when you need to find a
-  module or trace a layer.
-- [`development.md`](./development.md) — build, test, smoke,
-  add-a-tool workflow.
+- [`architecture.md`](./architecture.md) — the contract Atomyx
+  is built on: persona-driven module split, cross-package
+  boundary rules, interface layering (CLI / MCP / HTTP),
+  feature discovery via npm. Read first.
+- [`repo-map.md`](./repo-map.md) — repo layout: which package
+  lives where, tool surface pointer. Read when locating a
+  module.
 - [`tools.md`](./tools.md) — tool implementation reference:
-  file paths, response shapes, invariants. Read before editing
-  anything under `packages/core-driver-mcp/src/tools/` or the
-  legacy `src/tools/`.
-- [`pitfalls.md`](./pitfalls.md) — known traps the team has hit
-  once. Read before touching the corresponding subsystem.
-- [`ios.md`](./ios.md) — iOS implementation deep dive: bridge
-  decision log, Phase tracking, Swift driver internals, real
-  device setup, CI matrix.
-- [`android-shrink.md`](./android-shrink.md) — completed Android
-  APK shrink record (executed alongside the legacy `src/` retire).
-  Dead-code inventory that survived kept here for the historical
-  record and the next platform shrink.
-- [`cli-ios-simulator.md`](./cli-ios-simulator.md) — **deferred
-  batch plan**: make `atomyx-driver mcp --platform ios --kind
-  simulator` spawn the Swift XCUITest runner itself instead of
-  requiring `make serve` in a second terminal. Can't execute in
-  a sandbox without Xcode — plan doc is the deliverable until a
-  contributor with a local Mac picks it up.
+  file paths, response shapes, invariants, Orchestra contract,
+  observable state + wait primitives. Read before editing
+  anything under `packages/mcp/src/tools/` or
+  `packages/driver/src/{state,waits}/`.
+- [`development.md`](./development.md) — build, test, smoke,
+  and extension checklists.
+- [`pitfalls.md`](./pitfalls.md) — known traps per subsystem.
+  Read before touching the relevant code.
+- [`ios.md`](./ios.md) — iOS driver internals: architecture
+  split, host-side layering, platform quirks, extension points.
+- [`android.md`](./android.md) — Android driver internals:
+  APK + host-side layering, command surface, quirks, latency.
+- [`status.md`](./status.md) — current version, active branch,
+  per-package test counts, known limitations, out-of-scope
+  roadmap.
+> Architecture decision records live in
+> `.claude/docs/decisions/` and unshipped design sketches in
+> `.claude/docs/proposals/` — both gitignored, kept per-
+> contributor. Internal deliberations don't ride with the
+> shipped docs tree.
+
+See also:
+
+- [`../rules/docs.md`](../rules/docs.md) — rules for every docs file
+  (both this directory and `docs/`). Read before creating or editing
+  any markdown file in the repo.
+- [`../rules/comments.md`](../rules/comments.md) — rules for inline
+  comments and docstrings in `packages/`, `platforms/`, `shared/`.
 
 ## Why under `.claude/`?
 
@@ -59,9 +63,9 @@ Two reasons:
    to point them out.
 
 2. **Separation of concerns** — `docs/` is for end users; the
-   contributor view doesn't belong in the same tree. Mixing them
+   contributor view does not belong in the same tree. Mixing them
    creates a `docs/` directory full of internal jargon
-   ("strangler fig", "obscurement detection", "Driver port") that
+   (obscurement detection, Driver port, snapshot walk) that
    confuses someone who just wants to install the framework.
 
 ## Why tracked in git?
@@ -73,9 +77,15 @@ remains ignored.
 
 ## When adding a new doc
 
+Before writing, read [`../rules/docs.md`](../rules/docs.md) and
+confirm the new file answers a question none of the existing files
+answer. Then:
+
 - **End-user content** → `docs/`
-- **Contributor / implementation content** → `.claude/docs/`
-- **Decision records that affect future code** →
-  `.claude/docs/<area>.md` decision-log section
+- **Contributor / implementation reference** → `.claude/docs/`
+- **Unshipped design / accepted decision worth preserving locally** →
+  `.claude/docs/proposals/<slug>.md` or
+  `.claude/docs/decisions/NNN-short-slug.md`. Both directories
+  are gitignored (kept per-contributor, not pushed).
 - **AI-agent runtime instructions** → `CLAUDE.md` at repo root
-  (those are loaded into every session, so keep them tight)
+  (loaded into every session — keep tight).

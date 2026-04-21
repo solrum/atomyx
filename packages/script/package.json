@@ -1,0 +1,30 @@
+{
+  "name": "@atomyx/script",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Atomyx YML test script engine — parser, runner, and built-in commands for deterministic test execution without an agent.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./parser": "./dist/parser/index.js",
+    "./commands": "./dist/commands/index.js",
+    "./runner": "./dist/runner/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test $(find src -name '*.test.ts')"
+  },
+  "dependencies": {
+    "@atomyx/shared": "0.1.0",
+    "@atomyx/core": "0.1.0",
+    "@atomyx/driver": "0.1.0",
+    "yaml": "^2.4.0",
+    "zod": "^3.23.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

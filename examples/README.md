@@ -8,27 +8,25 @@ to install example dependencies into the root `node_modules`.
 
 ## Planned examples
 
-- `core-driver-only/` — minimal MCP client driving an Android
-  device with just `@atomyx/core-driver-cli` installed.
-- `core-driver-ios/` — same for iOS.
-- `mode-b-spec/` — running a YAML test spec end-to-end.
-- `mode-c-explore/` — exploratory agent loop.
-- `studio-quickstart/` — Studio + core-driver power-user
-  workflow (when Studio ships).
-- `synapse-integration/` — using core-driver with Synapse
-  test management as an external storage backend.
+- `atomyx-demo/` — Flutter cross-platform demo app, wired for
+  both iOS and Android. Used by the script and MCP examples.
+- `mcp-quickstart/` — minimal MCP client driving a device with
+  just `@atomyx/mcp` + a driver adapter installed.
+- `script-login-flow/` — runnable YAML script demonstrating
+  login + OTP-branching against the demo app.
+- `studio-quickstart/` — Studio power-user workflow (when the
+  Studio module ships).
 
 ## Convention
 
-Each example has:
+Each future subdirectory-based example will carry:
 
-- `README.md` — what it shows + how to run
-- `package.json` — independent deps
-- Source files
-- Optional `.atomyx/` workspace dir with sample test cases
+- `README.md` — what it shows + how to run.
+- `package.json` — independent deps (examples are NOT workspace
+  members).
+- Source files.
+- Optional `.atomyx/` workspace dir with sample test cases.
 
 The examples deliberately install Atomyx modules from npm (or
 from the local workspace via `file:` paths in dev) — they do
-NOT reach into `modules/*/packages/*/src/` directly.
-
-Currently empty pending real examples.
+NOT reach into package `src/` directly.
