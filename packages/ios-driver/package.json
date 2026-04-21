@@ -1,0 +1,25 @@
+{
+  "name": "@atomyx/ios-driver",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Atomyx iOS driver — thin Driver implementation talking to the Swift XCUITest runner over TCP (simulator loopback or iproxy tunnel)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test $(find src -name '*.test.ts')"
+  },
+  "dependencies": {
+    "@atomyx/core": "0.1.0",
+    "@atomyx/driver": "0.1.0",
+    "@atomyx/driver-wire": "0.1.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

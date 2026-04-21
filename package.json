@@ -2,18 +2,19 @@
   "name": "atomyx",
   "version": "0.1.0",
   "private": true,
-  "description": "Atomyx — Agentic Test Orchestration Module. Cross-platform mobile test framework driven by Claude (or any MCP client). This is the workspace root; the shipping binary lives in packages/core-driver-cli as `atomyx-driver`.",
+  "description": "Atomyx — Agentic Test Orchestration Module. Cross-platform mobile test framework driven by Claude (or any MCP client). Workspace root; end-user CLI ships from packages/cli as `atomyx`, MCP stdio server ships from packages/mcp as `atomyx-mcp`.",
   "license": "Apache-2.0",
   "author": "Solrum",
   "homepage": "https://atomyx.dev",
   "type": "module",
   "workspaces": [
+    "shared",
     "packages/*"
   ],
   "scripts": {
-    "build": "for d in packages/core-driver*; do (cd \"$d\" && [ -f tsconfig.json ] && npm run build); done",
-    "test": "for d in packages/core-driver*; do (cd \"$d\" && [ -f tsconfig.json ] && npm test); done",
-    "test:all": "for d in packages/core-driver*; do (cd \"$d\" && [ -f tsconfig.json ] && npm test); done",
+    "build": "for d in core driver driver-wire android-driver ios-driver script mcp cli; do (cd packages/$d && [ -f tsconfig.json ] && npm run build) || exit 1; done",
+    "test": "for d in core driver driver-wire android-driver ios-driver script mcp cli; do (cd packages/$d && [ -f tsconfig.json ] && npm test) || exit 1; done",
+    "test:all": "for d in core driver driver-wire android-driver ios-driver script mcp cli; do (cd packages/$d && [ -f tsconfig.json ] && npm test) || exit 1; done",
     "depcruise": "depcruise --config .dependency-cruiser.cjs packages/"
   },
   "dependencies": {

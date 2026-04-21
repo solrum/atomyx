@@ -20,10 +20,10 @@
 //   node scripts/ios-driver-call.mjs getKeyboard
 //
 //   # Resolve a selector
-//   node scripts/ios-driver-call.mjs resolveSelector '{"resourceId":"A01-01-01/6"}'
+//   node scripts/ios-driver-call.mjs resolveSelector '{"resourceId":""}'
 //
 //   # Launch a bundle
-//   node scripts/ios-driver-call.mjs launchApp '{"bundleId":"inc.guide.kabuappStation.dev"}'
+//   node scripts/ios-driver-call.mjs launchApp '{"bundleId":""}'
 //
 //   # Tap coordinates
 //   node scripts/ios-driver-call.mjs tapAt '{"x":200,"y":400}'

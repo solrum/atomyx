@@ -6,7 +6,7 @@ modules.
 
 - **The User is King:** Users install only what they need.
 - **Example:** A pure developer who only wants device interaction installs
-  `@atomyx/core-driver-cli` alone — no test-management, no studio, no cloud.
+  `@atomyx/cli` alone — no test-management, no studio, no cloud.
 - **Persona-driven:** Every module exists because a real user persona needs
   it standalone (see §6).
 
@@ -29,13 +29,11 @@ modules link in-process via standard ES imports** — no HTTP between them,
 no separate processes to orchestrate, no serialization overhead, full
 TypeScript type safety preserved end-to-end.
 
-This is the same pattern Playwright uses (`@playwright/test`,
-`@playwright/browser-chromium`, `@playwright/browser-firefox` — opt-in
-install, in-process composition). The opposite pattern is Appium
-(everything talks HTTP, separate driver processes) — Atomyx deliberately
-rejects that path because it pays high operational cost for benefits
-that only matter at multi-team / multi-language scale, neither of which
-applies to Atomyx today.
+The tradeoff we make: in-process composition trades inter-module HTTP
+overhead + per-module deployment autonomy for operational simplicity and
+type safety end-to-end. The sharp edge is that a process crash takes
+every module down together; the benefit is that a single install yields
+a working setup without orchestrating multiple services.
 
 When the day comes that a module needs to scale to a separate team, a
 separate language, or a separate deployment tier, the boundaries are
@@ -98,12 +96,12 @@ any point with `git subtree split` if the team scales beyond one.
 **Imports across packages go through public entry points only:**
 
 ```ts
-// ✅ ALLOWED — studio imports core-driver's PUBLIC API
-import { Orchestra, IosDriver } from "@atomyx/core-driver";
+// ✅ ALLOWED — studio imports driver's PUBLIC API
+import { Orchestra, IosDriver } from "@atomyx/driver";
 
-// ❌ FORBIDDEN — reaching into core-driver internals
-import { ScrollController } from "@atomyx/core-driver/src/scroll/...";
-import { internalThing } from "@atomyx/core-driver/dist/internals/...";
+// ❌ FORBIDDEN — reaching into driver internals
+import { ScrollController } from "@atomyx/driver/src/scroll/...";
+import { internalThing } from "@atomyx/driver/dist/internals/...";
 ```
 
 This is enforced by `dependency-cruiser` configured in the repo root:
@@ -123,8 +121,8 @@ forbidden: [
 ```
 
 The rule operates on the package directory level (`packages/<name>/`).
-Module ownership is encoded in the package NAME prefix (`core-driver-*`,
-`test-mgmt-*`, `studio-*`, `cloud-*`), not in directory hierarchy. The
+Module ownership is encoded in the package name convention, not in
+directory hierarchy. The
 filesystem layout stays flat for ergonomics; the conceptual modules are
 inferred from naming.
 
@@ -148,11 +146,10 @@ try {
 }
 ```
 
-If a user installs only `@atomyx/core-driver-cli`, the optional
+If a user installs only `@atomyx/cli`, the optional
 `@atomyx/test-mgmt` import fails at runtime and the consumer
-gracefully reports "I have driver, no test repository" — exactly the
-behavior the previous ARCHITECTURE.md draft required, achieved via npm rather than HTTP
-probing.
+gracefully reports "I have driver, no test repository". The detection
+happens at npm resolution time, not via runtime HTTP probing.
 
 ## 6. USER PERSONAS
 
@@ -160,10 +157,10 @@ Each persona maps to a specific install:
 
 | Persona | Installs | Gets |
 |---|---|---|
-| **Pure Developer** | `@atomyx/core-driver-cli` | Device interaction via CLI + MCP. ~5-10 MB. |
+| **Pure Developer** | `@atomyx/cli` | Device interaction via CLI + MCP. ~5-10 MB. |
 | **QC Manager** | `@atomyx/test-mgmt-cli` | Standalone test-case + report manager. No driver. |
 | **Power User** | `@atomyx/studio` | GUI bundling everything. Auto-detects which siblings are installed. |
-| **CI Pipeline** | `@atomyx/core-driver-cli` + `@atomyx/test-mgmt-cli` | Headless run-and-report. |
+| **CI Pipeline** | `@atomyx/cli` + `@atomyx/test-mgmt-cli` | Headless run-and-report. |
 | **Cloud / Scale Operator** | `@atomyx/cloud` (future) | Remote device farm orchestration. |
 
 Each module has its own `bin` and its own MCP server entry point. The
@@ -192,11 +189,12 @@ linked at runtime (Studio imports the others as libraries).
  ║         INDEPENDENT NPM PACKAGES (the Ecosystem)                    ║
  ║                                                                     ║
  ║  ┌─────────────────────┐  ┌──────────────────────┐                  ║
- ║  │ @atomyx/core-driver │  │ @atomyx/test-mgmt    │                  ║
- ║  │ - Driver port       │  │ - Case manager       │                  ║
- ║  │ - Orchestra         │  │ - Report storage     │                  ║
- ║  │ - Filters / scroll  │  │ - YML parser         │                  ║
- ║  │ - iOS / Android     │  │ - Persona: QC Mgr    │                  ║
+ ║  │ @atomyx/core +      │  │ @atomyx/test-mgmt    │                  ║
+ ║  │ @atomyx/driver      │  │ - Case manager       │                  ║
+ ║  │ - Driver port       │  │ - Report storage     │                  ║
+ ║  │ - Orchestra         │  │ - YML parser         │                  ║
+ ║  │ - Filters / scroll  │  │ - Persona: QC Mgr    │                  ║
+ ║  │ - iOS / Android     │  │                      │                  ║
  ║  │   driver impls      │  │                      │                  ║
  ║  └─────────────────────┘  └──────────────────────┘                  ║
  ║                                                                     ║
@@ -224,7 +222,7 @@ linked at runtime (Studio imports the others as libraries).
 - It is **not** anti-HTTP. HTTP is one of three transports a module can
   ship (CLI, MCP, HTTP) — added when a real consumer needs it.
 
-The goal is the same as v1 of this document: **install only what you
-need, modules independently developable, gracefully degrade**. The
-mechanism is different: **npm-level distribution + in-process composition
-+ lint-enforced boundaries**, not HTTP-between-processes.
+The contract: **install only what you need, modules independently
+developable, gracefully degrade** — delivered through **npm-level
+distribution + in-process composition + lint-enforced boundaries**,
+not HTTP-between-processes.

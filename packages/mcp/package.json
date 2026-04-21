@@ -1,0 +1,33 @@
+{
+  "name": "@atomyx/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Atomyx MCP server — exposes the Atomyx framework as MCP tools over stdio. Ships both a library (createMcpServer) and the atomyx-mcp binary, the latter being the end-user deployment entry point parallel to the atomyx-driver CLI.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "atomyx-mcp": "./dist/bin.js"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./tools": "./dist/tools/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test $(find src -name '*.test.ts')"
+  },
+  "dependencies": {
+    "@atomyx/core": "0.1.0",
+    "@atomyx/driver": "0.1.0",
+    "@atomyx/android-driver": "0.1.0",
+    "@atomyx/ios-driver": "0.1.0",
+    "@atomyx/script": "0.1.0",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

@@ -9,7 +9,7 @@ module per `.claude/docs/architecture.md` §6.
 live screen preview, click-to-inspect element selection,
 visual test recording, replay debugger, report dashboards.
 Installs `@atomyx/studio` which auto-discovers whichever
-sibling modules (`@atomyx/core-driver`, `@atomyx/test-mgmt`,
+sibling modules (`@atomyx/driver`, `@atomyx/test-mgmt`,
 `@atomyx/cloud`) are present in the runtime.
 
 ## Planned packages
@@ -27,8 +27,8 @@ sibling modules (`@atomyx/core-driver`, `@atomyx/test-mgmt`,
 ## Composition pattern
 
 Studio imports sibling modules via npm package boundaries
-(`import { Orchestra, IosDriver } from "@atomyx/core-driver"`).
-At runtime, missing siblings are detected via dynamic-import
-try/catch and the corresponding UI sections are disabled
-gracefully. No HTTP between Studio and other modules — they
-run in-process.
+(`import { Orchestra } from "@atomyx/driver"`,
+`import { IosDriver } from "@atomyx/ios-driver"`). At runtime,
+missing siblings are detected via dynamic-import try/catch and
+the corresponding UI sections are disabled gracefully. No HTTP
+between Studio and other modules — they run in-process.
