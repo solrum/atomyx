@@ -1,7 +1,7 @@
 /**
  * Argv parser for the driver-module subcommands. The MCP stdio
- * transport is a separate binary — see
- * `.claude/docs/architecture.md` §3.
+ * transport is shipped as a separate binary (`atomyx-mcp`); this
+ * parser only handles the direct-CLI grammar.
  *
  * Grammar:
  *

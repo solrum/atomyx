@@ -14,23 +14,27 @@ branch, how many tests, what's out of scope for now?"
 ## Current version
 
 - **Released**: `v0.1.0` on `main`.
-- **Active branch**: `feature/ios-hardening`.
-- **Next milestone**: `v1.0.0` (MCP + tools + script engine major
-  release).
+- **Active branch**: `feature/v0.1.0-foundation` (53 commits ahead of
+  `main`). Carries the Rust sidecar, the Studio DI state refactor,
+  and the iOS probe fix.
+- **Next milestone**: `v1.0.0` (sidecar-backed run pipeline, tool
+  surface, script engine major release).
 
 ## Per-package test counts
 
 | Package | Tests |
 |---|---|
+| `@atomyx/shared` | 22 |
 | `@atomyx/core` | 25 |
-| `@atomyx/driver` | 139 |
+| `@atomyx/driver` | 141 |
 | `@atomyx/driver-wire` | 17 |
-| `@atomyx/android-driver` | 39 |
+| `@atomyx/android-driver` | 51 |
 | `@atomyx/ios-driver` | 47 |
 | `@atomyx/mcp` | 87 |
 | `@atomyx/script` | 123 |
 | `@atomyx/cli` | 20 |
-| **Total** | **497** (0 failures) |
+| `@atomyx/studio` | 54 |
+| **Total** | **587** (0 failures) |
 
 Recompute the totals when a PR adds or removes tests. Keep this table
 honest — a stale count is worse than no count.
@@ -52,9 +56,12 @@ honest — a stale count is worse than no count.
 
 ## Out of scope until after v1.0
 
-- Downstream consumer packages (`@atomyx/test-mgmt`, `@atomyx/studio`,
-  `@atomyx/cloud`) — empty skeletons only.
+- MCP-dependent Studio UI (device mirror, inspector, record mode).
+- Downstream consumer packages (`@atomyx/test-mgmt`, `@atomyx/cloud`)
+  — empty skeletons only.
 - HTTP transport layer on any module.
 - Changeset-based release pipeline.
 - Pluggable remote `Storage` adapter.
-- CI workflow verification in hosted iOS hardware.
+- CI workflow verification on hosted iOS hardware.
+- Windows + Linux Studio builds.
+- Studio auto-update (plugin wired, `active: false`).

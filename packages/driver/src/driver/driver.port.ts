@@ -27,7 +27,7 @@ export interface Driver {
   // ── Lifecycle ───────────────────────────────────────────────
 
   /** Open the transport, perform handshake, reach ready state. */
-  connect(): Promise<void>;
+  connect(opts?: CallOptions): Promise<void>;
 
   /** Close transport, release resources. Idempotent. */
   disconnect(): Promise<void>;
@@ -42,7 +42,7 @@ export interface Driver {
    * normalized tree (see `AttrKeys` for canonical key set). No
    * platform-native field names may leak to the caller.
    */
-  hierarchy(): Promise<TreeNode>;
+  hierarchy(opts?: CallOptions): Promise<TreeNode>;
 
   /**
    * Block until the UI reaches an idle state or the timeout
@@ -53,15 +53,15 @@ export interface Driver {
    * otherwise core falls back to tree-diff polling and this method
    * is not invoked.
    */
-  waitForIdle(timeoutMs: number): Promise<boolean>;
+  waitForIdle(timeoutMs: number, opts?: CallOptions): Promise<boolean>;
 
   // ── Gesture primitives (coordinate-only) ────────────────────
 
-  tap(point: Point): Promise<void>;
+  tap(point: Point, opts?: CallOptions): Promise<void>;
 
-  longPress(point: Point, durationMs: number): Promise<void>;
+  longPress(point: Point, durationMs: number, opts?: CallOptions): Promise<void>;
 
-  swipe(from: Point, to: Point, durationMs: number): Promise<void>;
+  swipe(from: Point, to: Point, durationMs: number, opts?: CallOptions): Promise<void>;
 
   /**
    * Dispatch an arbitrary W3C-Actions gesture composed of one or
@@ -78,12 +78,12 @@ export interface Driver {
    *   - Rejections throw an `Error` whose message is safe to
    *     surface to an agent.
    */
-  dispatchGesture(gesture: Gesture): Promise<void>;
+  dispatchGesture(gesture: Gesture, opts?: CallOptions): Promise<void>;
 
   // ── Text input primitives ───────────────────────────────────
 
   /** Type `text` into whatever element currently has focus. */
-  inputText(text: string): Promise<void>;
+  inputText(text: string, opts?: CallOptions): Promise<void>;
 
   /**
    * Erase `count` characters backwards from the focused field.
@@ -91,7 +91,7 @@ export interface Driver {
    * `capabilities.canEraseText === false`; core falls back to
    * issuing the platform's backspace key `count` times.
    */
-  eraseText(count: number): Promise<void>;
+  eraseText(count: number, opts?: CallOptions): Promise<void>;
 
   /**
    * Press a system or navigation key. The result indicates
@@ -100,7 +100,7 @@ export interface Driver {
    * hint to fall back to an on-screen Cancel/Close button via
    * the core finder.
    */
-  pressKey(key: KeyCode): Promise<KeyResult>;
+  pressKey(key: KeyCode, opts?: CallOptions): Promise<KeyResult>;
 
   /**
    * Dismiss the on-screen keyboard (IME) if one is visible. No-op
@@ -116,29 +116,48 @@ export interface Driver {
    * otherwise the method is not invoked and callers must use
    * a keyboard-aware tap or `pressKey("back")` fallback.
    */
-  hideKeyboard(): Promise<KeyResult>;
+  hideKeyboard(opts?: CallOptions): Promise<KeyResult>;
 
   // ── App lifecycle ───────────────────────────────────────────
 
-  launchApp(bundleId: string, args?: LaunchArgs): Promise<void>;
+  launchApp(bundleId: string, args?: LaunchArgs, opts?: CallOptions): Promise<void>;
 
-  stopApp(bundleId: string): Promise<void>;
+  stopApp(bundleId: string, opts?: CallOptions): Promise<void>;
 
-  killApp(bundleId: string): Promise<void>;
+  killApp(bundleId: string, opts?: CallOptions): Promise<void>;
 
-  currentForeground(): Promise<ForegroundInfo>;
+  currentForeground(opts?: CallOptions): Promise<ForegroundInfo>;
 
-  listApps(): Promise<readonly InstalledApp[]>;
+  listApps(opts?: CallOptions): Promise<readonly InstalledApp[]>;
 
   // ── Media & device info ─────────────────────────────────────
 
   /** PNG-encoded screenshot of the current screen. */
-  screenshot(): Promise<Uint8Array>;
+  screenshot(opts?: CallOptions): Promise<Uint8Array>;
 
-  deviceInfo(): Promise<DeviceInfo>;
+  deviceInfo(opts?: CallOptions): Promise<DeviceInfo>;
 
   /** Logical screen size in points (NOT pixels). */
-  screenSize(): Promise<Size>;
+  screenSize(opts?: CallOptions): Promise<Size>;
+}
+
+/**
+ * Per-call options threaded through every async Driver method.
+ *
+ * `signal` is the standard `AbortSignal` contract. When the
+ * caller (typically the MCP tool wrapper) aborts the signal,
+ * the driver MUST reject the in-flight call with an `AbortError`
+ * (a `DOMException` with `name: "AbortError"`, or any `Error`
+ * whose `name === "AbortError"`). Adapters are responsible for
+ * tearing down whatever underlying transport request is hung
+ * so the connection does not leak.
+ *
+ * Adapters that have nothing to cancel (e.g. a synchronous
+ * accessor) MAY ignore the signal. Adapters that DO have I/O
+ * MUST propagate it.
+ */
+export interface CallOptions {
+  readonly signal?: AbortSignal;
 }
 
 /**
@@ -158,8 +177,9 @@ export interface Capabilities {
    * independent pointer path at the same time (pinch, rotate,
    * multi-finger custom). When false, callers must reject
    * multi-pointer sequences before dispatch. See `docs/pointer.md`
-   * for the user-facing contract and ADR-001 for the iOS
-   * capability propagation architecture.
+   * for the user-facing contract. On iOS, the capability is
+   * determined by which event synthesizer the driver selected —
+   * only the private-XCTest backend reports `true`.
    */
   readonly canMultiPointer: boolean;
   /**
@@ -255,6 +275,15 @@ export interface KeyResult {
 export interface LaunchArgs {
   readonly args?: readonly string[];
   readonly environment?: Readonly<Record<string, string>>;
+  /**
+   * When `true`, the adapter attaches to a running instance of
+   * `bundleId` instead of relaunching it. If the adapter has no
+   * record of the app already running, it falls back to a fresh
+   * launch. Mirrors Appium's `noReset` semantics — useful when the
+   * caller wants to drive an app without losing in-memory state
+   * (e.g., Studio mirror tap forwarding).
+   */
+  readonly noReset?: boolean;
 }
 
 export interface ForegroundInfo {

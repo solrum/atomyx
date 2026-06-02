@@ -32,6 +32,11 @@ export interface WaitUntilOptions<T> {
   readonly clock: Clock;
   /** Short label used in timeout error messages. */
   readonly kind?: string;
+  /**
+   * External abort signal. When aborted between polls, the wait
+   * throws the signal's reason instead of looping further.
+   */
+  readonly signal?: AbortSignal;
 }
 
 export class WaitTimeoutError extends Error {
@@ -54,6 +59,9 @@ export async function waitUntil<T>(opts: WaitUntilOptions<T>): Promise<T> {
   // The loop re-enters only while the deadline is still ahead.
   // eslint-disable-next-line no-constant-condition
   while (true) {
+    if (opts.signal?.aborted) {
+      throw opts.signal.reason ?? new DOMException("Aborted", "AbortError");
+    }
     last = await opts.fetch();
     if (opts.predicate(last)) return last;
     const remaining = deadline - opts.clock.now();

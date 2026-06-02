@@ -26,11 +26,18 @@
  *     filter pipelines).
  *
  *   - State booleans (`clickable`, `enabled`, `focused`, `selected`,
- *     `checked`) live as top-level optional fields rather than in
- *     the attribute bag. They are the only commonly-queried
+ *     `checked`, `visible`) live as top-level optional fields rather
+ *     than in the attribute bag. They are the only commonly-queried
  *     properties whose type is boolean across every platform, so
  *     giving them typed slots avoids forcing callers to parse
  *     `"true"` / `"false"` strings in a hot filter loop.
+ *
+ *   - `visible` reports accessibility-runtime visibility. Android
+ *     reads `isVisibleToUser`, which accounts for offscreen scroll
+ *     position. iOS currently reads frame ∩ window as a proxy;
+ *     occlusion-aware detection via the daemon's
+ *     `XC_kAXXCAttributeIsVisible` attribute is on the roadmap
+ *     (symbol resolver wired, snapshot pre-fetch pending).
  */
 export interface TreeNode {
   readonly attributes: Readonly<Record<string, string>>;
@@ -40,6 +47,7 @@ export interface TreeNode {
   readonly focused?: boolean;
   readonly selected?: boolean;
   readonly checked?: boolean;
+  readonly visible?: boolean;
 }
 
 /**

@@ -6,14 +6,21 @@ compose Atomyx modules for a specific use case. Examples are
 and `npm install` independently. This prevents npm from trying
 to install example dependencies into the root `node_modules`.
 
+## Current contents
+
+- `atomyx-demo/` — Flutter cross-platform demo app used by the
+  script examples. Bundle id `dev.atomyx.demo` on both
+  platforms.
+- `test-login-flow.yml` — runnable YAML script: login +
+  OTP-branching flow against `atomyx-demo`.
+
 ## Planned examples
 
-- `atomyx-demo/` — Flutter cross-platform demo app, wired for
-  both iOS and Android. Used by the script and MCP examples.
-- `mcp-quickstart/` — minimal MCP client driving a device with
-  just `@atomyx/mcp` + a driver adapter installed.
-- `script-login-flow/` — runnable YAML script demonstrating
-  login + OTP-branching against the demo app.
+- `driver-only/` — minimal MCP client driving an Android device
+  with just `@atomyx/cli` installed.
+- `driver-ios/` — same for iOS.
+- `mode-b-spec/` — running a YAML test spec end-to-end.
+- `mode-c-explore/` — exploratory agent loop.
 - `studio-quickstart/` — Studio power-user workflow (when the
   Studio module ships).
 

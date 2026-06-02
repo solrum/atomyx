@@ -125,6 +125,15 @@ export interface McpServerOptions {
     readonly name: string;
     readonly version: string;
   };
+  /**
+   * Optional system-prompt-style guidance surfaced in the MCP
+   * `initialize` response. Clients (Claude Code, Claude Desktop)
+   * forward this to the agent as part of the connection metadata
+   * so methodology guidance loads on first connect, not on first
+   * tool call. Omit when embedding into another product that
+   * supplies its own instructions.
+   */
+  readonly instructions?: string;
 }
 
 export function createMcpServer(opts: McpServerOptions): Server {
@@ -134,13 +143,16 @@ export function createMcpServer(opts: McpServerOptions): Server {
   const storage = opts.storage ?? new FileStorage();
   const runStore = opts.runStore ?? new RunStore();
   const clock = opts.clock ?? new SystemClock();
-  const ctx: ToolContext = {
+  // The per-call ToolContext is assembled inside the handler so
+  // its `signal` reflects the wrapper's deadline. This base bundle
+  // holds the shared services every call inherits.
+  const baseServices = {
     session: opts.session,
     logger,
     storage,
     runStore,
     clock,
-  };
+  } as const;
 
   // Build a name → tool index once. Tools are immutable for the
   // lifetime of the server instance.
@@ -176,7 +188,9 @@ export function createMcpServer(opts: McpServerOptions): Server {
 
   const server = new Server(
     opts.serverInfo ?? { name: "atomyx", version: "0.1.0" },
-    { capabilities },
+    opts.instructions !== undefined
+      ? { capabilities, instructions: opts.instructions }
+      : { capabilities },
   );
 
   // tools/list — return JSON-Schema-converted tool descriptors.
@@ -217,17 +231,45 @@ export function createMcpServer(opts: McpServerOptions): Server {
     }
 
     const startedAt = Date.now();
-    const toolTimeoutMs = Number(process.env.ATOMYX_TOOL_TIMEOUT_MS) || 30_000;
-    try {
-      const result = await Promise.race([
-        tool.execute(parsed.data, ctx),
-        new Promise<never>((_resolve, reject) =>
-          setTimeout(
-            () => reject(new Error(`tool "${tool.name}" timed out after ${toolTimeoutMs}ms`)),
-            toolTimeoutMs,
-          ),
+    // Honor the call's own declared budget (maxTimeoutMs /
+    // timeoutMs) when the tool's schema exposes one. The wrapper
+    // grants the tool a small buffer beyond its declared deadline
+    // so the tool's own structured timeout result is returned
+    // first when it can — the wrapper's hard kill is the safety
+    // net for the case where the underlying driver call never
+    // honors the tool's internal deadline check (transport hang).
+    const args = parsed.data as Record<string, unknown>;
+    const declaredBudgetMs =
+      typeof args.maxTimeoutMs === "number"
+        ? args.maxTimeoutMs
+        : typeof args.timeoutMs === "number"
+          ? args.timeoutMs
+          : undefined;
+    const defaultTimeoutMs = Number(process.env.ATOMYX_TOOL_TIMEOUT_MS) || 30_000;
+    const TOOL_TIMEOUT_BUFFER_MS = 5_000;
+    const toolTimeoutMs =
+      declaredBudgetMs !== undefined
+        ? Math.max(declaredBudgetMs + TOOL_TIMEOUT_BUFFER_MS, defaultTimeoutMs)
+        : defaultTimeoutMs;
+    // Per-call AbortController bridges the wrapper deadline to the
+    // tool handler via `ctx.signal`. When the timer fires, the
+    // signal aborts and the driver adapter is responsible for
+    // tearing down its in-flight request — see Driver port
+    // CallOptions contract.
+    const callController = new AbortController();
+    const callCtx: ToolContext = { ...baseServices, signal: callController.signal };
+    let timedOut = false;
+    const timeoutHandle = setTimeout(() => {
+      timedOut = true;
+      callController.abort(
+        new DOMException(
+          `tool "${tool.name}" exceeded ${toolTimeoutMs}ms`,
+          "AbortError",
         ),
-      ]);
+      );
+    }, toolTimeoutMs);
+    try {
+      const result = await tool.execute(parsed.data, callCtx);
       const durationMs = Date.now() - startedAt;
       logger.debug("tool.success", {
         tool: tool.name,
@@ -249,6 +291,37 @@ export function createMcpServer(opts: McpServerOptions): Server {
       };
     } catch (err) {
       const durationMs = Date.now() - startedAt;
+      // Distinguish wrapper timeout from any other failure. A
+      // wrapper timeout returns a structured JSON payload the
+      // agent can parse and act on (retry, re-orient, abandon).
+      // A regular failure surfaces the underlying error message.
+      if (timedOut) {
+        const payload = {
+          code: "TOOL_TIMEOUT" as const,
+          tool: tool.name,
+          elapsedMs: durationMs,
+          budgetMs: toolTimeoutMs,
+          declaredBudgetMs: declaredBudgetMs ?? null,
+          hint:
+            "Tool exceeded its time budget and the underlying device " +
+            "call was aborted. The device transport may be hung. " +
+            "Recommended next steps: (1) call get_ui_tree to re-orient " +
+            "(its own short poll budget will fail fast if the driver " +
+            "is dead), (2) if get_ui_tree also times out, call " +
+            "select_device again to reconnect, (3) if a specific tool " +
+            "consistently times out on this device, abort the run and " +
+            "report the device id.",
+        };
+        logger.warn("tool.timeout", {
+          tool: tool.name,
+          durationMs,
+          budgetMs: toolTimeoutMs,
+        });
+        return {
+          isError: true,
+          content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
+        };
+      }
       const message = err instanceof Error ? err.message : String(err);
       logger.warn("tool.error", {
         tool: tool.name,
@@ -259,6 +332,8 @@ export function createMcpServer(opts: McpServerOptions): Server {
         isError: true,
         content: [{ type: "text", text: message }],
       };
+    } finally {
+      clearTimeout(timeoutHandle);
     }
   });
 

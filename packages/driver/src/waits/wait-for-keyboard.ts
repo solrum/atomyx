@@ -25,17 +25,21 @@ export interface WaitForKeyboardOptions {
   readonly clock: Clock;
   readonly timeoutMs?: number;
   readonly intervalMs?: number;
+  /** External abort signal forwarded into each hierarchy fetch. */
+  readonly signal?: AbortSignal;
 }
 
 export async function waitForKeyboard(
   opts: WaitForKeyboardOptions,
 ): Promise<KeyboardState> {
   return waitUntil<KeyboardState>({
-    fetch: async () => readKeyboardState(await opts.driver.hierarchy()),
+    fetch: async () =>
+      readKeyboardState(await opts.driver.hierarchy({ signal: opts.signal })),
     predicate: (state) => state.visible === opts.expectVisible,
     timeoutMs: opts.timeoutMs ?? 1000,
     intervalMs: opts.intervalMs ?? 50,
     clock: opts.clock,
     kind: `waitForKeyboard(visible=${opts.expectVisible})`,
+    signal: opts.signal,
   });
 }

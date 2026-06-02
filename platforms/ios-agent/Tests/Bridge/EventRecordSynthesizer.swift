@@ -28,9 +28,9 @@ import XCTest
 /// (`NSClassFromString`, `performSelector:`, IMP cast) so the
 /// binary carries no static references to those classes — if a
 /// symbol is missing at runtime, the probe fails and the factory
-/// falls back to `CoordinateSynthesizer`.
-///
-/// Contract: see ADR-001 in `.claude/docs/decisions/`.
+/// falls back to `CoordinateSynthesizer`. The caller is
+/// responsible for honouring the probe result: never attempt to
+/// instantiate this class when `probe()` returned `false`.
 ///
 /// Version drift expectations: `XCSynthesizedEventRecord` and
 /// `XCPointerEventPath` have been stable across Xcode 12–17 with
@@ -66,7 +66,7 @@ final class EventRecordSynthesizer: EventSynthesizer {
         Self.lastProbeLog.isEmpty ? nil : Self.lastProbeLog
     }
 
-    func dispatch(pointers: [PointerPath], in app: XCUIApplication) throws {
+    func dispatch(pointers: [PointerPath]) throws {
         guard Self.isAvailable else {
             throw SynthesizerError.privateSymbolMissing(
                 symbol: "XCSynthesizedEventRecord (see probe log)"
@@ -78,7 +78,7 @@ final class EventRecordSynthesizer: EventSynthesizer {
             )
         }
 
-        let orientation = Self.currentInterfaceOrientation(in: app)
+        let orientation = Self.currentInterfaceOrientation()
 
         guard let recordCls = NSClassFromString("XCSynthesizedEventRecord") as? NSObject.Type else {
             throw SynthesizerError.privateSymbolMissing(symbol: "XCSynthesizedEventRecord")
@@ -428,7 +428,7 @@ final class EventRecordSynthesizer: EventSynthesizer {
     /// timeout and breaks the first pointer dispatch of a
     /// session. Rotation-aware dispatch needs a one-shot cached
     /// orientation read on a background queue.
-    private static func currentInterfaceOrientation(in app: XCUIApplication) -> Int {
+    private static func currentInterfaceOrientation() -> Int {
         return 1 // portrait
     }
 }

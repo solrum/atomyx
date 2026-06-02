@@ -1,0 +1,155 @@
+/*
+ * Design tokens — static layer.
+ *
+ * This file defines two orthogonal systems:
+ *   1. Layout / spacing / typography (`--fs-*`, `--gap-*`, `--r-*`,
+ *      `--row-h`, `--font-ui`, `--font-mono`) — fixed values that
+ *      do not change with the active theme.
+ *   2. Surface palette (`--bg-*`, `--fg-*`, `--line*`, `--chrome-*`,
+ *      `--accent*`, `--ok*`, `--warn*`, `--err*`, `--info`, `--syn-*`,
+ *      `--shadow-*`) — selected by `[data-theme="dark|light"]`.
+ *
+ * The semantic attribute tokens used by the Monaco editor and other
+ * legacy UI (`--ui-bg-primary`, `--atomyx-keyword`, ...) are written
+ * at runtime by `apply-tokens.ts` from the active `Theme`. Both
+ * systems coexist: new UI consumes the bundle tokens below; the
+ * editor keeps consuming the attribute tokens.
+ *
+ * `[data-theme]` and `[data-density]` are set by `apply-mode.ts`.
+ */
+
+:root {
+  --font-ui: 'Inter', -apple-system, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Menlo', monospace;
+
+  --fs-11: 11px;
+  --fs-12: 12px;
+  --fs-13: 13px;
+  --fs-14: 14px;
+  --fs-16: 16px;
+  --fs-18: 18px;
+  --fs-22: 22px;
+  --fs-28: 28px;
+
+  --row-h: 22px;
+  --row-h-lg: 26px;
+  --gap-1: 2px;
+  --gap-2: 4px;
+  --gap-3: 6px;
+  --gap-4: 8px;
+  --gap-5: 12px;
+  --gap-6: 16px;
+  --gap-7: 20px;
+  --gap-8: 24px;
+
+  --r-1: 2px;
+  --r-2: 3px;
+  --r-3: 4px;
+  --r-4: 6px;
+  --r-pill: 999px;
+
+  --accent-h: 220;
+  --accent: oklch(0.72 0.15 var(--accent-h));
+  --accent-hi: oklch(0.80 0.15 var(--accent-h));
+  --accent-lo: oklch(0.58 0.15 var(--accent-h));
+  --accent-fg: oklch(0.98 0.01 var(--accent-h));
+  --accent-bg: oklch(0.72 0.15 var(--accent-h) / 0.12);
+  --accent-border: oklch(0.72 0.15 var(--accent-h) / 0.35);
+
+  --ok-h: 150;
+  --ok: oklch(0.70 0.15 var(--ok-h));
+  --ok-bg: oklch(0.70 0.15 var(--ok-h) / 0.14);
+  --warn-h: 75;
+  --warn: oklch(0.78 0.15 var(--warn-h));
+  --warn-bg: oklch(0.78 0.15 var(--warn-h) / 0.14);
+  --err-h: 25;
+  --err: oklch(0.66 0.18 var(--err-h));
+  --err-bg: oklch(0.66 0.18 var(--err-h) / 0.14);
+  --info-h: 260;
+  --info: oklch(0.72 0.12 var(--info-h));
+}
+
+:root,
+[data-theme="dark"] {
+  --bg-0: #1e1f22;
+  --bg-1: #2b2d30;
+  --bg-2: #1e1f22;
+  --bg-3: #26282c;
+  --bg-hover: #2e3033;
+  --bg-sel: #2e436e;
+  --bg-sel-inactive: #2c2e34;
+  --bg-active-line: #26282c;
+
+  --line: #393b40;
+  --line-soft: #2e3033;
+  --line-strong: #4a4d52;
+
+  --fg-0: #dfe1e5;
+  --fg-1: #b4b8bf;
+  --fg-2: #868a91;
+  --fg-3: #5a5d63;
+
+  --chrome-bg: #2b2d30;
+  --chrome-fg: #b4b8bf;
+  --status-bg: #2b2d30;
+
+  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+
+  --syn-key: #cf8e6d;
+  --syn-string: #6aab73;
+  --syn-var: #c77dbb;
+  --syn-num: #2aacb8;
+  --syn-comment: #7a7e85;
+  --syn-punct: #b4b8bf;
+  --syn-bool: #cf8e6d;
+  --syn-selection: #214283;
+}
+
+[data-theme="light"] {
+  --bg-0: #f7f8fa;
+  --bg-1: #ffffff;
+  --bg-2: #ffffff;
+  --bg-3: #f0f1f3;
+  --bg-hover: #ebecef;
+  --bg-sel: #d4e4ff;
+  --bg-sel-inactive: #e7e9ec;
+  --bg-active-line: #f2f3f6;
+
+  --line: #d9dbe0;
+  --line-soft: #e6e8eb;
+  --line-strong: #c4c7cc;
+
+  --fg-0: #1e1f22;
+  --fg-1: #3c3f44;
+  --fg-2: #6c7079;
+  --fg-3: #a7abb3;
+
+  --chrome-bg: #f0f1f3;
+  --chrome-fg: #3c3f44;
+  --status-bg: #f0f1f3;
+
+  --shadow-lg: 0 10px 30px rgba(20, 25, 40, 0.14), 0 2px 6px rgba(20, 25, 40, 0.06);
+  --shadow-md: 0 4px 14px rgba(20, 25, 40, 0.08);
+  --shadow-sm: 0 1px 2px rgba(20, 25, 40, 0.06);
+
+  --syn-key: #0033b3;
+  --syn-string: #067d17;
+  --syn-var: #9c27b0;
+  --syn-num: #1750eb;
+  --syn-comment: #8c8c8c;
+  --syn-punct: #3c3f44;
+  --syn-bool: #0033b3;
+  --syn-selection: #a8c7ff;
+}
+
+[data-density="compact"] {
+  --row-h: 20px;
+  --fs-13: 12px;
+  --fs-14: 13px;
+}
+
+[data-density="comfortable"] {
+  --row-h: 26px;
+}

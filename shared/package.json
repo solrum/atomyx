@@ -2,7 +2,7 @@
   "name": "@atomyx/shared",
   "version": "0.1.0",
   "private": true,
-  "description": "Cross-module type contracts — pure types, no runtime code, no dependencies. Shared between core-driver, test-mgmt, studio, cloud modules.",
+  "description": "Cross-module contracts — types plus zod schemas that validate them at runtime. Consumed by core, driver, script, mcp, cli, studio.",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -12,27 +12,13 @@
     "./script": "./dist/script/index.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test $(find src -name '*.test.ts')"
+  },
+  "dependencies": {
+    "zod": "^3.23.0"
   },
   "engines": {
     "node": ">=20.0.0"
-  },
-  "author": "Solrum",
-  "homepage": "https://atomyx.dev",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/solrum/atomyx.git",
-    "directory": "shared"
-  },
-  "bugs": {
-    "url": "https://github.com/solrum/atomyx/issues"
-  },
-  "keywords": [
-    "atomyx",
-    "mobile",
-    "testing",
-    "automation",
-    "types",
-    "contracts"
-  ]
+  }
 }

@@ -1,0 +1,33 @@
+# Sub-flow: provision a fresh test account before the main flow.
+# Loaded via `requires:` or `runFlow:` from a parent script. Runs
+# in the parent's context so any captures + extracted variables
+# survive the sub-flow boundary.
+- launchApp
+- waitFor: "Sign up"
+- tap: "Sign up"
+
+- type:
+    into:
+      id: signup_email
+    text: ${email}
+- type:
+    into:
+      id: signup_password
+    text: ${password}
+
+- capture: "POST /api/v1/auth/signup as: signupRsp"
+- tap: "Create account"
+
+- assertApi:
+    from: signupRsp
+    status: 201
+    body:
+      "$.user.email": ${email}
+
+- extract:
+    from: signupRsp
+    values:
+      newUserId: $.user.id
+
+- waitFor: "Welcome"
+- screenshot: account-created

@@ -50,7 +50,15 @@ See also:
   (both this directory and `docs/`). Read before creating or editing
   any markdown file in the repo.
 - [`../rules/comments.md`](../rules/comments.md) — rules for inline
-  comments and docstrings in `packages/`, `platforms/`, `shared/`.
+  comments and docstrings in `packages/`, `apps/`, `platforms/`,
+  `shared/`.
+- [`../rules/feature-structure.md`](../rules/feature-structure.md) —
+  where files go inside a package or app.
+- [`../rules/feature-api.md`](../rules/feature-api.md) — how a feature
+  exposes itself (contract + factory + index), so swapping an impl
+  touches one wire site.
+- [`../rules/studio-architecture.md`](../rules/studio-architecture.md)
+  — the four-layer rule that scopes to `apps/studio/`.
 
 ## Why under `.claude/`?
 

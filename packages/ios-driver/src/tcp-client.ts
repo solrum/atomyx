@@ -59,6 +59,8 @@ interface Pending {
   resolve: (data: Record<string, unknown>) => void;
   reject: (err: Error) => void;
   timer?: NodeJS.Timeout;
+  /** Listener cleanup for an external AbortSignal, if one was attached. */
+  detachSignal?: () => void;
 }
 
 export class TcpClient {
@@ -170,6 +172,7 @@ export class TcpClient {
     if (!waiter) return;
     this.pending.delete(msg.id);
     if (waiter.timer) clearTimeout(waiter.timer);
+    waiter.detachSignal?.();
     if (msg.ok === true) {
       waiter.resolve(msg.data ?? {});
     } else {
@@ -196,6 +199,7 @@ export class TcpClient {
     const err = new TcpClientError(`driver disconnected: ${reason}`, "disconnected");
     for (const [, waiter] of this.pending) {
       if (waiter.timer) clearTimeout(waiter.timer);
+      waiter.detachSignal?.();
       waiter.reject(err);
     }
     this.pending.clear();
@@ -211,7 +215,7 @@ export class TcpClient {
   async call(
     type: string,
     args: Record<string, unknown> = {},
-    timeoutMs?: number,
+    opts?: { timeoutMs?: number; signal?: AbortSignal },
   ): Promise<Record<string, unknown>> {
     if (!this.socket || this.connectionDead) {
       throw new TcpClientError(
@@ -220,14 +224,19 @@ export class TcpClient {
         type,
       );
     }
+    if (opts?.signal?.aborted) {
+      throw opts.signal.reason ?? new DOMException("Aborted", "AbortError");
+    }
     const id = this.nextId++;
     const line = JSON.stringify({ id, type, args }) + "\n";
     return new Promise<Record<string, unknown>>((resolve, reject) => {
       const waiter: Pending = { type, resolve, reject };
-      if (timeoutMs !== undefined) {
+      if (opts?.timeoutMs !== undefined) {
+        const timeoutMs = opts.timeoutMs;
         waiter.timer = setTimeout(() => {
           if (this.pending.has(id)) {
             this.pending.delete(id);
+            waiter.detachSignal?.();
             reject(
               new TcpClientError(
                 `call(${type}) timed out after ${timeoutMs}ms`,
@@ -238,12 +247,25 @@ export class TcpClient {
           }
         }, timeoutMs);
       }
+      if (opts?.signal) {
+        const signal = opts.signal;
+        const onAbort = () => {
+          if (this.pending.has(id)) {
+            this.pending.delete(id);
+            if (waiter.timer) clearTimeout(waiter.timer);
+            reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+          }
+        };
+        signal.addEventListener("abort", onAbort, { once: true });
+        waiter.detachSignal = () => signal.removeEventListener("abort", onAbort);
+      }
       this.pending.set(id, waiter);
       try {
         this.socket!.write(line);
       } catch (err) {
         this.pending.delete(id);
         if (waiter.timer) clearTimeout(waiter.timer);
+        waiter.detachSignal?.();
         reject(err as Error);
       }
     });
@@ -258,6 +280,7 @@ export class TcpClient {
     this.buffer = "";
     for (const [, waiter] of this.pending) {
       if (waiter.timer) clearTimeout(waiter.timer);
+      waiter.detachSignal?.();
       waiter.reject(new TcpClientError("client disconnected by caller", "disconnected"));
     }
     this.pending.clear();

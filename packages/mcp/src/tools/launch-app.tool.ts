@@ -22,7 +22,7 @@ export const launchAppTool = defineTool({
   inputSchema: LaunchAppArgs,
   async execute(args, ctx) {
     const orchestra = orchestraOrFail(ctx);
-    await orchestra.launchApp(args.appId);
+    await orchestra.launchApp(args.appId, undefined, { signal: ctx.signal });
     return { ok: true, appId: args.appId };
   },
 });

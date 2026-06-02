@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Phase 1 permissions: filesystem (workspace folder), dialog (open-folder picker), shell (spawn atomyx-mcp). Updater is listed but disabled in tauri.conf.json.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    "fs:default",
+    "shell:default"
+  ]
+}

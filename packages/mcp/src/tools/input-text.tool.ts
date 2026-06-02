@@ -42,6 +42,7 @@ export const inputTextTool = defineTool({
       const selector = compileSelectorInput(args.selector);
       return orchestra.inputText(selector, args.text, {
         clearFirst: args.clearFirst,
+        signal: ctx.signal,
       });
     }
     // Coordinate path: tap to focus, then type. No selector
@@ -52,15 +53,15 @@ export const inputTextTool = defineTool({
     // a generous upper bound here is safe. The try/catch is a
     // defense-in-depth for drivers that don't implement eraseText
     // at all; eraseText failing is not an action-level failure.
-    await orchestra.tapAt({ x: args.x!, y: args.y! });
+    await orchestra.tapAt({ x: args.x!, y: args.y! }, { signal: ctx.signal });
     if (args.clearFirst !== false) {
       try {
-        await orchestra.eraseText(999);
+        await orchestra.eraseText(999, { signal: ctx.signal });
       } catch {
         // Driver doesn't support erase — caller must clear explicitly.
       }
     }
-    await orchestra.typeText(args.text);
+    await orchestra.typeText(args.text, { signal: ctx.signal });
     return {
       ok: true,
       detail: `typed ${args.text.length} char(s) at (${args.x},${args.y})`,

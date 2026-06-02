@@ -1,0 +1,7 @@
+# Build artifacts produced by `build.sh`. The signed .app bundle
+# must be rebuilt locally with a Developer ID certificate that is
+# specific to each contributor; committing it serves no purpose.
+atomyx-sim-capture/atomyx-sim-capture
+atomyx-sim-capture/atomyx-sim-capture.app/
+atomyx-sim-hid/atomyx-sim-hid
+atomyx-sim-hid/atomyx-sim-hid.app/

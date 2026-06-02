@@ -1,0 +1,76 @@
+format: atomyx/v1
+appId: dev.atomyx.demo
+name: Run timeline demo
+description: |
+  Exercises every step variant the run dock renders so you can
+  verify the new colored tokens + `line N · Xms` sub-line at a
+  glance. Open this file in Studio, hit Play, and watch each row
+  light up with its keyword (orange), selector identifier
+  (cyan), value (green), and source-line metadata.
+tags:
+  - demo
+  - timeline
+env:
+  email: qa+run42@atomyx.test
+  password: super-secret-123
+  username: hieu
+---
+# Top-of-flow boot
+- launchApp
+- sleep: 500
+
+# Selector-driven query — text selector on a labeled element
+- waitFor: "Sign in"
+
+# Tap with a string-shorthand text selector
+- tap: "Sign in"
+
+# Type-into with explicit selector — id-based field, secret masked
+- type:
+    into:
+      id: email
+    text: ${email}
+- type:
+    into:
+      id: password
+    text: ${password}
+
+# Tap with a structured selector + role narrow
+- tap:
+    text: "Continue"
+    role: button
+
+# Assertion + screenshot for evidence
+- assertVisible: "Welcome"
+- screenshot: dashboard-loaded
+
+# Gesture + key
+- swipe: up
+- pressKey: enter
+
+# Branching: handle two possible follow-up screens
+- handle:
+    - when:
+        visible: "Enter OTP"
+      do:
+        - type:
+            into:
+              id: otp
+            text: "123456"
+        - tap:
+            text: "Verify"
+            role: button
+    - when:
+        visible: "Notifications"
+      do:
+        - tap: "Allow"
+        - waitFor: "Dashboard"
+  otherwise: skip
+  timeout: 8000
+
+# Navigation back
+- back
+
+# Final assert + closing screenshot
+- assertVisible: "Dashboard"
+- screenshot: end-of-flow

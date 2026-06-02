@@ -19,8 +19,17 @@ import { z } from "zod";
  *     ones.
  *
  *   - State booleans (`clickable`, `enabled`, `focused`, `selected`,
- *     `checked`) are optional. `undefined` means "unknown", NOT
- *     "false" — consumers must distinguish the two.
+ *     `checked`, `visible`) are optional. `undefined` means
+ *     "unknown", NOT "false" — consumers must distinguish the two.
+ *
+ *   - `visible` reports whether the accessibility runtime considers
+ *     this node viewable on screen. Android reads `isVisibleToUser`
+ *     (accounts for offscreen scroll position). iOS currently reads
+ *     `frame ∩ window` as a proxy because `app.snapshot()` does not
+ *     pre-fetch the daemon's `XC_kAXXCAttributeIsVisible` attribute;
+ *     the symbol resolver is wired (see `AccessibilityAttrSymbols`)
+ *     and a future snapshot pre-fetch path will switch the iOS
+ *     bridge to that signal for true occlusion handling.
  *
  * The schema uses `z.lazy` for recursion because children are
  * themselves `TreeNodeWire` values. Zod type inference handles
@@ -34,6 +43,7 @@ export interface TreeNodeWire {
   focused?: boolean;
   selected?: boolean;
   checked?: boolean;
+  visible?: boolean;
 }
 
 export const TreeNodeSchema: z.ZodType<TreeNodeWire> = z.lazy(() =>
@@ -45,6 +55,7 @@ export const TreeNodeSchema: z.ZodType<TreeNodeWire> = z.lazy(() =>
     focused: z.boolean().optional(),
     selected: z.boolean().optional(),
     checked: z.boolean().optional(),
+    visible: z.boolean().optional(),
   }),
 );
 

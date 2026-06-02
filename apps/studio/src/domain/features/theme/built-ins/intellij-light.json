@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "intellij-light",
+  "label": "IntelliJ · Light",
+  "monacoBase": "vs",
+  "attributes": {
+    "EDITOR_BACKGROUND": { "background": "#ffffff", "foreground": "#ffffff" },
+    "EDITOR_FOREGROUND": { "foreground": "#000000" },
+    "EDITOR_LINE_HIGHLIGHT_BG": { "background": "#fffae3", "foreground": "#fffae3" },
+    "EDITOR_SELECTION_BG": { "background": "#a6d2ff", "foreground": "#a6d2ff" },
+    "EDITOR_CARET": { "foreground": "#000000" },
+    "EDITOR_GUTTER_BG": { "background": "#f2f2f2", "foreground": "#f2f2f2" },
+    "EDITOR_GUTTER_FG": { "foreground": "#999999" },
+
+    "ATOMYX_KEYWORD": { "foreground": "#000080", "fontStyle": "bold" },
+    "ATOMYX_COMMAND_BARE": { "foreground": "#000080", "fontStyle": "bold" },
+    "ATOMYX_SELECTOR": { "foreground": "#660e7a" },
+    "ATOMYX_VARIABLE": { "foreground": "#660e7a", "fontStyle": "italic" },
+    "ATOMYX_VARIABLE_UNDEFINED": { "foreground": "#cc0000", "fontStyle": "italic" },
+
+    "SYNTAX_STRING": { "foreground": "#008000" },
+    "SYNTAX_NUMBER": { "foreground": "#0000ff" },
+    "SYNTAX_BOOLEAN": { "foreground": "#000080", "fontStyle": "bold" },
+    "SYNTAX_NULL": { "foreground": "#000080", "fontStyle": "bold" },
+    "SYNTAX_COMMENT": { "foreground": "#808080", "fontStyle": "italic" },
+
+    "DIAGNOSTIC_ERROR_FG": { "foreground": "#cc0000" },
+    "DIAGNOSTIC_ERROR_BG": { "background": "#ffcccc", "foreground": "#ffcccc" },
+    "DIAGNOSTIC_WARNING_FG": { "foreground": "#b58900" },
+    "DIAGNOSTIC_WARNING_BG": { "background": "#fff3cf", "foreground": "#fff3cf" },
+    "DIAGNOSTIC_INFO_FG": { "foreground": "#0000ff" },
+    "DIAGNOSTIC_HINT_FG": { "foreground": "#808080" },
+
+    "RUN_STEP_PENDING": { "foreground": "#808080" },
+    "RUN_STEP_RUNNING": { "foreground": "#b58900" },
+    "RUN_STEP_PASS": { "foreground": "#008000" },
+    "RUN_STEP_FAIL": { "foreground": "#cc0000" },
+    "RUN_STEP_SKIP": { "foreground": "#808080" },
+    "RUN_STEP_CURRENT_BG": { "background": "#fffae3", "foreground": "#fffae3" }
+  }
+}

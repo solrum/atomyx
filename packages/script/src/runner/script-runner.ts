@@ -17,7 +17,31 @@ import type { NetworkCapture } from "@atomyx/shared/script";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { DEFAULT_COMMANDS } from "../commands/index.js";
+import { summarizeStep, type StepToken } from "./step-summary.js";
 import { parseScript } from "../parser/yaml-parser.js";
+
+export type StepEvent =
+  | {
+      readonly type: "stepStarted";
+      readonly stepIndex: number;
+      readonly command: string;
+      readonly summary: string;
+      readonly tokens: readonly StepToken[];
+      readonly depth: number;
+      readonly line?: number;
+    }
+  | {
+      readonly type: "stepCompleted";
+      readonly stepIndex: number;
+      readonly command: string;
+      readonly summary: string;
+      readonly tokens: readonly StepToken[];
+      readonly ok: boolean;
+      readonly detail?: string;
+      readonly durationMs: number;
+      readonly depth: number;
+      readonly line?: number;
+    };
 
 export interface ScriptRunnerDeps {
   readonly orchestra: Orchestra;
@@ -26,6 +50,20 @@ export interface ScriptRunnerDeps {
   readonly networkCapture?: NetworkCapture;
   /** Override the built-in command registry. */
   readonly commands?: readonly AnyCommandDefinition[];
+  /**
+   * Progress hook invoked before each step (stepStarted) and after
+   * (stepCompleted). Exceptions thrown from the hook are swallowed
+   * so a misbehaving consumer cannot crash the run. Use for
+   * sidecar event streaming, live UIs, trace logging.
+   */
+  readonly onStep?: (event: StepEvent) => void;
+  /**
+   * Cooperative cancellation. Checked between steps; when aborted
+   * the runner throws via `signal.throwIfAborted()`. Mid-step
+   * cancellation (inside a long-running command) is not supported
+   * — abort takes effect when the current step finishes.
+   */
+  readonly signal?: AbortSignal;
 }
 
 export interface StepResult {
@@ -65,6 +103,16 @@ export class ScriptRunner {
     }
   }
 
+  private emitStep(event: StepEvent): void {
+    const hook = this.deps.onStep;
+    if (!hook) return;
+    try {
+      hook(event);
+    } catch {
+      /* consumer misbehaviour must not crash the run */
+    }
+  }
+
   /** Track completed requires flows for dedup. */
   private completedRequires = new Set<string>();
   /** Track call stack for circular dependency detection. */
@@ -77,6 +125,9 @@ export class ScriptRunner {
     const artifacts = createArtifacts();
     const stepResults: StepResult[] = [];
     let failedAtStep: number | undefined;
+
+    let globalStepIndex = 0;
+    let nestedDepth = 0;
 
     // Validate proxy requirement before executing any steps
     if (script.proxy === "required") {
@@ -99,27 +150,64 @@ export class ScriptRunner {
     const runSteps = async (
       steps: readonly ScriptStep[],
     ): Promise<CommandResult> => {
-      for (const nestedStep of steps) {
-        const cmd = this.commandRegistry.get(nestedStep.command);
-        if (!cmd) {
-          return { ok: false, detail: `Unknown command: "${nestedStep.command}"` };
+      nestedDepth++;
+      try {
+        for (const nestedStep of steps) {
+          this.deps.signal?.throwIfAborted();
+          const cmd = this.commandRegistry.get(nestedStep.command);
+          if (!cmd) {
+            return { ok: false, detail: `Unknown command: "${nestedStep.command}"` };
+          }
+          const myIndex = globalStepIndex++;
+          const summary = summarizeStep(nestedStep);
+          this.emitStep({
+            type: "stepStarted",
+            stepIndex: myIndex,
+            command: nestedStep.command,
+            summary: summary.text,
+            tokens: summary.tokens,
+            depth: nestedDepth,
+          });
+          const nestedCtx: CommandContext = {
+            orchestra: this.deps.orchestra,
+            clock: this.deps.clock,
+            logger: this.deps.logger,
+            variables,
+            captures,
+            networkCapture: this.deps.networkCapture ?? null,
+            stepIndex: myIndex,
+            script,
+            artifacts,
+            runSteps,
+          };
+          const stepStart = this.deps.clock.now();
+          let result: CommandResult;
+          try {
+            result = await cmd.execute(nestedStep as never, nestedCtx);
+          } catch (err) {
+            result = {
+              ok: false,
+              detail: `Exception: ${(err as Error).message}`,
+            };
+          }
+          const durationMs = this.deps.clock.now() - stepStart;
+          this.emitStep({
+            type: "stepCompleted",
+            stepIndex: myIndex,
+            command: nestedStep.command,
+            summary: summary.text,
+            tokens: summary.tokens,
+            ok: result.ok,
+            detail: result.detail,
+            durationMs,
+            depth: nestedDepth,
+          });
+          if (!result.ok) return result;
         }
-        const nestedCtx: CommandContext = {
-          orchestra: this.deps.orchestra,
-          clock: this.deps.clock,
-          logger: this.deps.logger,
-          variables,
-          captures,
-          networkCapture: this.deps.networkCapture ?? null,
-          stepIndex: -1,
-          script,
-          artifacts,
-          runSteps,
-        };
-        const result = await cmd.execute(nestedStep as never, nestedCtx);
-        if (!result.ok) return result;
+        return { ok: true, detail: "completed" };
+      } finally {
+        nestedDepth--;
       }
-      return { ok: true, detail: "completed" };
     };
 
     // Execute required flows (dedup + circular detection + shared state)
@@ -185,8 +273,10 @@ export class ScriptRunner {
     }
 
     for (let i = 0; i < script.steps.length; i++) {
+      this.deps.signal?.throwIfAborted();
       const step = script.steps[i]!;
       const cmd = this.commandRegistry.get(step.command);
+      const myIndex = globalStepIndex++;
 
       if (!cmd) {
         stepResults.push({
@@ -223,6 +313,17 @@ export class ScriptRunner {
         await this.deps.clock.sleep(stepDelay);
       }
 
+      const summary = summarizeStep(step);
+      const line = script._stepLines?.[i] || undefined;
+      this.emitStep({
+        type: "stepStarted",
+        stepIndex: myIndex,
+        command: step.command,
+        summary: summary.text,
+        tokens: summary.tokens,
+        depth: 0,
+        line,
+      });
       const stepStart = this.deps.clock.now();
       try {
         const result = await cmd.execute(step as never, ctx);
@@ -234,6 +335,18 @@ export class ScriptRunner {
           detail: result.detail,
           durationMs,
         });
+        this.emitStep({
+          type: "stepCompleted",
+          stepIndex: myIndex,
+          command: step.command,
+          summary: summary.text,
+          tokens: summary.tokens,
+          ok: result.ok,
+          detail: result.detail,
+          durationMs,
+          depth: 0,
+          line,
+        });
 
         if (!result.ok) {
           failedAtStep = i;
@@ -241,12 +354,25 @@ export class ScriptRunner {
         }
       } catch (err) {
         const durationMs = this.deps.clock.now() - stepStart;
+        const detail = `Exception: ${(err as Error).message}`;
         stepResults.push({
           stepIndex: i,
           command: step.command,
           ok: false,
-          detail: `Exception: ${(err as Error).message}`,
+          detail,
           durationMs,
+        });
+        this.emitStep({
+          type: "stepCompleted",
+          stepIndex: myIndex,
+          command: step.command,
+          summary: summary.text,
+          tokens: summary.tokens,
+          ok: false,
+          detail,
+          durationMs,
+          depth: 0,
+          line,
         });
         failedAtStep = i;
         break;

@@ -1,4 +1,4 @@
-import type { Driver, Size } from "../driver/driver.port.js";
+import type { CallOptions, Driver, Size } from "../driver/driver.port.js";
 import type { Clock } from "@atomyx/core/infra";
 import type { Logger } from "@atomyx/core/infra";
 import { NoopLogger } from "@atomyx/core/infra";
@@ -134,16 +134,16 @@ export class ScrollController {
    * found via scroll-search OR cannot be centered within the
    * iteration budget.
    */
-  async ensureVisible(filter: ElementFilter): Promise<TreeCursor> {
-    const screen = await this.deps.driver.screenSize();
+  async ensureVisible(filter: ElementFilter, opts?: CallOptions): Promise<TreeCursor> {
+    const screen = await this.deps.driver.screenSize(opts);
 
     // Stage 1: scroll-search when the initial resolve is empty.
     let match: TreeCursor;
-    const initial = (await this.finder.find(filter))[0];
+    const initial = (await this.finder.find(filter, opts))[0];
     if (initial) {
       match = initial;
     } else {
-      const found = await this.scrollSearch(filter, screen);
+      const found = await this.scrollSearch(filter, screen, opts);
       if (!found) {
         throw new ScrollUnreachableError(
           "element not found after scroll-search (UP + DOWN budgets exhausted)",
@@ -176,10 +176,10 @@ export class ScrollController {
       }
       previousBounds = bounds;
 
-      await this.scrollTowardElement(bounds, screen);
+      await this.scrollTowardElement(bounds, screen, opts);
       await this.deps.clock.sleep(this.settleWaitMs);
 
-      const next = (await this.finder.find(filter))[0];
+      const next = (await this.finder.find(filter, opts))[0];
       if (!next) {
         throw new ScrollUnreachableError(
           `element lost after scroll attempt ${iteration + 1} — ` +
@@ -205,17 +205,18 @@ export class ScrollController {
   private async scrollSearch(
     filter: ElementFilter,
     screen: Size,
+    opts?: CallOptions,
   ): Promise<TreeCursor | undefined> {
     for (let i = 0; i < this.scrollSearchBudget; i++) {
-      await this.swipeCenter(screen, "up");
+      await this.swipeCenter(screen, "up", opts);
       await this.deps.clock.sleep(this.settleWaitMs);
-      const found = (await this.finder.find(filter))[0];
+      const found = (await this.finder.find(filter, opts))[0];
       if (found) return found;
     }
     for (let i = 0; i < this.scrollSearchBudget; i++) {
-      await this.swipeCenter(screen, "down");
+      await this.swipeCenter(screen, "down", opts);
       await this.deps.clock.sleep(this.settleWaitMs);
-      const found = (await this.finder.find(filter))[0];
+      const found = (await this.finder.find(filter, opts))[0];
       if (found) return found;
     }
     return undefined;
@@ -227,7 +228,11 @@ export class ScrollController {
    * to `maxScrollFraction * screenHeight` so each iteration makes
    * a predictable step.
    */
-  private async scrollTowardElement(bounds: Bounds, screen: Size): Promise<void> {
+  private async scrollTowardElement(
+    bounds: Bounds,
+    screen: Size,
+    opts?: CallOptions,
+  ): Promise<void> {
     const elemMidX = (bounds.left + bounds.right) / 2;
     const elemMidY = (bounds.top + bounds.bottom) / 2;
     const viewportMidY = screen.height / 2;
@@ -252,6 +257,7 @@ export class ScrollController {
       { x: swipeX, y: fromY },
       { x: swipeX, y: toY },
       this.swipeDurationMs,
+      opts,
     );
   }
 
@@ -260,7 +266,11 @@ export class ScrollController {
    * fixed to `maxScrollFraction` — not adaptive, because we don't
    * know where the target is yet.
    */
-  private async swipeCenter(screen: Size, direction: "up" | "down"): Promise<void> {
+  private async swipeCenter(
+    screen: Size,
+    direction: "up" | "down",
+    opts?: CallOptions,
+  ): Promise<void> {
     const x = screen.width / 2;
     const midY = screen.height / 2;
     const delta = (screen.height * this.maxScrollFraction) / 2;
@@ -268,7 +278,12 @@ export class ScrollController {
     // "down" = reveal items BELOW: finger drags up, content scrolls up.
     const fromY = direction === "up" ? midY - delta : midY + delta;
     const toY = direction === "up" ? midY + delta : midY - delta;
-    await this.deps.driver.swipe({ x, y: fromY }, { x, y: toY }, this.swipeDurationMs);
+    await this.deps.driver.swipe(
+      { x, y: fromY },
+      { x, y: toY },
+      this.swipeDurationMs,
+      opts,
+    );
   }
 
   private boundsOf(cursor: TreeCursor): Bounds | null {

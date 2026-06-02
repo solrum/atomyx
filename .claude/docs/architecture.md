@@ -48,24 +48,32 @@ Every module follows the same internal layering:
 ┌─────────────────────────────────────────────┐
 │  CORE LOGIC (TypeScript library)            │
 │  — pure functions, no I/O assumptions       │
-└──────────────────┬──────────────────────────┘
-                   │
-       ┌───────────┴───────────┐
-       ▼                       ▼
-┌──────────────┐      ┌──────────────────┐
-│  CLI         │      │  MCP server      │
-│  binary      │      │  (stdio)         │
-└──────────────┘      └──────────────────┘
-       │                       │
-       │  (optional sibling)   │
-       ▼                       ▼
-┌─────────────────────────────────────┐
-│  HTTP server (optional)             │
-│  for browser / curl / external      │
-│  consumers that can't link in-      │
-│  process (e.g. a remote Studio)     │
-└─────────────────────────────────────┘
+│  — the primary execution engine             │
+└──────────────┬───────────────┬──────────────┘
+               │               │
+       ┌───────┴────┐     ┌────┴──────┐
+       ▼            ▼     ▼           ▼
+┌──────────┐  ┌───────────┐  ┌──────────────┐
+│  CLI     │  │  Studio   │  │ MCP server   │
+│  binary  │  │  (Tauri,  │  │ (stdio)      │
+│          │  │  Node     │  │ — optional   │
+│          │  │  sidecar) │  │   AI adapter │
+└──────────┘  └───────────┘  └──────────────┘
+                                     │
+                          (optional) ▼
+                            ┌──────────────┐
+                            │ HTTP server  │
+                            │ (browser /   │
+                            │  non-TS /    │
+                            │  remote use) │
+                            └──────────────┘
 ```
+
+Studio consumes the core runtime via a `StudioRuntime` port —
+default adapter spawns a Node sidecar that links the core as a
+library. MCP is a SECONDARY adapter that wraps the same core for
+AI-agent consumers; Studio can opt into it via settings but does
+not depend on it. See ADR-005 for the rationale and contract.
 
 Rules:
 
@@ -73,9 +81,10 @@ Rules:
    library — exports types, classes, and functions. No transport, no I/O
    beyond what the Driver port abstracts.
 
-2. **CLI, MCP, and HTTP are PARALLEL transports**, all wrapping the same
-   core logic in-process. They are siblings, not stacked layers. MCP does
-   NOT wrap HTTP; both call the core directly.
+2. **CLI, Studio, MCP, and HTTP are PARALLEL consumers** of the core
+   logic. They are siblings, not stacked layers. MCP does NOT wrap
+   HTTP; both call the core directly. Studio in Tauri talks to the
+   core through a Node sidecar it owns — no MCP required for humans.
 
 3. **HTTP is OPTIONAL** within a module. Ship it when there's a real
    external consumer that cannot link the core as a library (browser,
@@ -85,6 +94,11 @@ Rules:
 4. **MCP wraps the core, not HTTP.** AI agents talking to a local MCP
    server hit the core in the same process — zero network hops, full
    speed, full type safety up to the MCP boundary.
+
+5. **MCP is optional**, not a middleware the human tools depend on.
+   CLI and Studio call the core runtime directly; MCP is a separate
+   adapter that AI-agent sessions opt into. Building Studio features
+   that require MCP when the user has not opted in is a regression.
 
 ## 4. CROSS-MODULE BOUNDARIES — ENFORCED BY LINT
 
@@ -136,7 +150,7 @@ Modules detect siblings at install time via npm dependency resolution,
 NOT at runtime via network probes:
 
 ```ts
-// packages/studio/src/features.ts
+// inside any consumer that wants test-management as an optional sibling
 let testRepo: TestCaseRepo | null = null;
 try {
   const mod = await import("@atomyx/test-mgmt");
@@ -148,8 +162,9 @@ try {
 
 If a user installs only `@atomyx/cli`, the optional
 `@atomyx/test-mgmt` import fails at runtime and the consumer
-gracefully reports "I have driver, no test repository". The detection
-happens at npm resolution time, not via runtime HTTP probing.
+gracefully reports "I have driver, no test repository" — exactly the
+behavior the previous ARCHITECTURE.md draft required, achieved via npm rather than HTTP
+probing.
 
 ## 6. USER PERSONAS
 
@@ -158,9 +173,9 @@ Each persona maps to a specific install:
 | Persona | Installs | Gets |
 |---|---|---|
 | **Pure Developer** | `@atomyx/cli` | Device interaction via CLI + MCP. ~5-10 MB. |
-| **QC Manager** | `@atomyx/test-mgmt-cli` | Standalone test-case + report manager. No driver. |
+| **QC Manager** | `@atomyx/test-mgmt` | Standalone test-case + report manager. No driver. |
 | **Power User** | `@atomyx/studio` | GUI bundling everything. Auto-detects which siblings are installed. |
-| **CI Pipeline** | `@atomyx/cli` + `@atomyx/test-mgmt-cli` | Headless run-and-report. |
+| **CI Pipeline** | `@atomyx/cli` + `@atomyx/test-mgmt` | Headless run-and-report. |
 | **Cloud / Scale Operator** | `@atomyx/cloud` (future) | Remote device farm orchestration. |
 
 Each module has its own `bin` and its own MCP server entry point. The
@@ -222,7 +237,7 @@ linked at runtime (Studio imports the others as libraries).
 - It is **not** anti-HTTP. HTTP is one of three transports a module can
   ship (CLI, MCP, HTTP) — added when a real consumer needs it.
 
-The contract: **install only what you need, modules independently
-developable, gracefully degrade** — delivered through **npm-level
-distribution + in-process composition + lint-enforced boundaries**,
-not HTTP-between-processes.
+The goal is the same as v1 of this document: **install only what you
+need, modules independently developable, gracefully degrade**. The
+mechanism is different: **npm-level distribution + in-process composition
++ lint-enforced boundaries**, not HTTP-between-processes.

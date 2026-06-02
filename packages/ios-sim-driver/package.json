@@ -1,0 +1,25 @@
+{
+  "name": "@atomyx/ios-sim-driver",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Atomyx iOS Simulator direct-HID driver — composes an IosDriver delegate for non-touch operations with a SimDeviceLegacyHIDClient path for touch (arm64 + Xcode 26+ only).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./*": "./dist/*.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test $(find src -name '*.test.ts')"
+  },
+  "dependencies": {
+    "@atomyx/driver": "0.1.0",
+    "@atomyx/ios-driver": "0.1.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

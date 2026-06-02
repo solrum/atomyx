@@ -122,6 +122,16 @@ atomyx-local/
 # Contributors who need them author / recreate them locally.
 scripts/
 
+# ─── Rust / Cargo ──────────────────────────────────────────────────
+# Cargo build output for every crate in the tree (currently
+# `apps/studio/src-tauri`). Crates regenerate this on each build.
+**/target/
+Cargo.lock.bak
+
+# ─── Tauri ─────────────────────────────────────────────────────────
+# Per-machine generated Tauri context (capabilities schema, etc.).
+**/src-tauri/gen/
+
 # ─── Local-only design docs ───────────────────────────────────────
 # ADRs and proposals are internal design deliberations. They live
 # on disk next to the rest of `.claude/docs/` so local tooling can

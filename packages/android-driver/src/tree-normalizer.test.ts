@@ -118,6 +118,61 @@ describe("normalizeAndroidTree", () => {
     assert.equal(wire.attributes["bounds"], undefined);
   });
 
+  it("derives button role when bare View is clickable + has label (Flutter Semantics)", () => {
+    // Gangan tab: Flutter Semantics emits the category tile as
+    // `android.view.View` with clickable=true and a content
+    // description. Class-name table cannot identify it; signal-
+    // based fallback recovers `button`.
+    const wire = normalizeAndroidTree({
+      elementId: "tab-1",
+      className: "android.view.View",
+      contentDesc: "Xe máy",
+      clickable: true,
+    });
+    assert.equal(wire.attributes["role"], "button");
+  });
+
+  it("derives button role when bare View is clickable + has text", () => {
+    const wire = normalizeAndroidTree({
+      elementId: "btn-1",
+      className: "android.view.View",
+      text: "Tin nhắn",
+      clickable: true,
+    });
+    assert.equal(wire.attributes["role"], "button");
+  });
+
+  it("derives text role for non-clickable View with text", () => {
+    const wire = normalizeAndroidTree({
+      elementId: "lbl-1",
+      className: "android.view.View",
+      text: "TIN MỚI ĐĂNG",
+      clickable: false,
+    });
+    assert.equal(wire.attributes["role"], "text");
+  });
+
+  it("keeps role 'other' for bare View with no actionable signal", () => {
+    const wire = normalizeAndroidTree({
+      elementId: "decor-1",
+      className: "android.view.View",
+      clickable: false,
+    });
+    assert.equal(wire.attributes["role"], "other");
+  });
+
+  it("keeps role 'other' for bare View with only contentDesc and not clickable", () => {
+    // Decorative description (a11y label on a non-interactive
+    // region) shouldn't be promoted — too ambiguous.
+    const wire = normalizeAndroidTree({
+      elementId: "icon-1",
+      className: "android.view.View",
+      contentDesc: "Logo",
+      clickable: false,
+    });
+    assert.equal(wire.attributes["role"], "other");
+  });
+
   it("plumbs focused state when set", () => {
     const wire = normalizeAndroidTree({
       elementId: "el-1",
@@ -134,6 +189,39 @@ describe("normalizeAndroidTree", () => {
       className: "android.widget.TextView",
     });
     assert.equal(wire.focused, undefined);
+  });
+
+  it("plumbs selected and visible state when set", () => {
+    const wire = normalizeAndroidTree({
+      elementId: "tab-1",
+      className: "android.widget.TextView",
+      selected: true,
+      visible: false,
+    });
+    assert.equal(wire.selected, true);
+    assert.equal(wire.visible, false);
+  });
+
+  it("emits checked only when checkable is true", () => {
+    const checkbox = normalizeAndroidTree({
+      elementId: "cb-1",
+      className: "android.widget.CheckBox",
+      checkable: true,
+      checked: true,
+    });
+    assert.equal(checkbox.checked, true);
+    // Plain views report checked=false by default in
+    // AccessibilityNodeInfo even when checked is meaningless.
+    // Adapter must NOT emit it on non-checkable nodes — consumers
+    // would otherwise see a misleading "checked=false" for buttons,
+    // text fields, etc.
+    const button = normalizeAndroidTree({
+      elementId: "btn-1",
+      className: "android.widget.Button",
+      checkable: false,
+      checked: false,
+    });
+    assert.equal(button.checked, undefined);
   });
 
   it("preserves document order of children (matters for z-order)", () => {

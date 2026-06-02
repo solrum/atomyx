@@ -31,13 +31,12 @@ Adding a new platform = implement the `Driver` port from
 ## Repo map
 
 Atomyx is organized as an opt-in package ecosystem (see
-`.claude/docs/architecture.md` for the contract). All TS packages live flat
-under `packages/`. Module ownership is encoded in the package
-name convention: plain `@atomyx/<name>` for the device-interaction
-module, `@atomyx/test-mgmt-*` for test management, `@atomyx/studio-*`
-for the GUI client, `@atomyx/cloud-*` for scale workers.
-Platform-native projects (Swift, Kotlin) live separately under
-`platforms/`.
+`.claude/docs/architecture.md` for the contract). Libraries live flat
+under `packages/`; end-user applications live under `apps/`. Module
+ownership is encoded in the package name convention for the device
+interaction module, `test-mgmt-*` for test management, `studio-*` for
+the GUI client, `cloud-*` for scale workers. Platform-native projects
+(Swift, Kotlin) live separately under `platforms/`.
 
 ```
 atomyx/
@@ -47,7 +46,7 @@ atomyx/
 ├── .dependency-cruiser.cjs    ← cross-package boundary lint
 ├── package.json               ← root workspace
 │
-├── packages/                  ← all TS packages, flat
+├── packages/                  ← all TS library packages, flat
 │   │
 │   │── ── driver MODULE (Persona: Pure Developer) ──
 │   ├── core/                  @atomyx/core
@@ -72,6 +71,10 @@ atomyx/
 │   │                            createMcpServer factory + 27 tools
 │   ├── script/                @atomyx/script
 │   │                            Parser + 17 commands + runner + network
+│   ├── sidecar/               @atomyx/sidecar
+│   │                            JSON-RPC-over-stdio bridge consumed by
+│   │                            Studio's Tauri backend. Feature-sliced
+│   │                            (infra + features/).
 │   ├── cli/                   @atomyx/cli
 │   │                            bin: atomyx driver — the end-user
 │   │                            entry point
@@ -79,11 +82,15 @@ atomyx/
 │   │── ── test-mgmt MODULE (Persona: QC Manager) ──
 │   ├── test-mgmt/             @atomyx/test-mgmt (skeleton)
 │   │
-│   │── ── studio MODULE (Persona: Power User) ──
-│   ├── studio/                @atomyx/studio (skeleton)
-│   │
 │   └── ── cloud MODULE (Persona: Scale Operator) ──
 │       cloud/                 @atomyx/cloud (skeleton)
+│
+├── apps/                      ← end-user applications
+│   └── studio/                @atomyx/studio — Tauri IDE. Four layers
+│                              (ui/ state/ domain/ platform/), each
+│                              feature-sliced. State features use the
+│                              feature-api DI pattern — see
+│                              .claude/rules/feature-api.md.
 │
 ├── platforms/                 ← non-npm platform projects
 │   ├── ios-agent/             Swift XCUITest runner
@@ -91,9 +98,11 @@ atomyx/
 │   └── android-agent/         Kotlin APK
 │                                app/src/main/java/dev/atomyx/agent/
 │
-├── shared/                    ← cross-package type contracts (empty)
-├── examples/                  ← runnable demos (not workspace members)
-├── scripts/                   ← repo-level dev tools
+├── shared/                    @atomyx/shared — cross-package contracts
+│                              (types + zod schemas). Consumed by core,
+│                              driver, script, mcp, cli, sidecar, studio.
+├── examples/                  runnable demos (not workspace members)
+├── scripts/                   repo-level dev tools
 │
 ├── docs/                      ← END USER documentation
 │   └── README.md              roadmap of planned user content
@@ -114,7 +123,7 @@ atomyx/
 **Module conceptual grouping**: a "module" in Atomyx is the
 set of packages related to a feature area. Driver module =
 {`core`, `driver`, `driver-wire`, `android-driver`,
-`ios-driver`, `mcp`, `script`, `cli`}.
+`ios-driver`, `mcp`, `script`, `sidecar`, `cli`, `apps/studio`}.
 The grouping is implicit in naming, not explicit in directory
 structure — keeps paths shallow and lets `dependency-cruiser`
 enforce module boundaries at CI time rather than relying on a
@@ -126,5 +135,6 @@ nested directory layout.
 `defineTool` wrapper that calls Orchestra methods. See
 [`tools.md`](./tools.md) for the full contract.
 
-Each tool has exactly one intent. Before adding a tool, confirm
-no existing tool can absorb the new intent via a parameter.
+The surface was consolidated so each tool has exactly one
+intent. Before adding a tool, ask whether an existing tool
+can absorb the new intent via a parameter.

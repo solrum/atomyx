@@ -68,6 +68,75 @@ final class CommandHandlerUnitTests: XCTestCase {
         XCTAssertEqual(state.currentBundleId, "com.example.app")
         XCTAssertNotNil(state.currentApp)
         XCTAssertEqual(resp.data["bundleId"] as? String, "com.example.app")
+        XCTAssertEqual(resp.data["attached"] as? Bool, false)
+    }
+
+    func testLaunchAppNoResetSkipsLaunchWhenSameBundleAlreadyTracked() {
+        let cmd = LaunchAppCommand()
+        let bridge = MockXCUIBridge()
+        let state = mockState(bundleId: "com.example.app")
+
+        let req = Request(
+            id: 1,
+            type: "launchApp",
+            args: ["bundleId": "com.example.app", "noReset": true]
+        )
+        let resp = cmd.handle(req, bridge: bridge, state: state)
+
+        XCTAssertTrue(resp.ok)
+        XCTAssertEqual(bridge.launchCalls, [])
+        XCTAssertEqual(state.currentBundleId, "com.example.app")
+        XCTAssertNotNil(state.currentApp)
+        XCTAssertEqual(resp.data["attached"] as? Bool, true)
+    }
+
+    func testLaunchAppNoResetLaunchesWhenBundleIdDiffers() {
+        let cmd = LaunchAppCommand()
+        let bridge = MockXCUIBridge()
+        let state = mockState(bundleId: "com.example.old")
+
+        let req = Request(
+            id: 1,
+            type: "launchApp",
+            args: ["bundleId": "com.example.new", "noReset": true]
+        )
+        let resp = cmd.handle(req, bridge: bridge, state: state)
+
+        XCTAssertTrue(resp.ok)
+        XCTAssertEqual(bridge.launchCalls, ["com.example.new"])
+        XCTAssertEqual(state.currentBundleId, "com.example.new")
+        XCTAssertEqual(resp.data["attached"] as? Bool, false)
+    }
+
+    func testLaunchAppNoResetLaunchesWhenNoCurrentApp() {
+        let cmd = LaunchAppCommand()
+        let bridge = MockXCUIBridge()
+        let state = DriverState()
+
+        let req = Request(
+            id: 1,
+            type: "launchApp",
+            args: ["bundleId": "com.example.app", "noReset": true]
+        )
+        let resp = cmd.handle(req, bridge: bridge, state: state)
+
+        XCTAssertTrue(resp.ok)
+        XCTAssertEqual(bridge.launchCalls, ["com.example.app"])
+        XCTAssertEqual(state.currentBundleId, "com.example.app")
+        XCTAssertEqual(resp.data["attached"] as? Bool, false)
+    }
+
+    func testLaunchAppDefaultsToResetEvenWhenAlreadyTracked() {
+        let cmd = LaunchAppCommand()
+        let bridge = MockXCUIBridge()
+        let state = mockState(bundleId: "com.example.app")
+
+        let req = Request(id: 1, type: "launchApp", args: ["bundleId": "com.example.app"])
+        let resp = cmd.handle(req, bridge: bridge, state: state)
+
+        XCTAssertTrue(resp.ok)
+        XCTAssertEqual(bridge.launchCalls, ["com.example.app"])
+        XCTAssertEqual(resp.data["attached"] as? Bool, false)
     }
 
     // MARK: - TapAtCommand
@@ -79,15 +148,6 @@ final class CommandHandlerUnitTests: XCTestCase {
 
         XCTAssertFalse(resp.ok)
         XCTAssertEqual(resp.error, "missing x/y (numbers)")
-    }
-
-    func testTapAtRejectsWhenNoAppLaunched() {
-        let cmd = TapAtCommand(synthesizer: CoordinateSynthesizer())
-        let req = Request(id: 1, type: "tapAt", args: ["x": 100, "y": 200])
-        let resp = cmd.handle(req, bridge: MockXCUIBridge(), state: DriverState())
-
-        XCTAssertFalse(resp.ok)
-        XCTAssertTrue(resp.error?.contains("no app launched") == true)
     }
 
     // MARK: - ForceStopAppCommand
@@ -139,17 +199,6 @@ final class CommandHandlerUnitTests: XCTestCase {
         XCTAssertTrue(resp.error?.contains("missing") == true)
     }
 
-    func testSwipeRejectsWhenNoAppLaunched() {
-        let cmd = SwipeCommand(synthesizer: CoordinateSynthesizer())
-        let req = Request(id: 1, type: "swipe", args: [
-            "fromX": 0, "fromY": 0, "toX": 100, "toY": 100,
-        ])
-        let resp = cmd.handle(req, bridge: MockXCUIBridge(), state: DriverState())
-
-        XCTAssertFalse(resp.ok)
-        XCTAssertTrue(resp.error?.contains("no app launched") == true)
-    }
-
     // MARK: - LongPressAtCommand
 
     func testLongPressRejectsMissingCoordinates() {
@@ -159,15 +208,6 @@ final class CommandHandlerUnitTests: XCTestCase {
 
         XCTAssertFalse(resp.ok)
         XCTAssertEqual(resp.error, "missing x/y (numbers)")
-    }
-
-    func testLongPressRejectsWhenNoAppLaunched() {
-        let cmd = LongPressAtCommand(synthesizer: CoordinateSynthesizer())
-        let req = Request(id: 1, type: "longPressAt", args: ["x": 10, "y": 20])
-        let resp = cmd.handle(req, bridge: MockXCUIBridge(), state: DriverState())
-
-        XCTAssertFalse(resp.ok)
-        XCTAssertTrue(resp.error?.contains("no app launched") == true)
     }
 
     // MARK: - PressKeyCommand
@@ -326,13 +366,18 @@ final class CommandHandlerUnitTests: XCTestCase {
 
     // MARK: - GetScreenSizeCommand
 
-    func testGetScreenSizeRequiresTrackedApp() {
+    func testGetScreenSizeFallsBackToSpringboardWithoutTrackedApp() {
         let cmd = GetScreenSizeCommand()
+        let bridge = MockXCUIBridge()
+        bridge.screenSizeBehavior = {
+            CGSize(width: 390, height: 844)
+        }
         let req = Request(id: 1, type: "getScreenSize", args: [:])
-        let resp = cmd.handle(req, bridge: MockXCUIBridge(), state: DriverState())
+        let resp = cmd.handle(req, bridge: bridge, state: DriverState())
 
-        XCTAssertFalse(resp.ok)
-        XCTAssertTrue(resp.error?.contains("no app launched") == true)
+        XCTAssertTrue(resp.ok)
+        XCTAssertEqual(resp.data["width"] as? Int, 390)
+        XCTAssertEqual(resp.data["height"] as? Int, 844)
     }
 
     func testGetScreenSizeReturnsBridgeValue() {
@@ -469,7 +514,7 @@ final class CommandHandlerUnitTests: XCTestCase {
         let resp = cmd.handle(req, bridge: MockXCUIBridge(), state: DriverState())
 
         XCTAssertFalse(resp.ok)
-        XCTAssertTrue(resp.error?.contains("no app launched") == true)
+        XCTAssertTrue(resp.error?.contains("no app bound") == true)
     }
 
     func testDumpRawTreeReportsSnapshotFailure() {

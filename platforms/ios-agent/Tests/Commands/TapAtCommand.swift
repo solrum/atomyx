@@ -1,8 +1,10 @@
 import Foundation
 import CoreGraphics
 
-/// Tap at raw point coordinates, app-relative (origin = app frame
-/// top-left). Requires a tracked app.
+/// Tap at raw point coordinates in device-global point space
+/// (origin = top-left of the full screen). The synthesizer
+/// dispatches to whichever app is currently frontmost — no
+/// `launchApp` required.
 ///
 /// Request args: `x` and `y` as Double | Int | String (parsed).
 ///
@@ -34,17 +36,15 @@ final class TapAtCommand: CommandHandler {
 
     func handle(_ request: Request, bridge: XCUIBridge, state: DriverState) -> Response {
         _ = bridge  // gesture dispatch routes through `synthesizer`; bridge is unused here
+        _ = state   // synthesizer dispatches device-global events; no tracked-app dependency
         guard let x = CommandArgs.numeric(request.args["x"]),
               let y = CommandArgs.numeric(request.args["y"]) else {
             return .error(id: request.id, message: "missing x/y (numbers)")
         }
-        guard let app = state.currentApp else {
-            return .error(id: request.id, message: "no app launched — call launchApp first")
-        }
 
         let path = Self.buildPath(x: x, y: y)
         do {
-            try synthesizer.dispatch(pointers: [path], in: app)
+            try synthesizer.dispatch(pointers: [path])
         } catch {
             return .error(id: request.id, message: "tap dispatch failed: \(error)")
         }

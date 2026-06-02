@@ -20,20 +20,23 @@ taking dictation — you are expected to:
 - Treat "it works" as necessary but not sufficient — the bar is "it
   works AND it keeps the architecture honest for the next contributor".
 
-You are building a framework whose consumers are **other AI agents**
-AND future features layered on top (MCP server, Studio IDE, test
-management integrations). Evaluate every design decision through:
-"does this make the downstream agent's job easier?" AND "can a new
-feature plug in without breaking existing ones?" Agent ergonomics and
-extensibility are first-class requirements.
+You are building a framework whose consumers are **humans AND AI
+agents**, plus future features layered on top (Studio IDE, MCP
+server for AI-augmented sessions, test management integrations).
+Evaluate every design decision through: "does this keep the core
+runtime standalone — usable by CLI / Studio without MCP?" AND
+"does this make the agent's life easier when MCP IS enabled?" AND
+"can a new consumer plug in without breaking existing ones?"
 
 ## Mission
 
-Let an AI agent drive a real mobile app the way a human QA would —
-discover screens, try flows, report bugs — through a small, stable
-set of high-intent tools, while exposing a framework-grade port /
-adapter API that multiple modules (CLI, MCP server, Studio, test
-management) share without duplication.
+Let a human QA or an AI agent drive a real mobile app — discover
+screens, try flows, report bugs — through a small, stable **core
+runtime** (driver + script engine + adapters). Humans reach it via
+CLI or Studio; AI agents reach it via the optional MCP surface
+(`atomyx-mcp`) that wraps the same core with a 27-tool surface.
+The core runtime is the primary; MCP is an extension adapter (see
+ADR-005).
 
 Three tenets — first filter for any change request:
 
@@ -53,11 +56,17 @@ Three tenets — first filter for any change request:
 A hexagonal-architecture monorepo:
 
 - **`packages/`** (TypeScript, flat npm workspaces) — `@atomyx/core`
-  + `@atomyx/driver` hold the cross-platform logic (Driver port,
-  Orchestra, filters, selectors, obscurement, testing kit).
-  `@atomyx/android-driver` and `@atomyx/ios-driver` implement the
-  `Driver` port. `@atomyx/mcp` ships the 27-tool surface. `@atomyx/cli`
-  is the user-facing binary.
+  + `@atomyx/driver` + `@atomyx/script` form the **core runtime**
+  (Driver port, Orchestra, filters, selectors, obscurement, testing
+  kit, script engine). `@atomyx/android-driver` and `@atomyx/ios-driver`
+  implement the `Driver` port. `@atomyx/cli` is the user-facing
+  binary that invokes the core directly. `@atomyx/mcp` is an
+  **optional wrapper** exposing the core as a 27-tool MCP surface
+  for AI agents — not required for CLI or Studio.
+- **`apps/`** — end-user applications. `apps/studio/` is the Tauri
+  IDE; consumes the core runtime via a `StudioRuntime` port (see
+  ADR-005). MCP can back it as an optional adapter, not a
+  dependency.
 - **`platforms/`** — non-npm native projects: `android-agent/`
   (Kotlin APK, HTTP on `127.0.0.1:8765` via `adb forward`) and
   `ios-agent/` (Swift XCUITest runner, TCP JSON on
@@ -149,6 +158,9 @@ Fuller rationale + boundary enforcement: [`.claude/docs/architecture.md`](./.cla
 | Touch anything Android-related                          | [`.claude/docs/android.md`](./.claude/docs/android.md)                  |
 | Write or edit any comment / docstring                   | [`.claude/rules/comments.md`](./.claude/rules/comments.md)              |
 | Write or edit any file under `docs/` or `.claude/docs/` | [`.claude/rules/docs.md`](./.claude/rules/docs.md)                      |
+| Edit anything under `apps/studio/`                      | [`.claude/rules/studio-architecture.md`](./.claude/rules/studio-architecture.md) |
+| Create a new file or feature in any TS package or app   | [`.claude/rules/feature-structure.md`](./.claude/rules/feature-structure.md)    |
+| Export anything from a feature's `index.ts` or add a new feature | [`.claude/rules/feature-api.md`](./.claude/rules/feature-api.md)           |
 
 Updating a tool without reading `tools.md` is how regressions get
 reintroduced. Treat these docs as required reading for the task at

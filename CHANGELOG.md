@@ -30,6 +30,26 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `.claude/rules/comments.md` — repo commenting rules.
 
 ### Changed
+- `.npmrc` sets `ignore-scripts=true` so `npm ci` suppresses lifecycle
+  scripts from transitive dependencies: `esbuild@0.27`'s postinstall
+  falls back to a live `registry.npmjs.org` download when its optional
+  platform package is absent, and several devDependencies run
+  `husky install` or TypeScript builds via `prepare` — none of which
+  serve any purpose at install time in this repo. The esbuild binary
+  resolves correctly via its platform-specific optional package without
+  the postinstall.
+- `apps/studio` `tauri:dev` script adds `--no-watch` to disable
+  Tauri's Rust file watcher during development. `src-tauri/resources/`
+  contains a bundled `sidecar.cjs` (~600 KB) that changes whenever the
+  sidecar is rebuilt; without `--no-watch`, any sidecar rebuild triggers
+  a full Rust recompilation of the Tauri host even though only a
+  resource file changed. Vite HMR (started by `beforeDevCommand`) handles
+  frontend hot-reload independently, so Tauri's watcher is redundant for
+  that path. A `src-tauri/.taurignore` was added first to exclude the
+  resource path, but Tauri 2's CLI (a native NAPI binary) does not
+  honour `src-tauri/.taurignore` — the ignore file must sit at the
+  project root. `--no-watch` is the reliable fix until a root-level
+  `.taurignore` is confirmed to work with the installed CLI version.
 - Script `stepDelay` default 500 → 0. Observation-driven actions
   remove the need for fixed inter-step padding.
 - `examples/test-login-flow.yml` — removed explicit `sleep:` pads

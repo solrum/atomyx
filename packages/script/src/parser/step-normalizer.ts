@@ -45,45 +45,30 @@ const NORMALIZERS: Record<string, StepNormalizer> = {
   },
 
   waitFor: (value): ScriptStep => {
-    if (typeof value === "string") {
-      return {
-        command: "waitFor",
-        selector: expandSelectorShorthand(value),
-      };
+    const { selector, timeoutMs } = splitSelectorAndTimeout(value);
+    const step: ScriptStep = { command: "waitFor", selector };
+    if (timeoutMs !== undefined) {
+      (step as { timeoutMs?: number }).timeoutMs = timeoutMs;
     }
-    const obj = value as Record<string, unknown>;
-    return {
-      command: "waitFor",
-      selector: expandSelectorShorthand(
-        obj.text ?? obj.id ?? obj.label ?? obj,
-      ),
-      timeoutMs:
-        typeof obj.timeout === "number" ? obj.timeout : undefined,
-    };
+    return step;
   },
 
   assertVisible: (value): ScriptStep => {
-    if (typeof value === "string") {
-      return { command: "assertVisible", selector: expandSelectorShorthand(value) };
+    const { selector, timeoutMs } = splitSelectorAndTimeout(value);
+    const step: ScriptStep = { command: "assertVisible", selector };
+    if (timeoutMs !== undefined) {
+      (step as { timeoutMs?: number }).timeoutMs = timeoutMs;
     }
-    const obj = value as Record<string, unknown>;
-    return {
-      command: "assertVisible",
-      selector: expandSelectorShorthand(obj.text ?? obj.id ?? obj.label ?? obj),
-      timeoutMs: typeof obj.timeout === "number" ? obj.timeout : undefined,
-    };
+    return step;
   },
 
   assertNotVisible: (value): ScriptStep => {
-    if (typeof value === "string") {
-      return { command: "assertNotVisible", selector: expandSelectorShorthand(value) };
+    const { selector, timeoutMs } = splitSelectorAndTimeout(value);
+    const step: ScriptStep = { command: "assertNotVisible", selector };
+    if (timeoutMs !== undefined) {
+      (step as { timeoutMs?: number }).timeoutMs = timeoutMs;
     }
-    const obj = value as Record<string, unknown>;
-    return {
-      command: "assertNotVisible",
-      selector: expandSelectorShorthand(obj.text ?? obj.id ?? obj.label ?? obj),
-      timeoutMs: typeof obj.timeout === "number" ? obj.timeout : undefined,
-    };
+    return step;
   },
 
   screenshot: (value): ScriptStep => ({
@@ -264,6 +249,34 @@ const NORMALIZERS: Record<string, StepNormalizer> = {
     };
   },
 };
+
+/**
+ * Split a `waitFor` / `assert*` YAML value into a selector and an
+ * optional `timeoutMs`. Object form carries both on a single
+ * mapping (`{ id: "…", timeout: 5000 }`) — separating them here
+ * keeps every selector field intact instead of collapsing the
+ * mapping to whichever single field the old heuristic happened
+ * to check first.
+ */
+function splitSelectorAndTimeout(value: unknown): {
+  readonly selector: ReturnType<typeof expandSelectorShorthand>;
+  readonly timeoutMs: number | undefined;
+} {
+  if (typeof value === "string") {
+    return { selector: expandSelectorShorthand(value), timeoutMs: undefined };
+  }
+  if (typeof value !== "object" || value === null) {
+    throw new ScriptParseError(
+      `Invalid step value: expected string or object, got ${typeof value}`,
+    );
+  }
+  const { timeout, ...selectorFields } = value as Record<string, unknown>;
+  const timeoutMs = typeof timeout === "number" ? timeout : undefined;
+  return {
+    selector: expandSelectorShorthand(selectorFields),
+    timeoutMs,
+  };
+}
 
 function normalizePointerMoveDuration(raw: unknown): number | undefined {
   if (raw === undefined || raw === null) return undefined;

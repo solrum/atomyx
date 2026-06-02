@@ -183,4 +183,20 @@ describe("TreeNodeSchema — recursive", () => {
     assert.equal(parsed.clickable, undefined);
     assert.equal(parsed.enabled, undefined);
   });
+
+  it("preserves the full state-boolean set including visible", () => {
+    const parsed = TreeNodeSchema.parse({
+      attributes: { id: "x" },
+      children: [],
+      clickable: true,
+      enabled: true,
+      focused: false,
+      selected: true,
+      checked: false,
+      visible: true,
+    });
+    assert.equal(parsed.visible, true);
+    assert.equal(parsed.selected, true);
+    assert.equal(parsed.checked, false);
+  });
 });

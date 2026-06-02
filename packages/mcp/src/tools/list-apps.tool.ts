@@ -17,7 +17,7 @@ export const listAppsTool = defineTool({
   inputSchema: ListAppsArgs,
   async execute(_args, ctx) {
     const orchestra = orchestraOrFail(ctx);
-    const apps = await orchestra.listApps();
+    const apps = await orchestra.listApps({ signal: ctx.signal });
     return {
       count: apps.length,
       apps,

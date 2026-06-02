@@ -37,9 +37,13 @@ module.exports = {
         "Packages may only import each other's public entry points " +
         "(@atomyx/<package>) — never reach into another package's " +
         "src/ paths. Use the exported API surface.",
-      from: { path: "^packages/" },
+      from: { path: "^packages/([^/]+)/" },
       to: {
-        path: "^packages/[^/]+/src/",
+        // The negative lookahead on `\\1` confines this rule to
+        // CROSS-package imports: same-package imports are allowed
+        // to deep-link freely. Without it, an intra-package
+        // import of `./foo.ts` would also trip the rule.
+        path: "^packages/(?!\\1)([^/]+)/src/",
         pathNot: "/index\\.ts$",
       },
     },

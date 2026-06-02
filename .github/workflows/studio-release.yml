@@ -1,0 +1,62 @@
+name: Studio Release
+
+on:
+  push:
+    tags:
+      - "studio-v*"
+  workflow_dispatch:
+
+jobs:
+  build-and-publish:
+    runs-on: macos-14
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/studio/src-tauri
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build sidecar bundle
+        run: npm --workspace=@atomyx/sidecar run build:bundle
+
+      - name: Build Studio (sign + notarize + sign update bundle)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          # macOS code signing — Apple Developer ID
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # Notarization — app-specific password method
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Tauri update bundle signing — separate key from Apple
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: apps/studio
+          tagName: ${{ github.ref_name }}
+          releaseName: "Atomyx Studio __VERSION__"
+          releaseBody: "Verify the DMG signature with `codesign -dv --verbose=4 'Atomyx Studio.app'`."
+          releaseDraft: true
+          prerelease: false
+          args: "--target universal-apple-darwin"

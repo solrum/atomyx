@@ -21,3 +21,9 @@ export * from "./android.driver.js";
 export * from "./tree-normalizer.js";
 export { AdbError, adbListDevices, type AdbDeviceEntry } from "./adb.js";
 export { HttpClientError } from "./http-client.js";
+export {
+  AndroidAgentLauncher,
+  AndroidAgentLauncherError,
+  probeAndroidAgentHealth,
+  type AndroidAgentLauncherOptions,
+} from "./agent-launcher.js";

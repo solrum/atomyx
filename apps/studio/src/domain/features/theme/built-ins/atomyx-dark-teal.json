@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "atomyx-dark-teal",
+  "label": "Atomyx · Dark Teal",
+  "extends": "intellij-darcula",
+  "monacoBase": "vs-dark",
+  "attributes": {
+    "ATOMYX_KEYWORD": { "foreground": "#4ec9b0", "fontStyle": "bold" },
+    "ATOMYX_COMMAND_BARE": { "foreground": "#4ec9b0", "fontStyle": "bold" },
+    "ATOMYX_SELECTOR": { "foreground": "#9cdcfe" },
+    "ATOMYX_VARIABLE": { "foreground": "#4ec9b0", "fontStyle": "italic" },
+
+    "SYNTAX_STRING": { "foreground": "#ce9178" },
+    "SYNTAX_NUMBER": { "foreground": "#b5cea8" },
+    "SYNTAX_COMMENT": { "foreground": "#6a9955", "fontStyle": "italic" },
+
+    "RUN_STEP_PASS": { "foreground": "#4ec9b0" }
+  }
+}

@@ -79,6 +79,55 @@ describe("ScriptRunner", () => {
     assert.match(result.steps[0]!.detail!, /Unknown command/);
   });
 
+  it("throws when the abort signal fires between steps", async () => {
+    const { driver } = buildRunner();
+    const clock = new SystemClock();
+    const logger = new NoopLogger();
+    const orchestra = new Orchestra({ driver, clock, logger });
+    const controller = new AbortController();
+    const runner = new ScriptRunner({
+      orchestra,
+      clock,
+      logger,
+      signal: controller.signal,
+      onStep: (e) => {
+        if (e.type === "stepCompleted" && e.stepIndex === 0) {
+          controller.abort();
+        }
+      },
+    });
+    const script: ScriptDefinition = {
+      appId: "com.test",
+      name: "Abortable",
+      env: {},
+      steps: [
+        { command: "launchApp" },
+        { command: "tap", selector: { text: "Login" } },
+      ],
+    };
+    await assert.rejects(() => runner.run(script), /aborted/i);
+  });
+
+  it("throws immediately when the signal is already aborted", async () => {
+    const { driver } = buildRunner();
+    const clock = new SystemClock();
+    const logger = new NoopLogger();
+    const orchestra = new Orchestra({ driver, clock, logger });
+    const runner = new ScriptRunner({
+      orchestra,
+      clock,
+      logger,
+      signal: AbortSignal.abort(),
+    });
+    const script: ScriptDefinition = {
+      appId: "com.test",
+      name: "Pre-aborted",
+      env: {},
+      steps: [{ command: "launchApp" }],
+    };
+    await assert.rejects(() => runner.run(script), /aborted/i);
+  });
+
   it("collects screenshots in artifacts", async () => {
     const { runner } = buildRunner();
     const script: ScriptDefinition = {

@@ -25,6 +25,7 @@
 
 export * from "./ios.driver.js";
 export * from "./tree-normalizer.js";
+export { iosListDevices, type IosDeviceEntry } from "./list-devices.js";
 export { TcpClient, TcpClientError, type TcpClientOptions } from "./tcp-client.js";
 export { Iproxy, IproxyError, type IproxyOptions } from "./iproxy.js";
 export {

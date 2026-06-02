@@ -236,7 +236,7 @@ final class DefaultXCUIBridge: XCUIBridge {
 
     func dumpRawTree(app: XCUIApplication) -> [String: Any]? {
         guard let root = try? app.snapshot() else { return nil }
-        return Self.buildRawTree(root: root)
+        return Self.buildRawTree(root: root, screen: app.frame)
     }
 
     /// Iterative pre-order walk producing a nested `[String: Any]`
@@ -259,7 +259,7 @@ final class DefaultXCUIBridge: XCUIBridge {
     ///
     /// Entry 0 is always the root. `maxDepth` of 100 is a generous
     /// ceiling — real iOS/Flutter apps rarely exceed 20 levels.
-    private static func buildRawTree(root: XCUIElementSnapshot) -> [String: Any] {
+    private static func buildRawTree(root: XCUIElementSnapshot, screen: CGRect) -> [String: Any] {
         let maxDepth = 100
         struct WorkItem {
             let node: XCUIElementSnapshot
@@ -273,7 +273,7 @@ final class DefaultXCUIBridge: XCUIBridge {
         var stack: [WorkItem] = [WorkItem(node: root, parentIndex: -1, depth: 0)]
         while let item = stack.popLast() {
             let myIndex = entries.count
-            entries.append(Self.nodeDict(item.node))
+            entries.append(Self.nodeDict(item.node, screen: screen))
 
             if item.parentIndex >= 0 {
                 childrenOf[item.parentIndex, default: []].append(myIndex)
@@ -307,7 +307,9 @@ final class DefaultXCUIBridge: XCUIBridge {
 
     /// Build the flat per-node `[String: Any]` (no children key yet).
     /// Called by `buildRawTree` once per node as the walk descends.
-    private static func nodeDict(_ node: XCUIElementSnapshot) -> [String: Any] {
+    /// `screen` is the host app's window frame; used to decide an
+    /// on-screen / off-screen `visible` flag.
+    private static func nodeDict(_ node: XCUIElementSnapshot, screen: CGRect) -> [String: Any] {
         let frame = node.frame
         var dict: [String: Any] = [
             "elementType": elementTypeName(node.elementType),
@@ -330,7 +332,121 @@ final class DefaultXCUIBridge: XCUIBridge {
         if let value = node.value as? String, !value.isEmpty {
             dict["value"] = value
         }
+        if let placeholder = node.placeholderValue, !placeholder.isEmpty {
+            // Placeholder text on an empty field. Cross-platform
+            // selector key: `hint`. Lets host code pick an input
+            // whose only identifier is its placeholder ("Email",
+            // "Search products") — typical when developers forget
+            // to set `accessibilityIdentifier`.
+            dict["placeholderValue"] = placeholder
+        }
+        // `isSelected` carries Apple's accessibility "selected" bit
+        // — used by tabs, segmented controls, and any custom
+        // surface that calls `accessibilityTraits.insert(.selected)`.
+        // Cross-platform consumers read `node.selected`.
+        dict["selected"] = node.isSelected
+        // Window / view title. Useful for navigation surfaces where
+        // the visible heading is exposed via the title attribute
+        // rather than `label`.
+        if !node.title.isEmpty {
+            dict["title"] = node.title
+        }
+        // Accessibility traits bitmask, decoded into a string array
+        // of the canonical UIAccessibility trait names. The bitmask
+        // is the closest objective signal to "what kind of element
+        // is this really" and survives Flutter's accessibility-node
+        // merging that loses fidelity in `elementType` alone.
+        //
+        // `XCUIElementSnapshot.traits` is exposed as a public
+        // property on iOS 17+ but reachable on earlier versions via
+        // KVC; wrap in `value(forKey:)` so absent keys fail silently.
+        if let rawTraits = (node as AnyObject).value(forKey: "traits") as? UInt64,
+           rawTraits != 0 {
+            let names = decodeTraits(rawTraits)
+            if !names.isEmpty {
+                dict["traits"] = names
+            }
+        }
+        // Device-coordinate frame for the accessibility region. On
+        // most surfaces this matches `frame`; when it differs, it's
+        // the element's hit area as opposed to its layout area.
+        // `accessibilityFrame` is exposed on `XCUIElement` but not
+        // declared on the `XCUIElementSnapshot` protocol — reach via
+        // KVC so older Xcode SDKs and protocol-typed values keep
+        // compiling. Snapshots returned by `app.snapshot()` typically
+        // carry CGRect.zero for this key (the property is element-
+        // facing, not snapshot-facing); skip emitting when the rect
+        // is empty or matches `frame` to avoid noise downstream.
+        if let aFrame = (node as AnyObject).value(forKey: "accessibilityFrame") as? CGRect,
+           !aFrame.isEmpty,
+           aFrame != frame {
+            dict["accessibilityFrame"] = [
+                "left": Int(aFrame.minX),
+                "top": Int(aFrame.minY),
+                "right": Int(aFrame.maxX),
+                "bottom": Int(aFrame.maxY),
+            ]
+        }
+        // Visibility + accessibility-leaf flag from the XCTest
+        // accessibility daemon. Reads the snapshot's
+        // `additionalAttributes` using integer keys resolved at
+        // process load via `AccessibilityAttrSymbols`. This is the
+        // same path WDA takes for `wdVisible` / `wdAccessible` —
+        // when the dictionary is populated, it is the only signal
+        // that accounts for occlusion (modal sheets, covering
+        // siblings) which a pure frame-intersect cannot catch.
+        //
+        // Caveat: `app.snapshot()` does not pre-fetch the daemon
+        // attributes today, so the dictionary is typically empty
+        // and the fallback path runs. A future change will switch
+        // to a snapshot variant that requests these attributes
+        // explicitly; the resolver is in place so callers light up
+        // automatically once that path lands.
+        //
+        // Fallbacks: `frame ∩ screen` for visibility, KVC
+        // `isAccessibilityElement` for leaf detection. Both miss
+        // occlusion but keep the wire schema slot populated.
+        let additional = (node as AnyObject).value(forKey: "additionalAttributes") as? [AnyHashable: Any]
+        if let visKey = AtomyxXCAXAIsVisibleAttribute(),
+           let raw = additional?[visKey] as? NSNumber {
+            dict["visible"] = raw.boolValue
+        } else {
+            dict["visible"] = !frame.isEmpty && frame.intersects(screen)
+        }
+        if let elKey = AtomyxXCAXAIsElementAttribute(),
+           let raw = additional?[elKey] as? NSNumber {
+            dict["accessible"] = raw.boolValue
+        } else if let accessible = (node as AnyObject).value(forKey: "isAccessibilityElement") as? Bool {
+            dict["accessible"] = accessible
+        }
         return dict
+    }
+
+    /// Decode a `UIAccessibilityTraits` bitmask into an array of
+    /// canonical trait names. Mirrors the public trait constants;
+    /// callers that consume the wire JSON match against these
+    /// strings. Unknown bits are dropped silently — the host can
+    /// still observe them by reading the raw bitmask if it cares.
+    private static func decodeTraits(_ bits: UInt64) -> [String] {
+        var out: [String] = []
+        if bits & UIAccessibilityTraits.button.rawValue != 0 { out.append("button") }
+        if bits & UIAccessibilityTraits.link.rawValue != 0 { out.append("link") }
+        if bits & UIAccessibilityTraits.image.rawValue != 0 { out.append("image") }
+        if bits & UIAccessibilityTraits.searchField.rawValue != 0 { out.append("searchField") }
+        if bits & UIAccessibilityTraits.staticText.rawValue != 0 { out.append("staticText") }
+        if bits & UIAccessibilityTraits.header.rawValue != 0 { out.append("header") }
+        if bits & UIAccessibilityTraits.tabBar.rawValue != 0 { out.append("tabBar") }
+        if bits & UIAccessibilityTraits.selected.rawValue != 0 { out.append("selected") }
+        if bits & UIAccessibilityTraits.notEnabled.rawValue != 0 { out.append("notEnabled") }
+        if bits & UIAccessibilityTraits.adjustable.rawValue != 0 { out.append("adjustable") }
+        if bits & UIAccessibilityTraits.summaryElement.rawValue != 0 { out.append("summaryElement") }
+        if bits & UIAccessibilityTraits.keyboardKey.rawValue != 0 { out.append("keyboardKey") }
+        if bits & UIAccessibilityTraits.causesPageTurn.rawValue != 0 { out.append("causesPageTurn") }
+        if bits & UIAccessibilityTraits.playsSound.rawValue != 0 { out.append("playsSound") }
+        if bits & UIAccessibilityTraits.startsMediaSession.rawValue != 0 { out.append("startsMediaSession") }
+        if bits & UIAccessibilityTraits.allowsDirectInteraction.rawValue != 0 { out.append("allowsDirectInteraction") }
+        if bits & UIAccessibilityTraits.updatesFrequently.rawValue != 0 { out.append("updatesFrequently") }
+        return out
     }
 
     func getKeyboard(app: XCUIApplication) -> KeyboardInfoResult {

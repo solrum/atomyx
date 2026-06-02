@@ -59,30 +59,24 @@ Pre-1.0 (current: `v0.1.0`).
 
 | Feature | State |
 |---|---|
-| MCP tool surface (27 tools) | First release — `@atomyx/mcp` |
-| YML script engine (17 commands) | Preview — `@atomyx/script` |
+| MCP tool surface (27 tools) | Preview |
+| YML script engine (17 commands) | Preview |
 | API capture (mitmproxy integration) | Preview |
-| Unified CLI binary (`atomyx`) | Planned |
-| Studio (GUI) | Planned |
+| Unified `atomyx mcp` binary | Planned for v1.0 (today: use `atomyx-mcp`) |
+| npm / GitHub Packages release | Planned for v1.0 |
 
 ## Getting started
 
-Atomyx ships as a set of opt-in npm packages. The first published
-module is `@atomyx/mcp` — the MCP server that exposes the 27-tool
-surface to any MCP-compatible client (Claude Code, Cursor, Continue,
-custom agents).
-
-Build from source while pre-registry:
+Atomyx is pre-release and not yet published to any registry. Build
+from source:
 
 ```bash
 git clone https://github.com/solrum/atomyx.git
 cd atomyx && npm install && npm run build
 ```
 
-Wire the built `@atomyx/mcp` binary into your MCP client's config
-(`.mcp.json` or equivalent) with a driver kind (`ios` or `android`)
-and device selector. Device prerequisites are covered in the
-contributor docs under [`.claude/docs/`](./.claude/docs/).
+Full walkthrough — MCP client config, device prerequisites, first
+test — in [`docs/getting-started.md`](./docs/getting-started.md).
 
 ## Documentation
 
@@ -90,6 +84,8 @@ contributor docs under [`.claude/docs/`](./.claude/docs/).
 |---|---|
 | End users (install, run, script) | [`docs/`](./docs/) |
 | Contributors (architecture, internals, pitfalls) | [`.claude/docs/`](./.claude/docs/) |
+| YAML script authors | [`docs/yml-script-reference.md`](./docs/yml-script-reference.md) |
+| Device setup (Android + iOS) | [`docs/device-setup.md`](./docs/device-setup.md) |
 
 ## Contributing
 

@@ -22,9 +22,9 @@ const TapAndWaitArgs = z
     selector: SelectorSchema,
     waitForAbsent: SelectorSchema.optional(),
     waitForAppear: SelectorSchema.optional(),
-    timeoutMs: z.number().int().positive().optional(),
-    maxTimeoutMs: z.number().int().positive().optional(),
-    intervalMs: z.number().int().positive().optional(),
+    timeoutMs: z.number().int().positive().default(10_000),
+    maxTimeoutMs: z.number().int().positive().default(60_000),
+    intervalMs: z.number().int().positive().default(300),
     loadingKeywords: z.array(z.string()).optional(),
   })
   .strict()
@@ -54,9 +54,9 @@ export const tapAndWaitTransitionTool = defineTool({
   inputSchema: TapAndWaitArgs,
   async execute(args, ctx) {
     const orchestra = orchestraOrFail(ctx);
-    const timeoutMs = args.timeoutMs ?? 10_000;
-    const maxTimeoutMs = args.maxTimeoutMs ?? 60_000;
-    const intervalMs = args.intervalMs ?? 300;
+    const timeoutMs = args.timeoutMs;
+    const maxTimeoutMs = args.maxTimeoutMs;
+    const intervalMs = args.intervalMs;
 
     const selector = compileSelectorInput(args.selector) as Selector;
     const absentSelector = args.waitForAbsent
@@ -66,11 +66,11 @@ export const tapAndWaitTransitionTool = defineTool({
       ? (compileSelectorInput(args.waitForAppear) as Selector)
       : null;
 
-    const beforeTreeRaw = await orchestra.hierarchy();
+    const beforeTreeRaw = await orchestra.hierarchy({ signal: ctx.signal });
     const beforeCompact = treeNodeToCompactElements(beforeTreeRaw);
-    const pre = await resolveAsState(orchestra, selector);
+    const pre = await resolveAsState(orchestra, selector, ctx.signal);
 
-    const tapResult = await orchestra.tap(selector);
+    const tapResult = await orchestra.tap(selector, { signal: ctx.signal });
     if (!tapResult.ok) {
       return {
         ok: false,
@@ -87,16 +87,17 @@ export const tapAndWaitTransitionTool = defineTool({
     let lastSample: CompactElement[] = beforeCompact;
 
     while (ctx.clock.now() < hardDeadline) {
+      if (ctx.signal.aborted) throw ctx.signal.reason ?? new DOMException("Aborted", "AbortError");
       await ctx.clock.sleep(intervalMs);
 
-      const currentTree = await orchestra.hierarchy();
+      const currentTree = await orchestra.hierarchy({ signal: ctx.signal });
       const currentCompact = treeNodeToCompactElements(currentTree);
 
       const absentOk = absentSelector
-        ? (await orchestra.find(absentSelector)).length === 0
+        ? (await orchestra.find(absentSelector, { signal: ctx.signal })).length === 0
         : true;
       const appearOk = appearSelector
-        ? (await orchestra.find(appearSelector)).length > 0
+        ? (await orchestra.find(appearSelector, { signal: ctx.signal })).length > 0
         : true;
 
       if (absentOk && appearOk) {
@@ -122,9 +123,9 @@ export const tapAndWaitTransitionTool = defineTool({
       lastSample = currentCompact;
     }
 
-    const afterTreeRaw = await orchestra.hierarchy();
+    const afterTreeRaw = await orchestra.hierarchy({ signal: ctx.signal });
     const afterCompact = treeNodeToCompactElements(afterTreeRaw);
-    const post = await resolveAsState(orchestra, selector);
+    const post = await resolveAsState(orchestra, selector, ctx.signal);
 
     const targetStateChange = detectTargetStateChange(pre, post);
     const overlay = analyzeOverlay(beforeCompact, afterCompact);
@@ -132,10 +133,10 @@ export const tapAndWaitTransitionTool = defineTool({
     const motion = detectMotion(beforeCompact, afterCompact);
 
     const absentOkFinal = absentSelector
-      ? (await orchestra.find(absentSelector)).length === 0
+      ? (await orchestra.find(absentSelector, { signal: ctx.signal })).length === 0
       : true;
     const appearOkFinal = appearSelector
-      ? (await orchestra.find(appearSelector)).length > 0
+      ? (await orchestra.find(appearSelector, { signal: ctx.signal })).length > 0
       : false;
 
     const diag = classifyFailure(
@@ -170,8 +171,9 @@ export const tapAndWaitTransitionTool = defineTool({
 async function resolveAsState(
   orchestra: Orchestra,
   selector: Selector,
+  signal: AbortSignal,
 ): Promise<ResolvedElementState> {
-  const cursor = await orchestra.findOne(selector);
+  const cursor = await orchestra.findOne(selector, { signal });
   if (!cursor) return { found: false };
   const attrs = cursor.node.attributes;
   return {

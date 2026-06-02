@@ -32,11 +32,9 @@ import CoreGraphics
 ///     to the host so the YAML validator can map it to the
 ///     right POINTER_* code.
 ///
-/// Requires a tracked app (for coordinate space). The
-/// synthesizer's dispatch routes events through the XCUITest
-/// daemon regardless of which `XCUIApplication` reference is
-/// active; we pass the tracked app to stay consistent with the
-/// other gesture commands.
+/// Coordinates are in device-global point space. The synthesizer
+/// dispatches events through the XCUITest daemon to whichever app
+/// is currently frontmost — no `launchApp` required.
 final class DispatchPointerCommand: CommandHandler {
     let type = "dispatchPointer"
 
@@ -51,12 +49,9 @@ final class DispatchPointerCommand: CommandHandler {
         self.synthesizer = synthesizer
     }
 
-    func handle(_ request: Request, bridge _: XCUIBridge, state: DriverState) -> Response {
+    func handle(_ request: Request, bridge _: XCUIBridge, state _: DriverState) -> Response {
         guard let pointersRaw = request.args["pointers"] as? [[String: Any]], !pointersRaw.isEmpty else {
             return .error(id: request.id, message: "missing or empty `pointers` array")
-        }
-        guard let app = state.currentApp else {
-            return .error(id: request.id, message: "no app launched — call launchApp first")
         }
 
         let pointers: [PointerPath]
@@ -69,7 +64,7 @@ final class DispatchPointerCommand: CommandHandler {
         }
 
         do {
-            try synthesizer.dispatch(pointers: pointers, in: app)
+            try synthesizer.dispatch(pointers: pointers)
         } catch let err as SynthesizerError {
             return .error(id: request.id, message: "dispatch rejected: \(Self.describe(err))")
         } catch {
