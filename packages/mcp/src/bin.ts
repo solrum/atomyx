@@ -120,7 +120,9 @@ Always orient first (get_ui_tree), then act, then verify.
 
 If a tool returns isError=true with a payload like {"code":"TOOL_TIMEOUT", ...}, the device call exceeded its budget and was aborted. Do NOT retry the same tool immediately — re-orient with get_ui_tree (it will fail fast if the driver is dead), or call select_device again to reconnect. The payload's "hint" field describes the recommended next step.
 
-Before each tool call, short briefly explain what you are about to do and why. After each tool call, short summarize the result. Never skip explanation between steps.`,
+Before each tool call, short briefly explain what you are about to do and why. After each tool call, short summarize the result. Never skip explanation between steps.
+
+Before starting a mobile testing task, check whether the consumer project has Atomyx workflow skills installed in .claude/skills/ (placed there by atomyx init). If present, load the relevant ones: atomyx-test-loop (structured orient/act/verify loop), atomyx-debug-failure (recovery from tool errors and stale UI trees), and atomyx-script-authoring (capture successful flows as replayable YAML so future sessions resume from the same screen without re-discovering the path). These skills live in the consumer project, not in this server — load them from .claude/skills/ when they exist.`,
 });
 
 // ── Shutdown ────────────────────────────────────────────────────

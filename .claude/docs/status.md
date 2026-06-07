@@ -14,9 +14,10 @@ branch, how many tests, what's out of scope for now?"
 ## Current version
 
 - **Released**: `v0.1.0` on `main`.
-- **Active branch**: `feature/v0.1.0-foundation` (53 commits ahead of
-  `main`). Carries the Rust sidecar, the Studio DI state refactor,
-  and the iOS probe fix.
+- **Active branch**: `feature/v0.1.0-foundation-1` (HEAD `c2860e9`).
+  Carries the Studio foundation, `@atomyx/skills` distribution
+  package, CLI `init` / `update-skills` subcommands, and MCP
+  instructions hook.
 - **Next milestone**: `v1.0.0` (sidecar-backed run pipeline, tool
   surface, script engine major release).
 
@@ -30,14 +31,67 @@ branch, how many tests, what's out of scope for now?"
 | `@atomyx/driver-wire` | 17 |
 | `@atomyx/android-driver` | 51 |
 | `@atomyx/ios-driver` | 47 |
-| `@atomyx/mcp` | 87 |
+| `@atomyx/mcp` | 90 |
 | `@atomyx/script` | 123 |
-| `@atomyx/cli` | 20 |
+| `@atomyx/cli` | 29 |
+| `@atomyx/skills` | 6 |
 | `@atomyx/studio` | 54 |
-| **Total** | **587** (0 failures) |
+| **Total** | **605** (0 failures) |
 
 Recompute the totals when a PR adds or removes tests. Keep this table
 honest — a stale count is worse than no count.
+
+## Packages
+
+### `@atomyx/skills` (`packages/skills/`)
+
+Skills distribution package at version `0.1.0`. A leaf package with
+no workspace dependencies.
+
+Public API:
+
+- `copySkillsTo(targetDir, { overwrite })` — copies the bundled
+  skill and agent files into `<targetDir>/.claude/`.
+- `getInstalledVersion(targetDir)` — reads the version marker from
+  an existing install.
+- `currentVersion` — the package version string.
+- `SKILL_FILES` — array of bundled skill markdown filenames.
+- `AGENT_FILES` — array of bundled agent markdown filenames.
+- `getContentRoot()` — absolute path to the bundled content
+  directory.
+
+Bundled skills (under `packages/skills/content/skills/`):
+
+- `atomyx-test-loop.md`
+- `atomyx-debug-failure.md`
+- `atomyx-script-authoring.md`
+
+Bundled agents (under `packages/skills/content/agents/`):
+
+- `atomyx-explorer.md`
+- `atomyx-replayer.md`
+
+### `@atomyx/cli` subcommands — `skills` module
+
+Two subcommands live at `packages/cli/src/skills/`:
+
+- `atomyx init` — copies the `@atomyx/skills` bundle into
+  `<cwd>/.claude/` (or `--target=<path>`). Non-destructive by
+  default; `--force` to overwrite existing files.
+- `atomyx update-skills` — version-checks the installed bundle
+  against `currentVersion`; replaces in place when the versions
+  differ.
+
+The module follows the same `execute.ts` dispatcher + per-command
+file shape as the `driver/` module in the CLI.
+
+### `@atomyx/mcp` — instructions hook
+
+The MCP server's `instructions` template (at
+`packages/mcp/src/bin.ts`) includes a hook that tells the
+downstream agent to load Atomyx workflow skills from
+`.claude/skills/` when that directory is present before starting
+a mobile testing task.
 
 ## Known limitations
 
