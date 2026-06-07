@@ -13,9 +13,9 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "(cd shared && npm run build) && for d in core driver driver-wire android-driver ios-driver ios-sim-driver script mcp sidecar cli; do (cd packages/$d && [ -f tsconfig.json ] && npm run build) || exit 1; done",
-    "test": "(cd shared && npm test) && for d in core driver driver-wire android-driver ios-driver ios-sim-driver script mcp sidecar cli; do (cd packages/$d && [ -f tsconfig.json ] && npm test) || exit 1; done && (cd apps/studio && npm test)",
-    "test:all": "(cd shared && npm test) && for d in core driver driver-wire android-driver ios-driver ios-sim-driver script mcp cli; do (cd packages/$d && [ -f tsconfig.json ] && npm test) || exit 1; done && (cd apps/studio && npm test)",
+    "build": "(cd shared && npm run build) && for d in core driver driver-wire android-driver ios-driver ios-sim-driver skills script mcp sidecar cli; do (cd packages/$d && [ -f tsconfig.json ] && npm run build) || exit 1; done",
+    "test": "(cd shared && npm test) && for d in core driver driver-wire android-driver ios-driver ios-sim-driver skills script mcp sidecar cli; do (cd packages/$d && [ -f tsconfig.json ] && npm test) || exit 1; done && (cd apps/studio && npm test)",
+    "test:all": "(cd shared && npm test) && for d in core driver driver-wire android-driver ios-driver ios-sim-driver skills script mcp cli; do (cd packages/$d && [ -f tsconfig.json ] && npm test) || exit 1; done && (cd apps/studio && npm test)",
     "depcruise": "depcruise --config .dependency-cruiser.cjs packages/"
   },
   "dependencies": {

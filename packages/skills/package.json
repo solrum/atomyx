@@ -1,0 +1,24 @@
+{
+  "name": "@atomyx/skills",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Atomyx skills + agents bundle — markdown content distributed to consumer projects via `atomyx init`. Teaches Claude sessions how to drive the Atomyx tool surface (orient/act/verify, failure recovery, YAML script authoring) and ships ready-to-spawn subagents for long-running exploration and self-healing replay.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "content"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test $(find src -name '*.test.ts')"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
