@@ -1,6 +1,6 @@
 /**
  * Skills-module subcommand dispatcher. The unified CLI in
- * `main.ts` strips the `skills` prefix and calls `execute(rest)`
+ * `router.ts` strips the `skills` prefix and calls `execute(rest)`
  * from here; shortcuts `init` and `update-skills` also route here.
  */
 
@@ -11,12 +11,16 @@ export async function execute(args: readonly string[]): Promise<void> {
   const command = args[0];
 
   switch (command) {
-    case "init":
-      process.exit(await runInit(args.slice(1)));
+    case "init": {
+      const code = await runInit(args.slice(1));
+      if (code !== 0) process.exit(code);
       return;
-    case "update-skills":
-      process.exit(await runUpdateSkills(args.slice(1)));
+    }
+    case "update-skills": {
+      const code = await runUpdateSkills(args.slice(1));
+      if (code !== 0) process.exit(code);
       return;
+    }
     case "help":
     case undefined:
       printHelp(process.stdout.write.bind(process.stdout));

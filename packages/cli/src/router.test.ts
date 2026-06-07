@@ -7,6 +7,11 @@ describe("router — modules", () => {
     assert.ok(modules.driver);
     assert.equal(typeof modules.driver.execute, "function");
   });
+
+  it("has skills module registered", () => {
+    assert.ok(modules.skills);
+    assert.equal(typeof modules.skills.execute, "function");
+  });
 });
 
 describe("router — shortcuts", () => {
@@ -26,5 +31,17 @@ describe("router — shortcuts", () => {
     const result = shortcuts.devices!([]);
     assert.equal(result.module, "driver");
     assert.deepStrictEqual(result.args, ["list-devices"]);
+  });
+
+  it("init → skills init", () => {
+    const result = shortcuts.init!(["--force"]);
+    assert.equal(result.module, "skills");
+    assert.deepStrictEqual(result.args, ["init", "--force"]);
+  });
+
+  it("update-skills → skills update-skills", () => {
+    const result = shortcuts["update-skills"]!(["--target=/tmp/foo"]);
+    assert.equal(result.module, "skills");
+    assert.deepStrictEqual(result.args, ["update-skills", "--target=/tmp/foo"]);
   });
 });

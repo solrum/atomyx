@@ -14,13 +14,13 @@ import {
  * Flags:
  *   --target=<path>   Override destination directory (default: <cwd>/.claude)
  */
-export async function runUpdateSkills(args: readonly string[]): Promise<number> {
-  let targetDir = join(process.cwd(), ".claude");
+export async function runUpdateSkills(args: readonly string[], cwd: string = process.cwd()): Promise<number> {
+  let targetDir = join(cwd, ".claude");
 
   for (const arg of args) {
     if (arg.startsWith("--target=")) {
       targetDir = arg.slice("--target=".length);
-    } else if (arg !== "update-skills") {
+    } else {
       process.stderr.write(`error: unknown flag "${arg}"\n`);
       return 2;
     }

@@ -9,8 +9,8 @@ import { copySkillsTo, currentVersion, SKILL_FILES, AGENT_FILES } from "@atomyx/
  *   --target=<path>   Override destination directory (default: <cwd>/.claude)
  *   --force           Overwrite existing files without prompting.
  */
-export async function runInit(args: readonly string[]): Promise<number> {
-  let targetDir = join(process.cwd(), ".claude");
+export async function runInit(args: readonly string[], cwd: string = process.cwd()): Promise<number> {
+  let targetDir = join(cwd, ".claude");
   let force = false;
 
   for (const arg of args) {
@@ -18,7 +18,7 @@ export async function runInit(args: readonly string[]): Promise<number> {
       targetDir = arg.slice("--target=".length);
     } else if (arg === "--force") {
       force = true;
-    } else if (arg !== "init") {
+    } else {
       process.stderr.write(`error: unknown flag "${arg}"\n`);
       return 2;
     }

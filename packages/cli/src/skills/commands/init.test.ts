@@ -53,12 +53,16 @@ describe("runInit", () => {
   });
 
   it("uses <cwd>/.claude as default target when no --target flag", async () => {
-    // We can't easily test the default without changing cwd, so
-    // verify that providing an explicit --target= works end-to-end.
-    // This test exercises the flag parsing path.
-    const targetDir = join(tmpBase, "default-path-check");
-    const exitCode = await runInit([`--target=${targetDir}`]);
+    const tmpDir = join(tmpBase, "default-cwd");
+    const exitCode = await runInit([], tmpDir);
     assert.equal(exitCode, 0);
+
+    const { readFile } = await import("node:fs/promises");
+    const stamp = JSON.parse(
+      await readFile(join(tmpDir, ".claude", "atomyx-skills.version.json"), "utf8"),
+    ) as { version: string };
+    assert.ok(typeof stamp.version === "string");
+    assert.ok(stamp.version.length > 0);
   });
 
   it("returns 2 for unknown flags", async () => {

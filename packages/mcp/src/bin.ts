@@ -122,6 +122,7 @@ If a tool returns isError=true with a payload like {"code":"TOOL_TIMEOUT", ...},
 
 Before each tool call, short briefly explain what you are about to do and why. After each tool call, short summarize the result. Never skip explanation between steps.
 
+// Path assumes default atomyx init target (<project>/.claude/skills/); consumers using --target=<other> will have skills at a different location.
 Before starting a mobile testing task, check whether the consumer project has Atomyx workflow skills installed in .claude/skills/ (placed there by atomyx init). If present, load the relevant ones: atomyx-test-loop (structured orient/act/verify loop), atomyx-debug-failure (recovery from tool errors and stale UI trees), and atomyx-script-authoring (capture successful flows as replayable YAML so future sessions resume from the same screen without re-discovering the path). These skills live in the consumer project, not in this server — load them from .claude/skills/ when they exist.`,
 });
 

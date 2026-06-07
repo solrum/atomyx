@@ -33,10 +33,10 @@ branch, how many tests, what's out of scope for now?"
 | `@atomyx/ios-driver` | 47 |
 | `@atomyx/mcp` | 90 |
 | `@atomyx/script` | 123 |
-| `@atomyx/cli` | 29 |
+| `@atomyx/cli` | 37 |
 | `@atomyx/skills` | 6 |
 | `@atomyx/studio` | 54 |
-| **Total** | **605** (0 failures) |
+| **Total** | **613** (0 failures) |
 
 Recompute the totals when a PR adds or removes tests. Keep this table
 honest — a stale count is worse than no count.
