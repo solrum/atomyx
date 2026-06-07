@@ -19,7 +19,8 @@
     "@atomyx/driver": "0.1.0",
     "@atomyx/android-driver": "0.1.0",
     "@atomyx/ios-driver": "0.1.0",
-    "@atomyx/script": "0.1.0"
+    "@atomyx/script": "0.1.0",
+    "@atomyx/skills": "0.1.0"
   },
   "engines": {
     "node": ">=20.0.0"
