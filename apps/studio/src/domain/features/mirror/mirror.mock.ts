@@ -7,8 +7,8 @@ import type {
   MirrorTarget,
   RecordingHandle,
   Unsubscribe,
-} from "./types.js";
-import type { MirrorTouchSink } from "./touch-sink.js";
+} from "./mirror.types.js";
+import type { MirrorTouchSink } from "./mirror-touch-sink.js";
 
 interface MockSessionState {
   readonly session: MirrorSession;

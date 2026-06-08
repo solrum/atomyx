@@ -1,1 +1,1 @@
-export { formatRelativeTime } from "./format-relative-time.js";
+export { formatRelativeTime } from "./runs-format-relative-time.js";

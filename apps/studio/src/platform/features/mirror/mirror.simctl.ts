@@ -12,10 +12,10 @@ import type {
   MirrorTarget,
   RecordingHandle,
   Unsubscribe,
-} from "../../../domain/features/mirror/types.js";
-import type { MirrorTouchSink } from "../../../domain/features/mirror/touch-sink.js";
-import { ClassifiedTouchSink } from "./classified-touch-sink.js";
-import { SimHidTouchSink } from "./sim-hid-touch-sink.js";
+} from "../../../domain/features/mirror/mirror.types.js";
+import type { MirrorTouchSink } from "../../../domain/features/mirror/mirror-touch-sink.js";
+import { ClassifiedTouchSink } from "./mirror-classified-touch-sink.js";
+import { SimHidTouchSink } from "./mirror-sim-hid-touch-sink.js";
 
 const BACKEND = "simctl";
 

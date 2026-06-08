@@ -1,5 +1,5 @@
 import type { SettingsStore } from "./settings-store.port.js";
-import { DEFAULT_SETTINGS, type StudioSettings } from "./types.js";
+import { DEFAULT_SETTINGS, type StudioSettings } from "./settings.types.js";
 
 /**
  * In-memory settings store for UI/state tests.

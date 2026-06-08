@@ -5,7 +5,7 @@ import type { DevicesApi, DevicesSnapshot, Device } from "./devices.contract.js"
 import { createZustandDevices } from "./devices.zustand.js";
 
 export type { DevicesApi, DevicesSnapshot, Device };
-export { deviceToMirrorTarget } from "./mirror-target.js";
+export { deviceToMirrorTarget } from "./devices-mirror-target.js";
 
 export const DEVICES_KEY = "devices";
 

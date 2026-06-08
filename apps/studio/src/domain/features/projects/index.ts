@@ -1,3 +1,3 @@
-export * from "./types.js";
-export * from "./registry.port.js";
-export * from "./registry.mock.js";
+export * from "./projects.types.js";
+export * from "./projects.registry.port.js";
+export * from "./projects.registry.mock.js";

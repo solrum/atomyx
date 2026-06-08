@@ -1,4 +1,4 @@
-import type { FileTree } from "./types.js";
+import type { FileTree } from "./workspace.types.js";
 
 /**
  * Filesystem operations the editor and file tree need. Keeps the

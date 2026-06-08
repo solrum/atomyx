@@ -1,1 +1,1 @@
-export * from "./status-indicator.js";
+export * from "./runtime-status-status-indicator.js";

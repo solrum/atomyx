@@ -3,7 +3,7 @@ import type {
   ThemeStore,
   ThemeWatchCallback,
 } from "./theme-store.port.js";
-import type { Theme } from "./types.js";
+import type { Theme } from "./theme.types.js";
 
 /**
  * In-memory `ThemeStore` used by tests. Seed with a list of

@@ -1,4 +1,4 @@
-import type { FileTree } from "./types.js";
+import type { FileTree } from "./workspace.types.js";
 import type { WorkspaceStore } from "./workspace.port.js";
 
 interface MockWorkspaceFixture {

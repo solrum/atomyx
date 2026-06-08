@@ -1,11 +1,11 @@
-import type { ArtifactStore } from "../../domain/features/artifacts/artifact-store.port.js";
-import type { ProjectRegistry } from "../../domain/features/projects/registry.port.js";
+import type { ArtifactStore } from "../../domain/features/artifacts/artifacts.artifact-store.port.js";
+import type { ProjectRegistry } from "../../domain/features/projects/projects.registry.port.js";
 import type { StudioRuntime } from "../../domain/features/runtime/runtime.port.js";
 import type { SettingsStore } from "../../domain/features/settings/settings-store.port.js";
 import type { ThemeStore } from "../../domain/features/theme/theme-store.port.js";
 import type { WorkspaceStore } from "../../domain/features/workspace/workspace.port.js";
 import type { WorkspaceSearch } from "../../domain/features/workspace-search/index.js";
-import type { TodoScanner } from "../../domain/features/todos/scanner.port.js";
+import type { TodoScanner } from "../../domain/features/todos/todos.scanner.port.js";
 import type { WorkspaceWatcher } from "../../domain/features/workspace/workspace-watcher.port.js";
 
 /**

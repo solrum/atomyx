@@ -10,4 +10,4 @@ export {
   agentStateTooltip,
   describeAgentState,
   type AgentStateDisplay,
-} from "./agent-state-display.js";
+} from "./ios-agent-agent-state-display.js";

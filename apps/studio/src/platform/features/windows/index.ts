@@ -1,1 +1,1 @@
-export * from "./window-manager.tauri.js";
+export * from "./windows.window-manager.tauri.js";

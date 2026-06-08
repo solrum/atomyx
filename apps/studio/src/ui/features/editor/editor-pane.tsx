@@ -1,11 +1,11 @@
 import { useEditor } from "../../../state/features/editor/index.js";
 import { useLayout } from "../../../state/features/layout/index.js";
 import { EditorTabs } from "./editor-tabs.js";
-import { ScriptEditor } from "./script-editor.js";
-import { FileBreadcrumb } from "./file-breadcrumb.js";
+import { ScriptEditor } from "./editor-script-editor.js";
+import { FileBreadcrumb } from "./editor-file-breadcrumb.js";
 import { GlobalRunBar } from "../runs/index.js";
 import { StructureView } from "../tool-windows/index.js";
-import { jumpActiveEditorTo } from "./monaco-active.js";
+import { jumpActiveEditorTo } from "./editor-monaco-active.js";
 import { getFeature } from "../../../state/core/registry.js";
 import {
   type EditorApi,

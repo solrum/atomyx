@@ -1,1 +1,1 @@
-export * from "./artifact-store.fs.js";
+export * from "./artifacts.artifact-store.fs.js";

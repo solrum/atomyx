@@ -19,7 +19,7 @@ import { MIRROR_KEY } from "../../../state/features/mirror/index.js";
 
 import { attachAnnexBPath } from "./mirror-annexb-decoder.js";
 import { attachFmp4Path } from "./mirror-fmp4-demuxer.js";
-import { InspectorOverlay } from "./inspector-overlay.js";
+import { InspectorOverlay } from "./mirror-inspector-overlay.js";
 import { clientToDeviceRatio, eventToDevicePoint } from "./mirror-pointer.js";
 import { MirrorToolbar } from "./mirror-toolbar.js";
 

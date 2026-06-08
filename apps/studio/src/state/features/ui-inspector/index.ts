@@ -17,9 +17,9 @@ export {
   collectBranchPaths,
   collectInterestingPaths,
   isInformative,
-} from "./tree-filter.js";
-export { summarize, truncate } from "./tree-display.js";
-export { attributeRows, type AttributeRow } from "./attribute-rows.js";
+} from "./ui-inspector-tree-filter.js";
+export { summarize, truncate } from "./ui-inspector-tree-display.js";
+export { attributeRows, type AttributeRow } from "./ui-inspector-attribute-rows.js";
 
 export const UI_INSPECTOR_KEY = "ui-inspector";
 

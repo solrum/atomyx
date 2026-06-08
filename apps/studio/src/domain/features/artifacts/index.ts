@@ -1,3 +1,3 @@
-export * from "./artifact-store.mock.js";
-export * from "./artifact-store.port.js";
-export * from "./types.js";
+export * from "./artifacts.artifact-store.mock.js";
+export * from "./artifacts.artifact-store.port.js";
+export * from "./artifacts.types.js";

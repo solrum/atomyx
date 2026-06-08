@@ -5,7 +5,7 @@ import type {
   RunEvent,
   RunOpts,
   UiTreeNode,
-} from "./types.js";
+} from "./runtime.types.js";
 
 /**
  * In-memory runtime used by UI and state tests — lets components

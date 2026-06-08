@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
 import type { UiTreeNode } from "../runtime/index.js";
-import { SCRIPT_ACTIONS } from "./action-catalog.js";
-import { bestSelector, selectorsFromNode } from "./selectors-from-node.js";
+import { SCRIPT_ACTIONS } from "./script-actions-action-catalog.js";
+import { bestSelector, selectorsFromNode } from "./script-actions-selectors-from-node.js";
 
 const buttonNode: UiTreeNode = {
   attributes: {

@@ -7,8 +7,8 @@ import type {
   RecordingHandle,
   TouchAction,
   Unsubscribe,
-} from "./types.js";
-import type { MirrorTouchSink } from "./touch-sink.js";
+} from "./mirror.types.js";
+import type { MirrorTouchSink } from "./mirror-touch-sink.js";
 
 export interface TouchEvent {
   readonly action: TouchAction;

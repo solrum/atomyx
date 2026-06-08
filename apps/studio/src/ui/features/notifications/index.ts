@@ -1,1 +1,1 @@
-export * from "./notification-stack.js";
+export * from "./notifications-notification-stack.js";

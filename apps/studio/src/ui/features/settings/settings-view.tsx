@@ -3,8 +3,8 @@ import { X, RotateCcw, FolderOpen } from "lucide-react";
 import { useSettings } from "../../../state/features/settings/index.js";
 import { useThemes } from "../../../state/features/theme/index.js";
 import { useLayout } from "../../../state/features/layout/index.js";
-import { SETTINGS_CATEGORIES, type SettingsCategory } from "./category.js";
-import { AttributeRow } from "./attribute-row.js";
+import { SETTINGS_CATEGORIES, type SettingsCategory } from "./settings-category.js";
+import { AttributeRow } from "./settings-attribute-row.js";
 
 const NAV_GROUPS: readonly {
   readonly id: string;

@@ -1,7 +1,7 @@
-import darcula from "./intellij-darcula.json";
-import light from "./intellij-light.json";
-import teal from "./atomyx-dark-teal.json";
-import violet from "./atomyx-dark-violet.json";
+import darcula from "./theme-intellij-darcula.json";
+import light from "./theme-intellij-light.json";
+import teal from "./theme-atomyx-dark-teal.json";
+import violet from "./theme-atomyx-dark-violet.json";
 
 /**
  * Bundled themes, loaded as JSON at compile time so they ship

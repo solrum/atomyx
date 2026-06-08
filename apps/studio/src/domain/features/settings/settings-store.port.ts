@@ -1,4 +1,4 @@
-import type { StudioSettings } from "./types.js";
+import type { StudioSettings } from "./settings.types.js";
 
 /**
  * Load and persist user settings. The filesystem layout belongs

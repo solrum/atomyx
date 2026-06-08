@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { ScreenMirror } from "../../../domain/features/mirror/mirror.port.js";
-import type { MirrorSession } from "../../../domain/features/mirror/types.js";
+import type { MirrorSession } from "../../../domain/features/mirror/mirror.types.js";
 import { ScrcpyScreenMirror, scrcpyCapabilities } from "./mirror.scrcpy.js";
 
 // `start()` is not exercised here: it constructs a Tauri `Channel`,

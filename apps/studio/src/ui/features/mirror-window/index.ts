@@ -1,1 +1,1 @@
-export { DeviceMirrorWindow } from "./device-mirror-window.js";
+export { DeviceMirrorWindow } from "./mirror-window-device-mirror-window.js";

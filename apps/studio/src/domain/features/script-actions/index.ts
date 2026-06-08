@@ -5,5 +5,5 @@ export type {
   SelectorCandidate,
   SelectorKind,
 } from "./script-actions.types.js";
-export { selectorsFromNode, bestSelector } from "./selectors-from-node.js";
-export { SCRIPT_ACTIONS } from "./action-catalog.js";
+export { selectorsFromNode, bestSelector } from "./script-actions-selectors-from-node.js";
+export { SCRIPT_ACTIONS } from "./script-actions-action-catalog.js";

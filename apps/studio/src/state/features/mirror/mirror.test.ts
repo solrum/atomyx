@@ -5,7 +5,7 @@ import { MockScreenMirror } from "../../../domain/features/mirror/mirror.mock.js
 import type {
   H264Frame,
   MirrorTarget,
-} from "../../../domain/features/mirror/types.js";
+} from "../../../domain/features/mirror/mirror.types.js";
 import { createZustandMirror } from "./mirror.zustand.js";
 
 function mkTarget(): MirrorTarget {

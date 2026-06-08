@@ -7,7 +7,7 @@ import type {
   MirrorSession,
   MirrorTarget,
   RecordingHandle,
-} from "../../../domain/features/mirror/types.js";
+} from "../../../domain/features/mirror/mirror.types.js";
 
 import type {
   ClipRequest,

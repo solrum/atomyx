@@ -1,1 +1,1 @@
-export * from "./device-picker.js";
+export * from "./devices-device-picker.js";

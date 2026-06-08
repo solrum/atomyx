@@ -13,9 +13,9 @@ import type {
   MirrorTarget,
   RecordingHandle,
   Unsubscribe,
-} from "../../../domain/features/mirror/types.js";
-import type { MirrorTouchSink } from "../../../domain/features/mirror/touch-sink.js";
-import { StreamingTouchSink } from "./streaming-touch-sink.js";
+} from "../../../domain/features/mirror/mirror.types.js";
+import type { MirrorTouchSink } from "../../../domain/features/mirror/mirror-touch-sink.js";
+import { StreamingTouchSink } from "./mirror-streaming-touch-sink.js";
 
 const BACKEND = "scrcpy";
 

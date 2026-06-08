@@ -58,14 +58,14 @@ import {
   getLaunchWorkspacePath,
 } from "./platform/index.js";
 import { AppShell } from "./ui/shell/app-shell.js";
-import { applyTokens } from "./ui/features/theme/apply-tokens.js";
-import { applyThemeMode } from "./ui/features/theme/apply-mode.js";
+import { applyTokens } from "./ui/features/theme/theme-apply-tokens.js";
+import { applyThemeMode } from "./ui/features/theme/theme-apply-mode.js";
 import { installTweaks } from "./ui/features/tweaks-panel/index.js";
-import { applyMonacoTheme } from "./ui/features/theme/monaco-theme.js";
-import { ensureMonacoReady } from "./ui/features/editor/monaco-init.js";
-import { installKeymap } from "./ui/features/actions/keymap.js";
-import { installAutoSaveOnBlur } from "./ui/features/actions/auto-save.js";
-import { installFsEvents } from "./ui/features/workspace/fs-events-installer.js";
+import { applyMonacoTheme } from "./ui/features/theme/theme-monaco-theme.js";
+import { ensureMonacoReady } from "./ui/features/editor/editor-monaco-init.js";
+import { installKeymap } from "./ui/features/actions/actions-keymap.js";
+import { installAutoSaveOnBlur } from "./ui/features/actions/actions-auto-save.js";
+import { installFsEvents } from "./ui/features/workspace/workspace-fs-events-installer.js";
 import {
   createRuntimeStatus,
   RUNTIME_STATUS_KEY,
@@ -134,9 +134,9 @@ import "./ui/features/settings/index.js";
 import "./ui/features/run-configs/index.js";
 import "./ui/features/command-palette/index.js";
 import "./ui/features/ui-inspector/index.js";
-import "./ui/features/theme/tokens.css";
-import "./ui/features/theme/app.css";
-import "./ui/features/theme/tailwind.css";
+import "./ui/features/theme/theme-tokens.css";
+import "./ui/features/theme/theme-app.css";
+import "./ui/features/theme/theme-tailwind.css";
 
 /**
  * Composition root. Wires concrete platform implementations into

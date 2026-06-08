@@ -1,2 +1,2 @@
-export * from "./auto-save.js";
-export * from "./keymap.js";
+export * from "./actions-auto-save.js";
+export * from "./actions-keymap.js";

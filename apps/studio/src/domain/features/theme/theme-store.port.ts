@@ -1,4 +1,4 @@
-import type { Theme } from "./types.js";
+import type { Theme } from "./theme.types.js";
 
 /**
  * Raw theme entry — what a ThemeStore returns before zod

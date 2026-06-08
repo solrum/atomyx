@@ -11,8 +11,8 @@ import type {
   MirrorTargetKind,
   RecordingHandle,
   Unsubscribe,
-} from "../../../domain/features/mirror/types.js";
-import type { MirrorTouchSink } from "../../../domain/features/mirror/touch-sink.js";
+} from "../../../domain/features/mirror/mirror.types.js";
+import type { MirrorTouchSink } from "../../../domain/features/mirror/mirror-touch-sink.js";
 
 /**
  * Routes `ScreenMirror` calls to the adapter registered for each

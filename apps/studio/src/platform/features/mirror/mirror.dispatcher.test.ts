@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { MockScreenMirror } from "../../../domain/features/mirror/mirror.mock.js";
-import type { MirrorTarget } from "../../../domain/features/mirror/types.js";
+import type { MirrorTarget } from "../../../domain/features/mirror/mirror.types.js";
 import { ScreenMirrorDispatcher } from "./mirror.dispatcher.js";
 
 function mkTarget(

@@ -1,4 +1,4 @@
-import type { App, Device, RunEvent, RunOpts, UiTreeNode } from "./types.js";
+import type { App, Device, RunEvent, RunOpts, UiTreeNode } from "./runtime.types.js";
 
 /**
  * Public contract for Studio's core runtime. The primary adapter
