@@ -413,15 +413,14 @@ export class IosDriver implements Driver {
 
   async pressKey(key: KeyCode, opts?: CallOptions): Promise<KeyResult> {
     const data = await this.tcp.call("pressKey", { key }, { signal: opts?.signal });
-    // Swift `PressKeyCommand` returns `{key, affordanceFound,
-    // strategy}`. `affordanceFound=true` means a verifiable
-    // control was used (nav_bar_back, home device press, enter
-    // into focused field); `false` means a best-effort gesture
-    // was dispatched but the driver cannot confirm any effect
-    // (e.g. edge_swipe_best_effort for iOS back gesture). We
-    // surface that directly as the `KeyResult` ok flag, and
-    // pass the strategy name through as `reason` for agent
-    // observability.
+    // The Swift runner returns {key, affordanceFound, strategy}.
+    // affordanceFound=true means a verifiable control was used
+    // (nav_bar_back, home device press, enter into focused field);
+    // false means a best-effort gesture was dispatched but the
+    // driver cannot confirm any effect (e.g. edge_swipe_best_effort
+    // for iOS back gesture). We surface that directly as the
+    // KeyResult ok flag, and pass the strategy name through as
+    // reason for agent observability.
     const affordanceFound = data.affordanceFound === true;
     const strategy = typeof data.strategy === "string" ? data.strategy : undefined;
     return {

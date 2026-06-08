@@ -65,18 +65,27 @@ Pre-1.0 (current: `v0.1.0`).
 | Unified `atomyx mcp` binary | Planned for v1.0 (today: use `atomyx-mcp`) |
 | npm / GitHub Packages release | Planned for v1.0 |
 
-## Getting started
-
-Atomyx is pre-release and not yet published to any registry. Build
-from source:
+## Setup
 
 ```bash
 git clone https://github.com/solrum/atomyx.git
-cd atomyx && npm install && npm run build
+cd atomyx
+npm run setup   # installs dependencies and git hooks
 ```
 
-Full walkthrough — MCP client config, device prerequisites, first
-test — in [`docs/getting-started.md`](./docs/getting-started.md).
+Verify the install by running the fast quality gate:
+
+```bash
+npm run check:fast   # lint + typecheck + prefix + phrases — should pass
+```
+
+This sets up the TypeScript packages only. Native toolchains for
+Android and iOS require additional steps — see
+[`.claude/docs/android.md`](./.claude/docs/android.md) and
+[`.claude/docs/ios.md`](./.claude/docs/ios.md).
+
+For a full walkthrough — MCP client config, device prerequisites,
+first test — see [`docs/getting-started.md`](./docs/getting-started.md).
 
 ## Documentation
 

@@ -13,7 +13,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   driver-side self-synchronization and keyboard-gated retries.
 - `@atomyx/driver/state/` — free functions that derive focused-node
   and keyboard state from any canonical `TreeNode`.
-- `@atomyx/driver/waits/` — observation-driven wait primitives
+- `@atomyx/driver/waits/` — driver-side wait primitives
   (`waitUntil`, `waitForFocus`, `waitForText`, `waitForInputReady`,
   `waitForInputCommitted`, `waitForKeyboard`, `waitForTreeStable`).
 - `Driver.hideKeyboard()` + `canHideKeyboard` capability.

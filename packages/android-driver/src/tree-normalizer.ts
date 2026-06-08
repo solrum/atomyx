@@ -54,10 +54,10 @@ export interface AndroidRawElement {
  * classes fall through to "other" so the attribute bag still has
  * a valid role value.
  *
- * The canonical role vocabulary matches
- * `@atomyx/driver/tree/tree-node.ts#Roles`. Duplicated here as
+ * The canonical role vocabulary matches the Roles constant in
+ * `packages/driver/src/tree/tree-node.ts`. Duplicated here as
  * string literals because this package doesn't take a runtime
- * dependency on @atomyx/driver (dependency direction: drivers →
+ * dependency on the driver package (dependency direction: drivers →
  * wire-schema only; drivers consume core types but through the
  * structural shape of `TreeNodeWire`, not by importing).
  */

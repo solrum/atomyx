@@ -42,7 +42,7 @@ describe("classNameToRole", () => {
 });
 
 describe("normalizeAndroidTree", () => {
-  it("maps canonical attribute keys from legacy fields", () => {
+  it("maps canonical attribute keys from wire fields", () => {
     const raw: AndroidRawElement = {
       elementId: "el-1",
       className: "android.widget.Button",

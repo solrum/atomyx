@@ -1,196 +1,227 @@
 # Contributing to Atomyx
 
-Thanks for your interest. Atomyx is an open-source framework at
-`v0.1.0` (pre-release), and contributions from users, downstream
-agent authors, and mobile platform experts are how we get it to
-`v1.0`.
+Atomyx is an open-source mobile test orchestration framework at `v0.1.0`.
+Contributions from humans and AI agents are welcome — bug reports, driver
+adapters, script engine fixes, platform coverage, documentation.
 
-This document covers how to propose a change, set up a working
-environment, and merge code that stays consistent with the
-framework's design contract.
+## First-time setup
 
-## Contents
+Node 22 is required (see `.nvmrc`). If you use nvm:
 
-- [Code of conduct](#code-of-conduct)
-- [Ways to contribute](#ways-to-contribute)
-- [Before you open a PR](#before-you-open-a-pr)
-- [Development setup](#development-setup)
-- [Coding standards](#coding-standards)
-- [Commit and PR conventions](#commit-and-pr-conventions)
-- [Review and merge](#review-and-merge)
-- [License](#license)
+```bash
+nvm use
+```
 
-## Code of conduct
-
-Be respectful, direct, and patient. We welcome first-time
-contributors and expect the same baseline of professional behavior
-from everyone — maintainers and contributors alike. If something
-feels off, open a GitHub issue tagged `coc` or email
-security@atomyx.dev.
-
-## Ways to contribute
-
-All of the following are in-scope:
-
-- **Bug reports.** Reproducible failures on a specific device + app.
-  Attach the command you ran, the agent log, and (for UI issues) a
-  screenshot or UI tree dump.
-- **Feature proposals.** Open a GitHub discussion or issue describing
-  the user problem first, before writing code. Atomyx is deliberately
-  small-surface (27 tools, 17 YAML commands) and new surface area
-  needs a design pass.
-- **Platform support.** New `Driver` adapter (e.g. Web, a custom
-  device fleet). Start from
-  [`.claude/docs/architecture.md`](./.claude/docs/architecture.md)
-  and the `Driver` port in
-  `packages/driver/src/driver/driver.port.ts`.
-- **App UI framework coverage.** If Atomyx misbehaves against a
-  framework we already support (Flutter, Compose, RN), a reduced
-  repro + the fix is the highest-value contribution type.
-- **Documentation.** Corrections, clarifications, missing setup
-  steps. Docs follow [`.claude/rules/docs.md`](./.claude/rules/docs.md) —
-  read before editing.
-- **Test cases.** Scripts or fixtures that exercise a gap in the
-  current test matrix.
-
-Out of scope for now:
-
-- **Changes to the iOS bridge strategy.** The Swift XCUITest runner
-  is the committed approach for v1.0 — see rule 7 in
-  [`CLAUDE.md`](./CLAUDE.md).
-- **New top-level modules** (test management, studio, cloud).
-  Skeletons exist under `packages/test-mgmt/`, `packages/studio/`,
-  `packages/cloud/` but are not yet ready for external contributions.
-
-## Before you open a PR
-
-1. **Open an issue first** for anything non-trivial. A 10-line bug
-   fix does not need one; a new tool or a new driver adapter does.
-2. **Search existing issues** for duplicates.
-3. **Read the relevant docs**. The table in
-   [`CLAUDE.md`](./CLAUDE.md#before-you-act) tells you which file to
-   read before which kind of change. Skipping this step is the #1
-   reason PRs get sent back.
-4. **Confirm the non-negotiable rules** in `CLAUDE.md` and
-   [`.claude/docs/pitfalls.md`](./.claude/docs/pitfalls.md). These
-   exist because they caught real regressions.
-
-## Development setup
+Then clone and install:
 
 ```bash
 git clone https://github.com/solrum/atomyx.git
 cd atomyx
-npm install
+npm run setup   # npm ci + husky git hooks
 ```
 
-Build all TypeScript packages in dependency order:
+`npm run setup` installs all workspace dependencies and wires the husky
+pre-commit and pre-push hooks. You should see a confirmation that hooks
+were installed.
+
+This sets up TypeScript packages only. Native toolchains (Android APK,
+iOS XCUITest runner) require additional steps — see
+[`.claude/docs/android.md`](./.claude/docs/android.md) and
+[`.claude/docs/ios.md`](./.claude/docs/ios.md).
+
+## Quality gates
+
+Atomyx is local-first — there is no CI server. Correctness is the
+contributor's responsibility before pushing.
+
+### Fast gate (run often)
 
 ```bash
-for d in core driver driver-wire android-driver ios-driver script mcp cli; do
-  (cd packages/$d && npx tsc)
-done
+npm run check:fast
 ```
 
-Run tests for one package:
+Runs lint, TypeScript typecheck, filename-prefix lint, and banned-phrase
+scan. Takes a few seconds. Run this before committing.
+
+### Full gate (run before push)
+
+```bash
+npm run check
+```
+
+Runs everything: lint, typecheck, dep-cruiser, feature-api lint,
+prefix lint, phrase lint, doc-path lint, tests, coverage check, API
+snapshots, wire schema snapshots, audit, and license check. The pre-push
+hook runs this automatically.
+
+**Audit note**: the `audit` step runs at `--audit-level=critical`. A set
+of high-severity CVEs in `fast-uri` and `ajv` (transitive via
+`@modelcontextprotocol/sdk`) are excluded because no upstream fix is
+available and the affected code paths (URL parsing inside MCP's JSON
+Schema validator) are not reachable from user-controlled input in Atomyx.
+Re-evaluate when a fixed `@modelcontextprotocol/sdk` version ships.
+
+### Hooks
+
+- **Pre-commit**: runs lint-staged on changed files.
+- **Pre-push**: runs `npm run check`.
+
+Do not bypass hooks with `--no-verify` unless you have already run the
+full gate locally and confirmed it is green.
+
+## The rules
+
+Atomyx has codified rules with enforcement gates. Read the relevant rule
+before making a change — skipping this step is the most common reason
+PRs are sent back.
+
+| You are about to… | Read |
+|---|---|
+| Design or evaluate a module or feature boundary | [`.claude/docs/architecture.md`](./.claude/docs/architecture.md) |
+| Create a new file or feature in any TS package or app | [`.claude/rules/feature-structure.md`](./.claude/rules/feature-structure.md) |
+| Export anything from a feature's `index.ts` | [`.claude/rules/feature-api.md`](./.claude/rules/feature-api.md) |
+| Edit anything under `apps/studio/` | [`.claude/rules/studio-architecture.md`](./.claude/rules/studio-architecture.md) |
+| Write or edit any comment or docstring | [`.claude/rules/comments.md`](./.claude/rules/comments.md) |
+| Write or edit any markdown file | [`.claude/rules/docs.md`](./.claude/rules/docs.md) |
+| Write or edit Studio tests | [`.claude/rules/studio-testing.md`](./.claude/rules/studio-testing.md) |
+| Edit Android or iOS agent code, or tool-layer code | [`.claude/docs/pitfalls.md`](./.claude/docs/pitfalls.md) |
+
+Each rule has an associated enforcement gate (dep-cruiser, ESLint,
+lint scripts, node:test coverage). Rules drift without enforcement — the
+gate is the rule.
+
+## Adding a feature
+
+A new feature is one folder and one composition-root line. Removing it
+is one folder delete and one line delete. No other file should change.
+
+Follow the checklist in
+[`.claude/rules/feature-structure.md`](./.claude/rules/feature-structure.md)
+for the folder shape and the checklist in
+[`.claude/rules/feature-api.md`](./.claude/rules/feature-api.md)
+for the `index.ts` contract. Both checklists must be green before a
+feature PR is considered complete.
+
+## Editing a public API
+
+Any change to a domain port, a wire schema, or a zod schema exported
+from `@atomyx/shared` is a breaking change and requires a changeset:
+
+```bash
+npx changeset add
+```
+
+Select the affected packages and pick a semver bump (`patch`, `minor`,
+or `major`). Commit the generated changeset file alongside your code
+change. One changeset per PR.
+
+If the change affects API snapshots or wire snapshots, regenerate them:
+
+```bash
+npm run api:check        # check — fails if snapshots are stale
+node scripts/snapshot-wire-schema.mjs   # regenerate wire snapshots
+```
+
+Commit the updated snapshot files in the same PR as the change.
+
+## Tests
+
+Tests are colocated with the code they cover (`foo.test.ts` next to
+`foo.ts`), never in a parallel `tests/` tree.
+
+The runner is `node:test`. Run a single package:
 
 ```bash
 cd packages/driver
-node --import tsx --test $(find src -name '*.test.ts')
+npm test
 ```
 
-Run tests across all packages:
+Run all packages:
 
 ```bash
-for d in packages/*/; do
-  (cd "$d" && [ -f tsconfig.json ] && npm test)
-done
+npm test
 ```
 
-Platform-specific agent setup (Android APK, iOS XCUITest runner) is
-covered in [`.claude/docs/development.md`](./.claude/docs/development.md).
-Device-level prerequisites are in
-[`docs/device-setup.md`](./docs/device-setup.md).
+### DOM-free invariant
 
-## Coding standards
+Tests under `domain/` and `state/` in `apps/studio/` must run under
+`node:test` with no bundler, no `jsdom`, and no React. A test that
+imports `react`, `react-dom`, or touches `document` or `window` fails
+at load time — that is intentional. If a test needs the DOM, the code
+under test belongs in `ui/`, not `domain/` or `state/`.
 
-Atomyx has codified rules that apply to every change:
+### Coverage ratchet
 
-- [`.claude/rules/comments.md`](./.claude/rules/comments.md) —
-  inline comments and docstrings. Default: write no comment; comment
-  WHY, not WHAT; never narrate the diff.
-- [`.claude/rules/docs.md`](./.claude/rules/docs.md) — every
-  markdown file in the repo. Present-tense only; paths must be
-  verifiable; one file, one question.
-- [`.claude/docs/architecture.md`](./.claude/docs/architecture.md) —
-  module layering, cross-package boundary rules (enforced by
-  `dependency-cruiser` at CI time).
-- [`.claude/docs/tools.md`](./.claude/docs/tools.md) — contract for
-  MCP tool authors: `defineTool`, pure orchestration, delegate to
-  `Orchestra`, never reach the `Driver` directly.
+Coverage is measured by `c8` over the `domain/` and `state/` layers in
+`apps/studio/`. The floor in `apps/studio/.c8rc.json` only ever goes
+up. When new tests raise measured coverage, raise the floor to match
+in the same PR. Never lower it to make a failing build green.
 
-General engineering expectations:
+## Banned phrases
 
-- **One responsibility per file.** Constructor injection over
-  singletons.
-- **No platform branching in tool handlers.** If behavior must
-  differ per platform, fix it in the driver adapter.
-- **Unit tests do not require a device.** Use `MockDriver` from
-  `packages/driver/src/testing/`.
-- **No commented-out code.** Git history has it.
-- **English only** for all source, docs, and commit messages.
+These phrases are blocked by `npm run lint:phrases` and must not appear
+in source files or docs:
 
-## Commit and PR conventions
+- **Milestone refs** — words like "Phase", "Batch", "Sprint", "Week",
+  or "Milestone" followed by a number. Project-plan concepts don't
+  travel with the source; describe the current state instead.
+- **Past-thing refs** — phrases that name a thing that no longer exists
+  (e.g. "the old X", "X was no longer used"). Describe what IS; git
+  log owns what WAS.
+- **ADR refs in code** — phrases like "per ADR-NNN" or "see ADR-NNN"
+  in source or doc files. State the constraint inline, not by reference
+  to a document the reader may not have.
+- **SHIPPED status markers** — words like "SHIPPED" followed by a date.
+  Docs describe present state; git keeps history.
+- **Code-style comments inside template literals** (`//`, `/* */`) —
+  they leak into user-facing strings.
 
-- **Atomic commits.** One commit per logical change. A PR can have
-  multiple commits but each should build and test green.
-- **Commit message**: imperative mood, ≤ 72 chars subject, body
-  explaining WHY when the change is non-obvious. Example:
+## Commits and PRs
 
-  ```
-  ios: reuse existing iproxy tunnel when port 22087 is occupied
+Follow the conventional commit format used throughout the repo:
 
-  Second-session device reconnect was refusing to start because the
-  port was still held by the prior `make serve-device`. Probe with a
-  ping handshake; if an Atomyx driver answers, reuse it.
-  ```
+```
+feat(scope): short imperative description
 
-- **No `--no-verify`, no `--no-gpg-sign`**. Pre-commit hooks and
-  signing exist for a reason.
-- **Reference issues** with `Fixes #123` / `Refs #45` in the body.
-- **Signed-off-by** (DCO) is encouraged for larger contributions;
-  add `-s` to your `git commit`.
+Body explains WHY when the change is non-obvious. Keep the subject
+under 72 characters. Reference issues with Fixes #N or Refs #N.
+```
 
-### Pull request template
+Common scopes: `android`, `ios`, `mcp`, `cli`, `driver`, `script`,
+`studio`, `core`, `shared`, `skills`.
 
-When opening a PR, include in the description:
+One concept per commit. A PR may contain multiple commits; each must
+build and test green on its own.
 
-1. **What**: one sentence on the user-visible change.
-2. **Why**: the motivating problem, ideally with a linked issue.
-3. **How**: the design decision, especially any tradeoff.
-4. **Test plan**: what you ran. For device-facing changes, name the
-   platform + OS version + app you exercised against.
+- Do not use `--no-verify` or `--no-gpg-sign`.
+- Co-authored-by trailers are fine for AI-assisted changes.
 
-A PR template in `.github/PULL_REQUEST_TEMPLATE.md` will land
-alongside issue templates in a future iteration.
+### PR description
 
-## Review and merge
+Include:
 
-- Reviews focus on: correctness, design fit (hexagonal + non-
-  negotiable rules), agent ergonomics, test coverage.
-- At least one maintainer approval is required before merge.
-- CI must be green — TypeScript type-check + unit tests across
-  every workspace package.
-- `dependency-cruiser` enforces cross-package boundaries at CI
-  time. A violation blocks merge; the fix is almost always to
-  route the import through a package's public entry point.
-- Merge method: **squash** for single-author PRs, **merge commit**
-  for multi-contributor PRs where authorship matters.
+1. **What** — one sentence on the user-visible change.
+2. **Why** — the motivating problem, with a linked issue when one exists.
+3. **How** — the design decision and any tradeoff.
+4. **Test plan** — what you ran. For device-facing changes, name the
+   platform, OS version, and app you tested against.
+
+## Releases
+
+Releases are maintainer-only and run from a local machine:
+
+```bash
+npm run release
+```
+
+This runs `changeset version` to apply pending changesets, then
+`npm run check` to confirm the build is green, then `changeset publish`
+to push packages to the registry. Do not run this as a contributor.
 
 ## License
 
-Atomyx is Apache 2.0. By contributing, you agree your contribution
-is licensed under the same terms. Do not submit code with
-incompatible licenses; in particular, **do not copy from GPL
-projects**.
+Atomyx is Apache 2.0. By contributing, you agree your code ships under
+the same terms. Do not submit code with incompatible licenses. Do not
+copy from GPL projects.
 
 See [`LICENSE`](./LICENSE) for the full text.

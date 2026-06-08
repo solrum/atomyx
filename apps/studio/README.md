@@ -108,6 +108,7 @@ that needs an ADR before it lands.
 All three are delegated to the Tauri Rust backend via the
 `platform/` adapters. Default locations (macOS):
 
+<!-- atomyx-allow-path: ~/Library/Application Support/dev.atomyx.studio/config.json -->
 - Artifact store: `~/Library/Application Support/dev.atomyx.studio/runs/`.
 - Settings: `~/Library/Application Support/dev.atomyx.studio/config.json`.
 

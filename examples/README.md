@@ -36,4 +36,4 @@ Each future subdirectory-based example will carry:
 
 The examples deliberately install Atomyx modules from npm (or
 from the local workspace via `file:` paths in dev) — they do
-NOT reach into package `src/` directly.
+NOT reach into any package's source tree directly.

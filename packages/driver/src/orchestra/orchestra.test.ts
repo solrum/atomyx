@@ -91,8 +91,8 @@ describe("Orchestra.tap with selector", () => {
     // TreeNode references between the two results. On real
     // drivers that rebuild the TreeNode graph from JSON per call,
     // the two trees are referentially distinct even when
-    // structurally identical, so detectObscurement's `topmost ===
-    // target` + `containsNode(reference walk)` both silently
+    // structurally identical, so detectObscurement's topmost===target
+    // + containsNode(reference walk) both silently
     // returned false. The algorithm then fell through to generic-
     // container suppression, which does NOT suppress nodes with
     // distinctive role or non-empty id — so every tap on an

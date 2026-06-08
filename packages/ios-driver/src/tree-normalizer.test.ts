@@ -53,7 +53,7 @@ describe("iosElementTypeToRole", () => {
 });
 
 describe("normalizeIosTree", () => {
-  it("maps canonical attribute keys from legacy fields", () => {
+  it("maps canonical attribute keys from wire fields", () => {
     const raw: IosRawElement = {
       elementType: "button",
       identifier: "login_btn",
