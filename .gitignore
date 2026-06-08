@@ -90,6 +90,12 @@ kotlin-js-store/
 Thumbs.db
 desktop.ini
 
+# ─── Husky ─────────────────────────────────────────────────────────
+.husky/_/
+
+# ─── Test coverage output ──────────────────────────────────────────
+.nyc_output/
+
 # ─── Atomyx local state ────────────────────────────────────────────
 .atomyx/
 .mcp.json
@@ -117,10 +123,22 @@ platforms/ios-agent/AtomyxDriver.xcodeproj/
 atomyx-local/
 
 # ─── Local-only dev scripts ────────────────────────────────────────
-# Every directory named `scripts/` in the tree holds per-contributor
-# self-test and probe scripts — not part of the shipped surface.
-# Contributors who need them author / recreate them locally.
-scripts/
+# Per-contributor scripts under any package's own `scripts/`. The
+# top-level `/scripts/` ships shared lint/snapshot/codemod tooling
+# and IS tracked, EXCEPT the legacy per-contributor probes listed
+# below.
+**/packages/*/scripts/
+**/apps/*/scripts/
+platforms/*/scripts/
+/scripts/bench-ios-type.mjs
+/scripts/ios-driver-call.mjs
+/scripts/ios-flutter-pointer-smoke.mjs
+/scripts/ios-pointer-smoke.mjs
+/scripts/mitm-capture-addon.py
+/scripts/run-login-ios.mjs
+
+# ─── api-extractor temp output ──────────────────────────────────────
+**/temp/
 
 # ─── Rust / Cargo ──────────────────────────────────────────────────
 # Cargo build output for every crate in the tree (currently
@@ -139,3 +157,4 @@ Cargo.lock.bak
 # their own local copies.
 .claude/docs/decisions/
 .claude/docs/proposals/
+.npm-cache/
