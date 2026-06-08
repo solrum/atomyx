@@ -1,15 +1,11 @@
-/**
- * Skills-module subcommand dispatcher. The unified CLI in
- * `router.ts` strips the `skills` prefix and calls `execute(rest)`
- * from here; shortcuts `init` and `update-skills` also route here.
- */
-
+import { createFsSkills } from "@atomyx/skills";
 import { ArgvError, parseArgv } from "./argv.js";
 import { printCommandHelp, printModuleHelp } from "./help.js";
 import { runInit } from "./commands/init.js";
 import { runUpdateSkills } from "./commands/update-skills.js";
 
 export async function execute(args: readonly string[]): Promise<void> {
+  const skills = createFsSkills();
   const command = args[0];
 
   switch (command) {
@@ -30,7 +26,7 @@ export async function execute(args: readonly string[]): Promise<void> {
         printCommandHelp("init", process.stdout.write.bind(process.stdout));
         return;
       }
-      const code = await runInit(argv.flags);
+      const code = await runInit(skills, argv.flags);
       if (code !== 0) process.exit(code);
       return;
     }
@@ -54,7 +50,7 @@ export async function execute(args: readonly string[]): Promise<void> {
         );
         return;
       }
-      const code = await runUpdateSkills(argv.flags);
+      const code = await runUpdateSkills(skills, argv.flags);
       if (code !== 0) process.exit(code);
       return;
     }

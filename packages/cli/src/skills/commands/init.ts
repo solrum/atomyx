@@ -1,15 +1,9 @@
 import { join } from "node:path";
-import { copySkillsTo, currentVersion, SKILL_FILES, AGENT_FILES } from "@atomyx/skills";
+import { SKILL_FILES, AGENT_FILES, SKILLS_VERSION } from "@atomyx/skills";
+import type { SkillsApi } from "@atomyx/skills";
 
-/**
- * `atomyx init` — copies bundled skills and agents into the
- * consumer project's `.claude/` directory.
- *
- * Accepted flags (pre-parsed by the skills argv layer):
- *   --target   Override destination directory (default: <cwd>/.claude)
- *   --force    Overwrite existing files without prompting.
- */
 export async function runInit(
+  skills: SkillsApi,
   flags: Readonly<Record<string, string | boolean>>,
   cwd: string = process.cwd(),
 ): Promise<number> {
@@ -19,7 +13,7 @@ export async function runInit(
   const force = flags["--force"] === true;
 
   try {
-    await copySkillsTo(targetDir, { overwrite: force });
+    await skills.copyTo(targetDir, { overwrite: force });
   } catch (err) {
     const isExist =
       err instanceof Error &&
@@ -37,7 +31,7 @@ export async function runInit(
 
   const allFiles = [...SKILL_FILES, ...AGENT_FILES];
   const out = process.stdout.write.bind(process.stdout);
-  out(`Atomyx skills installed (v${currentVersion})\n`);
+  out(`Atomyx skills installed (v${SKILLS_VERSION})\n`);
   out(`  Destination: ${targetDir}\n`);
   for (const f of allFiles) {
     out(`  + ${f}\n`);

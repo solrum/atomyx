@@ -1,20 +1,9 @@
 import { join } from "node:path";
-import {
-  copySkillsTo,
-  currentVersion,
-  getInstalledVersion,
-  SKILL_FILES,
-  AGENT_FILES,
-} from "@atomyx/skills";
+import { SKILL_FILES, AGENT_FILES, SKILLS_VERSION } from "@atomyx/skills";
+import type { SkillsApi } from "@atomyx/skills";
 
-/**
- * `atomyx update-skills` — overwrites installed skills/agents with
- * the bundled version when a newer version is available.
- *
- * Accepted flags (pre-parsed by the skills argv layer):
- *   --target   Override destination directory (default: <cwd>/.claude)
- */
 export async function runUpdateSkills(
+  skills: SkillsApi,
   flags: Readonly<Record<string, string | boolean>>,
   cwd: string = process.cwd(),
 ): Promise<number> {
@@ -22,17 +11,17 @@ export async function runUpdateSkills(
   const targetDir =
     typeof targetFlag === "string" ? targetFlag : join(cwd, ".claude");
 
-  const installedVersion = await getInstalledVersion(targetDir);
+  const versionResult = await skills.getInstalledVersion(targetDir);
 
-  if (installedVersion === currentVersion) {
+  if (versionResult.upToDate) {
     process.stdout.write(
-      `Atomyx skills are already up to date (v${currentVersion})\n`,
+      `Atomyx skills are already up to date (v${SKILLS_VERSION})\n`,
     );
     return 0;
   }
 
   try {
-    await copySkillsTo(targetDir, { overwrite: true });
+    await skills.copyTo(targetDir, { overwrite: true });
   } catch (err) {
     const code =
       err instanceof Error
@@ -49,8 +38,8 @@ export async function runUpdateSkills(
 
   const allFiles = [...SKILL_FILES, ...AGENT_FILES];
   const out = process.stdout.write.bind(process.stdout);
-  const fromLabel = installedVersion ?? "(none)";
-  out(`Atomyx skills updated: v${fromLabel} → v${currentVersion}\n`);
+  const fromLabel = versionResult.version ?? "(none)";
+  out(`Atomyx skills updated: v${fromLabel} → v${SKILLS_VERSION}\n`);
   out(`  Destination: ${targetDir}\n`);
   for (const f of allFiles) {
     out(`  ↺ ${f}\n`);
