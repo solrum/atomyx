@@ -4,6 +4,8 @@
  * from here; shortcuts `init` and `update-skills` also route here.
  */
 
+import { ArgvError, parseArgv } from "./argv.js";
+import { printCommandHelp, printModuleHelp } from "./help.js";
 import { runInit } from "./commands/init.js";
 import { runUpdateSkills } from "./commands/update-skills.js";
 
@@ -12,49 +14,57 @@ export async function execute(args: readonly string[]): Promise<void> {
 
   switch (command) {
     case "init": {
-      const code = await runInit(args.slice(1));
+      let argv;
+      try {
+        argv = parseArgv(args.slice(1), "init");
+      } catch (err) {
+        if (err instanceof ArgvError) {
+          process.stderr.write(`error: ${err.message}\n\n`);
+          printCommandHelp("init");
+          process.exit(2);
+          return;
+        }
+        throw err;
+      }
+      if (argv.help) {
+        printCommandHelp("init", process.stdout.write.bind(process.stdout));
+        return;
+      }
+      const code = await runInit(argv.flags);
       if (code !== 0) process.exit(code);
       return;
     }
     case "update-skills": {
-      const code = await runUpdateSkills(args.slice(1));
+      let argv;
+      try {
+        argv = parseArgv(args.slice(1), "update-skills");
+      } catch (err) {
+        if (err instanceof ArgvError) {
+          process.stderr.write(`error: ${err.message}\n\n`);
+          printCommandHelp("update-skills");
+          process.exit(2);
+          return;
+        }
+        throw err;
+      }
+      if (argv.help) {
+        printCommandHelp(
+          "update-skills",
+          process.stdout.write.bind(process.stdout),
+        );
+        return;
+      }
+      const code = await runUpdateSkills(argv.flags);
       if (code !== 0) process.exit(code);
       return;
     }
     case "help":
     case undefined:
-      printHelp(process.stdout.write.bind(process.stdout));
+      printModuleHelp(process.stdout.write.bind(process.stdout));
       return;
     default:
       process.stderr.write(`error: unknown skills command "${command}"\n\n`);
-      printHelp(process.stderr.write.bind(process.stderr));
+      printModuleHelp(process.stderr.write.bind(process.stderr));
       process.exit(2);
   }
-}
-
-function printHelp(write: (s: string) => void): void {
-  write(`atomyx skills — install and update Claude skills
-
-USAGE
-  atomyx skills <command> [flags]
-
-COMMANDS
-  init             Copy bundled skills into <cwd>/.claude
-  update-skills    Overwrite existing skills when a newer version is available
-  help             Print this usage and exit
-
-FLAGS (init)
-  --target=<path>  Destination directory (default: <cwd>/.claude)
-  --force          Overwrite existing files without prompting
-
-FLAGS (update-skills)
-  --target=<path>  Destination directory (default: <cwd>/.claude)
-
-SHORTCUTS
-  atomyx init                  → atomyx skills init
-  atomyx update-skills         → atomyx skills update-skills
-
-SEE ALSO
-  https://atomyx.dev
-`);
 }

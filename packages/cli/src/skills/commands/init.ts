@@ -5,24 +5,18 @@ import { copySkillsTo, currentVersion, SKILL_FILES, AGENT_FILES } from "@atomyx/
  * `atomyx init` — copies bundled skills and agents into the
  * consumer project's `.claude/` directory.
  *
- * Flags:
- *   --target=<path>   Override destination directory (default: <cwd>/.claude)
- *   --force           Overwrite existing files without prompting.
+ * Accepted flags (pre-parsed by the skills argv layer):
+ *   --target   Override destination directory (default: <cwd>/.claude)
+ *   --force    Overwrite existing files without prompting.
  */
-export async function runInit(args: readonly string[], cwd: string = process.cwd()): Promise<number> {
-  let targetDir = join(cwd, ".claude");
-  let force = false;
-
-  for (const arg of args) {
-    if (arg.startsWith("--target=")) {
-      targetDir = arg.slice("--target=".length);
-    } else if (arg === "--force") {
-      force = true;
-    } else {
-      process.stderr.write(`error: unknown flag "${arg}"\n`);
-      return 2;
-    }
-  }
+export async function runInit(
+  flags: Readonly<Record<string, string | boolean>>,
+  cwd: string = process.cwd(),
+): Promise<number> {
+  const targetFlag = flags["--target"];
+  const targetDir =
+    typeof targetFlag === "string" ? targetFlag : join(cwd, ".claude");
+  const force = flags["--force"] === true;
 
   try {
     await copySkillsTo(targetDir, { overwrite: force });
