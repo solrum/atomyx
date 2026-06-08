@@ -5,37 +5,29 @@ import android.os.Bundle
 import android.view.accessibility.AccessibilityNodeInfo
 
 /**
- * Text-input and keyboard-dismissal helpers. Lives device-side
- * because every path here needs multiple tightly sequenced reads
- * of focused-node state that would cost too many adb roundtrips
- * to orchestrate from the host.
+ * Types text into the currently focused input field using a three-strategy
+ * chain. Lives device-side because every path here needs multiple tightly
+ * sequenced reads of focused-node state that would cost too many adb
+ * roundtrips to orchestrate from the host.
  *
  * Strategy chain for `typeViaKeyboard`:
  *
- *   1. `ACTION_SET_TEXT` — native EditText + Flutter Semantics
- *      text fields accept this atomically. Verified by a polling
- *      read so `obscureText: true` Flutter inputs (which accept
- *      the action but drop the write) fall through.
- *   2. System IME per-key tap — when the system keyboard is
- *      visible, tap each character's key via the IME's reported
- *      key bounds. Handles numeric↔qwerty layout switches.
- *   3. On-screen keypad — when no system IME is visible (custom
- *      Flutter banking / OTP keypads), scan the compact tree for
- *      clickable elements with short labels matching each char.
+ *   1. `ACTION_SET_TEXT` — native EditText + Flutter Semantics text fields
+ *      accept this atomically. Verified by a polling read so `obscureText:
+ *      true` Flutter inputs (which accept the action but drop the write)
+ *      fall through.
+ *   2. System IME per-key tap — when the system keyboard is visible, tap
+ *      each character's key via the IME's reported key bounds. Handles
+ *      numeric↔qwerty layout switches.
+ *   3. On-screen keypad — when no system IME is visible (custom Flutter
+ *      banking / OTP keypads), scan the compact tree for clickable elements
+ *      with short labels matching each char.
  */
-class InputDispatcher(
+class KeyboardTyper(
     private val service: AccessibilityService,
     private val uiTree: UiTreeService,
     private val gestures: GestureDispatcher,
 ) {
-
-    data class TapResult(val success: Boolean, val reason: String)
-    data class TypeResult(
-        val success: Boolean,
-        val typed: Int,
-        val total: Int,
-        val reason: String,
-    )
 
     fun typeViaKeyboard(
         text: String,
@@ -113,15 +105,15 @@ class InputDispatcher(
     }
 
     /**
-     * Try to set text directly via ACTION_SET_TEXT on the focused
-     * node. Bypasses keyboard layout entirely.
+     * Try to set text directly via ACTION_SET_TEXT on the focused node.
+     * Bypasses keyboard layout entirely.
      *
      * Contract:
-     *   - Returns a successful TypeResult when the action is accepted
-     *     AND verification confirms the text landed.
-     *   - Returns null when the action is rejected OR when
-     *     verification misses, signaling the caller to fall through
-     *     to per-key keyboard dispatch.
+     *   - Returns a successful TypeResult when the action is accepted AND
+     *     verification confirms the text landed.
+     *   - Returns null when the action is rejected OR when verification
+     *     misses, signaling the caller to fall through to per-key keyboard
+     *     dispatch.
      *
      * Framework notes (expand this list when adding support):
      *
@@ -129,9 +121,9 @@ class InputDispatcher(
      *     programmatic-set path. Accepts and applies atomically.
      *
      *   - Flutter Semantics text fields: accept the action, but
-     *     `obscureText: true` variants silently drop the write
-     *     without updating the rendered value. The explicit
-     *     verification loop below catches this case.
+     *     `obscureText: true` variants silently drop the write without
+     *     updating the rendered value. The explicit verification loop below
+     *     catches this case.
      */
     private fun trySetText(text: String): TypeResult? {
         val root = service.rootInActiveWindow ?: return null
@@ -177,18 +169,17 @@ class InputDispatcher(
     }
 
     /**
-     * Best-effort clear of the currently focused input field. Two strategies:
+     * Best-effort clear of the currently focused input field before typing.
+     * Two strategies:
      *
-     *   1. ACTION_SET_TEXT(""): fastest, works for native Android EditText
-     *      and Flutter inputs that proxy through Semantics. If the focused
-     *      node accepts the action, we're done in <10ms.
+     *   1. ACTION_SET_TEXT(""): fastest, works for native Android EditText and
+     *      Flutter inputs that proxy through Semantics.
      *
      *   2. Backspace via on-screen keypad: when ACTION_SET_TEXT is rejected
-     *      (Flutter custom inputs without Semantics text-edit support), we
-     *      read the focused node's text length and tap an on-screen
-     *      backspace key that many character times.
+     *      (Flutter custom inputs without Semantics text-edit support), tap
+     *      an on-screen backspace key that many character times.
      *
-     * Returns silently. Failure is logged but does NOT abort the type.
+     * Returns silently. Failure does NOT abort the type.
      */
     private fun clearFocusedFieldBestEffort(perKeyDelayMs: Long) {
         val root = service.rootInActiveWindow ?: return
@@ -224,36 +215,6 @@ class InputDispatcher(
         } finally {
             try { focused.recycle() } catch (_: Exception) {}
         }
-    }
-
-    /**
-     * Locate a backspace / clear / delete key on the current screen by
-     * matching the label / contentDesc against a wide set of language- and
-     * icon-independent patterns. Structural — works on any locale, any
-     * keypad style.
-     */
-    private fun findBackspaceKey(summary: List<CompactElement>): CompactElement? {
-        val patterns = listOf(
-            // Glyphs / icons
-            "⌫", "⌦", "✕", "✖", "×", "x", "✗",
-            // English
-            "del", "delete", "back", "backspace", "clear", "erase",
-            // Japanese banking apps
-            "削除", "消去", "クリア", "戻る",
-            // Korean
-            "삭제", "지우기",
-            // Vietnamese
-            "xoá", "xóa",
-        )
-        for (el in summary) {
-            if (!el.enabled) continue
-            val needle = el.label.trim().lowercase()
-            if (needle.isEmpty() || needle.length > 12) continue
-            if (patterns.any { it.equals(needle, ignoreCase = true) }) {
-                return el
-            }
-        }
-        return null
     }
 
     /**
@@ -357,9 +318,9 @@ class InputDispatcher(
      *   - "ABC" / "abc"            → switch from numbers back to letters
      *   - "あいう" / "ABC" / "ｱｲｳ"  → switch input mode (Japanese IMEs)
      *
-     * We pick the switch key based on what `needle` is — digit needs a numeric
-     * layout, letter needs an alphabet layout. Returns the new keyboard info
-     * after switch, or null if no useful switch key was found.
+     * We pick the switch key based on what `needle` is — digit needs a
+     * numeric layout, letter needs an alphabet layout. Returns the new
+     * keyboard info after switch, or null if no useful switch key was found.
      */
     private fun trySwitchLayoutFor(needle: String, current: KeyboardInfo): KeyboardInfo? {
         val isDigit = needle.length == 1 && needle[0].isDigit()
@@ -387,81 +348,5 @@ class InputDispatcher(
             }
         }
         return null
-    }
-
-    /**
-     * Clear the currently focused input by finding the focused editable node
-     * via the accessibility API and performing ACTION_SET_TEXT with an empty
-     * string. Works even when the field has no stable selector — which is the
-     * common case for Flutter apps where text fields are exposed as plain
-     * views without resourceId / contentDesc. Caller must focus the target
-     * first with a tap.
-     */
-    fun clearFocusedInput(): TapResult {
-        val root = service.rootInActiveWindow
-            ?: return TapResult(false, "no active window — is the device unlocked?")
-        val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-            ?: return TapResult(false, "no input-focused node — tap the target field first")
-        try {
-            // Strategy 1: ACTION_SET_TEXT — fast path for native EditText
-            // and Flutter inputs that proxy through Semantics.
-            val args = Bundle().apply {
-                putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "")
-            }
-            if (focused.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) {
-                return TapResult(true, "ok via ACTION_SET_TEXT")
-            }
-
-            // Strategy 2: backspace via on-screen keypad — for Flutter custom
-            // inputs that don't accept ACTION_SET_TEXT.
-            val existing = focused.text?.toString() ?: ""
-            if (existing.isEmpty()) return TapResult(true, "ok (already empty)")
-            uiTree.markDirty()
-            val summary = uiTree.dumpCompact()
-            val backspace = findBackspaceKey(summary)
-                ?: return TapResult(
-                    false,
-                    "ACTION_SET_TEXT rejected and no on-screen backspace key found " +
-                        "(custom keypad must expose a delete/clear button labeled with " +
-                        "⌫, del, 削除, etc.). Existing text length: ${existing.length}",
-                )
-            val taps = existing.length + 1
-            for (i in 0 until taps) {
-                gestures.tapAt(
-                    backspace.bounds.left + (backspace.bounds.right - backspace.bounds.left) / 2f,
-                    backspace.bounds.top + (backspace.bounds.bottom - backspace.bounds.top) / 2f,
-                )
-                try { Thread.sleep(80L) } catch (_: InterruptedException) {}
-            }
-            return TapResult(true, "ok via on-screen backspace ($taps taps)")
-        } finally {
-            try { focused.recycle() } catch (_: Exception) {}
-        }
-    }
-
-    /**
-     * Dismiss the on-screen keyboard without triggering navigation.
-     * Uses GLOBAL_ACTION_BACK only when a keyboard is visible — if no
-     * keyboard is showing, this is a no-op (safe to call anytime).
-     */
-    fun hideKeyboard(): TapResult {
-        uiTree.markDirty()
-        val kb = uiTree.getKeyboardInfo()
-        if (!kb.visible) return TapResult(true, "keyboard not visible — no-op")
-        service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
-        // Poll until the IME window disappears instead of a fixed
-        // 300ms sleep. Exponential backoff (50/100/200 ms, ~1s cap)
-        // returns quickly on fast dismiss animations and tolerates
-        // slower devices without inflating the common-case latency.
-        val deadline = System.currentTimeMillis() + 1000L
-        var wait = 50L
-        while (System.currentTimeMillis() < deadline) {
-            try { Thread.sleep(wait) } catch (_: InterruptedException) {}
-            uiTree.markDirty()
-            val after = uiTree.getKeyboardInfo()
-            if (!after.visible) return TapResult(true, "keyboard dismissed")
-            wait = minOf(wait * 2, 200L)
-        }
-        return TapResult(true, "keyboard dismiss dispatched (poll timeout — IME may still animate)")
     }
 }
