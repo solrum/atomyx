@@ -228,7 +228,41 @@ linked at runtime (Studio imports the others as libraries).
    Deep imports into another module's internals → CI fail (dep-cruiser).
 ```
 
-## 8. WHAT THIS DOCUMENT IS NOT
+## 8. Wire protocols
+
+Atomyx has two distinct wire protocols — one per platform. There is no
+shared cross-platform wire schema. The `Driver` port in `@atomyx/driver`
+abstracts both; adapter authors implement that port, not a wire schema.
+
+### Android HTTP
+
+- **Transport**: HTTP over `127.0.0.1:8765` via `adb forward`.
+- **Path namespace**: `/actions/*` for mutations, `/tree` for the UI
+  hierarchy, `/current-activity`, `/health`, `/ping` for meta.
+- **Response envelope**: write actions return
+  `DispatchResult { ok: boolean, reason?: string, code?: string }`.
+- **Runner spec**: `platforms/android-agent/…/router/CommonRoutes.kt`.
+- **Host adapter**: `packages/android-driver/src/android.driver.ts`.
+
+### iOS TCP+JSON
+
+- **Transport**: TCP JSON stream on `127.0.0.1:22087`; `iproxy` tunnels
+  physical devices. Bundle id: `dev.atomyx.driver.host`.
+- **Message envelope**: `{ id: string, type: string, args: object }` for
+  requests; per-command response shapes vary by command type.
+- **Runner spec**: `platforms/ios-agent/Sources/…/*Command.swift` files.
+- **Host adapter**: `packages/ios-driver/src/ios.driver.ts`.
+
+### Shared types only
+
+`@atomyx/driver-wire` provides `TreeNodeWire` and primitive types
+(`PointWire`, `BoundsWire`, etc.) that normalizers in each adapter
+produce. These are TS type declarations — not a wire schema, not a
+validation layer, and not a constraint on what bytes cross the wire.
+
+---
+
+## 9. WHAT THIS DOCUMENT IS NOT
 
 - It is **not** a microservices manifesto. Microservices solve cross-team
   / cross-language deployment problems Atomyx does not have.
