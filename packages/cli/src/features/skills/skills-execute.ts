@@ -1,11 +1,13 @@
-import { createFsSkills } from "@atomyx/skills";
-import { ArgvError, parseArgv } from "./argv.js";
-import { printCommandHelp, printModuleHelp } from "./help.js";
-import { runInit } from "./commands/init.js";
-import { runUpdateSkills } from "./commands/update-skills.js";
+import type { SkillsApi } from "@atomyx/skills";
+import { ArgvError, parseArgv } from "./skills-argv.js";
+import { printCommandHelp, printModuleHelp } from "./skills-help.js";
+import { runInit } from "./skills-init.js";
+import { runUpdateSkills } from "./skills-update.js";
 
-export async function execute(args: readonly string[]): Promise<void> {
-  const skills = createFsSkills();
+export async function executeSkills(
+  skills: SkillsApi,
+  args: readonly string[],
+): Promise<void> {
   const command = args[0];
 
   switch (command) {

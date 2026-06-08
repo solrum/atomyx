@@ -1,14 +1,8 @@
 #!/usr/bin/env node
-/**
- * Atomyx unified CLI — single entry point for all modules.
- *
- * Routes `atomyx <module> <command> …` to the module handler
- * registered in `router.ts`. Shortcut aliases (`atomyx run`,
- * `atomyx devices`) rewrite to their full form before dispatch.
- * New modules plug in by adding a `router.ts` entry.
- */
 
-import { modules, shortcuts } from "./router.js";
+import { createFsSkills } from "@atomyx/skills";
+import { createRuntimeDriverFactory } from "./features/driver/index.js";
+import { modules, shortcuts } from "./infra/router/router.js";
 
 const VERSION = "0.1.0";
 
@@ -25,22 +19,26 @@ async function main(): Promise<void> {
     return;
   }
 
+  const ctx = {
+    driverFactory: createRuntimeDriverFactory(),
+    skills: createFsSkills(),
+  };
+  const mods = modules(ctx);
+
   const command = args[0]!;
   const rest = args.slice(1);
 
-  // Check shortcuts first
   const shortcut = shortcuts[command];
   if (shortcut) {
     const resolved = shortcut(rest);
-    const mod = modules[resolved.module];
+    const mod = mods[resolved.module];
     if (mod) {
       await mod.execute(resolved.args);
       return;
     }
   }
 
-  // Check module commands
-  const mod = modules[command];
+  const mod = mods[command];
   if (mod) {
     await mod.execute(rest);
     return;

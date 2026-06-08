@@ -2,8 +2,6 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { Orchestra } from "@atomyx/driver/orchestra";
 import { SystemClock, ConsoleLogger } from "@atomyx/core/infra";
-import { AndroidDriver } from "@atomyx/android-driver";
-import { IosDriver } from "@atomyx/ios-driver";
 import type { Driver } from "@atomyx/driver/driver";
 import type { CaptureConfig } from "@atomyx/shared/script";
 import {
@@ -15,16 +13,10 @@ import {
   createCapture,
 } from "@atomyx/script";
 import type { ScenarioResult } from "@atomyx/script";
+import type { DriverFactory } from "./driver.contract.js";
 
-/**
- * `atomyx-driver run` — execute a YML test script against a
- * real device. Wires up Driver + Orchestra + ScriptRunner
- * and prints results.
- *
- * Required: --file <path>
- * Optional: --platform, --device, --proxy, --json
- */
 export async function runScript(
+  factory: DriverFactory,
   flags: Readonly<Record<string, string | boolean>>,
 ): Promise<void> {
   const filePath = flags["--file"];
@@ -35,16 +27,23 @@ export async function runScript(
     process.exit(2);
   }
 
-  const platform = (flags["--platform"] as string) ?? "android";
+  const platformFlag = (flags["--platform"] as string) ?? "android";
   const deviceId = flags["--device"] as string | undefined;
   const proxyFlag = flags["--proxy"] as string | undefined;
   const jsonOutput = !!flags["--json"];
+
+  if (platformFlag !== "android" && platformFlag !== "ios") {
+    process.stderr.write(
+      `error: Unknown platform "${platformFlag}". Use --platform android or --platform ios.\n`,
+    );
+    process.exit(2);
+  }
 
   const absPath = resolve(filePath);
   const yamlContent = readFileSync(absPath, "utf-8");
   const isScenario = isScenarioYaml(yamlContent);
 
-  const driver = createDriver(platform, deviceId);
+  const driver: Driver = factory.forPlatform(platformFlag, deviceId);
   const clock = new SystemClock();
   const logger = new ConsoleLogger();
 
@@ -156,35 +155,6 @@ function printScenarioResult(result: ScenarioResult): void {
   out("\n");
 }
 
-// Default ADB serial assigned by Android Studio / emulator CLI
-// when a single emulator boots. Used only when the caller omits
-// `--device`; real runs should pass the id from `list-devices`.
-const DEFAULT_ANDROID_EMULATOR_SERIAL = "emulator-5554";
-
-function createDriver(platform: string, deviceId?: string): Driver {
-  switch (platform) {
-    case "android":
-      return new AndroidDriver({
-        serial: deviceId ?? DEFAULT_ANDROID_EMULATOR_SERIAL,
-      });
-    case "ios":
-      return new IosDriver({
-        kind: "simulator",
-        udid: deviceId ?? "",
-      });
-    default:
-      throw new Error(
-        `Unknown platform "${platform}". Use --platform android or --platform ios.`,
-      );
-  }
-}
-
-/**
- * Parse --proxy flag: "type:path" → CaptureConfig.
- * Examples:
- *   --proxy file:/tmp/capture.jsonl
- *   --proxy mitmproxy:/tmp/mitm.jsonl
- */
 function parseCaptureFlag(
   flag: string | undefined,
 ): CaptureConfig | undefined {

@@ -1,13 +1,3 @@
-/**
- * Help text for the skills-module subcommands.
- *
- * `printCommandHelp` prints usage for a single command (shown after
- * an ArgvError or when --help/-h is passed).
- *
- * `printModuleHelp` prints the combined skills-module usage (shown
- * for `atomyx skills help` or `atomyx skills` with no subcommand).
- */
-
 export function printCommandHelp(
   command: "init" | "update-skills",
   write: (s: string) => void = (s) => process.stderr.write(s),

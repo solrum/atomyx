@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { printCommandHelp, printModuleHelp } from "./help.js";
+import { printCommandHelp, printModuleHelp } from "./skills-help.js";
 
 describe("printCommandHelp", () => {
   it("prints init usage when command is 'init'", () => {

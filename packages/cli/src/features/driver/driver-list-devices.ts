@@ -4,19 +4,6 @@ import { adbListDevices } from "@atomyx/android-driver";
 
 const execFileAsync = promisify(execFile);
 
-/**
- * `atomyx-driver list-devices` — enumerate currently-connected
- * devices that Atomyx can drive.
- *
- * Covers:
- * - Android devices via `adb devices -l`
- * - iOS simulators via `xcrun simctl list devices booted --json`
- * - iOS physical devices via `idevice_id -l` + `ideviceinfo`
- *
- * Missing host tools are silently skipped — a Linux CI without
- * Xcode still sees Android devices.
- */
-
 interface DeviceEntry {
   readonly platform: "android" | "ios";
   readonly id: string;

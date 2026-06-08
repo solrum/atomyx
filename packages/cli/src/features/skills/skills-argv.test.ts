@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { parseArgv, ArgvError } from "./argv.js";
+import { parseArgv, ArgvError } from "./skills-argv.js";
 
 // ── init ──────────────────────────────────────────────────────────────────────
 

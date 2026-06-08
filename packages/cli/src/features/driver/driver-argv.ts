@@ -1,20 +1,3 @@
-/**
- * Argv parser for the driver-module subcommands. The MCP stdio
- * transport is shipped as a separate binary (`atomyx-mcp`); this
- * parser only handles the direct-CLI grammar.
- *
- * Grammar:
- *
- *   atomyx driver <command> [--flag=value | --flag value | --bool]
- *
- * Commands:
- *
- *   list-devices  Enumerate connected devices.
- *   run           Run a YML test script.
- *   version       Print version + exit.
- *   help          Print usage + exit (default when no command).
- */
-
 export class ArgvError extends Error {
   constructor(message: string) {
     super(message);
@@ -29,11 +12,6 @@ export interface ParsedArgv {
 
 const VALID_COMMANDS = new Set(["list-devices", "run", "version", "help"]);
 
-/**
- * Flag definitions per command.
- * - `true` = boolean flag (no value)
- * - `false` = value flag (requires next arg)
- */
 const COMMAND_FLAGS: Record<string, Record<string, boolean>> = {
   "list-devices": { "--json": true },
   run: {
@@ -72,7 +50,6 @@ export function parseArgv(args: readonly string[]): ParsedArgv {
   for (let i = 1; i < args.length; i++) {
     const arg = args[i]!;
 
-    // Handle --flag=value form
     const eqIdx = arg.indexOf("=");
     if (eqIdx > 0) {
       const key = arg.slice(0, eqIdx);
@@ -94,16 +71,14 @@ export function parseArgv(args: readonly string[]): ParsedArgv {
     }
 
     if (defs[arg]) {
-      // Boolean flag
       flags[arg] = true;
     } else {
-      // Value flag — consume next arg
       const nextArg = args[i + 1];
       if (nextArg === undefined || nextArg.startsWith("--")) {
         throw new ArgvError(`Flag "${arg}" requires a value.`);
       }
       flags[arg] = nextArg;
-      i++; // skip value
+      i++;
     }
   }
 

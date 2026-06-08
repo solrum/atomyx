@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { createMockSkills, SKILLS_VERSION } from "@atomyx/skills";
-import { runUpdateSkills } from "./update-skills.js";
+import { runUpdateSkills } from "./skills-update.js";
 
 describe("runUpdateSkills", () => {
   it("prints already-up-to-date message and returns 0 when versions match", async () => {

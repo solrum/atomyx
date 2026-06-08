@@ -1,16 +1,22 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { createMockDriverFactory } from "../../features/driver/index.js";
+import { createMockSkills } from "@atomyx/skills";
 import { modules, shortcuts } from "./router.js";
 
 describe("router — modules", () => {
   it("has driver module registered", () => {
-    assert.ok(modules.driver);
-    assert.equal(typeof modules.driver.execute, "function");
+    const ctx = { driverFactory: createMockDriverFactory(), skills: createMockSkills() };
+    const mods = modules(ctx);
+    assert.ok(mods.driver);
+    assert.equal(typeof mods.driver.execute, "function");
   });
 
   it("has skills module registered", () => {
-    assert.ok(modules.skills);
-    assert.equal(typeof modules.skills.execute, "function");
+    const ctx = { driverFactory: createMockDriverFactory(), skills: createMockSkills() };
+    const mods = modules(ctx);
+    assert.ok(mods.skills);
+    assert.equal(typeof mods.skills.execute, "function");
   });
 });
 

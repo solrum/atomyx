@@ -1,16 +1,3 @@
-/**
- * Argv parser for the skills-module subcommands.
- *
- * Grammar:
- *
- *   atomyx <command> [--flag=value | --bool | --help | -h]
- *
- * Commands handled here (skills shortcuts):
- *
- *   init            Copy bundled skills into <target>/.claude/.
- *   update-skills   Update an existing skills install.
- */
-
 export class ArgvError extends Error {
   constructor(message: string) {
     super(message);
@@ -24,11 +11,6 @@ export interface ParsedArgv {
   readonly help: boolean;
 }
 
-/**
- * Flag definitions per command.
- * - `true`  = boolean flag (no value)
- * - `false` = value flag (requires next arg or =value form)
- */
 export const COMMAND_FLAGS: Record<string, Record<string, boolean>> = {
   init: {
     "--target": false,
@@ -53,12 +35,10 @@ export function parseArgv(
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!;
 
-    // --help / -h shortcut
     if (arg === "--help" || arg === "-h") {
       return { command: commandName, flags, help: true };
     }
 
-    // --flag=value form
     const eqIdx = arg.indexOf("=");
     if (eqIdx > 0) {
       const key = arg.slice(0, eqIdx);
@@ -81,7 +61,6 @@ export function parseArgv(
       continue;
     }
 
-    // --flag or -h form
     if (!(arg in defs)) {
       throw new ArgvError(
         `Command "${commandName}" does not accept "${arg}". ` +
@@ -90,13 +69,11 @@ export function parseArgv(
     }
 
     if (defs[arg]) {
-      // Boolean flag
       if (arg in flags) {
         throw new ArgvError(`Flag "${arg}" was specified more than once.`);
       }
       flags[arg] = true;
     } else {
-      // Value flag — consume next arg
       const nextArg = args[i + 1];
       if (nextArg === undefined || nextArg.startsWith("-")) {
         throw new ArgvError(`Flag "${arg}" requires a value.`);

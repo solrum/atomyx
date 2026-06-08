@@ -1,16 +1,14 @@
-/**
- * Driver-module subcommand dispatcher. The unified CLI in
- * `main.ts` strips the `driver` prefix and calls `execute(rest)`
- * from here; direct invocation is also supported for testing.
- */
-
-import { ArgvError, parseArgv, printHelp } from "./argv.js";
-import { runListDevices } from "./commands/list-devices.js";
-import { runScript } from "./commands/run-script.js";
+import { ArgvError, parseArgv, printHelp } from "./driver-argv.js";
+import { runListDevices } from "./driver-list-devices.js";
+import { runScript } from "./driver-run-script.js";
+import type { DriverFactory } from "./driver.contract.js";
 
 const VERSION = "0.1.0";
 
-export async function execute(args: readonly string[]): Promise<void> {
+export async function executeDriver(
+  factory: DriverFactory,
+  args: readonly string[],
+): Promise<void> {
   let argv;
   try {
     argv = parseArgv(args);
@@ -28,7 +26,7 @@ export async function execute(args: readonly string[]): Promise<void> {
       await runListDevices({ json: !!argv.flags["--json"] });
       return;
     case "run":
-      await runScript(argv.flags);
+      await runScript(factory, argv.flags);
       return;
     case "version":
       process.stdout.write(`atomyx ${VERSION}\n`);

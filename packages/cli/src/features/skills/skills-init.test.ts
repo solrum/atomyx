@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { createMockSkills } from "@atomyx/skills";
-import { runInit } from "./init.js";
+import { runInit } from "./skills-init.js";
 
 describe("runInit", () => {
   it("copies files to --target dir and returns 0", async () => {
