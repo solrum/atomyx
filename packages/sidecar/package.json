@@ -25,7 +25,9 @@
     "build": "tsc -p tsconfig.json",
     "build:bundle": "node ./build-bundle.mjs",
     "test": "node --import tsx --test $(find src -name '*.test.ts')",
-    "depcruise": "depcruise --config .dependency-cruiser.cjs src"
+    "depcruise": "depcruise --config .dependency-cruiser.cjs src",
+    "api:check": "api-extractor run",
+    "api:update": "api-extractor run --local"
   },
   "dependencies": {
     "@atomyx/android-driver": "0.1.0",

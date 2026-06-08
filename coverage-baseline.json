@@ -1,0 +1,81 @@
+{
+  "shared": {
+    "statements": 100,
+    "branches": 100,
+    "functions": 100,
+    "lines": 100
+  },
+  "core": {
+    "statements": 100,
+    "branches": 89.04,
+    "functions": 100,
+    "lines": 100
+  },
+  "driver": {
+    "statements": 89.53,
+    "branches": 82.22,
+    "functions": 77.33,
+    "lines": 89.53
+  },
+  "driver-wire": {
+    "statements": 100,
+    "branches": 100,
+    "functions": 100,
+    "lines": 100
+  },
+  "android-driver": {
+    "statements": 40.51,
+    "branches": 89.47,
+    "functions": 57.14,
+    "lines": 40.51
+  },
+  "ios-driver": {
+    "statements": 43.53,
+    "branches": 89.26,
+    "functions": 67.56,
+    "lines": 43.53
+  },
+  "ios-sim-driver": {
+    "statements": 53.29,
+    "branches": 78.26,
+    "functions": 26.78,
+    "lines": 53.29
+  },
+  "mcp": {
+    "statements": 94.2,
+    "branches": 76.47,
+    "functions": 87.5,
+    "lines": 94.2
+  },
+  "script": {
+    "statements": 82.75,
+    "branches": 81.68,
+    "functions": 86.36,
+    "lines": 82.75
+  },
+  "skills": {
+    "statements": 98.48,
+    "branches": 95.83,
+    "functions": 75,
+    "lines": 98.48
+  },
+  "sidecar": {
+    "statements": 60.38,
+    "branches": 87.06,
+    "functions": 74.34,
+    "lines": 60.38
+  },
+  "cli": {
+    "statements": 56.9,
+    "branches": 87.96,
+    "functions": 68.75,
+    "lines": 56.9
+  },
+  "studio": {
+    "statements": 61.18,
+    "branches": 85.83,
+    "functions": 73.07,
+    "lines": 61.18,
+    "_note": "domain+state layers only per apps/studio/.c8rc.json"
+  }
+}

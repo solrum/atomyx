@@ -23,7 +23,9 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "node --import tsx --test $(find src -name '*.test.ts')"
+    "test": "node --import tsx --test $(find src -name '*.test.ts')",
+    "api:check": "api-extractor run",
+    "api:update": "api-extractor run --local"
   },
   "dependencies": {
     "@atomyx/shared": "0.1.0",

@@ -16,14 +16,44 @@
     "build": "(cd shared && npm run build) && for d in core driver driver-wire android-driver ios-driver ios-sim-driver skills script mcp sidecar cli; do (cd packages/$d && [ -f tsconfig.json ] && npm run build) || exit 1; done",
     "test": "(cd shared && npm test) && for d in core driver driver-wire android-driver ios-driver ios-sim-driver skills script mcp sidecar cli; do (cd packages/$d && [ -f tsconfig.json ] && npm test) || exit 1; done && (cd apps/studio && npm test)",
     "test:all": "(cd shared && npm test) && for d in core driver driver-wire android-driver ios-driver ios-sim-driver skills script mcp cli; do (cd packages/$d && [ -f tsconfig.json ] && npm test) || exit 1; done && (cd apps/studio && npm test)",
-    "depcruise": "depcruise --config .dependency-cruiser.cjs packages/"
+    "typecheck": "tsc --noEmit && (cd apps/studio && npm run typecheck)",
+    "lint": "(cd apps/studio && npm run lint)",
+    "lint:feature-api": "(cd apps/studio && npm run lint:feature-api)",
+    "depcruise": "depcruise --config .dependency-cruiser.cjs packages/",
+    "setup": "npm ci && husky install",
+    "prepare": "husky install",
+    "lint:prefix": "node scripts/lint-filename-prefix.mjs",
+    "lint:phrases": "node scripts/lint-banned-phrases.mjs",
+    "lint:doc-paths": "node scripts/lint-doc-paths.mjs",
+    "wire:check": "node scripts/snapshot-wire-schema.mjs --check",
+    "coverage:check": "node scripts/check-coverage-baseline.mjs",
+    "api:check": "npm run api:check --workspaces --if-present",
+    "check:fast": "npm run lint && npm run typecheck && npm run lint:prefix && npm run lint:phrases",
+    "check": "npm run lint && npm run typecheck && npm run depcruise && npm run lint:feature-api && npm run lint:prefix && npm run lint:phrases && npm run lint:doc-paths && npm run test && npm run coverage:check && npm run api:check && npm run wire:check && npm run audit && npm run license:check",
+    "license:check": "node scripts/lint-license-allowlist.mjs",
+    "audit": "npm audit --omit=dev --audit-level=critical",
+    "release": "changeset version && npm run check && changeset publish"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,mjs,js}": [
+      "prettier --check"
+    ],
+    "*.md": [
+      "prettier --check"
+    ]
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.0",
+    "@microsoft/api-extractor": "^7.58.7",
     "@types/node": "^20.0.0",
+    "husky": "^9.0.0",
+    "license-checker": "^25.0.1",
+    "lint-staged": "^15.0.0",
+    "prettier": "^3.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.3.0"
   },

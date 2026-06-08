@@ -1,0 +1,62 @@
+{
+  "$ref": "#/definitions/ScenarioDefinition",
+  "definitions": {
+    "ScenarioDefinition": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string",
+          "pattern": "^atomyx-scenario\\/v\\d+$",
+          "description": "Scenario format version. Defaults to 'atomyx-scenario/v1' when omitted."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable scenario name. Shown in run reports and the Studio scenario view."
+        },
+        "description": {
+          "type": "string",
+          "description": "Longer description of what this scenario verifies. Surfaced in reports and the Studio detail view."
+        },
+        "scripts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "description": "Ordered list of script paths to run. Paths are resolved relative to the scenario file. Each script runs in its own clean execution context (no shared variables / captures). Example: ['flows/login.yml', 'flows/checkout.yml']."
+        },
+        "onFailure": {
+          "type": "string",
+          "enum": [
+            "stop",
+            "continue"
+          ],
+          "description": "Behaviour when a script in the scenario fails. `stop` (default) aborts the scenario and marks remaining scripts as skipped. `continue` runs every script regardless and reports an aggregate result — useful when surfacing all failures in one regression sweep."
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Variables exposed to every child script. A child script's own `env` overrides scenario `env` per-key, so scripts remain runnable standalone with the same variable names."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Tags for filtering and organizing scenarios. Examples: 'smoke', 'regression', 'release-candidate'."
+        }
+      },
+      "required": [
+        "name",
+        "scripts"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
