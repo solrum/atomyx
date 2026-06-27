@@ -174,8 +174,13 @@ export class Orchestra {
    * compile → scroll-into-view → obscurement check → coordinate
    * tap. Returns `ActionResult` — never throws on action-level
    * failure, only on infrastructure errors.
+   *
+   * Set `opts.scrollToFind = false` to skip the scroll-into-view
+   * stage. Useful when the caller knows the element is already on
+   * screen and wants to avoid the hierarchy round-trip overhead of
+   * the scroll controller. Defaults to `true`.
    */
-  async tap(selector: Selector, opts?: CallOptions): Promise<ActionResult> {
+  async tap(selector: Selector, opts?: CallOptions & { scrollToFind?: boolean }): Promise<ActionResult> {
     const prepared = await this.prepareSelectorForAction(selector, opts);
     if (!prepared.ok) {
       // Keyboard-gate at failure: when obscurement flags a node that
@@ -249,31 +254,15 @@ export class Orchestra {
     const callOpts: CallOptions = { signal: opts.signal };
     const prepared = await this.prepareSelectorForAction(selector, callOpts);
     if (!prepared.ok) return prepared.result;
-    // Inspect the resolved field's current content BEFORE tapping.
-    // The pre-tap tree still holds the honest "what's in the field
-    // right now" snapshot — typing/clearing will race against a
-    // fresh hierarchy fetch otherwise. `hasInitialContent` lets us
-    // skip the erase roundtrip entirely when the field is empty,
-    // which is the common case for login / form screens.
-    const hasInitialContent = fieldHasContent(prepared.cursor);
     await this.driver.tap(prepared.point, callOpts);
-    // No explicit focus wait here. Driver adapters are responsible
-    // for their own keyboard / focus synchronization before a
-    // subsequent inputText or eraseText lands — Orchestra trusts
-    // the contract rather than duplicating it platform-agnostically.
-    //
-    // Conditional erase — only when the field already holds
-    // content. Skipping the no-op erase on empty fields avoids two
-    // observable side effects:
-    //   1. Keyboard flicker when the platform clear primitive fires
-    //      keystrokes that the system IME renders.
-    //   2. An extra driver round-trip whose wall-clock cost compounds
-    //      across a multi-field form.
-    if (
-      opts.clearFirst !== false &&
-      hasInitialContent &&
-      this.driver.capabilities.canEraseText
-    ) {
+    // Delegate the empty/non-empty decision to the driver's clear
+    // chain. A tree-level `text === label` check here is wrong on
+    // Flutter / RN, which mirror the user value into the label
+    // attribute after typing — a filled field then looks identical
+    // to an empty placeholder. The driver chain reads the focused
+    // node directly and exits in ~50 ms when there is nothing to
+    // clear, so the round-trip cost is acceptable.
+    if (opts.clearFirst !== false && this.driver.capabilities.canEraseText) {
       await this.driver.eraseText(999, callOpts);
     }
     await this.driver.inputText(text, callOpts);
@@ -531,7 +520,7 @@ export class Orchestra {
    */
   private async prepareSelectorForAction(
     selector: Selector,
-    opts?: CallOptions,
+    opts?: CallOptions & { scrollToFind?: boolean },
   ): Promise<
     | { ok: true; point: Point; cursor: TreeCursor; resolvedBy: string | undefined }
     | { ok: false; result: ActionResult }
@@ -539,20 +528,34 @@ export class Orchestra {
     const filter = compileSelector(selector);
 
     // Scroll into view (includes scroll-search for virtualized lists
-    // and positional inset-aware centering).
+    // and positional inset-aware centering). Skipped when the caller
+    // sets scrollToFind=false — useful when the element is already
+    // known to be on screen and the hierarchy round-trips of the
+    // scroll controller would add unnecessary latency.
     let cursor: TreeCursor;
-    try {
-      cursor = await this.scroll.ensureVisible(filter, opts);
-    } catch (err) {
-      if (err instanceof ScrollUnreachableError) {
+    if (opts?.scrollToFind !== false) {
+      try {
+        cursor = await this.scroll.ensureVisible(filter, opts);
+      } catch (err) {
+        if (err instanceof ScrollUnreachableError) {
+          return {
+            ok: false,
+            result: failResult(
+              `could not scroll element into view: ${err.message}`,
+            ),
+          };
+        }
+        throw err;
+      }
+    } else {
+      const match = (await this.finder.find(filter, opts))[0];
+      if (!match) {
         return {
           ok: false,
-          result: failResult(
-            `could not scroll element into view: ${err.message}`,
-          ),
+          result: failResult("element not found (scroll disabled via scrollToFind=false)"),
         };
       }
-      throw err;
+      cursor = match;
     }
 
     // Obscurement check against the SAME tree the cursor points
@@ -639,22 +642,6 @@ function matches(value: string | undefined, pattern: string | RegExp): boolean {
 
 function pointStr(p: Point): string {
   return `(${Math.round(p.x)},${Math.round(p.y)})`;
-}
-
-/**
- * True when the field at `cursor` currently holds user-entered
- * content, as opposed to an empty field rendering its placeholder.
- * Cross-platform rule: Flutter / native iOS mirror the label into
- * `text` when value is empty (so text === label == placeholder
- * rendered as content). Anything else indicates real content.
- */
-function fieldHasContent(cursor: TreeCursor): boolean {
-  const text = getAttr(cursor.node, AttrKeys.Text) ?? "";
-  if (text === "") return false;
-  const label = getAttr(cursor.node, AttrKeys.Label) ?? "";
-  // Placeholder-as-text mirror: empty field showing its label.
-  if (text === label) return false;
-  return true;
 }
 
 // Keyboard-gate budget for `tap` — how long to wait for the driver's

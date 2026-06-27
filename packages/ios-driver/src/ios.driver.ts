@@ -15,7 +15,9 @@ import type {
   Size,
   TreeNode,
 } from "@atomyx/driver";
-import { TcpClient } from "./tcp-client.js";
+import { TcpClient, TcpClientError } from "./tcp-client.js";
+import { ClearTextFailedError } from "./clear/index.js";
+import type { ClearFailureDiagnostic } from "./clear/index.js";
 import { Iproxy } from "./iproxy.js";
 import { XctestLauncher } from "./xctest-launcher.js";
 import { normalizeIosTree, type IosRawElement } from "./tree-normalizer.js";
@@ -400,15 +402,41 @@ export class IosDriver implements Driver {
   }
 
   async eraseText(count: number, opts?: CallOptions): Promise<void> {
-    // Swift driver has `clearFocusedInput` which bulk-sends
-    // delete keys to the focused field. The arg name on the
-    // wire is `maxDeletes` — Swift caps it at 500 to avoid
-    // runaway repeat counts.
-    await this.tcp.call(
-      "clearFocusedInput",
-      { maxDeletes: count },
-      { signal: opts?.signal },
-    );
+    // Swift driver sends delete keystrokes to the focused field via a 4-strategy
+    // priority chain. maxDeletes is capped at 500 on the Swift side.
+    // When all strategies fail, the runner returns {ok:false} with a JSON-encoded
+    // diagnostic in the error string; we re-throw as ClearTextFailedError so
+    // callers can inspect which strategies ran and what value remained.
+    try {
+      await this.tcp.call(
+        "clearFocusedInput",
+        { maxDeletes: count },
+        { signal: opts?.signal },
+      );
+    } catch (err) {
+      if (err instanceof TcpClientError && err.code === "driver-error") {
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(err.message);
+        } catch {
+          throw err;
+        }
+        if (
+          parsed !== null &&
+          typeof parsed === "object" &&
+          (parsed as Record<string, unknown>)["code"] === "clear-text-failed"
+        ) {
+          const p = parsed as ClearFailureDiagnostic & { code: string };
+          throw new ClearTextFailedError({
+            strategiesTried: p.strategiesTried ?? [],
+            lastValue: p.lastValue ?? null,
+            focusedElementType: p.focusedElementType ?? "unknown",
+            hasHardwareKeyboard: p.hasHardwareKeyboard ?? false,
+          });
+        }
+      }
+      throw err;
+    }
   }
 
   async pressKey(key: KeyCode, opts?: CallOptions): Promise<KeyResult> {

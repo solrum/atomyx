@@ -265,18 +265,21 @@ describe("Orchestra.inputText", () => {
     assert.equal(driver.calls.filter((c) => c.method === "tap").length, 1);
   });
 
-  it("skips eraseText when the field is already empty (placeholder only)", async () => {
-    // Empty email field: `text` mirrors the hint/label, no user
-    // content. Orchestra should NOT fire an eraseText — on iOS
-    // this causes keyboard flicker for zero benefit (nothing to
-    // delete).
+  it("always issues eraseText when clearFirst is on, regardless of pre-tap tree content", async () => {
+    // Orchestra cannot trust pre-tap `text` / `label` to decide
+    // whether the field holds user content. Flutter and RN mirror
+    // the user value into the label after typing, so a filled
+    // field is indistinguishable from a placeholder-rendering
+    // empty one. Delegating to the driver's clear chain is the
+    // only way to be correct on every framework; the chain itself
+    // short-circuits when the focused node reads empty.
     const driver = new MockDriver();
     driver.stageHierarchyRepeated(loginTree(), 5);
     const clock = new FakeClock();
     const orchestra = new Orchestra({ driver, clock });
 
     await orchestra.inputText({ id: "email" }, "hello");
-    assert.equal(driver.calls.filter((c) => c.method === "eraseText").length, 0);
+    assert.equal(driver.calls.filter((c) => c.method === "eraseText").length, 1);
   });
 
   it("issues eraseText when the field already holds user content", async () => {

@@ -14,6 +14,7 @@ import type {
 } from "@atomyx/driver";
 import type { TreeNode } from "@atomyx/driver";
 import { adbForward, adbForwardRemove } from "./adb.js";
+import { ClearTextError } from "./clear/index.js";
 import { HttpClient } from "./http-client.js";
 import { type AndroidRawElement, normalizeAndroidTree } from "./tree-normalizer.js";
 
@@ -346,13 +347,28 @@ export class AndroidDriver implements Driver {
   }
 
   async eraseText(_count: number, opts?: CallOptions): Promise<void> {
-    // APK's native `/actions/clear_focused_input` bulk-deletes the
-    // focused field in one RPC. The `count` parameter is ignored:
-    // the route clears the entire current value regardless (good
-    // enough for the framework's "erase before type" flow — any
-    // caller that needed partial delete would use pressKey(delete)
-    // in a loop explicitly).
-    await this.http.post("/actions/clear_focused_input", {}, { signal: opts?.signal });
+    // APK's `/actions/clear_focused_input` clears the focused field via
+    // a four-strategy chain. `count` is ignored — the route always
+    // clears the entire current value. On full failure the APK returns
+    // `ok: false`; we throw ClearTextError so callers can distinguish a
+    // clear failure from a transport error.
+    const res = await this.http.post<{
+      ok: boolean;
+      strategiesTried?: string[];
+      lastValue?: string;
+      focusedNodeDesc?: string;
+      screenWidth?: number;
+      screenHeight?: number;
+    }>("/actions/clear_focused_input", {}, { signal: opts?.signal });
+    if (!res.ok) {
+      throw new ClearTextError({
+        strategiesTried: res.strategiesTried ?? [],
+        lastValue: res.lastValue ?? "",
+        focusedNodeDesc: res.focusedNodeDesc ?? "unknown",
+        screenWidth: res.screenWidth ?? 0,
+        screenHeight: res.screenHeight ?? 0,
+      });
+    }
   }
 
   async pressKey(key: KeyCode, opts?: CallOptions): Promise<KeyResult> {

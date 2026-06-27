@@ -1,12 +1,15 @@
 import type { CallOptions, Driver, Size } from "../driver/driver.port.js";
+import type { TreeNode } from "../tree/tree-node.js";
 import type { Clock } from "@atomyx/core/infra";
 import type { Logger } from "@atomyx/core/infra";
 import { NoopLogger } from "@atomyx/core/infra";
 import type { ElementFilter } from "../filters/element-filter.js";
+import { fromTree } from "../filters/element-filter.js";
 import type { TreeCursor } from "../tree/tree-cursor.js";
 import { AttrKeys, getAttr } from "../tree/tree-node.js";
 import { parseBounds, boundsCenter, type Bounds } from "../tree/bounds.js";
 import { Finder } from "../finder/finder.js";
+import { hashVisibleLeaves, countLeaves, maxLeafBoundsBottom } from "./tree-signature.js";
 
 /**
  * Cross-platform scroll-into-view controller.
@@ -46,6 +49,15 @@ export interface ScrollControllerDeps {
   readonly clock: Clock;
   readonly logger?: Logger;
 }
+
+// Leaf-count threshold and fractional height threshold for the
+// viewport pre-check. A tree with fewer than this many leaves AND
+// whose deepest leaf sits above this fraction of the screen height
+// is treated as thin: its scroll-search budget is capped to avoid
+// burning swipes on a non-scrollable or lazily-loading container.
+const THIN_TREE_LEAF_THRESHOLD = 5;
+const THIN_TREE_HEIGHT_FRACTION = 0.9;
+const THIN_TREE_BUDGET = 2;
 
 export interface ScrollControllerOptions {
   /**
@@ -197,27 +209,47 @@ export class ScrollController {
   }
 
   /**
-   * Alternating-direction probe. Swipes UP for budget iterations,
-   * then DOWN for budget iterations, polling the filter between
-   * each swipe. Returns the first cursor that matches, or
-   * `undefined` if both budgets are exhausted.
+   * Alternating-direction probe with tree-signature saturation
+   * detection. Swipes UP then DOWN, polling the filter after each
+   * swipe. Breaks early when two consecutive hierarchy snapshots
+   * hash identically — this signals either a scroll boundary or a
+   * non-scrollable container, so continuing to swipe would waste
+   * round-trips.
+   *
+   * Viewport pre-check: when the initial tree has fewer than
+   * THIN_TREE_LEAF_THRESHOLD leaves AND all leaves sit above
+   * THIN_TREE_HEIGHT_FRACTION of the screen, the effective budget
+   * is capped at THIN_TREE_BUDGET. A few swipes are still allowed
+   * because lazy-loaded lists can start sparse.
    */
   private async scrollSearch(
     filter: ElementFilter,
     screen: Size,
     opts?: CallOptions,
   ): Promise<TreeCursor | undefined> {
-    for (let i = 0; i < this.scrollSearchBudget; i++) {
-      await this.swipeCenter(screen, "up", opts);
-      await this.deps.clock.sleep(this.settleWaitMs);
-      const found = (await this.finder.find(filter, opts))[0];
-      if (found) return found;
-    }
-    for (let i = 0; i < this.scrollSearchBudget; i++) {
-      await this.swipeCenter(screen, "down", opts);
-      await this.deps.clock.sleep(this.settleWaitMs);
-      const found = (await this.finder.find(filter, opts))[0];
-      if (found) return found;
+    let currentTree: TreeNode = await this.deps.driver.hierarchy(opts);
+
+    // Viewport pre-check: thin tree → reduced budget.
+    const leafCount = countLeaves(currentTree);
+    const maxBottom = maxLeafBoundsBottom(currentTree);
+    const effectiveBudget =
+      leafCount < THIN_TREE_LEAF_THRESHOLD &&
+      maxBottom < screen.height * THIN_TREE_HEIGHT_FRACTION
+        ? THIN_TREE_BUDGET
+        : this.scrollSearchBudget;
+
+    for (const direction of ["up", "down"] as const) {
+      let prevSig = hashVisibleLeaves(currentTree);
+      for (let i = 0; i < effectiveBudget; i++) {
+        await this.swipeCenter(screen, direction, opts);
+        await this.deps.clock.sleep(this.settleWaitMs);
+        currentTree = await this.deps.driver.hierarchy(opts);
+        const found = filter(fromTree(currentTree))[0];
+        if (found) return found;
+        const newSig = hashVisibleLeaves(currentTree);
+        if (newSig === prevSig) break; // boundary or non-scrollable
+        prevSig = newSig;
+      }
     }
     return undefined;
   }

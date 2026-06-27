@@ -3,6 +3,7 @@ package dev.atomyx.agent.control
 import android.accessibilityservice.AccessibilityService
 import android.os.Bundle
 import android.view.accessibility.AccessibilityNodeInfo
+import dev.atomyx.agent.control.clear.ClearTextChain
 
 /**
  * Types text into the currently focused input field using a three-strategy
@@ -170,51 +171,10 @@ class KeyboardTyper(
 
     /**
      * Best-effort clear of the currently focused input field before typing.
-     * Two strategies:
-     *
-     *   1. ACTION_SET_TEXT(""): fastest, works for native Android EditText and
-     *      Flutter inputs that proxy through Semantics.
-     *
-     *   2. Backspace via on-screen keypad: when ACTION_SET_TEXT is rejected
-     *      (Flutter custom inputs without Semantics text-edit support), tap
-     *      an on-screen backspace key that many character times.
-     *
-     * Returns silently. Failure does NOT abort the type.
+     * Delegates to ClearTextChain. Failure does NOT abort the type.
      */
     private fun clearFocusedFieldBestEffort(perKeyDelayMs: Long) {
-        val root = service.rootInActiveWindow ?: return
-        val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return
-        try {
-            // Strategy 1: ACTION_SET_TEXT
-            try {
-                val args = Bundle().apply {
-                    putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "")
-                }
-                if (focused.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) {
-                    return
-                }
-            } catch (_: Exception) {}
-
-            // Strategy 2: backspace via on-screen keypad
-            val existing = focused.text?.toString() ?: ""
-            if (existing.isEmpty()) return
-
-            uiTree.markDirty()
-            val summary = uiTree.dumpCompact()
-            val backspace = findBackspaceKey(summary) ?: return
-            // Tap backspace one extra time as a safety margin (some inputs
-            // append a leading char during focus animation).
-            val taps = existing.length + 1
-            for (i in 0 until taps) {
-                gestures.tapAt(
-                    backspace.bounds.left + (backspace.bounds.right - backspace.bounds.left) / 2f,
-                    backspace.bounds.top + (backspace.bounds.bottom - backspace.bounds.top) / 2f,
-                )
-                try { Thread.sleep(perKeyDelayMs) } catch (_: InterruptedException) {}
-            }
-        } finally {
-            try { focused.recycle() } catch (_: Exception) {}
-        }
+        ClearTextChain(service, uiTree, gestures).clearBestEffort(perKeyDelayMs)
     }
 
     /**
