@@ -1,7 +1,9 @@
 import Foundation
 import CoreGraphics
 
-/// Long-press at raw point coordinates for a given duration.
+/// Long-press at raw point coordinates for a given duration, in
+/// device-global point space. The synthesizer dispatches to the
+/// currently frontmost app — no `launchApp` required.
 ///
 /// Request args:
 ///   - `x`, `y` (required, numeric)
@@ -10,9 +12,8 @@ import CoreGraphics
 ///     `up` waypoints; the coordinate backend maps this to
 ///     `XCUICoordinate.press(forDuration:)`.
 ///
-/// Requires a tracked app (for coordinate space). Gesture
-/// dispatch routes through the shared `EventSynthesizer` so
-/// every backend consumes the same waypoint shape.
+/// Gesture dispatch routes through the shared `EventSynthesizer`
+/// so every backend consumes the same waypoint shape.
 final class LongPressAtCommand: CommandHandler {
     let type = "longPressAt"
 
@@ -29,18 +30,16 @@ final class LongPressAtCommand: CommandHandler {
 
     func handle(_ request: Request, bridge: XCUIBridge, state: DriverState) -> Response {
         _ = bridge
+        _ = state
         guard let x = CommandArgs.numeric(request.args["x"]),
               let y = CommandArgs.numeric(request.args["y"]) else {
             return .error(id: request.id, message: "missing x/y (numbers)")
-        }
-        guard let app = state.currentApp else {
-            return .error(id: request.id, message: "no app launched — call launchApp first")
         }
 
         let durationMs = CommandArgs.numeric(request.args["durationMs"]) ?? 800
         let path = Self.buildPath(x: x, y: y, durationMs: durationMs)
         do {
-            try synthesizer.dispatch(pointers: [path], in: app)
+            try synthesizer.dispatch(pointers: [path])
         } catch {
             return .error(id: request.id, message: "longPress dispatch failed: \(error)")
         }

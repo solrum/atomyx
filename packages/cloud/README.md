@@ -12,15 +12,13 @@ to manage the infrastructure side.
 
 ## Planned packages
 
-- `packages/cloud/` — `@atomyx/cloud` — module main: device
-  registry, worker pool abstractions, scheduling primitives.
-- `packages/worker/` — `@atomyx/cloud-worker` — long-running
-  worker process that hosts a driver instance and reports up to
-  an orchestrator.
-- `packages/orchestrator/` — `@atomyx/cloud-orchestrator` —
-  centralized scheduler that distributes test runs to workers.
-- `packages/cli/` — `@atomyx/cloud-cli` — `atomyx-cloud` binary
-  for ops + admin.
+- `@atomyx/cloud` — module main: device registry, worker pool
+  abstractions, scheduling primitives.
+- `@atomyx/cloud-worker` — long-running worker process that hosts
+  a driver instance and reports up to an orchestrator.
+- `@atomyx/cloud-orchestrator` — centralized scheduler that
+  distributes test runs to workers.
+- `@atomyx/cloud-cli` — `atomyx-cloud` binary for ops + admin.
 
 ## Why a separate module
 

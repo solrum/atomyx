@@ -11,9 +11,18 @@
  *   - DEFAULT_COMMANDS    → built-in command registry
  */
 
-export { parseScript } from "./parser/index.js";
-export { ScriptRunner } from "./runner/index.js";
-export type { ScriptRunnerDeps, ScriptResult, StepResult } from "./runner/index.js";
+export { parseScript, parseScenario, isScenarioYaml } from "./parser/index.js";
+export { ScriptRunner, ScenarioRunner, memoryScriptLoader } from "./runner/index.js";
+export type {
+  ScriptRunnerDeps,
+  ScriptResult,
+  StepResult,
+  ScenarioRunnerDeps,
+  ScenarioResult,
+  ScenarioScriptResult,
+  ScenarioEvent,
+  ScriptRunStatus,
+} from "./runner/index.js";
 export { DEFAULT_COMMANDS } from "./commands/index.js";
 export {
   createCapture,

@@ -1,0 +1,68 @@
+format: atomyx/v1
+appId: dev.atomyx.demo
+name: API capture + assertApi
+description: |
+  Logs in via the UI while the proxy captures the auth round-trip,
+  then validates the response with assertApi (status + body
+  assertions) and pulls the access token out with extract for the
+  next request.
+tags:
+  - api
+  - capture
+  - assertApi
+proxy: required
+env:
+  email: qa+capture@atomyx.test
+  password: super-secret
+  expectedUserId: "u_42"
+---
+- launchApp
+- waitFor: "Sign in"
+
+- type:
+    into:
+      id: email
+    text: ${email}
+- type:
+    into:
+      id: password
+    text: ${password}
+
+# Arm the proxy to keep the next matching request, then drive the
+# UI action that triggers it. The capture step itself does not
+# wait for the response — the next assertApi against the same
+# variable will block until the round-trip lands or the runner
+# times out.
+- capture: "POST /api/v1/auth/login as: loginRsp"
+- tap: "Login"
+
+# Validate the captured request: status must be 200 and the body
+# must carry an access_token + the user id we expect.
+- assertApi:
+    from: loginRsp
+    status: 200
+    body:
+      "$.user.id": ${expectedUserId}
+      "$.user.email": ${email}
+      "$.access_token": present
+
+# Pull the token out so the next step can use it.
+- extract:
+    from: loginRsp
+    values:
+      accessToken: $.access_token
+      sessionId: $.session.id
+
+# Now capture the second hop and assert the dashboard payload.
+- capture: "GET /api/v1/me/dashboard as: dashboardRsp"
+- waitFor:
+    text: "Dashboard"
+    timeout: 5000
+- assertApi:
+    from: dashboardRsp
+    status: 200
+    body:
+      "$.notifications.unread": present
+      "$.user.session_id": ${sessionId}
+
+- screenshot: dashboard-loaded

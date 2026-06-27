@@ -185,15 +185,30 @@ export class XctestLauncher {
       return fromEnv;
     }
 
-    // Walk up from this file to find platforms/ios-agent/.
-    // `import.meta.url` points at the compiled file inside dist/;
-    // the repo root is a few levels up — stop at the first
-    // ancestor that contains a `platforms/ios-agent` directory.
-    let dir = path.dirname(new URL(import.meta.url).pathname);
-    for (let i = 0; i < 6; i++) {
-      const candidate = path.join(dir, "platforms", "ios-agent");
-      if (fs.existsSync(candidate)) return candidate;
-      dir = path.dirname(dir);
+    // Walk up looking for platforms/ios-agent/. Try every plausible
+    // anchor: this module's URL (ESM source build), the entry
+    // script path (CJS bundle, where import.meta.url is unreliable),
+    // and finally the process cwd.
+    const anchors: string[] = [];
+    try {
+      anchors.push(path.dirname(new URL(import.meta.url).pathname));
+    } catch {
+      // import.meta.url is undefined in CJS bundles.
+    }
+    if (process.argv[1]) {
+      anchors.push(path.dirname(process.argv[1]));
+    }
+    anchors.push(process.cwd());
+
+    for (const start of anchors) {
+      let dir = start;
+      for (let i = 0; i < 8; i++) {
+        const candidate = path.join(dir, "platforms", "ios-agent");
+        if (fs.existsSync(candidate)) return candidate;
+        const parent = path.dirname(dir);
+        if (parent === dir) break;
+        dir = parent;
+      }
     }
 
     throw new XctestLauncherError(
@@ -210,9 +225,24 @@ export class XctestLauncher {
   private isSourceNewer(projectDir: string, runnerApp: string): boolean {
     try {
       const productMtime = fs.statSync(runnerApp).mtimeMs;
+
+      // pbxproj regeneration (e.g. after BUNDLE_ID / signing
+      // changes) must force a rebuild — the .swift files may be
+      // untouched but the bundle identifier and signing settings
+      // baked into Info.plist change with the project file.
+      const pbxproj = path.join(
+        projectDir,
+        "AtomyxDriver.xcodeproj",
+        "project.pbxproj",
+      );
+      if (fs.existsSync(pbxproj)) {
+        if (fs.statSync(pbxproj).mtimeMs > productMtime) return true;
+      }
+
       const srcDirs = [
         path.join(projectDir, "Tests"),
         path.join(projectDir, "Sources"),
+        path.join(projectDir, "App"),
       ];
 
       for (const dir of srcDirs) {
@@ -238,7 +268,22 @@ export class XctestLauncher {
   }
 
   private signOverrides(): string[] {
-    if (this.opts.kind !== "device") return [];
+    if (this.opts.kind !== "device") {
+      // Simulator does not use provisioning profiles. A contributor
+      // whose .xcodeproj was generated with physical-device settings
+      // baked in (Manual signing + wildcard profile from their
+      // `device.env`) would otherwise hit install failures on
+      // simulator. Zero out every signing-related setting so the
+      // simulator build ignores whatever the generator wrote.
+      return [
+        "CODE_SIGN_STYLE=Automatic",
+        "CODE_SIGNING_REQUIRED=NO",
+        "CODE_SIGNING_ALLOWED=NO",
+        "CODE_SIGN_IDENTITY=",
+        "PROVISIONING_PROFILE_SPECIFIER=",
+        "DEVELOPMENT_TEAM=",
+      ];
+    }
     const team = this.opts.devTeam;
     if (!team) {
       throw new XctestLauncherError(

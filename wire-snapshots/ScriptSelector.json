@@ -1,0 +1,38 @@
+{
+  "$ref": "#/definitions/ScriptSelector",
+  "definitions": {
+    "ScriptSelector": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Match element by its visible text (the string the user sees). Use for buttons, labels, menu items. YAML shorthand: a bare string like `tap: \"Login\"` expands to `{ text: \"Login\", label: \"Login\" }` for Flutter parity."
+        },
+        "id": {
+          "type": "string",
+          "description": "Match element by its stable resource id (Android `resource-id`) or accessibility id (iOS). Preferred when the app exposes them — survives i18n and copy changes. Example: `id: com.app:id/login_btn`."
+        },
+        "label": {
+          "type": "string",
+          "description": "Match element by its accessibility label. Flutter exposes visible text as `label`; native Android/iOS use `text`. Setting both lets priority broadening try each platform's convention without the author knowing which."
+        },
+        "hint": {
+          "type": "string",
+          "description": "Match element by its input hint / placeholder. Use for text fields whose only identifier is the placeholder text (e.g. `hint: \"Search products\"`)."
+        },
+        "role": {
+          "type": "string",
+          "description": "Constrain the match to a semantic role. Common values: 'button', 'text-field', 'image', 'link', 'checkbox', 'switch', 'container'. Narrow broad text matches — e.g. `{ text: 'Home', role: 'button' }` avoids matching a 'Home' menu item."
+        },
+        "nth": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "When multiple elements match, pick the nth one (0-indexed). Use sparingly — `nth` is brittle under layout changes. Prefer adding `role` or a more specific `text`."
+        }
+      },
+      "additionalProperties": false,
+      "description": "Element selector. Every field is optional, but at least one must be set for the selector to be useful. In YAML, a bare string shorthand — e.g. `tap: \"Login\"` — is equivalent to `tap: { text: \"Login\", label: \"Login\" }`."
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

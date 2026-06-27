@@ -37,30 +37,44 @@ export class HttpClient {
     return `${this.opts.baseUrl}${path.startsWith("/") ? path : "/" + path}`;
   }
 
-  async get<T = unknown>(path: string, timeoutMs?: number): Promise<T> {
-    return this.request<T>("GET", path, undefined, timeoutMs);
+  async get<T = unknown>(
+    path: string,
+    opts?: { timeoutMs?: number; signal?: AbortSignal },
+  ): Promise<T> {
+    return this.request<T>("GET", path, undefined, opts);
   }
 
   async post<T = unknown>(
     path: string,
     body: unknown,
-    timeoutMs?: number,
+    opts?: { timeoutMs?: number; signal?: AbortSignal },
   ): Promise<T> {
-    return this.request<T>("POST", path, body, timeoutMs);
+    return this.request<T>("POST", path, body, opts);
   }
 
   private async request<T>(
     method: "GET" | "POST",
     path: string,
     body: unknown,
-    timeoutMs?: number,
+    opts?: { timeoutMs?: number; signal?: AbortSignal },
   ): Promise<T> {
     const url = this.url(path);
+    const timeoutMs = opts?.timeoutMs ?? this.opts.defaultTimeoutMs ?? 10_000;
+    // Merge the optional external signal with our internal timeout
+    // controller. Either path (external abort OR per-request
+    // timeout) aborts the in-flight fetch. The external signal's
+    // reason is preserved so AbortError propagation upstream stays
+    // honest about WHY the request was cancelled.
     const controller = new AbortController();
-    const timer = setTimeout(
-      () => controller.abort(),
-      timeoutMs ?? this.opts.defaultTimeoutMs ?? 10_000,
-    );
+    const onExternalAbort = () => controller.abort(opts?.signal?.reason);
+    if (opts?.signal) {
+      if (opts.signal.aborted) {
+        controller.abort(opts.signal.reason);
+      } else {
+        opts.signal.addEventListener("abort", onExternalAbort, { once: true });
+      }
+    }
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const res = await fetch(url, {
         method,
@@ -92,8 +106,14 @@ export class HttpClient {
       if (err instanceof HttpClientError) throw err;
       const e = err as Error;
       if (e.name === "AbortError") {
+        // Re-throw the external signal's AbortError verbatim so
+        // callers can detect intentional cancellation distinctly
+        // from a transport-side timeout.
+        if (opts?.signal?.aborted) {
+          throw opts.signal.reason ?? e;
+        }
         throw new HttpClientError(
-          `${method} ${path} timed out after ${timeoutMs ?? this.opts.defaultTimeoutMs ?? 10_000}ms`,
+          `${method} ${path} timed out after ${timeoutMs}ms`,
           url,
         );
       }
@@ -103,6 +123,9 @@ export class HttpClient {
       );
     } finally {
       clearTimeout(timer);
+      if (opts?.signal) {
+        opts.signal.removeEventListener("abort", onExternalAbort);
+      }
     }
   }
 }

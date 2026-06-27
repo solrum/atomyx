@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./src/domain" },
+    { "path": "./src/state" },
+    { "path": "./src/platform" },
+    { "path": "./src/ui" },
+    { "path": "./tsconfig.composition.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
+}

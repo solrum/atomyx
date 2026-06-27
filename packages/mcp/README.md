@@ -32,7 +32,7 @@ per-tool contract.
 
 No business logic lives in the tool files — tools compose the
 `Orchestra` pipeline (scroll-into-view, obscurement, priority
-broadening, observation-driven wait primitives) that lives in
+broadening, driver-side wait primitives) that lives in
 `@atomyx/driver`.
 
 ## Usage

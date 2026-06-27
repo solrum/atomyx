@@ -1,4 +1,5 @@
 import type {
+  CallOptions,
   Driver,
   Gesture,
   KeyCode,
@@ -138,18 +139,18 @@ export class Orchestra {
   // ── Tree inspection ──────────────────────────────────────────
 
   /** Current UI hierarchy as a canonical `TreeNode`. */
-  async hierarchy(): Promise<TreeNode> {
-    return this.driver.hierarchy();
+  async hierarchy(opts?: CallOptions): Promise<TreeNode> {
+    return this.driver.hierarchy(opts);
   }
 
   /** Single-shot find. Returns all matches of the compiled selector. */
-  async find(selector: Selector): Promise<TreeCursor[]> {
-    return this.finder.find(compileSelector(selector));
+  async find(selector: Selector, opts?: CallOptions): Promise<TreeCursor[]> {
+    return this.finder.find(compileSelector(selector), opts);
   }
 
   /** Single-shot find, first match or null. */
-  async findOne(selector: Selector): Promise<TreeCursor | null> {
-    return this.finder.findOne(compileSelector(selector));
+  async findOne(selector: Selector, opts?: CallOptions): Promise<TreeCursor | null> {
+    return this.finder.findOne(compileSelector(selector), opts);
   }
 
   /**
@@ -173,9 +174,14 @@ export class Orchestra {
    * compile → scroll-into-view → obscurement check → coordinate
    * tap. Returns `ActionResult` — never throws on action-level
    * failure, only on infrastructure errors.
+   *
+   * Set `opts.scrollToFind = false` to skip the scroll-into-view
+   * stage. Useful when the caller knows the element is already on
+   * screen and wants to avoid the hierarchy round-trip overhead of
+   * the scroll controller. Defaults to `true`.
    */
-  async tap(selector: Selector): Promise<ActionResult> {
-    const prepared = await this.prepareSelectorForAction(selector);
+  async tap(selector: Selector, opts?: CallOptions & { scrollToFind?: boolean }): Promise<ActionResult> {
+    const prepared = await this.prepareSelectorForAction(selector, opts);
     if (!prepared.ok) {
       // Keyboard-gate at failure: when obscurement flags a node that
       // sits under the keyboard, dismiss the keyboard and retry.
@@ -186,7 +192,7 @@ export class Orchestra {
         prepared.result.ok === false &&
         prepared.result.obscurer?.role === "keyboard"
       ) {
-        await this.driver.hideKeyboard();
+        await this.driver.hideKeyboard(opts);
         try {
           await waitForKeyboard({
             driver: this.driver,
@@ -194,6 +200,7 @@ export class Orchestra {
             clock: this.clock,
             timeoutMs: KEYBOARD_DISMISS_TIMEOUT_MS,
             intervalMs: KEYBOARD_DISMISS_POLL_MS,
+            signal: opts?.signal,
           });
         } catch (err) {
           if (!(err instanceof WaitTimeoutError)) throw err;
@@ -202,11 +209,11 @@ export class Orchestra {
           );
         }
         this.maybeKeyboardOpen = false;
-        return this.tap(selector);
+        return this.tap(selector, opts);
       }
       return prepared.result;
     }
-    await this.driver.tap(prepared.point);
+    await this.driver.tap(prepared.point, opts);
     return okResult({ resolvedBy: prepared.resolvedBy, detail: `tapped at ${pointStr(prepared.point)}` });
   }
 
@@ -214,10 +221,14 @@ export class Orchestra {
    * Long-press the element matching `selector`. Same pipeline as
    * `tap`, but dispatches a long-press primitive instead of tap.
    */
-  async longPress(selector: Selector, durationMs = 500): Promise<ActionResult> {
-    const prepared = await this.prepareSelectorForAction(selector);
+  async longPress(
+    selector: Selector,
+    durationMs = 500,
+    opts?: CallOptions,
+  ): Promise<ActionResult> {
+    const prepared = await this.prepareSelectorForAction(selector, opts);
     if (!prepared.ok) return prepared.result;
-    await this.driver.longPress(prepared.point, durationMs);
+    await this.driver.longPress(prepared.point, durationMs, opts);
     return okResult({
       resolvedBy: prepared.resolvedBy,
       detail: `long-pressed at ${pointStr(prepared.point)} for ${durationMs}ms`,
@@ -238,38 +249,23 @@ export class Orchestra {
   async inputText(
     selector: Selector,
     text: string,
-    opts: { clearFirst?: boolean } = {},
+    opts: { clearFirst?: boolean; signal?: AbortSignal } = {},
   ): Promise<ActionResult> {
-    const prepared = await this.prepareSelectorForAction(selector);
+    const callOpts: CallOptions = { signal: opts.signal };
+    const prepared = await this.prepareSelectorForAction(selector, callOpts);
     if (!prepared.ok) return prepared.result;
-    // Inspect the resolved field's current content BEFORE tapping.
-    // The pre-tap tree still holds the honest "what's in the field
-    // right now" snapshot — typing/clearing will race against a
-    // fresh hierarchy fetch otherwise. `hasInitialContent` lets us
-    // skip the erase roundtrip entirely when the field is empty,
-    // which is the common case for login / form screens.
-    const hasInitialContent = fieldHasContent(prepared.cursor);
-    await this.driver.tap(prepared.point);
-    // No explicit focus wait here. Driver adapters are responsible
-    // for their own keyboard / focus synchronization before a
-    // subsequent inputText or eraseText lands — Orchestra trusts
-    // the contract rather than duplicating it platform-agnostically.
-    //
-    // Conditional erase — only when the field already holds
-    // content. Skipping the no-op erase on empty fields avoids two
-    // observable side effects:
-    //   1. Keyboard flicker when the platform clear primitive fires
-    //      keystrokes that the system IME renders.
-    //   2. An extra driver round-trip whose wall-clock cost compounds
-    //      across a multi-field form.
-    if (
-      opts.clearFirst !== false &&
-      hasInitialContent &&
-      this.driver.capabilities.canEraseText
-    ) {
-      await this.driver.eraseText(999);
+    await this.driver.tap(prepared.point, callOpts);
+    // Delegate the empty/non-empty decision to the driver's clear
+    // chain. A tree-level `text === label` check here is wrong on
+    // Flutter / RN, which mirror the user value into the label
+    // attribute after typing — a filled field then looks identical
+    // to an empty placeholder. The driver chain reads the focused
+    // node directly and exits in ~50 ms when there is nothing to
+    // clear, so the round-trip cost is acceptable.
+    if (opts.clearFirst !== false && this.driver.capabilities.canEraseText) {
+      await this.driver.eraseText(999, callOpts);
     }
-    await this.driver.inputText(text);
+    await this.driver.inputText(text, callOpts);
     // Typing implicitly opens the keyboard on every platform —
     // remember it for the next `tap()` so it can decide whether to
     // dismiss before acting on an element that could be obscured.
@@ -296,16 +292,25 @@ export class Orchestra {
 
   // ── Coordinate primitives (bypass selector pipeline) ────────
 
-  async tapAt(point: Point): Promise<void> {
-    await this.driver.tap(point);
+  async tapAt(point: Point, opts?: CallOptions): Promise<void> {
+    await this.driver.tap(point, opts);
   }
 
-  async longPressAt(point: Point, durationMs = 500): Promise<void> {
-    await this.driver.longPress(point, durationMs);
+  async longPressAt(
+    point: Point,
+    durationMs = 500,
+    opts?: CallOptions,
+  ): Promise<void> {
+    await this.driver.longPress(point, durationMs, opts);
   }
 
-  async swipeAt(from: Point, to: Point, durationMs = 200): Promise<void> {
-    await this.driver.swipe(from, to, durationMs);
+  async swipeAt(
+    from: Point,
+    to: Point,
+    durationMs = 200,
+    opts?: CallOptions,
+  ): Promise<void> {
+    await this.driver.swipe(from, to, durationMs, opts);
   }
 
   /**
@@ -316,8 +321,8 @@ export class Orchestra {
    * `orchestra.capabilities.canMultiPointer` / `canPressure` —
    * the driver adapter also rejects mismatches defensively.
    */
-  async dispatchGesture(gesture: Gesture): Promise<void> {
-    await this.driver.dispatchGesture(gesture);
+  async dispatchGesture(gesture: Gesture, opts?: CallOptions): Promise<void> {
+    await this.driver.dispatchGesture(gesture, opts);
   }
 
   /**
@@ -343,8 +348,8 @@ export class Orchestra {
    * unreachable). Callers should wrap in a try/catch when they
    * want to surface errors as `ActionResult`.
    */
-  async resolvePoint(selector: Selector): Promise<Point> {
-    const prepared = await this.prepareSelectorForAction(selector);
+  async resolvePoint(selector: Selector, opts?: CallOptions): Promise<Point> {
+    const prepared = await this.prepareSelectorForAction(selector, opts);
     if (!prepared.ok) {
       // `prepareSelectorForAction` only builds its failure branch
       // via `failResult(...)` which always yields `ok:false` +
@@ -367,9 +372,10 @@ export class Orchestra {
    */
   async swipeDirection(
     direction: "up" | "down" | "left" | "right",
-    opts: { durationMs?: number; fraction?: number } = {},
+    opts: { durationMs?: number; fraction?: number; signal?: AbortSignal } = {},
   ): Promise<void> {
-    const screen: Size = await this.driver.screenSize();
+    const callOpts: CallOptions = { signal: opts.signal };
+    const screen: Size = await this.driver.screenSize(callOpts);
     const fraction = opts.fraction ?? 0.6;
     const durationMs = opts.durationMs ?? 200;
     const cx = screen.width / 2;
@@ -386,65 +392,71 @@ export class Orchestra {
       x: cx + (dx * amountX) / 2,
       y: cy + (dy * amountY) / 2,
     };
-    await this.driver.swipe(from, to, durationMs);
+    await this.driver.swipe(from, to, durationMs, callOpts);
   }
 
   // ── Keyboard + input primitives ──────────────────────────────
 
-  async pressKey(key: KeyCode): Promise<ActionResult> {
-    const result = await this.driver.pressKey(key);
+  async pressKey(key: KeyCode, opts?: CallOptions): Promise<ActionResult> {
+    const result = await this.driver.pressKey(key, opts);
     return result.ok
       ? okResult({ detail: result.reason })
       : failResult(result.reason ?? `pressKey(${key}) returned ok:false`);
   }
 
-  async typeText(text: string): Promise<void> {
-    await this.driver.inputText(text);
+  async typeText(text: string, opts?: CallOptions): Promise<void> {
+    await this.driver.inputText(text, opts);
   }
 
-  async eraseText(count: number): Promise<void> {
+  async eraseText(count: number, opts?: CallOptions): Promise<void> {
     if (!this.driver.capabilities.canEraseText) {
       throw new Error("driver does not support eraseText — use pressKey('delete') N times");
     }
-    await this.driver.eraseText(count);
+    await this.driver.eraseText(count, opts);
   }
 
   // ── App lifecycle ────────────────────────────────────────────
 
-  async launchApp(appId: string, args?: LaunchArgs): Promise<void> {
-    await this.driver.launchApp(appId, args);
+  async launchApp(appId: string, args?: LaunchArgs, opts?: CallOptions): Promise<void> {
+    await this.driver.launchApp(appId, args, opts);
     this.maybeKeyboardOpen = false;
   }
 
-  async stopApp(appId: string): Promise<void> {
-    await this.driver.stopApp(appId);
+  async stopApp(appId: string, opts?: CallOptions): Promise<void> {
+    await this.driver.stopApp(appId, opts);
     this.maybeKeyboardOpen = false;
   }
 
-  async killApp(appId: string): Promise<void> {
-    await this.driver.killApp(appId);
+  async killApp(appId: string, opts?: CallOptions): Promise<void> {
+    await this.driver.killApp(appId, opts);
     this.maybeKeyboardOpen = false;
   }
 
   /** Enumerate installed apps on the current device. */
-  async listApps(): Promise<readonly import("../driver/driver.port.js").InstalledApp[]> {
-    return this.driver.listApps();
+  async listApps(
+    opts?: CallOptions,
+  ): Promise<readonly import("../driver/driver.port.js").InstalledApp[]> {
+    return this.driver.listApps(opts);
   }
 
   /** Foreground app info (bundleId + optional activity). */
-  async currentForeground(): Promise<import("../driver/driver.port.js").ForegroundInfo> {
-    return this.driver.currentForeground();
+  async currentForeground(
+    opts?: CallOptions,
+  ): Promise<import("../driver/driver.port.js").ForegroundInfo> {
+    return this.driver.currentForeground(opts);
   }
 
   /** Device info (platform, version, model, udid, kind). */
-  async deviceInfo(): Promise<import("../driver/driver.port.js").DeviceInfo> {
-    return this.driver.deviceInfo();
+  async deviceInfo(
+    opts?: CallOptions,
+  ): Promise<import("../driver/driver.port.js").DeviceInfo> {
+    return this.driver.deviceInfo(opts);
   }
 
   // ── Media ────────────────────────────────────────────────────
 
-  async screenshot(): Promise<Uint8Array> {
-    return this.driver.screenshot();
+  async screenshot(opts?: CallOptions): Promise<Uint8Array> {
+    return this.driver.screenshot(opts);
   }
 
   // ── Idle detection ───────────────────────────────────────────
@@ -455,20 +467,26 @@ export class Orchestra {
    * available; otherwise falls back to a host-side tree-diff
    * polling loop driven by the Clock.
    */
-  async waitForIdle(timeoutMs: number): Promise<boolean> {
+  async waitForIdle(timeoutMs: number, opts?: CallOptions): Promise<boolean> {
     if (this.driver.capabilities.canWaitForIdle) {
-      return this.driver.waitForIdle(timeoutMs);
+      return this.driver.waitForIdle(timeoutMs, opts);
     }
-    return this.waitForIdleHostSide(timeoutMs);
+    return this.waitForIdleHostSide(timeoutMs, opts);
   }
 
-  private async waitForIdleHostSide(timeoutMs: number): Promise<boolean> {
+  private async waitForIdleHostSide(
+    timeoutMs: number,
+    opts?: CallOptions,
+  ): Promise<boolean> {
     const pollMs = 200;
     const deadline = this.clock.now() + timeoutMs;
-    let previous = JSON.stringify(await this.driver.hierarchy());
+    let previous = JSON.stringify(await this.driver.hierarchy(opts));
     while (this.clock.now() < deadline) {
+      if (opts?.signal?.aborted) {
+        throw opts.signal.reason ?? new DOMException("Aborted", "AbortError");
+      }
       await this.clock.sleep(pollMs);
-      const current = JSON.stringify(await this.driver.hierarchy());
+      const current = JSON.stringify(await this.driver.hierarchy(opts));
       if (current === previous) return true;
       previous = current;
     }
@@ -482,11 +500,11 @@ export class Orchestra {
    * hideKeyboard completes, subsequent taps don't need to worry
    * about keyboard obscurement".
    */
-  async hideKeyboard(): Promise<ActionResult> {
+  async hideKeyboard(opts?: CallOptions): Promise<ActionResult> {
     if (!this.driver.capabilities.canHideKeyboard) {
       return failResult("driver does not support hideKeyboard");
     }
-    const result = await this.driver.hideKeyboard();
+    const result = await this.driver.hideKeyboard(opts);
     this.maybeKeyboardOpen = false;
     return okResult({ detail: `hideKeyboard: ${result.reason ?? (result.ok ? "dispatched" : "no-op")}` });
   }
@@ -502,6 +520,7 @@ export class Orchestra {
    */
   private async prepareSelectorForAction(
     selector: Selector,
+    opts?: CallOptions & { scrollToFind?: boolean },
   ): Promise<
     | { ok: true; point: Point; cursor: TreeCursor; resolvedBy: string | undefined }
     | { ok: false; result: ActionResult }
@@ -509,20 +528,34 @@ export class Orchestra {
     const filter = compileSelector(selector);
 
     // Scroll into view (includes scroll-search for virtualized lists
-    // and positional inset-aware centering).
+    // and positional inset-aware centering). Skipped when the caller
+    // sets scrollToFind=false — useful when the element is already
+    // known to be on screen and the hierarchy round-trips of the
+    // scroll controller would add unnecessary latency.
     let cursor: TreeCursor;
-    try {
-      cursor = await this.scroll.ensureVisible(filter);
-    } catch (err) {
-      if (err instanceof ScrollUnreachableError) {
+    if (opts?.scrollToFind !== false) {
+      try {
+        cursor = await this.scroll.ensureVisible(filter, opts);
+      } catch (err) {
+        if (err instanceof ScrollUnreachableError) {
+          return {
+            ok: false,
+            result: failResult(
+              `could not scroll element into view: ${err.message}`,
+            ),
+          };
+        }
+        throw err;
+      }
+    } else {
+      const match = (await this.finder.find(filter, opts))[0];
+      if (!match) {
         return {
           ok: false,
-          result: failResult(
-            `could not scroll element into view: ${err.message}`,
-          ),
+          result: failResult("element not found (scroll disabled via scrollToFind=false)"),
         };
       }
-      throw err;
+      cursor = match;
     }
 
     // Obscurement check against the SAME tree the cursor points
@@ -609,22 +642,6 @@ function matches(value: string | undefined, pattern: string | RegExp): boolean {
 
 function pointStr(p: Point): string {
   return `(${Math.round(p.x)},${Math.round(p.y)})`;
-}
-
-/**
- * True when the field at `cursor` currently holds user-entered
- * content, as opposed to an empty field rendering its placeholder.
- * Cross-platform rule: Flutter / native iOS mirror the label into
- * `text` when value is empty (so text === label == placeholder
- * rendered as content). Anything else indicates real content.
- */
-function fieldHasContent(cursor: TreeCursor): boolean {
-  const text = getAttr(cursor.node, AttrKeys.Text) ?? "";
-  if (text === "") return false;
-  const label = getAttr(cursor.node, AttrKeys.Label) ?? "";
-  // Placeholder-as-text mirror: empty field showing its label.
-  if (text === label) return false;
-  return true;
 }
 
 // Keyboard-gate budget for `tap` — how long to wait for the driver's

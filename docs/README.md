@@ -14,37 +14,40 @@ agents working ON Atomyx find the deeper context in `.claude/`.
 
 ## Personas served by this directory
 
-- **Pure Developer** — installing `@atomyx/mcp` alongside a driver
-  adapter, driving devices from an MCP client, scripting test flows.
-- **QC Manager** — installing the test-management CLI, organizing
-  test cases (when the test-management module ships).
+- **Pure Developer** — installing `@atomyx/cli`, driving
+  devices via MCP, scripting test flows.
+- **QC Manager** — installing the test-management CLI,
+  organizing test cases (when the test-management module ships).
 - **Power User** — installing the Studio GUI for the visual
   experience (when the studio module ships).
-- **CI Pipeline Engineer** — wiring Atomyx into headless test runs
-  and result reporting.
+- **CI Pipeline Engineer** — wiring Atomyx into headless test
+  runs and result reporting.
 
 ## Planned content
 
 When real user documentation lands, it slots in here:
 
-- `getting-started.md` — install, first run, hello-world MCP session
-- `install/` — per-platform install guides (macOS, Linux, Windows,
-  Docker)
-- `mcp-setup.md` — wiring Atomyx into MCP-compatible clients
-- `tools/` — user-facing reference for each MCP tool (the agent's
-  view, not the implementer's)
-- `selectors.md` — selector patterns + priority broadening from a
-  user perspective
+- `getting-started.md` — install, first run, hello-world MCP
+  session
+- `install/` — per-platform install guides (macOS, Linux,
+  Windows, Docker)
+- `mcp-setup.md` — wiring Atomyx into Claude Code, Cursor,
+  Continue, or other MCP clients
+- `tools/` — user-facing reference for each MCP tool (the
+  agent's view, not the implementer's)
+- `selectors.md` — selector patterns + priority broadening
+  from a user perspective
 - `device-setup/`
-  - `android.md` — installing the Atomyx Android APK, granting
-    accessibility, troubleshooting
-  - `ios.md` — Xcode setup, code signing, real device provisioning
-- `recipes/` — common test patterns (login, payment, scroll-to-
-  element, etc.)
+  - `android.md` — installing the Atomyx Android APK,
+    granting accessibility, troubleshooting
+  - `ios.md` — Xcode setup, code signing, real device
+    provisioning
+- `recipes/` — common test patterns (login flow, payment,
+  scroll-to-element, etc.)
 - `troubleshooting.md` — common errors with fixes
-- `cli.md` — CLI subcommand reference
+- `cli.md` — `atomyx driver` command reference
 
 Currently empty pending real content. See
-[`architecture.md`](../.claude/docs/architecture.md) for the
-high-level contract and [`.claude/docs/`](../.claude/docs/) for the
+[architecture.md](../.claude/docs/architecture.md) for the high-level
+contract and [`.claude/docs/`](../.claude/docs/) for the
 contributor view.

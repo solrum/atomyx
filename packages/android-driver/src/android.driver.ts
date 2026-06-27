@@ -1,4 +1,5 @@
 import type {
+  CallOptions,
   Capabilities,
   DeviceInfo,
   Driver,
@@ -13,6 +14,7 @@ import type {
 } from "@atomyx/driver";
 import type { TreeNode } from "@atomyx/driver";
 import { adbForward, adbForwardRemove } from "./adb.js";
+import { ClearTextError } from "./clear/index.js";
 import { HttpClient } from "./http-client.js";
 import { type AndroidRawElement, normalizeAndroidTree } from "./tree-normalizer.js";
 
@@ -139,12 +141,12 @@ export class AndroidDriver implements Driver {
 
   // ── Lifecycle ────────────────────────────────────────────────
 
-  async connect(): Promise<void> {
+  async connect(opts?: CallOptions): Promise<void> {
     await adbForward(this.opts.serial, this.hostPort, this.devicePort);
     // Liveness probe. `/health` returns
     // `{ok, accessibilityConnected}` — we only care that the APK
     // responds; the accessibility state is advisory.
-    await this.http.get<{ ok: boolean }>("/health");
+    await this.http.get<{ ok: boolean }>("/health", { signal: opts?.signal });
     // Capability handshake. `/ping` populates gesture capabilities
     // (`canMultiPointer`, `canPressure`) and the active mechanism
     // name so the YAML validator can reject unsupported gesture
@@ -152,7 +154,9 @@ export class AndroidDriver implements Driver {
     // (older build) returns 404 — we swallow that and keep the
     // conservative defaults so old agents still work.
     try {
-      const pong = await this.http.get<Record<string, unknown>>("/ping");
+      const pong = await this.http.get<Record<string, unknown>>("/ping", {
+        signal: opts?.signal,
+      });
       this.applyPingCapabilities(pong);
     } catch {
       // Older agents pre-date /ping; keep conservative defaults.
@@ -222,8 +226,10 @@ export class AndroidDriver implements Driver {
 
   // ── Hierarchy ────────────────────────────────────────────────
 
-  async hierarchy(): Promise<TreeNode> {
-    const raw = await this.http.get<AndroidRawElement>("/tree");
+  async hierarchy(opts?: CallOptions): Promise<TreeNode> {
+    const raw = await this.http.get<AndroidRawElement>("/tree", {
+      signal: opts?.signal,
+    });
     const wire = normalizeAndroidTree(raw);
     // TreeNodeWire is structurally compatible with TreeNode from
     // @atomyx/driver — both have `attributes`, `children`, and the
@@ -232,7 +238,7 @@ export class AndroidDriver implements Driver {
     return wire as unknown as TreeNode;
   }
 
-  async waitForIdle(_timeoutMs: number): Promise<boolean> {
+  async waitForIdle(_timeoutMs: number, _opts?: CallOptions): Promise<boolean> {
     // Capability says false — core should not call this. Guarded
     // as a defensive no-op so a misbehaving consumer gets a
     // truthy return rather than a hang.
@@ -241,29 +247,42 @@ export class AndroidDriver implements Driver {
 
   // ── Gesture primitives ──────────────────────────────────────
 
-  async tap(point: Point): Promise<void> {
-    await this.http.post("/actions/tap_coords", { x: point.x, y: point.y });
+  async tap(point: Point, opts?: CallOptions): Promise<void> {
+    await this.http.post(
+      "/actions/tap_coords",
+      { x: point.x, y: point.y },
+      { signal: opts?.signal },
+    );
   }
 
-  async longPress(point: Point, durationMs: number): Promise<void> {
-    await this.http.post("/actions/long_press", {
-      x: point.x,
-      y: point.y,
-      durationMs,
-    });
+  async longPress(point: Point, durationMs: number, opts?: CallOptions): Promise<void> {
+    await this.http.post(
+      "/actions/long_press",
+      { x: point.x, y: point.y, durationMs },
+      { signal: opts?.signal },
+    );
   }
 
-  async swipe(from: Point, to: Point, durationMs: number): Promise<void> {
-    await this.http.post("/actions/swipe", {
-      fromX: from.x,
-      fromY: from.y,
-      toX: to.x,
-      toY: to.y,
-      durationMs,
-    });
+  async swipe(
+    from: Point,
+    to: Point,
+    durationMs: number,
+    opts?: CallOptions,
+  ): Promise<void> {
+    await this.http.post(
+      "/actions/swipe",
+      {
+        fromX: from.x,
+        fromY: from.y,
+        toX: to.x,
+        toY: to.y,
+        durationMs,
+      },
+      { signal: opts?.signal },
+    );
   }
 
-  async dispatchGesture(gesture: Gesture): Promise<void> {
+  async dispatchGesture(gesture: Gesture, opts?: CallOptions): Promise<void> {
     // Capability gate — host-side first tier. A matching guard
     // lives inside the APK (`DispatchGestureRoute`) so a driver
     // that bypasses this class still cannot leak an unsupported
@@ -307,69 +326,103 @@ export class AndroidDriver implements Driver {
     await this.http.post(
       "/actions/dispatch_gesture",
       { pointers },
-      GESTURE_REQUEST_TIMEOUT_MS,
+      { timeoutMs: GESTURE_REQUEST_TIMEOUT_MS, signal: opts?.signal },
     );
   }
 
   // ── Input ────────────────────────────────────────────────────
 
-  async inputText(text: string): Promise<void> {
+  async inputText(text: string, opts?: CallOptions): Promise<void> {
     // Invariant: `inputText` APPENDS. The APK's
     // `/actions/type_keyboard` route defaults `clearFirst` to true
     // when the parameter is omitted, so we must pass
     // `clearFirst: false` explicitly to honor the Driver port
     // contract. Clearing is a separate step the caller drives via
     // `eraseText` when intended.
-    await this.http.post("/actions/type_keyboard", {
-      text,
-      clearFirst: false,
-    });
+    await this.http.post(
+      "/actions/type_keyboard",
+      { text, clearFirst: false },
+      { signal: opts?.signal },
+    );
   }
 
-  async eraseText(_count: number): Promise<void> {
-    // APK's native `/actions/clear_focused_input` bulk-deletes the
-    // focused field in one RPC. The `count` parameter is ignored:
-    // the route clears the entire current value regardless (good
-    // enough for the framework's "erase before type" flow — any
-    // caller that needed partial delete would use pressKey(delete)
-    // in a loop explicitly).
-    await this.http.post("/actions/clear_focused_input", {});
+  async eraseText(_count: number, opts?: CallOptions): Promise<void> {
+    // APK's `/actions/clear_focused_input` clears the focused field via
+    // a four-strategy chain. `count` is ignored — the route always
+    // clears the entire current value. On full failure the APK returns
+    // `ok: false`; we throw ClearTextError so callers can distinguish a
+    // clear failure from a transport error.
+    const res = await this.http.post<{
+      ok: boolean;
+      strategiesTried?: string[];
+      lastValue?: string;
+      focusedNodeDesc?: string;
+      screenWidth?: number;
+      screenHeight?: number;
+    }>("/actions/clear_focused_input", {}, { signal: opts?.signal });
+    if (!res.ok) {
+      throw new ClearTextError({
+        strategiesTried: res.strategiesTried ?? [],
+        lastValue: res.lastValue ?? "",
+        focusedNodeDesc: res.focusedNodeDesc ?? "unknown",
+        screenWidth: res.screenWidth ?? 0,
+        screenHeight: res.screenHeight ?? 0,
+      });
+    }
   }
 
-  async pressKey(key: KeyCode): Promise<KeyResult> {
-    await this.http.post("/actions/key", { key });
+  async pressKey(key: KeyCode, opts?: CallOptions): Promise<KeyResult> {
+    await this.http.post("/actions/key", { key }, { signal: opts?.signal });
     // Android system key dispatch always "fires" regardless of
     // whether the app handled it. Report ok unconditionally.
     return { ok: true };
   }
 
-  async hideKeyboard(): Promise<KeyResult> {
+  async hideKeyboard(opts?: CallOptions): Promise<KeyResult> {
     const res = await this.http.post<{ ok: boolean; reason?: string }>(
       "/actions/hide_keyboard",
       {},
+      { signal: opts?.signal },
     );
     return { ok: res.ok, reason: res.reason };
   }
 
   // ── App lifecycle ────────────────────────────────────────────
 
-  async launchApp(bundleId: string, _args?: LaunchArgs): Promise<void> {
-    await this.http.post("/actions/launch", { packageName: bundleId });
+  async launchApp(
+    bundleId: string,
+    _args?: LaunchArgs,
+    opts?: CallOptions,
+  ): Promise<void> {
+    await this.http.post(
+      "/actions/launch",
+      { packageName: bundleId },
+      { signal: opts?.signal },
+    );
   }
 
-  async stopApp(bundleId: string): Promise<void> {
-    await this.http.post("/actions/force_stop", { packageName: bundleId });
+  async stopApp(bundleId: string, opts?: CallOptions): Promise<void> {
+    await this.http.post(
+      "/actions/force_stop",
+      { packageName: bundleId },
+      { signal: opts?.signal },
+    );
   }
 
-  async killApp(bundleId: string): Promise<void> {
+  async killApp(bundleId: string, opts?: CallOptions): Promise<void> {
     // Same endpoint as stopApp on Android — there's no hard
     // distinction at the AccessibilityService layer.
-    await this.http.post("/actions/force_stop", { packageName: bundleId });
+    await this.http.post(
+      "/actions/force_stop",
+      { packageName: bundleId },
+      { signal: opts?.signal },
+    );
   }
 
-  async currentForeground(): Promise<ForegroundInfo> {
+  async currentForeground(opts?: CallOptions): Promise<ForegroundInfo> {
     const raw = await this.http.get<{ packageName: string; activity?: string }>(
       "/current-activity",
+      { signal: opts?.signal },
     );
     return {
       bundleId: raw.packageName || null,
@@ -377,9 +430,10 @@ export class AndroidDriver implements Driver {
     };
   }
 
-  async listApps(): Promise<readonly InstalledApp[]> {
+  async listApps(opts?: CallOptions): Promise<readonly InstalledApp[]> {
     const raw = await this.http.get<Array<{ packageName: string; label?: string }>>(
       "/apps",
+      { signal: opts?.signal },
     );
     return raw.map((a) => ({
       bundleId: a.packageName,
@@ -389,12 +443,15 @@ export class AndroidDriver implements Driver {
 
   // ── Media + device info ─────────────────────────────────────
 
-  async screenshot(): Promise<Uint8Array> {
-    const raw = await this.http.get<{ base64: string; format: string }>("/screenshot");
+  async screenshot(opts?: CallOptions): Promise<Uint8Array> {
+    const raw = await this.http.get<{ base64: string; format: string }>(
+      "/screenshot",
+      { signal: opts?.signal },
+    );
     return Buffer.from(raw.base64, "base64");
   }
 
-  async deviceInfo(): Promise<DeviceInfo> {
+  async deviceInfo(_opts?: CallOptions): Promise<DeviceInfo> {
     // The APK does not expose a device-info route; return a stub populated from known options.
     // Return a minimal stub populated from the serial we know.
     return {
@@ -406,7 +463,7 @@ export class AndroidDriver implements Driver {
     };
   }
 
-  async screenSize(): Promise<Size> {
+  async screenSize(opts?: CallOptions): Promise<Size> {
     // The APK does not expose /screen-size directly. The `/tree` response
     // has a synthetic `el_root` wrapper with no bounds of its own —
     // it's just a container that holds the actual window roots
@@ -421,7 +478,7 @@ export class AndroidDriver implements Driver {
     // root DTO with NO bounds attribute. Always traverse to a
     // child with bounds — never read `tree.attributes.bounds`
     // directly.
-    const tree = await this.hierarchy();
+    const tree = await this.hierarchy(opts);
     const bounds = findScreenBounds(tree);
     if (!bounds) {
       throw new Error(

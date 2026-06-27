@@ -1,0 +1,22 @@
+# Sub-flow: tear down test data after a flow completes. Composed
+# at the end of a parent script so the parent's captures and
+# extracted variables (e.g. ${newUserId}) are still in scope.
+- tap:
+    label: "Profile"
+    role: button
+- waitFor: "Settings"
+- tap: "Settings"
+- waitFor: "Delete account"
+
+- tap: "Delete account"
+- waitFor: "Are you sure?"
+
+- capture: "DELETE /api/v1/users/${newUserId} as: deleteRsp"
+- tap: "Yes, delete"
+
+- assertApi:
+    from: deleteRsp
+    status: 204
+
+- waitFor: "Account deleted"
+- screenshot: account-deleted

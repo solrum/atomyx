@@ -1,8 +1,12 @@
 {
+<<<<<<<< HEAD:packages/driver-wire/package.json
+  "name": "@atomyx/driver-wire",
+========
   "name": "@atomyx/shared",
+>>>>>>>> 67f953e (feat: viewport-aware scroll + 4-strategy clear-text chain):shared/package.json
   "version": "0.1.0",
   "private": true,
-  "description": "Cross-module type contracts — pure types, no runtime code, no dependencies. Shared between core-driver, test-mgmt, studio, cloud modules.",
+  "description": "Cross-module contracts — types plus zod schemas that validate them at runtime. Consumed by core, driver, script, mcp, cli, studio.",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -12,7 +16,13 @@
     "./script": "./dist/script/index.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test $(find src -name '*.test.ts')",
+    "api:check": "api-extractor run",
+    "api:update": "api-extractor run --local"
+  },
+  "dependencies": {
+    "zod": "^3.23.0"
   },
   "engines": {
     "node": ">=20.0.0"
@@ -22,7 +32,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/solrum/atomyx.git",
-    "directory": "shared"
+    "directory": "packages/driver-wire"
   },
   "bugs": {
     "url": "https://github.com/solrum/atomyx/issues"
@@ -32,7 +42,8 @@
     "mobile",
     "testing",
     "automation",
-    "types",
-    "contracts"
+    "wire-protocol",
+    "schema",
+    "zod"
   ]
 }

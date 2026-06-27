@@ -242,6 +242,22 @@ class UiTreeService(
         // Input focus — the element accepting keystrokes right now.
         // Distinct from accessibility focus (isAccessibilityFocused).
         val focused = node.isFocused
+        // Selection state — surfaces tab selection and segmented-
+        // control current item.
+        val selected = node.isSelected
+        // Toggle / checkbox state for any node that exposes it.
+        val checkable = node.isCheckable
+        val checked = node.isChecked
+        // Accessibility-runtime visibility — true when the
+        // accessibility framework considers the node viewable on
+        // screen (accounts for offscreen scroll position even when
+        // bounds are non-zero).
+        val visible = node.isVisibleToUser
+        // Placeholder text on an empty field — API 26+. Lets host
+        // code pick an input whose only identifier is its placeholder
+        // (e.g. "Email", "Search products"). Cross-platform selector
+        // key: `hint`.
+        val hint = node.hintText?.toString()
 
         // Walk children first so we can decide whether to retain non-interesting parents
         val children = mutableListOf<RawElementDto>()
@@ -258,8 +274,13 @@ class UiTreeService(
 
         // `focused` is counted as interesting so a focused empty input
         // survives pruning — host-side focus observers need to see the
-        // node even when it has no resourceId/text/desc yet.
-        val interesting = clickable || !text.isNullOrBlank() || !desc.isNullOrBlank() || !rid.isNullOrBlank() || focused
+        // node even when it has no resourceId/text/desc yet. `hint` is
+        // interesting too: placeholder-only inputs (empty EditText
+        // whose only identifier is its placeholder) must reach the
+        // host so the inspector can emit a `hint:` selector.
+        val interesting = clickable || !text.isNullOrBlank() ||
+            !desc.isNullOrBlank() || !rid.isNullOrBlank() ||
+            !hint.isNullOrBlank() || focused
 
         // Aggressive pruning: drop non-interesting leaves AND non-interesting wrappers
         // with 0 or 1 child (the child will be promoted)
@@ -295,10 +316,15 @@ class UiTreeService(
             resourceId = rid,
             text = text,
             contentDesc = desc,
+            hintText = hint,
             bounds = BoundsDto(rect.left, rect.top, rect.right, rect.bottom),
             clickable = clickable,
             enabled = enabled,
             focused = focused,
+            selected = selected,
+            checkable = checkable,
+            checked = checked,
+            visible = visible,
             children = children,
         )
     }
@@ -338,10 +364,21 @@ data class RawElementDto(
     val resourceId: String? = null,
     val text: String? = null,
     val contentDesc: String? = null,
+    val hintText: String? = null,
     val bounds: BoundsDto? = null,
     val clickable: Boolean = false,
     val enabled: Boolean = true,
     val focused: Boolean = false,
+    val selected: Boolean = false,
+    // `checkable` distinguishes "this node can carry a checked
+    // state" (true for CheckBox, Switch, ToggleButton) from
+    // "this node is checked right now". A non-checkable node has
+    // `checked = false` because the AccessibilityNodeInfo default
+    // is false even when the property is meaningless — host code
+    // reads `checked` only when `checkable` is true.
+    val checkable: Boolean = false,
+    val checked: Boolean = false,
+    val visible: Boolean = true,
     // Set on the TOP-LEVEL DTO of an IME window subtree by dumpTree().
     // Lets host-side `findKeyboardNode(tree)` locate the keyboard
     // without a separate RPC. Descendants of the IME root inherit

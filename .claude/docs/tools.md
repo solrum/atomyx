@@ -2,7 +2,7 @@
 
 > Read before touching anything under `packages/mcp/src/tools/`.
 > Fast path to knowing which tool lives where, what the response shape
-> is, and which invariants must hold.
+> is, and which invariants must hold. Updated on every tool change.
 
 ## Overview
 
@@ -12,7 +12,7 @@ all wrapping the same in-process `Orchestra` command layer from
 
 - **MCP tools** (`packages/mcp/src/tools/`) — JSON tool
   descriptors consumed by AI agents over stdio. The primary surface.
-- **CLI commands** (`packages/cli/src/commands/`) — a
+- **CLI commands** (`packages/cli/src/driver/commands/`) — a
   thin argv wrapper that constructs Driver + Orchestra + MCP server
   and connects to a stdio transport.
 - **HTTP routes** (planned, not yet shipped) — REST endpoints that
@@ -251,8 +251,8 @@ attributes.
 
 Every tool either calls one of these directly or composes a small
 sequence of them. Complex behavior lives in the Orchestra pipeline
-(not in tools) so every transport (MCP, CLI, optional HTTP)
-inherits it for free.
+(not in tools) so all three transports (MCP, CLI, future HTTP)
+inherit it for free.
 
 ## Invariants
 
@@ -305,8 +305,3 @@ guidance (playbooks, exploratory heuristics) is exposed via the MCP
 `prompts/` capability in `packages/mcp/src/prompts/`
 (`atomyx/playbook`, `atomyx/exploratory`, etc), not as tools. Adding
 a methodology shortcut goes into `prompts/`, not into `tools/`.
-
-Device selection via `select_device` operates on the session state
-owned by `createMcpServer`. The tool itself is a thin wrapper over
-`DeviceSession.select`; agents call it once per session and the
-bound device persists across subsequent tool calls in that session.

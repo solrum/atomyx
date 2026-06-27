@@ -2,24 +2,56 @@
 /**
  * `atomyx mcp` — MCP stdio server for Atomyx.
  *
- * Structurally identical to a minimal handwritten MCP server:
- * synchronous Server construction + immediate stdio connect.
- * No async work before the transport is live.
+ * Thin entry-point that wires the workspace's concrete driver
+ * factories (iOS + Android) into a `DeviceSession` and hands the
+ * session to `createMcpServer`. All request dispatch, structured
+ * timeout enforcement, and error envelopes live in
+ * `createMcpServer` so the library API and this binary share one
+ * implementation.
  */
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { SystemClock, ConsoleLogger, NoopLogger } from "@atomyx/driver";
+import {
+  SystemClock,
+  ConsoleLogger,
+  NoopLogger,
+  FileStorage,
+  RunStore,
+  InMemoryStorage,
+} from "@atomyx/driver";
 import { IosDriver } from "@atomyx/ios-driver";
 import { AndroidDriver } from "@atomyx/android-driver";
 import { DeviceSession } from "./device-session.js";
 import { DEFAULT_TOOLS } from "./tools/index.js";
-import { zodToJsonSchema } from "./zod-to-json-schema.js";
-import type { ToolContext } from "./tool-definition.js";
-import { FileStorage, RunStore, InMemoryStorage } from "@atomyx/driver";
+import { createMcpServer } from "./server.js";
+
+/**
+ * Instructions surfaced to the MCP client (e.g. Claude) when it
+ * connects to this server. Exported so the snapshot test can
+ * import and compare against the committed reference text.
+ */
+export const INSTRUCTIONS_TEXT = `You are connected to Atomyx — a mobile test orchestration framework that drives real iOS and Android devices.
+
+When the user asks you to test, verify, check, or interact with a mobile app, use the Atomyx tools:
+
+1. First call list_devices to see available devices.
+2. Call select_device to bind to a device.
+3. Call launch_app with the app's bundle id (iOS) or package name (Android).
+4. Use get_ui_tree to see what's on screen before acting.
+5. Use tap, input_text, swipe, press_key to interact with the app.
+6. Use wait_for_element to verify navigation worked.
+7. Use screenshot to capture visual evidence.
+
+Keywords that should trigger Atomyx tools: test, mobile, app, device, tap, swipe, screenshot, UI, screen, launch, install, Android, iOS, phone, simulator, emulator.
+
+When running a scripted test, use run_script with a YAML test script.
+
+Always orient first (get_ui_tree), then act, then verify.
+
+If a tool returns isError=true with a payload like {"code":"TOOL_TIMEOUT", ...}, the device call exceeded its budget and was aborted. Do NOT retry the same tool immediately — re-orient with get_ui_tree (it will fail fast if the driver is dead), or call select_device again to reconnect. The payload's "hint" field describes the recommended next step.
+
+Before each tool call, short briefly explain what you are about to do and why. After each tool call, short summarize the result. Never skip explanation between steps.
+
+Before starting a mobile testing task, check whether the consumer project has Atomyx workflow skills installed in .claude/skills/ (placed there by atomyx init). If present, load the relevant ones: atomyx-test-loop (structured orient/act/verify loop), atomyx-debug-failure (recovery from tool errors and stale UI trees), and atomyx-script-authoring (capture successful flows as replayable YAML so future sessions resume from the same screen without re-discovering the path). These skills live in the consumer project, not in this server — load them from .claude/skills/ when they exist.`;
 
 // ── Arg parsing (minimal) ──────────────────────────────────────
 
@@ -91,77 +123,13 @@ const storage =
     : new FileStorage();
 const runStore = new RunStore();
 
-const ctx: ToolContext = { session, logger, storage, runStore, clock };
-
-// Pre-compute tool descriptors for tools/list response.
-const toolDescriptors = DEFAULT_TOOLS.map((t) => ({
-  name: t.name,
-  description: t.description,
-  inputSchema: zodToJsonSchema(t.inputSchema),
-}));
-
-const byName = new Map(DEFAULT_TOOLS.map((t) => [t.name, t]));
-
-// Server + handlers — direct construction, same shape as minimal-mcp.
-const server = new Server(
-  { name: "atomyx", version: "0.1.0" },
-  {
-    capabilities: { tools: {} },
-    instructions: `You are connected to Atomyx — a mobile test orchestration framework that drives real iOS and Android devices.
-
-When the user asks you to test, verify, check, or interact with a mobile app, use the Atomyx tools:
-
-1. First call list_devices to see available devices.
-2. Call select_device to bind to a device.
-3. Call launch_app with the app's bundle id (iOS) or package name (Android).
-4. Use get_ui_tree to see what's on screen before acting.
-5. Use tap, input_text, swipe, press_key to interact with the app.
-6. Use wait_for_element to verify navigation worked.
-7. Use screenshot to capture visual evidence.
-
-Keywords that should trigger Atomyx tools: test, mobile, app, device, tap, swipe, screenshot, UI, screen, launch, install, Android, iOS, phone, simulator, emulator.
-
-When running a scripted test, use run_script with a YAML test script.
-
-Always orient first (get_ui_tree), then act, then verify.
-
-Before each tool call, short briefly explain what you are about to do and why. After each tool call, short summarize the result. Never skip explanation between steps.`,
-  },
-);
-
-server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: toolDescriptors,
-}));
-
-server.setRequestHandler(CallToolRequestSchema, async (req) => {
-  const tool = byName.get(req.params.name);
-  if (!tool) {
-    return {
-      isError: true,
-      content: [{ type: "text", text: `Unknown tool: ${req.params.name}` }],
-    };
-  }
-  const parsed = tool.inputSchema.safeParse(req.params.arguments ?? {});
-  if (!parsed.success) {
-    return {
-      isError: true,
-      content: [
-        { type: "text", text: `Invalid arguments for ${tool.name}: ${parsed.error.message}` },
-      ],
-    };
-  }
-  try {
-    const result = await tool.execute(parsed.data, ctx);
-    return {
-      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-    };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return {
-      isError: true,
-      content: [{ type: "text", text: msg }],
-    };
-  }
+const server = createMcpServer({
+  session,
+  logger,
+  storage,
+  runStore,
+  clock,
+  instructions: INSTRUCTIONS_TEXT,
 });
 
 // ── Shutdown ────────────────────────────────────────────────────

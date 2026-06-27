@@ -67,7 +67,7 @@ export const reportBugTool = defineTool({
         );
       } else {
         try {
-          const bytes = await active.orchestra.screenshot();
+          const bytes = await active.orchestra.screenshot({ signal: ctx.signal });
           const base64 = Buffer.from(bytes).toString("base64");
           const key = `bugs/${bug.id}/screenshot`;
           await ctx.storage.save(key, {

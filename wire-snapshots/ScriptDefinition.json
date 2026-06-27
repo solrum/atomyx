@@ -1,0 +1,1306 @@
+{
+  "$ref": "#/definitions/ScriptDefinition",
+  "definitions": {
+    "ScriptDefinition": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string",
+          "pattern": "^atomyx\\/v\\d+$",
+          "description": "Script format version. Defaults to 'atomyx/v1' when omitted."
+        },
+        "appId": {
+          "type": "string",
+          "description": "Bundle id (iOS) or package name (Android) of the app under test. Example: `com.example.myapp` / `com.apple.mobilesafari`. An empty string is reserved for flow fragments that run in a parent script's context."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable script name. Shown in run reports and the Studio run list."
+        },
+        "description": {
+          "type": "string",
+          "description": "Longer description of what this script verifies. Surfaced in reports and the Studio detail view."
+        },
+        "precondition": {
+          "type": "string",
+          "description": "Human-readable preconditions that must hold before running (e.g. 'user is logged out', 'device is in airplane mode'). Informational only — not enforced by the runner."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Tags for filtering and organizing runs. Examples: 'smoke', 'regression', 'auth', 'ios-only'."
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Variables available via `${varName}` in every step value. External env (e.g. CLI `--env key=value`) is merged on top of this — external wins on key collision."
+        },
+        "proxy": {
+          "type": "string",
+          "enum": [
+            "required",
+            "optional"
+          ],
+          "description": "Network-capture proxy policy. 'required' → runner validates proxy before executing any step. 'optional' (default) → capture commands fail individually if no proxy is configured."
+        },
+        "requires": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Flow files to run before this script (paths relative to CWD). If any required flow fails, this script is skipped."
+        },
+        "stepDelay": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Delay in ms inserted between each step. Default: 500 ms — gives UI time to settle after actions (animations, keyboard, network). Set to 0 for maximum speed (unit tests with MockDriver)."
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "const": "launchApp"
+                  }
+                },
+                "required": [
+                  "command"
+                ],
+                "additionalProperties": false,
+                "description": "Launch (or relaunch) the app declared at the top of the script via `appId`. First step of most entry scripts. Example: `- launchApp`."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "const": "tap"
+                  },
+                  "selector": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string",
+                        "description": "Match element by its visible text (the string the user sees). Use for buttons, labels, menu items. YAML shorthand: a bare string like `tap: \"Login\"` expands to `{ text: \"Login\", label: \"Login\" }` for Flutter parity."
+                      },
+                      "id": {
+                        "type": "string",
+                        "description": "Match element by its stable resource id (Android `resource-id`) or accessibility id (iOS). Preferred when the app exposes them — survives i18n and copy changes. Example: `id: com.app:id/login_btn`."
+                      },
+                      "label": {
+                        "type": "string",
+                        "description": "Match element by its accessibility label. Flutter exposes visible text as `label`; native Android/iOS use `text`. Setting both lets priority broadening try each platform's convention without the author knowing which."
+                      },
+                      "hint": {
+                        "type": "string",
+                        "description": "Match element by its input hint / placeholder. Use for text fields whose only identifier is the placeholder text (e.g. `hint: \"Search products\"`)."
+                      },
+                      "role": {
+                        "type": "string",
+                        "description": "Constrain the match to a semantic role. Common values: 'button', 'text-field', 'image', 'link', 'checkbox', 'switch', 'container'. Narrow broad text matches — e.g. `{ text: 'Home', role: 'button' }` avoids matching a 'Home' menu item."
+                      },
+                      "nth": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "When multiple elements match, pick the nth one (0-indexed). Use sparingly — `nth` is brittle under layout changes. Prefer adding `role` or a more specific `text`."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Element selector. Every field is optional, but at least one must be set for the selector to be useful. In YAML, a bare string shorthand — e.g. `tap: \"Login\"` — is equivalent to `tap: { text: \"Login\", label: \"Login\" }`."
+                  }
+                },
+                "required": [
+                  "command",
+                  "selector"
+                ],
+                "additionalProperties": false,
+                "description": "Tap a UI element.\n\n```yaml\n- tap: \"Sign in\"\n- tap: { text: \"Continue\", role: button }\n- tap: { id: com.app:id/next_btn }\n```"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "const": "type"
+                  },
+                  "text": {
+                    "type": "string",
+                    "description": "Text to type. `${var}` placeholders are resolved against the script env before execution."
+                  },
+                  "into": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string",
+                        "description": "Match element by its visible text (the string the user sees). Use for buttons, labels, menu items. YAML shorthand: a bare string like `tap: \"Login\"` expands to `{ text: \"Login\", label: \"Login\" }` for Flutter parity."
+                      },
+                      "id": {
+                        "type": "string",
+                        "description": "Match element by its stable resource id (Android `resource-id`) or accessibility id (iOS). Preferred when the app exposes them — survives i18n and copy changes. Example: `id: com.app:id/login_btn`."
+                      },
+                      "label": {
+                        "type": "string",
+                        "description": "Match element by its accessibility label. Flutter exposes visible text as `label`; native Android/iOS use `text`. Setting both lets priority broadening try each platform's convention without the author knowing which."
+                      },
+                      "hint": {
+                        "type": "string",
+                        "description": "Match element by its input hint / placeholder. Use for text fields whose only identifier is the placeholder text (e.g. `hint: \"Search products\"`)."
+                      },
+                      "role": {
+                        "type": "string",
+                        "description": "Constrain the match to a semantic role. Common values: 'button', 'text-field', 'image', 'link', 'checkbox', 'switch', 'container'. Narrow broad text matches — e.g. `{ text: 'Home', role: 'button' }` avoids matching a 'Home' menu item."
+                      },
+                      "nth": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "When multiple elements match, pick the nth one (0-indexed). Use sparingly — `nth` is brittle under layout changes. Prefer adding `role` or a more specific `text`."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Optional selector for the target field. When omitted, `type` targets the currently focused field (after the previous step)."
+                  }
+                },
+                "required": [
+                  "command",
+                  "text"
+                ],
+                "additionalProperties": false,
+                "description": "Type text into a field.\n\n```yaml\n- type: \"hello\"                       # focused field\n- type: { into: \"Email\", text: ${email} }\n```"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "const": "waitFor"
+                  },
+                  "selector": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string",
+                        "description": "Match element by its visible text (the string the user sees). Use for buttons, labels, menu items. YAML shorthand: a bare string like `tap: \"Login\"` expands to `{ text: \"Login\", label: \"Login\" }` for Flutter parity."
+                      },
+                      "id": {
+                        "type": "string",
+                        "description": "Match element by its stable resource id (Android `resource-id`) or accessibility id (iOS). Preferred when the app exposes them — survives i18n and copy changes. Example: `id: com.app:id/login_btn`."
+                      },
+                      "label": {
+                        "type": "string",
+                        "description": "Match element by its accessibility label. Flutter exposes visible text as `label`; native Android/iOS use `text`. Setting both lets priority broadening try each platform's convention without the author knowing which."
+                      },
+                      "hint": {
+                        "type": "string",
+                        "description": "Match element by its input hint / placeholder. Use for text fields whose only identifier is the placeholder text (e.g. `hint: \"Search products\"`)."
+                      },
+                      "role": {
+                        "type": "string",
+                        "description": "Constrain the match to a semantic role. Common values: 'button', 'text-field', 'image', 'link', 'checkbox', 'switch', 'container'. Narrow broad text matches — e.g. `{ text: 'Home', role: 'button' }` avoids matching a 'Home' menu item."
+                      },
+                      "nth": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "When multiple elements match, pick the nth one (0-indexed). Use sparingly — `nth` is brittle under layout changes. Prefer adding `role` or a more specific `text`."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Element selector. Every field is optional, but at least one must be set for the selector to be useful. In YAML, a bare string shorthand — e.g. `tap: \"Login\"` — is equivalent to `tap: { text: \"Login\", label: \"Login\" }`."
+                  },
+                  "timeoutMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "How long to wait for the element to appear, in ms. Default: the driver's built-in wait (usually 5000 ms)."
+                  }
+                },
+                "required": [
+                  "command",
+                  "selector"
+                ],
+                "additionalProperties": false,
+                "description": "Wait for an element to become visible. Fails the script if the element does not appear within `timeoutMs`.\n\n```yaml\n- waitFor: \"Welcome\"\n- waitFor: { text: \"Done\", timeout: 10000 }\n```"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "const": "assertVisible"
+                  },
+                  "selector": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string",
+                        "description": "Match element by its visible text (the string the user sees). Use for buttons, labels, menu items. YAML shorthand: a bare string like `tap: \"Login\"` expands to `{ text: \"Login\", label: \"Login\" }` for Flutter parity."
+                      },
+                      "id": {
+                        "type": "string",
+                        "description": "Match element by its stable resource id (Android `resource-id`) or accessibility id (iOS). Preferred when the app exposes them — survives i18n and copy changes. Example: `id: com.app:id/login_btn`."
+                      },
+                      "label": {
+                        "type": "string",
+                        "description": "Match element by its accessibility label. Flutter exposes visible text as `label`; native Android/iOS use `text`. Setting both lets priority broadening try each platform's convention without the author knowing which."
+                      },
+                      "hint": {
+                        "type": "string",
+                        "description": "Match element by its input hint / placeholder. Use for text fields whose only identifier is the placeholder text (e.g. `hint: \"Search products\"`)."
+                      },
+                      "role": {
+                        "type": "string",
+                        "description": "Constrain the match to a semantic role. Common values: 'button', 'text-field', 'image', 'link', 'checkbox', 'switch', 'container'. Narrow broad text matches — e.g. `{ text: 'Home', role: 'button' }` avoids matching a 'Home' menu item."
+                      },
+                      "nth": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "When multiple elements match, pick the nth one (0-indexed). Use sparingly — `nth` is brittle under layout changes. Prefer adding `role` or a more specific `text`."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Element selector. Every field is optional, but at least one must be set for the selector to be useful. In YAML, a bare string shorthand — e.g. `tap: \"Login\"` — is equivalent to `tap: { text: \"Login\", label: \"Login\" }`."
+                  },
+                  "timeoutMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Polling timeout in ms. 0 or omitted = single instant check."
+                  }
+                },
+                "required": [
+                  "command",
+                  "selector"
+                ],
+                "additionalProperties": false,
+                "description": "Assert an element is currently visible. Unlike `waitFor`, this is an assertion — the step fails (not the step's precondition) if the element is absent."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "const": "assertNotVisible"
+                  },
+                  "selector": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string",
+                        "description": "Match element by its visible text (the string the user sees). Use for buttons, labels, menu items. YAML shorthand: a bare string like `tap: \"Login\"` expands to `{ text: \"Login\", label: \"Login\" }` for Flutter parity."
+                      },
+                      "id": {
+                        "type": "string",
+                        "description": "Match element by its stable resource id (Android `resource-id`) or accessibility id (iOS). Preferred when the app exposes them — survives i18n and copy changes. Example: `id: com.app:id/login_btn`."
+                      },
+                      "label": {
+                        "type": "string",
+                        "description": "Match element by its accessibility label. Flutter exposes visible text as `label`; native Android/iOS use `text`. Setting both lets priority broadening try each platform's convention without the author knowing which."
+                      },
+                      "hint": {
+                        "type": "string",
+                        "description": "Match element by its input hint / placeholder. Use for text fields whose only identifier is the placeholder text (e.g. `hint: \"Search products\"`)."
+                      },
+                      "role": {
+                        "type": "string",
+                        "description": "Constrain the match to a semantic role. Common values: 'button', 'text-field', 'image', 'link', 'checkbox', 'switch', 'container'. Narrow broad text matches — e.g. `{ text: 'Home', role: 'button' }` avoids matching a 'Home' menu item."
+                      },
+                      "nth": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "When multiple elements match, pick the nth one (0-indexed). Use sparingly — `nth` is brittle under layout changes. Prefer adding `role` or a more specific `text`."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Element selector. Every field is optional, but at least one must be set for the selector to be useful. In YAML, a bare string shorthand — e.g. `tap: \"Login\"` — is equivalent to `tap: { text: \"Login\", label: \"Login\" }`."
+                  },
+                  "timeoutMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "How long to wait for the element to disappear, in ms. 0 or omitted = single instant check."
+                  }
+                },
+                "required": [
+                  "command",
+                  "selector"
+                ],
+                "additionalProperties": false,
+                "description": "Assert an element is NOT visible. Useful after dismissing a dialog or navigating away."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "const": "screenshot"
+                  },
+                  "label": {
+                    "type": "string",
+                    "description": "Filename-safe label attached to the screenshot in the run artifacts. Omit to auto-name by step index."
+                  }
+                },
+                "required": [
+                  "command"
+                ],
+                "additionalProperties": false,
+                "description": "Capture a screenshot and attach it to the run artifacts.\n\n```yaml\n- screenshot               # auto-named\n- screenshot: home_screen  # labeled\n```"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "const": "swipe"
+                  },
+                  "direction": {
+                    "type": "string",
+                    "enum": [
+                      "up",
+                      "down",
+                      "left",
+                      "right"
+                    ],
+                    "description": "Swipe direction. 'up' scrolls content up (content moves up, the view reveals what was below). Mnemonic: direction of finger travel."
+                  }
+                },
+                "required": [
+                  "command",
+                  "direction"
+                ],
+                "additionalProperties": false,
+                "description": "Swipe the screen in a cardinal direction. Targets the centre of the visible viewport. For swipes on a specific element or with custom distance, use `pointer` instead."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "const": "pressKey"
+                  },
+                  "key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Key identifier. Common values: 'enter', 'back', 'home', 'menu', 'search', 'volumeUp', 'volumeDown', 'power'. Platform-specific keys are accepted — the driver maps them."
+                  }
+                },
+                "required": [
+                  "command",
+                  "key"
+                ],
+                "additionalProperties": false,
+                "description": "Press a hardware or system key. Example: `- pressKey: enter`."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "const": "back"
+                  }
+                },
+                "required": [
+                  "command"
+                ],
+                "additionalProperties": false,
+                "description": "Navigate back one step. Equivalent to Android's back button / iOS's swipe-back / view-stack pop. Example: `- back`."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "const": "sleep"
+                  },
+                  "ms": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Sleep duration in milliseconds. Avoid values above ~3000 — long unconditional sleeps mask timing bugs. Prefer `waitFor`."
+                  }
+                },
+                "required": [
+                  "command",
+                  "ms"
+                ],
+                "additionalProperties": false,
+                "description": "Unconditional wait. Use only when no observable signal exists (rare). Prefer `waitFor` for element-bound waits."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "const": "capture"
+                  },
+                  "pattern": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Method + path pattern to match against the captured traffic. Format: `METHOD /path`. Supports `*` wildcard. Examples: `POST /api/transfer`, `GET /users/*`."
+                  },
+                  "as": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                    "description": "Variable name to bind the captured request to. Referenceable later via `${name}` and by `from:` in `assertApi`/`extract`/`branch`."
+                  }
+                },
+                "required": [
+                  "command",
+                  "pattern",
+                  "as"
+                ],
+                "additionalProperties": false,
+                "description": "Capture the next request that matches `pattern` via the network proxy. Read-only (does not modify the request). Requires proxy.\n\n```yaml\n- capture: { pattern: \"POST /api/login\", as: loginResp }\n- capture: \"POST /api/transfer as: transfer\"   # shorthand\n```"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "const": "assertApi"
+                  },
+                  "from": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                    "description": "Variable name of a previously captured request."
+                  },
+                  "status": {
+                    "type": "integer",
+                    "minimum": 100,
+                    "maximum": 599,
+                    "description": "Expected HTTP status code (100–599)."
+                  },
+                  "body": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "description": "Body assertions keyed by dot-path. Each key is a JSONPath- style selector against the response body; each value is the expected match.\n\n```yaml\nbody:\n  \"$.status\": completed\n  \"$.user.id\": ${userId}\n```"
+                  }
+                },
+                "required": [
+                  "command",
+                  "from"
+                ],
+                "additionalProperties": false,
+                "description": "Assert that a captured request's response matches the given status and/or body shape. Fails the step on mismatch."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "const": "extract"
+                  },
+                  "from": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                    "description": "Variable name of a previously captured request."
+                  },
+                  "values": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "Map of target variable name → dot-path to extract from the captured response. Extracted values are usable as `${name}` in subsequent steps."
+                  }
+                },
+                "required": [
+                  "command",
+                  "from",
+                  "values"
+                ],
+                "additionalProperties": false,
+                "description": "Extract fields from a captured API response into runtime variables.\n\n```yaml\n- extract:\n    from: login\n    values:\n      token: $.body.token\n      userId: $.body.user.id\n```"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "const": "handle"
+                  },
+                  "branches": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "when": {
+                          "type": "object",
+                          "properties": {
+                            "visible": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "text": {
+                                      "type": "string",
+                                      "description": "Match element by its visible text (the string the user sees). Use for buttons, labels, menu items. YAML shorthand: a bare string like `tap: \"Login\"` expands to `{ text: \"Login\", label: \"Login\" }` for Flutter parity."
+                                    },
+                                    "id": {
+                                      "type": "string",
+                                      "description": "Match element by its stable resource id (Android `resource-id`) or accessibility id (iOS). Preferred when the app exposes them — survives i18n and copy changes. Example: `id: com.app:id/login_btn`."
+                                    },
+                                    "label": {
+                                      "type": "string",
+                                      "description": "Match element by its accessibility label. Flutter exposes visible text as `label`; native Android/iOS use `text`. Setting both lets priority broadening try each platform's convention without the author knowing which."
+                                    },
+                                    "hint": {
+                                      "type": "string",
+                                      "description": "Match element by its input hint / placeholder. Use for text fields whose only identifier is the placeholder text (e.g. `hint: \"Search products\"`)."
+                                    },
+                                    "role": {
+                                      "type": "string",
+                                      "description": "Constrain the match to a semantic role. Common values: 'button', 'text-field', 'image', 'link', 'checkbox', 'switch', 'container'. Narrow broad text matches — e.g. `{ text: 'Home', role: 'button' }` avoids matching a 'Home' menu item."
+                                    },
+                                    "nth": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "description": "When multiple elements match, pick the nth one (0-indexed). Use sparingly — `nth` is brittle under layout changes. Prefer adding `role` or a more specific `text`."
+                                    }
+                                  },
+                                  "additionalProperties": false,
+                                  "description": "Element selector. Every field is optional, but at least one must be set for the selector to be useful. In YAML, a bare string shorthand — e.g. `tap: \"Login\"` — is equivalent to `tap: { text: \"Login\", label: \"Login\" }`."
+                                }
+                              ],
+                              "description": "Branch matches when this element IS visible. Shorthand: a bare string becomes `{ text, label }`."
+                            },
+                            "notVisible": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "text": {
+                                      "type": "string",
+                                      "description": "Match element by its visible text (the string the user sees). Use for buttons, labels, menu items. YAML shorthand: a bare string like `tap: \"Login\"` expands to `{ text: \"Login\", label: \"Login\" }` for Flutter parity."
+                                    },
+                                    "id": {
+                                      "type": "string",
+                                      "description": "Match element by its stable resource id (Android `resource-id`) or accessibility id (iOS). Preferred when the app exposes them — survives i18n and copy changes. Example: `id: com.app:id/login_btn`."
+                                    },
+                                    "label": {
+                                      "type": "string",
+                                      "description": "Match element by its accessibility label. Flutter exposes visible text as `label`; native Android/iOS use `text`. Setting both lets priority broadening try each platform's convention without the author knowing which."
+                                    },
+                                    "hint": {
+                                      "type": "string",
+                                      "description": "Match element by its input hint / placeholder. Use for text fields whose only identifier is the placeholder text (e.g. `hint: \"Search products\"`)."
+                                    },
+                                    "role": {
+                                      "type": "string",
+                                      "description": "Constrain the match to a semantic role. Common values: 'button', 'text-field', 'image', 'link', 'checkbox', 'switch', 'container'. Narrow broad text matches — e.g. `{ text: 'Home', role: 'button' }` avoids matching a 'Home' menu item."
+                                    },
+                                    "nth": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "description": "When multiple elements match, pick the nth one (0-indexed). Use sparingly — `nth` is brittle under layout changes. Prefer adding `role` or a more specific `text`."
+                                    }
+                                  },
+                                  "additionalProperties": false,
+                                  "description": "Element selector. Every field is optional, but at least one must be set for the selector to be useful. In YAML, a bare string shorthand — e.g. `tap: \"Login\"` — is equivalent to `tap: { text: \"Login\", label: \"Login\" }`."
+                                }
+                              ],
+                              "description": "Branch matches when this element is NOT visible."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "description": "Condition a `handle` branch matches on. Exactly one of `visible` / `notVisible` should be set."
+                        },
+                        "do": {
+                          "anyOf": [
+                            {
+                              "type": "array",
+                              "items": {}
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ],
+                          "description": "Steps to execute when the `when` condition holds. Either an inline list of steps, or a string path to a flow fragment file (relative to the current script)."
+                        }
+                      },
+                      "required": [
+                        "when",
+                        "do"
+                      ],
+                      "additionalProperties": false,
+                      "description": "One branch of a `handle` step: a condition plus the steps to run when that condition matches."
+                    },
+                    "minItems": 1,
+                    "description": "Ordered list of branches. First matching `when` wins — subsequent branches are skipped for this invocation."
+                  },
+                  "otherwise": {
+                    "type": "string",
+                    "enum": [
+                      "fail",
+                      "skip"
+                    ],
+                    "description": "Action when no branch matches within `timeout`. 'fail' (default) fails the step; 'skip' continues the script."
+                  },
+                  "timeout": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Max time (ms) the runner waits for any branch's `when` condition to hold. When the timeout expires without a match, `otherwise` fires. Default is chosen to cover typical screen transitions so simple scripts need no explicit `sleep` before a `handle`."
+                  }
+                },
+                "required": [
+                  "command",
+                  "branches"
+                ],
+                "additionalProperties": false,
+                "description": "UI-based branching — probe the current screen state and run the matching branch.\n\n```yaml\n- handle:\n    - when: { visible: \"Enter OTP\" }\n      do:\n        - type: \"123456\"\n        - tap: \"Verify\"\n    - when: { visible: \"Success\" }\n      do:\n        - screenshot: success\n    - otherwise: fail\n```"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "const": "branch"
+                  },
+                  "from": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                    "description": "Variable name of a previously captured request to route on."
+                  },
+                  "on": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "match": {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "integer",
+                              "minimum": 100,
+                              "maximum": 599,
+                              "description": "Match when response status equals this code."
+                            },
+                            "body": {
+                              "type": "object",
+                              "additionalProperties": {},
+                              "description": "Match when every dot-path in this map equals its expected value in the response body."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "description": "Case condition for an API-based `branch`. Conditions are ANDed together (status AND body must both match)."
+                        },
+                        "do": {
+                          "anyOf": [
+                            {
+                              "type": "array",
+                              "items": {}
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ],
+                          "description": "Steps to run when this case matches. Inline list or path to a flow fragment."
+                        }
+                      },
+                      "required": [
+                        "match",
+                        "do"
+                      ],
+                      "additionalProperties": false,
+                      "description": "One case of a `branch` step: a match condition plus the steps to run when that case matches."
+                    },
+                    "minItems": 1,
+                    "description": "Ordered list of cases. First matching `match` wins."
+                  },
+                  "default": {
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {}
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ],
+                    "description": "Steps (inline) or flow-fragment path to run when no case matches. Omit to make a non-match a step failure."
+                  }
+                },
+                "required": [
+                  "command",
+                  "from",
+                  "on"
+                ],
+                "additionalProperties": false,
+                "description": "API-based branching — route based on a captured API response.\n\n```yaml\n- branch:\n    from: payment\n    on:\n      - match: { body: { $.requires_otp: true } }\n        do:\n          - waitFor: \"Enter OTP\"\n      - match: { status: 400 }\n        do:\n          - screenshot: error\n    default:\n      - waitFor: \"Success\"\n```"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "const": "runFlow"
+                  },
+                  "file": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Path to the sub-flow YML file, relative to the current script's directory. The sub-flow executes in this script's context (shares appId, env, captures)."
+                  },
+                  "env": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "Extra variables to pass to the sub-flow. Merged over the parent env — sub-flow values win on key collision."
+                  }
+                },
+                "required": [
+                  "command",
+                  "file"
+                ],
+                "additionalProperties": false,
+                "description": "Execute another YML script as a sub-flow.\n\n```yaml\n- runFlow: flows/login.yml\n- runFlow:\n    file: flows/login.yml\n    env:\n      email: other@test.com\n```"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "const": "pointer"
+                  },
+                  "actions": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "down"
+                            },
+                            "target": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "selector": {
+                                      "type": "object",
+                                      "properties": {
+                                        "text": {
+                                          "type": "string",
+                                          "description": "Match element by its visible text (the string the user sees). Use for buttons, labels, menu items. YAML shorthand: a bare string like `tap: \"Login\"` expands to `{ text: \"Login\", label: \"Login\" }` for Flutter parity."
+                                        },
+                                        "id": {
+                                          "type": "string",
+                                          "description": "Match element by its stable resource id (Android `resource-id`) or accessibility id (iOS). Preferred when the app exposes them — survives i18n and copy changes. Example: `id: com.app:id/login_btn`."
+                                        },
+                                        "label": {
+                                          "type": "string",
+                                          "description": "Match element by its accessibility label. Flutter exposes visible text as `label`; native Android/iOS use `text`. Setting both lets priority broadening try each platform's convention without the author knowing which."
+                                        },
+                                        "hint": {
+                                          "type": "string",
+                                          "description": "Match element by its input hint / placeholder. Use for text fields whose only identifier is the placeholder text (e.g. `hint: \"Search products\"`)."
+                                        },
+                                        "role": {
+                                          "type": "string",
+                                          "description": "Constrain the match to a semantic role. Common values: 'button', 'text-field', 'image', 'link', 'checkbox', 'switch', 'container'. Narrow broad text matches — e.g. `{ text: 'Home', role: 'button' }` avoids matching a 'Home' menu item."
+                                        },
+                                        "nth": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "description": "When multiple elements match, pick the nth one (0-indexed). Use sparingly — `nth` is brittle under layout changes. Prefer adding `role` or a more specific `text`."
+                                        }
+                                      },
+                                      "additionalProperties": false,
+                                      "description": "Element selector. Every field is optional, but at least one must be set for the selector to be useful. In YAML, a bare string shorthand — e.g. `tap: \"Login\"` — is equivalent to `tap: { text: \"Login\", label: \"Login\" }`."
+                                    }
+                                  },
+                                  "required": [
+                                    "selector"
+                                  ],
+                                  "additionalProperties": false,
+                                  "description": "Resolve to the centre of the matched element at dispatch time."
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "point": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                          "description": "Screen x in points."
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                          "description": "Screen y in points."
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": [
+                                    "point"
+                                  ],
+                                  "additionalProperties": false,
+                                  "description": "Absolute screen coordinates in points (the same unit the `get_ui_tree` MCP tool emits as `@cx,cy`)."
+                                }
+                              ],
+                              "description": "Target of a `down` or `move` pointer action: a selector or an absolute coordinate."
+                            },
+                            "pressure": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1,
+                              "description": "Pressure applied at this action, in the range [0.0, 1.0]. Drivers without the `canPressure` capability reject scripts that set this — iOS 3D Touch, Android API 26+ stroke pressure."
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "target"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Touch down at the resolved target. A pointer sequence must open with `down`."
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "move"
+                            },
+                            "target": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "selector": {
+                                      "type": "object",
+                                      "properties": {
+                                        "text": {
+                                          "type": "string",
+                                          "description": "Match element by its visible text (the string the user sees). Use for buttons, labels, menu items. YAML shorthand: a bare string like `tap: \"Login\"` expands to `{ text: \"Login\", label: \"Login\" }` for Flutter parity."
+                                        },
+                                        "id": {
+                                          "type": "string",
+                                          "description": "Match element by its stable resource id (Android `resource-id`) or accessibility id (iOS). Preferred when the app exposes them — survives i18n and copy changes. Example: `id: com.app:id/login_btn`."
+                                        },
+                                        "label": {
+                                          "type": "string",
+                                          "description": "Match element by its accessibility label. Flutter exposes visible text as `label`; native Android/iOS use `text`. Setting both lets priority broadening try each platform's convention without the author knowing which."
+                                        },
+                                        "hint": {
+                                          "type": "string",
+                                          "description": "Match element by its input hint / placeholder. Use for text fields whose only identifier is the placeholder text (e.g. `hint: \"Search products\"`)."
+                                        },
+                                        "role": {
+                                          "type": "string",
+                                          "description": "Constrain the match to a semantic role. Common values: 'button', 'text-field', 'image', 'link', 'checkbox', 'switch', 'container'. Narrow broad text matches — e.g. `{ text: 'Home', role: 'button' }` avoids matching a 'Home' menu item."
+                                        },
+                                        "nth": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "description": "When multiple elements match, pick the nth one (0-indexed). Use sparingly — `nth` is brittle under layout changes. Prefer adding `role` or a more specific `text`."
+                                        }
+                                      },
+                                      "additionalProperties": false,
+                                      "description": "Element selector. Every field is optional, but at least one must be set for the selector to be useful. In YAML, a bare string shorthand — e.g. `tap: \"Login\"` — is equivalent to `tap: { text: \"Login\", label: \"Login\" }`."
+                                    }
+                                  },
+                                  "required": [
+                                    "selector"
+                                  ],
+                                  "additionalProperties": false,
+                                  "description": "Resolve to the centre of the matched element at dispatch time."
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "point": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                          "description": "Screen x in points."
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                          "description": "Screen y in points."
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": [
+                                    "point"
+                                  ],
+                                  "additionalProperties": false,
+                                  "description": "Absolute screen coordinates in points (the same unit the `get_ui_tree` MCP tool emits as `@cx,cy`)."
+                                }
+                              ],
+                              "description": "Target of a `down` or `move` pointer action: a selector or an absolute coordinate."
+                            },
+                            "pressure": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1,
+                              "description": "Pressure applied at this action, in the range [0.0, 1.0]. Drivers without the `canPressure` capability reject scripts that set this — iOS 3D Touch, Android API 26+ stroke pressure."
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "target"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Drag the active pointer to a new target. Duration per move comes from `moveDurationMs` on the enclosing `pointer` step."
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "wait"
+                            },
+                            "ms": {
+                              "type": "number",
+                              "minimum": 0,
+                              "description": "Hold duration in milliseconds."
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "ms"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Hold the current pointer position for `ms` milliseconds. Used to produce long-press and dwell gestures."
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "up"
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Release the pointer. A pointer sequence must close with `up`."
+                        }
+                      ],
+                      "description": "One primitive in a pointer sequence. W3C Actions semantics."
+                    },
+                    "description": "Single-pointer form: one sequence the active pointer walks through. Mutually exclusive with `pointers`."
+                  },
+                  "pointers": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Author-chosen pointer id. Any string — used only to distinguish parallel pointers in the multi-pointer form."
+                        },
+                        "actions": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "const": "down"
+                                  },
+                                  "target": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "selector": {
+                                            "type": "object",
+                                            "properties": {
+                                              "text": {
+                                                "type": "string",
+                                                "description": "Match element by its visible text (the string the user sees). Use for buttons, labels, menu items. YAML shorthand: a bare string like `tap: \"Login\"` expands to `{ text: \"Login\", label: \"Login\" }` for Flutter parity."
+                                              },
+                                              "id": {
+                                                "type": "string",
+                                                "description": "Match element by its stable resource id (Android `resource-id`) or accessibility id (iOS). Preferred when the app exposes them — survives i18n and copy changes. Example: `id: com.app:id/login_btn`."
+                                              },
+                                              "label": {
+                                                "type": "string",
+                                                "description": "Match element by its accessibility label. Flutter exposes visible text as `label`; native Android/iOS use `text`. Setting both lets priority broadening try each platform's convention without the author knowing which."
+                                              },
+                                              "hint": {
+                                                "type": "string",
+                                                "description": "Match element by its input hint / placeholder. Use for text fields whose only identifier is the placeholder text (e.g. `hint: \"Search products\"`)."
+                                              },
+                                              "role": {
+                                                "type": "string",
+                                                "description": "Constrain the match to a semantic role. Common values: 'button', 'text-field', 'image', 'link', 'checkbox', 'switch', 'container'. Narrow broad text matches — e.g. `{ text: 'Home', role: 'button' }` avoids matching a 'Home' menu item."
+                                              },
+                                              "nth": {
+                                                "type": "integer",
+                                                "minimum": 0,
+                                                "description": "When multiple elements match, pick the nth one (0-indexed). Use sparingly — `nth` is brittle under layout changes. Prefer adding `role` or a more specific `text`."
+                                              }
+                                            },
+                                            "additionalProperties": false,
+                                            "description": "Element selector. Every field is optional, but at least one must be set for the selector to be useful. In YAML, a bare string shorthand — e.g. `tap: \"Login\"` — is equivalent to `tap: { text: \"Login\", label: \"Login\" }`."
+                                          }
+                                        },
+                                        "required": [
+                                          "selector"
+                                        ],
+                                        "additionalProperties": false,
+                                        "description": "Resolve to the centre of the matched element at dispatch time."
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "point": {
+                                            "type": "object",
+                                            "properties": {
+                                              "x": {
+                                                "type": "number",
+                                                "description": "Screen x in points."
+                                              },
+                                              "y": {
+                                                "type": "number",
+                                                "description": "Screen y in points."
+                                              }
+                                            },
+                                            "required": [
+                                              "x",
+                                              "y"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": [
+                                          "point"
+                                        ],
+                                        "additionalProperties": false,
+                                        "description": "Absolute screen coordinates in points (the same unit the `get_ui_tree` MCP tool emits as `@cx,cy`)."
+                                      }
+                                    ],
+                                    "description": "Target of a `down` or `move` pointer action: a selector or an absolute coordinate."
+                                  },
+                                  "pressure": {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 1,
+                                    "description": "Pressure applied at this action, in the range [0.0, 1.0]. Drivers without the `canPressure` capability reject scripts that set this — iOS 3D Touch, Android API 26+ stroke pressure."
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "target"
+                                ],
+                                "additionalProperties": false,
+                                "description": "Touch down at the resolved target. A pointer sequence must open with `down`."
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "const": "move"
+                                  },
+                                  "target": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "selector": {
+                                            "type": "object",
+                                            "properties": {
+                                              "text": {
+                                                "type": "string",
+                                                "description": "Match element by its visible text (the string the user sees). Use for buttons, labels, menu items. YAML shorthand: a bare string like `tap: \"Login\"` expands to `{ text: \"Login\", label: \"Login\" }` for Flutter parity."
+                                              },
+                                              "id": {
+                                                "type": "string",
+                                                "description": "Match element by its stable resource id (Android `resource-id`) or accessibility id (iOS). Preferred when the app exposes them — survives i18n and copy changes. Example: `id: com.app:id/login_btn`."
+                                              },
+                                              "label": {
+                                                "type": "string",
+                                                "description": "Match element by its accessibility label. Flutter exposes visible text as `label`; native Android/iOS use `text`. Setting both lets priority broadening try each platform's convention without the author knowing which."
+                                              },
+                                              "hint": {
+                                                "type": "string",
+                                                "description": "Match element by its input hint / placeholder. Use for text fields whose only identifier is the placeholder text (e.g. `hint: \"Search products\"`)."
+                                              },
+                                              "role": {
+                                                "type": "string",
+                                                "description": "Constrain the match to a semantic role. Common values: 'button', 'text-field', 'image', 'link', 'checkbox', 'switch', 'container'. Narrow broad text matches — e.g. `{ text: 'Home', role: 'button' }` avoids matching a 'Home' menu item."
+                                              },
+                                              "nth": {
+                                                "type": "integer",
+                                                "minimum": 0,
+                                                "description": "When multiple elements match, pick the nth one (0-indexed). Use sparingly — `nth` is brittle under layout changes. Prefer adding `role` or a more specific `text`."
+                                              }
+                                            },
+                                            "additionalProperties": false,
+                                            "description": "Element selector. Every field is optional, but at least one must be set for the selector to be useful. In YAML, a bare string shorthand — e.g. `tap: \"Login\"` — is equivalent to `tap: { text: \"Login\", label: \"Login\" }`."
+                                          }
+                                        },
+                                        "required": [
+                                          "selector"
+                                        ],
+                                        "additionalProperties": false,
+                                        "description": "Resolve to the centre of the matched element at dispatch time."
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "point": {
+                                            "type": "object",
+                                            "properties": {
+                                              "x": {
+                                                "type": "number",
+                                                "description": "Screen x in points."
+                                              },
+                                              "y": {
+                                                "type": "number",
+                                                "description": "Screen y in points."
+                                              }
+                                            },
+                                            "required": [
+                                              "x",
+                                              "y"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": [
+                                          "point"
+                                        ],
+                                        "additionalProperties": false,
+                                        "description": "Absolute screen coordinates in points (the same unit the `get_ui_tree` MCP tool emits as `@cx,cy`)."
+                                      }
+                                    ],
+                                    "description": "Target of a `down` or `move` pointer action: a selector or an absolute coordinate."
+                                  },
+                                  "pressure": {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 1,
+                                    "description": "Pressure applied at this action, in the range [0.0, 1.0]. Drivers without the `canPressure` capability reject scripts that set this — iOS 3D Touch, Android API 26+ stroke pressure."
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "target"
+                                ],
+                                "additionalProperties": false,
+                                "description": "Drag the active pointer to a new target. Duration per move comes from `moveDurationMs` on the enclosing `pointer` step."
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "const": "wait"
+                                  },
+                                  "ms": {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "description": "Hold duration in milliseconds."
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "ms"
+                                ],
+                                "additionalProperties": false,
+                                "description": "Hold the current pointer position for `ms` milliseconds. Used to produce long-press and dwell gestures."
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "const": "up"
+                                  }
+                                },
+                                "required": [
+                                  "type"
+                                ],
+                                "additionalProperties": false,
+                                "description": "Release the pointer. A pointer sequence must close with `up`."
+                              }
+                            ],
+                            "description": "One primitive in a pointer sequence. W3C Actions semantics."
+                          },
+                          "minItems": 1,
+                          "description": "This pointer's time-ordered action list. Must open with `down` and close with `up`."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "actions"
+                      ],
+                      "additionalProperties": false,
+                      "description": "One pointer's action list, used in the multi-pointer form (`pointer.pointers`). Pointers align on a shared wall clock anchored at the earliest `down`."
+                    },
+                    "description": "Multi-pointer form: parallel sequences keyed by author id. Requires the driver's `canMultiPointer` capability. Mutually exclusive with `actions`."
+                  },
+                  "moveDurationMs": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Duration (ms) of each `move` action in this gesture. Defaults to 200 ms. Shorter = flick; longer = slow drag."
+                  }
+                },
+                "required": [
+                  "command"
+                ],
+                "additionalProperties": false,
+                "description": "General-purpose pointer gesture. Expresses every W3C Actions sequence: tap, long-press, drag, flick, pinch, rotate, multi-finger. Use when `tap`/`swipe` don't fit.\n\n```yaml\n- pointer:\n    actions:\n      - down: \"Item A\"\n      - wait: 800\n      - move: { x: 300, y: 600 }\n      - up\n    moveDurationMs: 300\n```"
+              }
+            ]
+          },
+          "description": "Ordered list of steps to execute. Each step runs after the previous one completes; `stepDelay` applies between them."
+        },
+        "_stepLines": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": "Parser metadata: 1-indexed source line for each entry in `steps`, used by run telemetry to point a failure or a live progress row at its exact position in the YAML. Underscore prefix = not part of the user-authored surface; callers do not set this — `parseScript` populates it."
+        }
+      },
+      "required": [
+        "appId",
+        "name",
+        "env",
+        "steps"
+      ],
+      "additionalProperties": false,
+      "description": "Top-level Atomyx YAML script. Two physical forms share this shape:\n\n**Entry script** — full config + steps, separated by `---`:\n\n```yaml\nappId: com.example.app\nname: Login flow\nenv:\n  email: user@test.com\n---\n- launchApp\n- tap: \"Sign in\"\n```\n\n**Flow fragment** — steps only, no config. Used by `requires`, `runFlow`, and `do: file.yml`. Executes in the parent's context (appId, env, captures)."
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

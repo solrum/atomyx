@@ -626,6 +626,9 @@ A flow fragment is a steps-only YML file — no config, no `---`:
 - waitFor: "Dashboard"
 ```
 
+<!-- atomyx-allow-path: flows/login.yml -->
+<!-- atomyx-allow-path: runFlow: flows/login.yml -->
+<!-- atomyx-allow-path: do: flows/login.yml -->
 Used by:
 - `requires: [flows/login.yml]`
 - `runFlow: flows/login.yml`

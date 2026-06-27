@@ -19,13 +19,19 @@ export function compileScriptSelector(input: ScriptSelector): Selector {
 }
 
 /**
- * Expand a bare string into a ScriptSelector. In YAML,
- * `- tap: "Login"` matches against both text AND label.
+ * Expand a YAML selector value into a canonical ScriptSelector.
  *
- * Why both: Flutter apps expose visible text as `label` in the
- * accessibility tree, not `text`. Native Android/iOS use `text`.
- * Setting both lets priority broadening try label first (higher
- * priority) then text — cross-platform without user knowing.
+ * Two entry forms are accepted:
+ *
+ *   - Bare string (`- tap: "Login"`): treated as visible-content
+ *     match. Expanded to `{ text, label }` so priority broadening
+ *     matches both native (text) and Flutter (label) apps without
+ *     the author knowing which platform exposes which.
+ *   - Object (`- tap: { id: "..." }` etc.): passed through as-is
+ *     with one exception — if the caller set `text` but not
+ *     `label`, the `label` is mirrored from `text` for the same
+ *     Flutter-parity reason. Explicit `label` wins; all other
+ *     fields (`id`, `hint`, `role`, `nth`) are preserved verbatim.
  */
 export function expandSelectorShorthand(
   value: unknown,
@@ -34,7 +40,11 @@ export function expandSelectorShorthand(
     return { text: value, label: value };
   }
   if (typeof value === "object" && value !== null) {
-    return value as ScriptSelector;
+    const obj = value as Record<string, unknown>;
+    if (typeof obj["text"] === "string" && obj["label"] === undefined) {
+      return { ...obj, label: obj["text"] } as ScriptSelector;
+    }
+    return obj as ScriptSelector;
   }
   throw new ScriptParseError(
     `Invalid selector: expected string or object, got ${typeof value}`,

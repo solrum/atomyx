@@ -2,19 +2,20 @@
   "name": "@atomyx/driver-wire",
   "version": "0.1.0",
   "private": true,
-  "description": "Atomyx framework wire protocol schemas — canonical HTTP+JSON contract between host and platform drivers",
+  "description": "Atomyx shared wire types — TreeNodeWire and primitive shapes consumed by platform driver adapters",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": "./dist/index.js",
-    "./routes": "./dist/routes.schema.js",
     "./tree": "./dist/tree-node.schema.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "node --import tsx --test $(find src -name '*.test.ts')"
+    "test": "node --import tsx --test $(find src -name '*.test.ts')",
+    "api:check": "api-extractor run",
+    "api:update": "api-extractor run --local"
   },
   "dependencies": {
     "zod": "^3.23.0"

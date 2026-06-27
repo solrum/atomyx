@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist/composition",
+    "rootDir": "./src",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+  },
+  "include": ["./src/main.tsx"],
+  "references": [
+    { "path": "./src/domain" },
+    { "path": "./src/state" },
+    { "path": "./src/platform" },
+    { "path": "./src/ui" }
+  ]
+}

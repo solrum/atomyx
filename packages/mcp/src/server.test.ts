@@ -344,6 +344,93 @@ describe("tools/call when Orchestra returns ok:false", () => {
   });
 });
 
+describe("structured tool-timeout enforcement", () => {
+  it("returns isError + TOOL_TIMEOUT envelope when the driver hangs", async () => {
+    const prevEnv = process.env.ATOMYX_TOOL_TIMEOUT_MS;
+    // Tight budget so the wrapper deadline fires fast — the test
+    // would otherwise wait the default 30s before observing the
+    // structured timeout response.
+    process.env.ATOMYX_TOOL_TIMEOUT_MS = "150";
+    try {
+      const driver = new MockDriver();
+      driver.stageHierarchyRepeated(loginScreen(), 5);
+      driver.hangOnNextHierarchy = true;
+      const session = new DeviceSession({
+        factories: { ios: () => driver, android: () => driver },
+        clock: new FakeClock(),
+      });
+      await session.select({ platform: "android", id: "mock-device" });
+      const server = createMcpServer({ session });
+      const startedAt = Date.now();
+      const result = await callTool(server, "get_ui_tree", {});
+      const elapsedMs = Date.now() - startedAt;
+      // Wrapper must have killed the call within ~budget+buffer —
+      // not waited the full default 30s, and not hung forever.
+      assert.ok(
+        elapsedMs < 2_000,
+        `wrapper should resolve quickly on timeout, got ${elapsedMs}ms`,
+      );
+      assert.equal(result.isError, true);
+      const payload = JSON.parse(result.content[0]!.text);
+      assert.equal(payload.code, "TOOL_TIMEOUT");
+      assert.equal(payload.tool, "get_ui_tree");
+      assert.equal(typeof payload.elapsedMs, "number");
+      assert.equal(typeof payload.budgetMs, "number");
+      assert.match(payload.hint, /get_ui_tree|select_device/);
+    } finally {
+      if (prevEnv === undefined) delete process.env.ATOMYX_TOOL_TIMEOUT_MS;
+      else process.env.ATOMYX_TOOL_TIMEOUT_MS = prevEnv;
+    }
+  });
+
+  it("a successful call after a hang does not leak the prior abort", async () => {
+    const prevEnv = process.env.ATOMYX_TOOL_TIMEOUT_MS;
+    process.env.ATOMYX_TOOL_TIMEOUT_MS = "150";
+    try {
+      const driver = new MockDriver();
+      driver.stageHierarchyRepeated(loginScreen(), 5);
+      driver.hangOnNextHierarchy = true;
+      const session = new DeviceSession({
+        factories: { ios: () => driver, android: () => driver },
+        clock: new FakeClock(),
+      });
+      await session.select({ platform: "android", id: "mock-device" });
+      const server = createMcpServer({ session });
+      // First call: times out.
+      const first = await callTool(server, "get_ui_tree", {});
+      assert.equal(first.isError, true);
+      // Next call: must succeed with a fresh signal — driver is no
+      // longer hanging, queued tree gets returned.
+      const second = await callTool(server, "get_ui_tree", {});
+      assert.equal(second.isError, undefined);
+      const parsed = JSON.parse(second.content[0]!.text);
+      assert.ok(Array.isArray(parsed.nodes), "second call should return a tree (nodes array)");
+      assert.ok(parsed.nodes.length > 0, "tree should have at least one node");
+    } finally {
+      if (prevEnv === undefined) delete process.env.ATOMYX_TOOL_TIMEOUT_MS;
+      else process.env.ATOMYX_TOOL_TIMEOUT_MS = prevEnv;
+    }
+  });
+
+  it("non-timeout errors still surface unstructured", async () => {
+    const driver = new MockDriver();
+    // No staged hierarchy + not hanging → hierarchy() throws
+    // "no tree staged" synchronously. Wrapper's catch path
+    // forwards the raw message, not the TOOL_TIMEOUT envelope.
+    const session = new DeviceSession({
+      factories: { ios: () => driver, android: () => driver },
+      clock: new FakeClock(),
+    });
+    await session.select({ platform: "android", id: "mock-device" });
+    const server = createMcpServer({ session });
+    const result = await callTool(server, "get_ui_tree", {});
+    assert.equal(result.isError, true);
+    // No code:TOOL_TIMEOUT — this was a real driver error.
+    assert.doesNotMatch(result.content[0]!.text, /TOOL_TIMEOUT/);
+    assert.match(result.content[0]!.text, /no tree staged/);
+  });
+});
+
 describe("custom tool surface + duplicate detection", () => {
   it("createMcpServer accepts a custom tools list", async () => {
     const driver = new MockDriver();

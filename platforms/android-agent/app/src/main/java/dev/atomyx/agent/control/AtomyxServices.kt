@@ -15,7 +15,9 @@ class AtomyxServices(val accessibility: AtomyxAccessibilityService) {
     val uiTree: UiTreeService = UiTreeService(accessibility)
     val gestureRunner: GestureRunner = GestureRunner(accessibility)
     val gestures: GestureDispatcher = GestureDispatcher(gestureRunner)
-    val input: InputDispatcher = InputDispatcher(accessibility, uiTree, gestures)
+    val keyboardTyper: KeyboardTyper = KeyboardTyper(accessibility, uiTree, gestures)
+    val focusedInputClearer: FocusedInputClearer = FocusedInputClearer(accessibility, uiTree, gestures)
+    val keyboardHider: KeyboardHider = KeyboardHider(accessibility, uiTree)
     val system: SystemActionDispatcher = SystemActionDispatcher(accessibility)
 
     init {

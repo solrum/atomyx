@@ -56,6 +56,18 @@ export interface ToolContext {
   readonly storage: Storage;
   readonly runStore: RunStore;
   readonly clock: Clock;
+  /**
+   * Per-call abort signal owned by the server's tool wrapper. The
+   * server aborts this when the tool's own declared budget elapses
+   * so the underlying driver call can tear down its in-flight
+   * request instead of hanging.
+   *
+   * Tool handlers MUST forward this signal into every Orchestra /
+   * Finder call as `{ signal: ctx.signal }`. Long-running internal
+   * loops (polling, retrying) MUST check `ctx.signal.aborted`
+   * between iterations and throw early when set.
+   */
+  readonly signal: AbortSignal;
 }
 
 /**

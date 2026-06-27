@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "atomyx-dark-violet",
+  "label": "Atomyx · Dark Violet",
+  "extends": "intellij-darcula",
+  "monacoBase": "vs-dark",
+  "attributes": {
+    "ATOMYX_KEYWORD": { "foreground": "#c586c0", "fontStyle": "bold" },
+    "ATOMYX_COMMAND_BARE": { "foreground": "#c586c0", "fontStyle": "bold" },
+    "ATOMYX_SELECTOR": { "foreground": "#9cdcfe" },
+    "ATOMYX_VARIABLE": { "foreground": "#c586c0", "fontStyle": "italic" },
+
+    "SYNTAX_STRING": { "foreground": "#ce9178" },
+    "SYNTAX_NUMBER": { "foreground": "#b5cea8" },
+    "SYNTAX_COMMENT": { "foreground": "#6a9955", "fontStyle": "italic" }
+  }
+}

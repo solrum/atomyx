@@ -22,6 +22,6 @@ export const pressKeyTool = defineTool({
   inputSchema: PressKeyArgs,
   async execute(args, ctx) {
     const orchestra = orchestraOrFail(ctx);
-    return orchestra.pressKey(args.key);
+    return orchestra.pressKey(args.key, { signal: ctx.signal });
   },
 });

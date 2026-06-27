@@ -11,8 +11,9 @@ package dev.atomyx.agent.control
  * Responsibility boundary:
  *
  *   - **Gesture primitives only**. Text input helpers live in
- *     [InputDispatcher]; global key presses / app lifecycle live
- *     in [SystemActionDispatcher]. A reader who only needs to
+ *     [KeyboardTyper], [FocusedInputClearer], and [KeyboardHider];
+ *     global key presses / app lifecycle live in
+ *     [SystemActionDispatcher]. A reader who only needs to
  *     understand "how does a tap reach the OS" should not have
  *     to scroll past typing heuristics.
  */

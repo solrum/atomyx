@@ -56,6 +56,14 @@ export interface WaitOptions {
    * faster convergence but more RPC load. Default 250ms.
    */
   readonly pollIntervalMs?: number;
+  /**
+   * External abort signal. When aborted, the in-flight hierarchy
+   * RPC is cancelled and the next loop iteration throws the
+   * signal's reason (typically an `AbortError`). The MCP tool
+   * wrapper aborts this when its own deadline fires so a hung
+   * hierarchy call doesn't block the response.
+   */
+  readonly signal?: AbortSignal;
 }
 
 export class FindTimeoutError extends Error {
@@ -82,8 +90,8 @@ export class Finder {
    * Single-shot find. Captures the hierarchy once and runs the
    * filter against it. No polling, no retry.
    */
-  async find(filter: ElementFilter): Promise<TreeCursor[]> {
-    const tree = await this.deps.driver.hierarchy();
+  async find(filter: ElementFilter, opts?: { signal?: AbortSignal }): Promise<TreeCursor[]> {
+    const tree = await this.deps.driver.hierarchy({ signal: opts?.signal });
     const cursors = fromTree(tree);
     return filter(cursors);
   }
@@ -91,8 +99,11 @@ export class Finder {
   /**
    * Single-shot find returning the first match or null.
    */
-  async findOne(filter: ElementFilter): Promise<TreeCursor | null> {
-    const results = await this.find(filter);
+  async findOne(
+    filter: ElementFilter,
+    opts?: { signal?: AbortSignal },
+  ): Promise<TreeCursor | null> {
+    const results = await this.find(filter, opts);
     return results[0] ?? null;
   }
 
@@ -115,8 +126,11 @@ export class Finder {
     const deadline = startedAt + opts.timeoutMs;
     let polls = 0;
     while (true) {
+      if (opts.signal?.aborted) {
+        throw opts.signal.reason ?? new DOMException("Aborted", "AbortError");
+      }
       polls++;
-      const results = await this.find(filter);
+      const results = await this.find(filter, { signal: opts.signal });
       if (results.length > 0) {
         this.logger.debug("waitFor resolved", {
           polls,

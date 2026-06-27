@@ -11,7 +11,7 @@ import {
 const WaitForElementArgs = z
   .object({
     selector: SelectorSchema,
-    timeoutMs: z.number().int().positive().optional(),
+    timeoutMs: z.number().int().positive().default(5000),
     pollIntervalMs: z.number().int().positive().optional(),
   })
   .strict();
@@ -44,8 +44,9 @@ export const waitForElementTool = defineTool({
     const selector = compileSelectorInput(args.selector);
     try {
       const cursors = await orchestra.waitFor(selector, {
-        timeoutMs: args.timeoutMs ?? 5000,
+        timeoutMs: args.timeoutMs,
         pollIntervalMs: args.pollIntervalMs,
+        signal: ctx.signal,
       });
       const cursor = cursors[0]!;
       const attrs = cursor.node.attributes;

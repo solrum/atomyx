@@ -1,0 +1,84 @@
+format: atomyx/v1
+appId: dev.atomyx.demo
+name: API-driven branching
+description: |
+  Routes the UI based on the captured login response — different
+  body shapes drive different post-login flows. Demonstrates
+  `branch` (deterministic routing on a captured request) versus
+  `handle` (visibility-polling on the live UI).
+tags:
+  - api
+  - branching
+  - capture
+proxy: required
+env:
+  email: qa+branch@atomyx.test
+  password: super-secret
+---
+- launchApp
+- waitFor: "Sign in"
+
+- type:
+    into:
+      id: email
+    text: ${email}
+- type:
+    into:
+      id: password
+    text: ${password}
+
+# Arm + tap. The single capture variable will be routed below.
+- capture: "POST /api/v1/auth/login as: loginRsp"
+- tap: "Login"
+
+# Deterministic routing on the captured response. First match wins.
+# Each `do` is an inline list of steps; alternatively a string path
+# to a sub-flow YML works the same way.
+- branch:
+    from: loginRsp
+    on:
+      # Step-up auth required — server returns 200 + a flag.
+      - match:
+          status: 200
+          body:
+            "$.requires_step_up": true
+        do:
+          - waitFor: "Verify it's you"
+          - type:
+              into:
+                id: otp
+              text: "123456"
+          - tap:
+              text: "Verify"
+              role: button
+          - waitFor: "Dashboard"
+
+      # Brand-new account — onboarding wizard.
+      - match:
+          status: 200
+          body:
+            "$.user.is_new": true
+        do:
+          - waitFor: "Welcome aboard"
+          - tap: "Get started"
+          - waitFor: "Dashboard"
+
+      # Plain happy path — already onboarded user.
+      - match:
+          status: 200
+          body:
+            "$.user.is_new": false
+        do:
+          - waitFor: "Dashboard"
+
+      # Wrong credentials — assert the error UI surfaced.
+      - match:
+          status: 401
+        do:
+          - assertVisible: "Invalid email or password"
+          - screenshot: login-rejected
+    default:
+      - assertVisible: "Something went wrong"
+      - screenshot: unexpected-login-response
+
+- screenshot: post-login

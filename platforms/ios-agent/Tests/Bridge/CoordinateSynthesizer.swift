@@ -114,47 +114,58 @@ final class CoordinateSynthesizer: EventSynthesizer {
     let mechanismName = "coordinate"
     let probeLog: String? = nil
 
+    /// Springboard bundle id. `XCUIApplication(bundleIdentifier:)`
+    /// returns a proxy whose `frame` matches the device's full
+    /// screen rect without requiring a `launch()` call — we need
+    /// only the `(0,0)` normalized origin to anchor device-global
+    /// point coordinates via `coordinate(withNormalizedOffset:)
+    /// .withOffset(...)`. Using Springboard as the anchor is a
+    /// stable choice: it is always resident and its frame never
+    /// depends on a test-driven app being present.
+    private static let anchorBundleId = "com.apple.springboard"
+
     private let classifier = PointerPatternClassifier()
 
-    func dispatch(pointers: [PointerPath], in app: XCUIApplication) throws {
+    func dispatch(pointers: [PointerPath]) throws {
         guard pointers.count == 1 else {
             throw SynthesizerError.patternNotExpressible(
                 reason: "coordinate backend accepts exactly one pointer, got \(pointers.count)"
             )
         }
         let pattern = try classifier.classify(path: pointers[0])
-        try execute(pattern: pattern, in: app)
+        try execute(pattern: pattern)
     }
 
-    private func execute(pattern: PublicPointerPattern, in app: XCUIApplication) throws {
+    private func execute(pattern: PublicPointerPattern) throws {
         // XCUICoordinate primitives must run on the main thread.
         // Hop only when not already on main — nesting
         // `DispatchQueue.main.sync` aborts under libdispatch.
         if Thread.isMainThread {
-            runOnMain(pattern: pattern, in: app)
+            runOnMain(pattern: pattern)
         } else {
-            DispatchQueue.main.sync { runOnMain(pattern: pattern, in: app) }
+            DispatchQueue.main.sync { runOnMain(pattern: pattern) }
         }
     }
 
-    private func runOnMain(pattern: PublicPointerPattern, in app: XCUIApplication) {
+    private func runOnMain(pattern: PublicPointerPattern) {
+        let anchor = XCUIApplication(bundleIdentifier: Self.anchorBundleId)
         switch pattern {
         case .tap(let p):
-            coordinate(in: app, point: p).tap()
+            coordinate(anchor: anchor, point: p).tap()
 
         case .longPress(let p, let durationSeconds):
-            coordinate(in: app, point: p).press(forDuration: durationSeconds)
+            coordinate(anchor: anchor, point: p).press(forDuration: durationSeconds)
 
         case .drag(let from, let to, let pressSeconds):
-            let start = coordinate(in: app, point: from)
-            let end = coordinate(in: app, point: to)
+            let start = coordinate(anchor: anchor, point: from)
+            let end = coordinate(anchor: anchor, point: to)
             let effectivePress = max(pressSeconds, GESTURE_MIN_PRESS_SECONDS)
             start.press(forDuration: effectivePress, thenDragTo: end)
         }
     }
 
-    private func coordinate(in app: XCUIApplication, point: CGPoint) -> XCUICoordinate {
-        let origin = app.coordinate(
+    private func coordinate(anchor: XCUIApplication, point: CGPoint) -> XCUICoordinate {
+        let origin = anchor.coordinate(
             withNormalizedOffset: CGVector(dx: 0, dy: 0)
         )
         return origin.withOffset(CGVector(dx: point.x, dy: point.y))

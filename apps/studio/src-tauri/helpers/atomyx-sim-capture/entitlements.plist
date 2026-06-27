@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- ScreenCaptureKit stream session requires the hardened
+         runtime; this entitlement file is referenced by the sign
+         step so the binary keeps system framework access while
+         staying hardened. No sandbox — this is a dev helper that
+         spawns under Studio, not a distributed app. -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <false/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <false/>
+</dict>
+</plist>

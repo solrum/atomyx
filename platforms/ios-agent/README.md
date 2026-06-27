@@ -29,7 +29,7 @@ Covers the full `Driver` primitive set:
 | `getScreenSize` | `app.frame` in points |
 
 Selector resolution, scroll-into-view, obscurement detection,
-priority broadening, and observation-driven wait primitives live
+priority broadening, and driver-side wait primitives live
 **host-side** in `@atomyx/driver`. The Swift driver never receives
 a `Selector` — it only speaks coordinates.
 

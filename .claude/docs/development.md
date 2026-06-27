@@ -164,8 +164,8 @@ See [`tools.md`](./tools.md) for the full template. Short version:
 
 ### Adding a new selector strategy
 
-Selector resolution is pure function composition. To add a new match
-mode:
+Selector resolution is pure function composition now — no more
+strategy classes. To add a new match mode:
 
 1. Add a filter function to
    `packages/driver/src/filters/element-filter.ts` (e.g.
@@ -175,7 +175,7 @@ mode:
    it's a default strategy — or leave it as an exported primitive
    advanced users compose manually.
 3. No device-side changes needed. Selector resolution runs entirely
-   host-side; the Swift/Kotlin drivers only produce raw trees.
+   host-side now; the Swift/Kotlin drivers only produce raw trees.
 
 ## Testing philosophy
 
@@ -210,12 +210,14 @@ mode:
 
 ## Release / publish
 
+Not yet wired. When ready:
+
 - Each `packages/*/package.json` publishes independently (`npm
-  publish --workspace @atomyx/mcp`).
+  publish --workspace @atomyx/driver`).
 - Changeset-based versioning is the planned tool.
 - CI publishes on tag push.
-- `@atomyx/mcp` is the first published module — it pulls
-  `@atomyx/driver` + the platform adapters as peer deps.
+- `@atomyx/cli` is the primary end-user install target
+  — it transitively pulls the drivers + MCP server.
 
-See [`architecture.md`](./architecture.md) §6 for the distribution
-model per persona.
+See [`architecture.md`](./architecture.md) §6 for the planned
+distribution model per persona.
