@@ -156,6 +156,7 @@ Fuller rationale + boundary enforcement: [`.claude/docs/architecture.md`](./.cla
 | Edit Android, iOS, or tool-layer code                   | [`.claude/docs/pitfalls.md`](./.claude/docs/pitfalls.md)                |
 | Touch anything iOS-related                              | [`.claude/docs/ios.md`](./.claude/docs/ios.md)                          |
 | Touch anything Android-related                          | [`.claude/docs/android.md`](./.claude/docs/android.md)                  |
+| Check proxy, install cert, or manage screen lock on Android | [`.claude/docs/android-device-setup.md`](./.claude/docs/android-device-setup.md) |
 | Write or edit any comment / docstring                   | [`.claude/rules/comments.md`](./.claude/rules/comments.md)              |
 | Write or edit any file under `docs/` or `.claude/docs/` | [`.claude/rules/docs.md`](./.claude/rules/docs.md)                      |
 | Edit anything under `apps/studio/`                      | [`.claude/rules/studio-architecture.md`](./.claude/rules/studio-architecture.md) |
