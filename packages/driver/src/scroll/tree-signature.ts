@@ -2,13 +2,30 @@ import type { TreeNode } from "../tree/tree-node.js";
 import { AttrKeys } from "../tree/tree-node.js";
 
 /**
+ * Pixel size of the bucket each bounds coordinate is rounded into
+ * before hashing. Picked larger than the typical iOS UIScrollView
+ * rubber-band settle drift (usually < 30 px) so a bounce on a
+ * non-scrollable container does not appear as a content change.
+ * Real list scrolls move items by at least one row height (≥ 40 px
+ * on common layouts), so legitimate scrolling crosses bucket
+ * boundaries reliably.
+ */
+const BOUNDS_BUCKET_PX = 50;
+
+/**
  * Hash the set of visible leaf nodes in a UI tree.
  *
  * A leaf is any node with no children (or an empty children array).
  * Each leaf contributes a string combining its text, label, and
- * bounds attributes. Leaf strings are sorted before hashing so
- * sibling order does not affect the result — only the SET of
- * visible leaves matters.
+ * bucketed bounds attributes. Leaf strings are sorted before
+ * hashing so sibling order does not affect the result — only the
+ * SET of visible leaves matters.
+ *
+ * Bounds are quantized into BOUNDS_BUCKET_PX cells before hashing
+ * so sub-bucket drift (iOS rubber-band bounce settling back to
+ * "near" original position) does not flip the hash. Two consecutive
+ * snapshots of the same content land in the same buckets even when
+ * the platform reports bounds off by a few pixels.
  *
  * Returns a djb2 hex string. Callers compare two consecutive hashes
  * to detect scroll-boundary saturation: equal hashes mean the tree
@@ -67,12 +84,24 @@ function collectLeaves(node: TreeNode, out: string[]): void {
     const text = node.attributes[AttrKeys.Text] ?? "";
     const label = node.attributes[AttrKeys.Label] ?? "";
     const bounds = node.attributes[AttrKeys.Bounds] ?? "";
-    out.push(`${text}|${label}|${bounds}`);
+    out.push(`${text}|${label}|${bucketBounds(bounds)}`);
     return;
   }
   for (const child of node.children) {
     collectLeaves(child, out);
   }
+}
+
+function bucketBounds(bounds: string): string {
+  if (!bounds) return "";
+  const parts = bounds.split(",");
+  if (parts.length !== 4) return bounds;
+  const out: string[] = new Array(4);
+  for (let i = 0; i < 4; i++) {
+    const n = Number(parts[i]);
+    out[i] = Number.isNaN(n) ? parts[i] : String(Math.floor(n / BOUNDS_BUCKET_PX));
+  }
+  return out.join(",");
 }
 
 function visitLeaves(node: TreeNode, cb: (n: TreeNode) => void): void {

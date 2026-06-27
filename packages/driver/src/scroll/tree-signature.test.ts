@@ -21,10 +21,19 @@ describe("hashVisibleLeaves", () => {
     assert.equal(hashVisibleLeaves(tree), hashVisibleLeaves(tree));
   });
 
-  it("different bounds → different hash", () => {
+  it("bounds shifted past the bucket size → different hash", () => {
+    // 100 → 200 on top crosses bucket boundary (bucket size = 50).
     const treeA = containerWith(leafNode("Hello", "0,100,430,140"));
     const treeB = containerWith(leafNode("Hello", "0,200,430,240"));
     assert.notEqual(hashVisibleLeaves(treeA), hashVisibleLeaves(treeB));
+  });
+
+  it("sub-bucket bounds drift → same hash (bounce tolerance)", () => {
+    // iOS rubber-band bounce can settle bounds a few pixels off the
+    // pre-swipe position. Saturation must still trigger in that case.
+    const treeA = containerWith(leafNode("Hello", "0,100,430,140"));
+    const treeB = containerWith(leafNode("Hello", "3,105,433,145"));
+    assert.equal(hashVisibleLeaves(treeA), hashVisibleLeaves(treeB));
   });
 
   it("leaf order does not affect hash (deterministic sort)", () => {
