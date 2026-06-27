@@ -57,6 +57,7 @@ export const swipeTool = defineTool({
       await orchestra.swipeDirection(args.direction, {
         durationMs: args.durationMs,
         fraction: args.fraction,
+        signal: ctx.signal,
       });
       return { ok: true, direction: args.direction };
     }
@@ -64,6 +65,7 @@ export const swipeTool = defineTool({
       { x: args.fromX!, y: args.fromY! },
       { x: args.toX!, y: args.toY! },
       args.durationMs,
+      { signal: ctx.signal },
     );
     return {
       ok: true,

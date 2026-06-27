@@ -14,26 +14,84 @@ branch, how many tests, what's out of scope for now?"
 ## Current version
 
 - **Released**: `v0.1.0` on `main`.
-- **Active branch**: `feature/ios-hardening`.
-- **Next milestone**: `v1.0.0` (MCP + tools + script engine major
-  release).
+- **Active branch**: `feature/v0.1.0-foundation-1` (HEAD `c2860e9`).
+  Carries the Studio foundation, `@atomyx/skills` distribution
+  package, CLI `init` / `update-skills` subcommands, and MCP
+  instructions hook.
+- **Next milestone**: `v1.0.0` (sidecar-backed run pipeline, tool
+  surface, script engine major release).
 
 ## Per-package test counts
 
 | Package | Tests |
 |---|---|
+| `@atomyx/shared` | 22 |
 | `@atomyx/core` | 25 |
-| `@atomyx/driver` | 139 |
+| `@atomyx/driver` | 141 |
 | `@atomyx/driver-wire` | 17 |
-| `@atomyx/android-driver` | 39 |
+| `@atomyx/android-driver` | 51 |
 | `@atomyx/ios-driver` | 47 |
-| `@atomyx/mcp` | 87 |
+| `@atomyx/mcp` | 90 |
 | `@atomyx/script` | 123 |
-| `@atomyx/cli` | 20 |
-| **Total** | **497** (0 failures) |
+| `@atomyx/cli` | 37 |
+| `@atomyx/skills` | 6 |
+| `@atomyx/studio` | 54 |
+| **Total** | **613** (0 failures) |
 
 Recompute the totals when a PR adds or removes tests. Keep this table
 honest — a stale count is worse than no count.
+
+## Packages
+
+### `@atomyx/skills` (`packages/skills/`)
+
+Skills distribution package at version `0.1.0`. A leaf package with
+no workspace dependencies.
+
+Public API:
+
+- `copySkillsTo(targetDir, { overwrite })` — copies the bundled
+  skill and agent files into `<targetDir>/.claude/`.
+- `getInstalledVersion(targetDir)` — reads the version marker from
+  an existing install.
+- `currentVersion` — the package version string.
+- `SKILL_FILES` — array of bundled skill markdown filenames.
+- `AGENT_FILES` — array of bundled agent markdown filenames.
+- `getContentRoot()` — absolute path to the bundled content
+  directory.
+
+Bundled skills (under `packages/skills/content/skills/`):
+
+- `atomyx-test-loop.md`
+- `atomyx-debug-failure.md`
+- `atomyx-script-authoring.md`
+
+Bundled agents (under `packages/skills/content/agents/`):
+
+- `atomyx-explorer.md`
+- `atomyx-replayer.md`
+
+### `@atomyx/cli` subcommands — `skills` module
+
+Two subcommands live at `packages/cli/src/skills/`:
+
+- `atomyx init` — copies the `@atomyx/skills` bundle into
+  `<cwd>/.claude/` (or `--target=<path>`). Non-destructive by
+  default; `--force` to overwrite existing files.
+- `atomyx update-skills` — version-checks the installed bundle
+  against `currentVersion`; replaces in place when the versions
+  differ.
+
+The module follows the same `execute.ts` dispatcher + per-command
+file shape as the `driver/` module in the CLI.
+
+### `@atomyx/mcp` — instructions hook
+
+The MCP server's `instructions` template (at
+`packages/mcp/src/bin.ts`) includes a hook that tells the
+downstream agent to load Atomyx workflow skills from
+`.claude/skills/` when that directory is present before starting
+a mobile testing task.
 
 ## Known limitations
 
@@ -52,9 +110,12 @@ honest — a stale count is worse than no count.
 
 ## Out of scope until after v1.0
 
-- Downstream consumer packages (`@atomyx/test-mgmt`, `@atomyx/studio`,
-  `@atomyx/cloud`) — empty skeletons only.
+- MCP-dependent Studio UI (device mirror, inspector, record mode).
+- Downstream consumer packages (`@atomyx/test-mgmt`, `@atomyx/cloud`)
+  — empty skeletons only.
 - HTTP transport layer on any module.
 - Changeset-based release pipeline.
 - Pluggable remote `Storage` adapter.
-- CI workflow verification in hosted iOS hardware.
+- CI workflow verification on hosted iOS hardware.
+- Windows + Linux Studio builds.
+- Studio auto-update (plugin wired, `active: false`).

@@ -232,12 +232,41 @@ describe("HttpClient error envelope", () => {
       });
       let caught: unknown;
       try {
-        await client.get("/slow", 50); // override: 50ms
+        await client.get("/slow", { timeoutMs: 50 });
       } catch (err) {
         caught = err;
       }
       assert.ok(caught instanceof HttpClientError);
       assert.match((caught as HttpClientError).message, /timed out after 50ms/);
+    } finally {
+      await close();
+    }
+  });
+
+  it("aborts the in-flight request when an external signal aborts", async () => {
+    const { port, close } = await startFakeServer((_req, res) => {
+      setTimeout(() => res.end(JSON.stringify({ ok: true })), 5_000);
+    });
+    try {
+      const client = new HttpClient({ baseUrl: baseUrlFor(port), defaultTimeoutMs: 10_000 });
+      const controller = new AbortController();
+      const startedAt = Date.now();
+      const pending = client.get("/slow", { signal: controller.signal });
+      setTimeout(() => controller.abort(new DOMException("user-cancelled", "AbortError")), 50);
+      let caught: unknown;
+      try {
+        await pending;
+      } catch (err) {
+        caught = err;
+      }
+      const elapsedMs = Date.now() - startedAt;
+      // Must abort near-immediately on signal — not wait for either
+      // the per-request timeout (10s) or the fake server's 5s reply.
+      assert.ok(elapsedMs < 500, `expected fast abort, got ${elapsedMs}ms`);
+      // The external AbortError is preserved verbatim so the caller
+      // can distinguish "I cancelled" from "transport timed out".
+      assert.equal((caught as Error).name, "AbortError");
+      assert.match((caught as Error).message, /user-cancelled/);
     } finally {
       await close();
     }

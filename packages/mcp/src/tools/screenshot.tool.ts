@@ -34,7 +34,7 @@ export const screenshotTool = defineTool({
   inputSchema: ScreenshotArgs,
   async execute(_args, ctx) {
     const orchestra = orchestraOrFail(ctx);
-    const bytes = await orchestra.screenshot();
+    const bytes = await orchestra.screenshot({ signal: ctx.signal });
     const ext = detectExt(bytes);
     const dir = join(process.cwd(), ".atomyx", "screenshots");
     mkdirSync(dir, { recursive: true });

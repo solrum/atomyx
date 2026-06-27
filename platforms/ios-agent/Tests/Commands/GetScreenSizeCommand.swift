@@ -1,6 +1,10 @@
 import Foundation
+import XCTest
 
-/// Return the tracked app's screen frame in points.
+/// Return the device's screen frame in points. Resolves against
+/// the tracked app when one is selected; otherwise falls back to
+/// the Springboard proxy, whose `frame` matches the full screen
+/// rect without requiring an app launch.
 ///
 /// Used by the host adapter to determine whether a resolved element
 /// is inside the visible viewport before dispatching a coordinate
@@ -19,9 +23,7 @@ final class GetScreenSizeCommand: CommandHandler {
     let type = "getScreenSize"
 
     func handle(_ request: Request, bridge: XCUIBridge, state: DriverState) -> Response {
-        guard let app = state.currentApp else {
-            return .error(id: request.id, message: "no app launched — call launchApp first")
-        }
+        let app = state.currentApp ?? XCUIApplication(bundleIdentifier: "com.apple.springboard")
         let size = bridge.getScreenSize(app: app)
         return .ok(id: request.id, data: [
             "width": Int(size.width),

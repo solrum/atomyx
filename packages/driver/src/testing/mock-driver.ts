@@ -1,4 +1,5 @@
 import type {
+  CallOptions,
   Capabilities,
   DeviceInfo,
   Driver,
@@ -44,6 +45,15 @@ import type { TreeNode } from "../tree/tree-node.js";
  *   - All optional methods return safe defaults (`canX: false`
  *     for capabilities the test hasn't explicitly enabled) so
  *     tests only need to stub what they exercise.
+ *
+ *   - Every method honors `opts.signal` BEFORE doing its work
+ *     and throws an `AbortError` when already aborted. Tests
+ *     for abort-propagation can stage a tree, abort the signal,
+ *     and assert the next call rejects without consuming the
+ *     queued tree. The optional `hangOnNextHierarchy` flag puts
+ *     the next `hierarchy()` call into an unresolving Promise
+ *     that only completes via signal abort — modeling a stuck
+ *     driver transport for timeout integration tests.
  */
 export class MockDriver implements Driver {
   readonly platform = "mock";
@@ -69,6 +79,15 @@ export class MockDriver implements Driver {
    */
   private hierarchyQueue: TreeNode[] = [];
   private lastHierarchy: TreeNode | null = null;
+
+  /**
+   * When true, the next `hierarchy()` call returns a promise
+   * that NEVER resolves except via `opts.signal` abort. Tests
+   * use this to simulate a hung driver — confirming the abort
+   * signal propagates through the orchestra all the way down.
+   * Auto-resets to false after the next `hierarchy()` call.
+   */
+  public hangOnNextHierarchy = false;
 
   /** Static screen size returned from `screenSize()`. */
   screen: Size = { width: 430, height: 932 };
@@ -104,7 +123,8 @@ export class MockDriver implements Driver {
 
   // ── Driver interface ───────────────────────────────────────
 
-  async connect(): Promise<void> {
+  async connect(opts?: CallOptions): Promise<void> {
+    checkAborted(opts);
     this.connected = true;
   }
   async disconnect(): Promise<void> {
@@ -114,8 +134,13 @@ export class MockDriver implements Driver {
     return this.connected;
   }
 
-  async hierarchy(): Promise<TreeNode> {
+  async hierarchy(opts?: CallOptions): Promise<TreeNode> {
+    checkAborted(opts);
     this.calls.push({ method: "hierarchy", args: [] });
+    if (this.hangOnNextHierarchy) {
+      this.hangOnNextHierarchy = false;
+      return waitForAbort(opts);
+    }
     const tree = this.hierarchyQueue.shift() ?? this.lastHierarchy;
     if (!tree) {
       throw new Error(
@@ -126,37 +151,50 @@ export class MockDriver implements Driver {
     return tree;
   }
 
-  async waitForIdle(timeoutMs: number): Promise<boolean> {
+  async waitForIdle(timeoutMs: number, opts?: CallOptions): Promise<boolean> {
+    checkAborted(opts);
     this.calls.push({ method: "waitForIdle", args: [timeoutMs] });
     return true;
   }
 
-  async tap(point: Point): Promise<void> {
+  async tap(point: Point, opts?: CallOptions): Promise<void> {
+    checkAborted(opts);
     this.calls.push({ method: "tap", args: [point] });
   }
 
-  async longPress(point: Point, durationMs: number): Promise<void> {
+  async longPress(point: Point, durationMs: number, opts?: CallOptions): Promise<void> {
+    checkAborted(opts);
     this.calls.push({ method: "longPress", args: [point, durationMs] });
   }
 
-  async swipe(from: Point, to: Point, durationMs: number): Promise<void> {
+  async swipe(
+    from: Point,
+    to: Point,
+    durationMs: number,
+    opts?: CallOptions,
+  ): Promise<void> {
+    checkAborted(opts);
     this.calls.push({ method: "swipe", args: [from, to, durationMs] });
     if (this.onSwipe) this.onSwipe(from, to);
   }
 
-  async dispatchGesture(gesture: Gesture): Promise<void> {
+  async dispatchGesture(gesture: Gesture, opts?: CallOptions): Promise<void> {
+    checkAborted(opts);
     this.calls.push({ method: "dispatchGesture", args: [gesture] });
   }
 
-  async inputText(text: string): Promise<void> {
+  async inputText(text: string, opts?: CallOptions): Promise<void> {
+    checkAborted(opts);
     this.calls.push({ method: "inputText", args: [text] });
   }
 
-  async eraseText(count: number): Promise<void> {
+  async eraseText(count: number, opts?: CallOptions): Promise<void> {
+    checkAborted(opts);
     this.calls.push({ method: "eraseText", args: [count] });
   }
 
-  async pressKey(key: KeyCode): Promise<KeyResult> {
+  async pressKey(key: KeyCode, opts?: CallOptions): Promise<KeyResult> {
+    checkAborted(opts);
     this.calls.push({ method: "pressKey", args: [key] });
     return { ok: true };
   }
@@ -172,37 +210,45 @@ export class MockDriver implements Driver {
     this.onHideKeyboard = fn;
   }
 
-  async hideKeyboard(): Promise<KeyResult> {
+  async hideKeyboard(opts?: CallOptions): Promise<KeyResult> {
+    checkAborted(opts);
     this.calls.push({ method: "hideKeyboard", args: [] });
     const result = this.onHideKeyboard?.();
     return result ?? { ok: true };
   }
 
-  async launchApp(bundleId: string, args?: LaunchArgs): Promise<void> {
+  async launchApp(bundleId: string, args?: LaunchArgs, opts?: CallOptions): Promise<void> {
+    checkAborted(opts);
     this.calls.push({ method: "launchApp", args: [bundleId, args] });
   }
 
-  async stopApp(bundleId: string): Promise<void> {
+  async stopApp(bundleId: string, opts?: CallOptions): Promise<void> {
+    checkAborted(opts);
     this.calls.push({ method: "stopApp", args: [bundleId] });
   }
 
-  async killApp(bundleId: string): Promise<void> {
+  async killApp(bundleId: string, opts?: CallOptions): Promise<void> {
+    checkAborted(opts);
     this.calls.push({ method: "killApp", args: [bundleId] });
   }
 
-  async currentForeground(): Promise<ForegroundInfo> {
+  async currentForeground(opts?: CallOptions): Promise<ForegroundInfo> {
+    checkAborted(opts);
     return { bundleId: null };
   }
 
-  async listApps(): Promise<readonly InstalledApp[]> {
+  async listApps(opts?: CallOptions): Promise<readonly InstalledApp[]> {
+    checkAborted(opts);
     return [];
   }
 
-  async screenshot(): Promise<Uint8Array> {
+  async screenshot(opts?: CallOptions): Promise<Uint8Array> {
+    checkAborted(opts);
     return new Uint8Array();
   }
 
-  async deviceInfo(): Promise<DeviceInfo> {
+  async deviceInfo(opts?: CallOptions): Promise<DeviceInfo> {
+    checkAborted(opts);
     return {
       platform: "mock",
       platformVersion: "0.0.0",
@@ -212,7 +258,8 @@ export class MockDriver implements Driver {
     };
   }
 
-  async screenSize(): Promise<Size> {
+  async screenSize(opts?: CallOptions): Promise<Size> {
+    checkAborted(opts);
     return this.screen;
   }
 }
@@ -220,4 +267,26 @@ export class MockDriver implements Driver {
 export interface MockCall {
   readonly method: string;
   readonly args: readonly unknown[];
+}
+
+function checkAborted(opts: CallOptions | undefined): void {
+  if (opts?.signal?.aborted) {
+    throw opts.signal.reason ?? new DOMException("Aborted", "AbortError");
+  }
+}
+
+function waitForAbort<T>(opts: CallOptions | undefined): Promise<T> {
+  return new Promise<T>((_resolve, reject) => {
+    const signal = opts?.signal;
+    if (!signal) return;
+    if (signal.aborted) {
+      reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    signal.addEventListener(
+      "abort",
+      () => reject(signal.reason ?? new DOMException("Aborted", "AbortError")),
+      { once: true },
+    );
+  });
 }

@@ -66,11 +66,20 @@ export function compileSelector(s: Selector): ElementFilter {
 
   // Build the priority-ordered content filter list. Only the
   // fields the caller provided show up here — priority is
-  // implicit in array order.
+  // implicit in array order. When the caller provided `text` but
+  // not `label`, also try `label` as a fallback: iOS only sets
+  // `attributes.text` on genuine staticText leaves, so a cross-
+  // platform `{text: "Sign in"}` query against a button needs to
+  // fall back to the a11y `label` to match.
   const priorityFilters: ElementFilter[] = [];
   if (s.id !== undefined) priorityFilters.push(idMatches(s.id));
   if (s.label !== undefined) priorityFilters.push(labelMatches(s.label));
-  if (s.text !== undefined) priorityFilters.push(textMatches(s.text));
+  if (s.text !== undefined) {
+    priorityFilters.push(textMatches(s.text));
+    if (s.label === undefined) {
+      priorityFilters.push(labelMatches(s.text));
+    }
+  }
   if (s.value !== undefined) priorityFilters.push(valueMatches(s.value));
   if (s.hint !== undefined) priorityFilters.push(hintMatches(s.hint));
 

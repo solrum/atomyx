@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "resolveJsonModule": true,
+    "allowJs": false,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@atomyx/shared": ["shared/src/index.ts"],
+      "@atomyx/shared/*": ["shared/src/*"],
+      "@atomyx/core": ["packages/core/src/index.ts"],
+      "@atomyx/core/*": ["packages/core/src/*"],
+      "@atomyx/driver": ["packages/driver/src/index.ts"],
+      "@atomyx/driver/*": ["packages/driver/src/*"],
+      "@atomyx/driver-wire": ["packages/driver-wire/src/index.ts"],
+      "@atomyx/android-driver": ["packages/android-driver/src/index.ts"],
+      "@atomyx/ios-driver": ["packages/ios-driver/src/index.ts"],
+      "@atomyx/ios-sim-driver": ["packages/ios-sim-driver/src/index.ts"],
+      "@atomyx/mcp": ["packages/mcp/src/index.ts"],
+      "@atomyx/script": ["packages/script/src/index.ts"],
+      "@atomyx/cli": ["packages/cli/src/index.ts"],
+      "@atomyx/sidecar": ["packages/sidecar/src/index.ts"]
+    }
+  },
+  "include": [
+    "packages/*/src/**/*.ts",
+    "shared/src/**/*.ts"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/dist",
+    "**/*.test.ts"
+  ]
+}

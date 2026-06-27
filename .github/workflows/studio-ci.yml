@@ -1,0 +1,57 @@
+name: Studio CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/studio/**"
+      - "packages/shared/**"
+      - "packages/script/**"
+      - ".github/workflows/studio-ci.yml"
+  pull_request:
+    paths:
+      - "apps/studio/**"
+      - "packages/shared/**"
+      - "packages/script/**"
+      - ".github/workflows/studio-ci.yml"
+
+concurrency:
+  group: studio-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/studio
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+        working-directory: .
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Layer-import gate
+        run: npm run depcruise
+
+      - name: Feature-api gate
+        run: npm run lint:feature-api
+
+      - name: Tests + coverage gate
+        run: npm run test:coverage

@@ -1,7 +1,9 @@
 import Foundation
 import CoreGraphics
 
-/// Drag from one point to another, app-relative coordinates.
+/// Drag from one point to another in device-global point space.
+/// The synthesizer dispatches to the currently frontmost app —
+/// no `launchApp` required.
 ///
 /// Request args:
 ///   - `fromX`, `fromY` (required, numeric)
@@ -14,9 +16,8 @@ import CoreGraphics
 ///     not directly parameterizable via this XCUITest API.
 ///     Total gesture duration ≈ durationMs + drag.
 ///
-/// Requires a tracked app (for coordinate space). Gesture
-/// dispatch routes through the shared `EventSynthesizer` so
-/// every backend consumes the same waypoint shape.
+/// Gesture dispatch routes through the shared `EventSynthesizer`
+/// so every backend consumes the same waypoint shape.
 final class SwipeCommand: CommandHandler {
     let type = "swipe"
 
@@ -33,14 +34,12 @@ final class SwipeCommand: CommandHandler {
 
     func handle(_ request: Request, bridge: XCUIBridge, state: DriverState) -> Response {
         _ = bridge
+        _ = state
         guard let fromX = CommandArgs.numeric(request.args["fromX"]),
               let fromY = CommandArgs.numeric(request.args["fromY"]),
               let toX = CommandArgs.numeric(request.args["toX"]),
               let toY = CommandArgs.numeric(request.args["toY"]) else {
             return .error(id: request.id, message: "missing fromX/fromY/toX/toY (numbers)")
-        }
-        guard let app = state.currentApp else {
-            return .error(id: request.id, message: "no app launched — call launchApp first")
         }
 
         let durationMs = CommandArgs.numeric(request.args["durationMs"]) ?? 100
@@ -48,7 +47,7 @@ final class SwipeCommand: CommandHandler {
             fromX: fromX, fromY: fromY, toX: toX, toY: toY, durationMs: durationMs
         )
         do {
-            try synthesizer.dispatch(pointers: [path], in: app)
+            try synthesizer.dispatch(pointers: [path])
         } catch {
             return .error(id: request.id, message: "swipe dispatch failed: \(error)")
         }

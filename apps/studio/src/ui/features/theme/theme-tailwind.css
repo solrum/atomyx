@@ -1,0 +1,211 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+:root {
+  --ui-overlay-backdrop: rgba(0, 0, 0, 0.55);
+  --ui-overlay-backdrop-subtle: rgba(0, 0, 0, 0.45);
+}
+
+body {
+  background: var(--ui-bg-primary-bg, var(--ui-bg-primary, #2b2b2b));
+  color: var(--ui-text-primary, #bbbbbb);
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  /*
+   * App chrome (menus, tabs, tool-window headers, status bar) is
+   * not meant to be selectable — accidental drag-selects on
+   * clickable rows feel like bugs in a native IDE. Content areas
+   * that the user genuinely wants to copy (Monaco editor, form
+   * fields, inspector attribute table, terminal, logs) opt back
+   * in via the rule below.
+   */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.monaco-editor,
+.monaco-editor *,
+input,
+textarea,
+[contenteditable="true"],
+[data-selectable="true"],
+[data-selectable="true"] * {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/*
+ * Atomyx editor decoration classes. Colors and font effects come
+ * from the design-system CSS custom properties written at runtime
+ * by `ui/theme/apply-tokens.ts`. Theme swap = variable update; no
+ * rule in this file needs to change when a theme changes.
+ *
+ *   - `.atomyx-keyword` — every YAML mapping key (text before
+ *     `:`) — commands, selector fields, DSL structure, user env
+ *     vars. Foreground + font effects from `ATOMYX_KEYWORD`.
+ *
+ *   - `.atomyx-command-bare` — bare-string commands
+ *     (`launchApp`, `back`, `screenshot` auto-named).
+ *     Foreground + font effects from `ATOMYX_COMMAND_BARE`.
+ */
+.atomyx-keyword {
+  color: var(--atomyx-keyword) !important;
+  font-weight: var(--atomyx-keyword-font-weight, inherit);
+  font-style: var(--atomyx-keyword-font-italic, inherit);
+}
+
+.atomyx-command-bare {
+  color: var(--atomyx-command-bare) !important;
+  font-weight: var(--atomyx-command-bare-font-weight, inherit);
+  font-style: var(--atomyx-command-bare-font-italic, inherit);
+}
+
+/*
+ * Defense-in-depth: even if a non-error marker slips past the
+ * JS-level filter (`ui/editor/marker-filter.ts`), its visual
+ * squiggly is suppressed here. Errors keep their red squiggly
+ * resolved through `DIAGNOSTIC_ERROR_FG`.
+ */
+.monaco-editor .squiggly-warning,
+.monaco-editor .squiggly-info,
+.monaco-editor .squiggly-hint {
+  background: transparent !important;
+  border-bottom: none !important;
+}
+.monaco-editor .squiggly-error {
+  border-bottom-color: var(--diagnostic-error-fg, #ff6b68) !important;
+}
+
+.atomyx-bookmark-glyph {
+  background: var(--ui-accent, #589df6);
+  width: 4px !important;
+  margin-left: 3px;
+  border-radius: 2px;
+}
+
+.file-tree-row:hover {
+  background: var(--bg-hover);
+}
+
+.file-tree-row-active {
+  background: var(--bg-sel-inactive);
+}
+
+.file-tree-row-active:hover {
+  background: var(--bg-sel);
+}
+
+.editor-tab:hover:not(.editor-tab-active) {
+  background: var(--bg-hover);
+  color: var(--fg-1);
+}
+
+.editor-tab .editor-tab-close-x {
+  display: none;
+}
+.editor-tab .editor-tab-close-dot {
+  display: none;
+  font-size: var(--fs-13);
+  line-height: 1;
+  color: var(--accent);
+}
+.editor-tab.editor-tab-dirty .editor-tab-close-dot {
+  display: inline;
+}
+.editor-tab:not(.editor-tab-dirty):hover .editor-tab-close-x,
+.editor-tab.editor-tab-dirty:hover .editor-tab-close-x {
+  display: inline-flex;
+}
+.editor-tab.editor-tab-dirty:hover .editor-tab-close-dot {
+  display: none;
+}
+.editor-tab:not(.editor-tab-dirty) .editor-tab-close-x {
+  display: none;
+}
+
+.run-row:hover {
+  background: var(--bg-hover);
+}
+
+.activity-btn:hover {
+  background: var(--bg-hover);
+  color: var(--fg-0);
+}
+
+@keyframes atomyx-step-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  80%, 100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+.atomyx-step-run-ping::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: atomyx-step-ping 1.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+  pointer-events: none;
+}
+
+.atomyx-btn {
+  border: 1px solid transparent;
+  transition: background-color 0.1s ease, color 0.1s ease, border-color 0.1s ease;
+  cursor: default;
+}
+
+.atomyx-btn-primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+.atomyx-btn-primary:hover {
+  background: var(--accent-hi);
+  border-color: var(--accent-hi);
+}
+
+.atomyx-btn-secondary {
+  background: var(--bg-3);
+  color: var(--fg-0);
+  border-color: var(--line);
+}
+.atomyx-btn-secondary:hover {
+  background: var(--bg-hover);
+  border-color: var(--line-strong);
+}
+
+.atomyx-btn-ghost {
+  background: transparent;
+  color: var(--fg-1);
+}
+.atomyx-btn-ghost:hover {
+  background: var(--bg-hover);
+  color: var(--fg-0);
+}
+
+.atomyx-btn-destructive {
+  background: var(--err);
+  color: var(--fg-0);
+  border-color: var(--err);
+}
+.atomyx-btn-destructive:hover {
+  filter: brightness(1.1);
+}

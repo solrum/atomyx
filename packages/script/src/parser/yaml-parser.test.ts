@@ -105,6 +105,42 @@ appId: com.test
     assert.equal(step.timeoutMs, 10000);
   });
 
+  it("preserves id / role / nth in waitFor object selector", () => {
+    const yaml = `
+appId: com.test
+---
+- waitFor: { id: "com.app:id/login", timeout: 5000 }
+- waitFor: { role: "text-field", nth: 0 }
+- assertVisible: { id: "com.app:id/done" }
+- assertNotVisible: { hint: "Email" }
+`;
+    const script = parseScript(yaml);
+    const [wait, role, visible, notVisible] = script.steps as Array<{
+      selector: { id?: string; role?: string; nth?: number; hint?: string };
+      timeoutMs?: number;
+    }>;
+    assert.equal(wait!.selector.id, "com.app:id/login");
+    assert.equal(wait!.timeoutMs, 5000);
+    assert.equal(role!.selector.role, "text-field");
+    assert.equal(role!.selector.nth, 0);
+    assert.equal(visible!.selector.id, "com.app:id/done");
+    assert.equal(notVisible!.selector.hint, "Email");
+  });
+
+  it("mirrors label from text in explicit object selector", () => {
+    const yaml = `
+appId: com.test
+---
+- tap: { text: "Continue" }
+`;
+    const script = parseScript(yaml);
+    const step = script.steps[0] as {
+      selector: { text?: string; label?: string };
+    };
+    assert.equal(step.selector.text, "Continue");
+    assert.equal(step.selector.label, "Continue");
+  });
+
   it("handles capture command", () => {
     const yaml = `
 appId: com.test

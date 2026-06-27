@@ -1,6 +1,7 @@
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import type {
+  CallOptions,
   Capabilities,
   DeviceInfo,
   Driver,
@@ -14,7 +15,9 @@ import type {
   Size,
   TreeNode,
 } from "@atomyx/driver";
-import { TcpClient } from "./tcp-client.js";
+import { TcpClient, TcpClientError } from "./tcp-client.js";
+import { ClearTextFailedError } from "./clear/index.js";
+import type { ClearFailureDiagnostic } from "./clear/index.js";
 import { Iproxy } from "./iproxy.js";
 import { XctestLauncher } from "./xctest-launcher.js";
 import { normalizeIosTree, type IosRawElement } from "./tree-normalizer.js";
@@ -108,10 +111,10 @@ export class IosDriver implements Driver {
    * Capabilities populated at `connect()` time from the Swift
    * runner's ping response. Gesture capabilities
    * (`canMultiPointer`, `canPressure`) reflect what the runner's
-   * active backend can dispatch — `true` when the event-record
-   * backend is live, `false` on the coordinate fallback. See
-   * ADR-001 for the backend selection contract. Everything else
-   * is a static property of the driver version.
+   * active backend can dispatch — `true` when the private-XCTest
+   * event-record backend is live, `false` on the public-API
+   * coordinate fallback. Everything else is a static property of
+   * the driver version.
    */
   private _capabilities: Capabilities = {
     canScreenshot: true,
@@ -180,7 +183,7 @@ export class IosDriver implements Driver {
 
   // ── Lifecycle ────────────────────────────────────────────────
 
-  async connect(): Promise<void> {
+  async connect(opts?: CallOptions): Promise<void> {
     // Auto-launch: detect-or-spawn the XCUITest runner before
     // opening the transport. Must happen before iproxy — the
     // driver process must be running before the tunnel has
@@ -198,7 +201,7 @@ export class IosDriver implements Driver {
     // `canPressure`) and the active synthesizer name so the
     // YAML validator can reject unsupported gesture shapes
     // before they leave the host.
-    const pong = await this.tcp.call("ping", {});
+    const pong = await this.tcp.call("ping", {}, { signal: opts?.signal });
     this.applyPingCapabilities(pong);
   }
 
@@ -283,8 +286,26 @@ export class IosDriver implements Driver {
 
   // ── Hierarchy ────────────────────────────────────────────────
 
-  async hierarchy(): Promise<TreeNode> {
-    const data = await this.tcp.call("dumpRawTree", {});
+  async hierarchy(opts?: CallOptions): Promise<TreeNode> {
+    // If the runner has no app bound (operator launched the target
+    // app from outside Studio), hand it a shortlist of currently-
+    // running UIKit bundle ids. The runner picks whichever is in
+    // foreground via `XCUIApplication.state` and snapshots it.
+    // This avoids forcing an explicit `launchApp` round-trip when
+    // the user is just inspecting a foreground app on the
+    // simulator. Best-effort; query failures pass an empty list
+    // and the runner falls back to its existing error path.
+    const args: Record<string, unknown> = {};
+    if (!this.lastLaunchedBundleId && this.opts.kind === "simulator") {
+      const candidates = await this.listRunningUiKitBundleIds().catch(() => []);
+      if (candidates.length > 0) {
+        args["bundleIdCandidates"] = candidates;
+      }
+    }
+    const data = await this.tcp.call("dumpRawTree", args, { signal: opts?.signal });
+    if (typeof data.bundleId === "string" && data.bundleId.length > 0) {
+      this.lastLaunchedBundleId = data.bundleId;
+    }
     const root = (data.root as IosRawElement | undefined) ?? {
       elementType: "other",
     };
@@ -292,7 +313,26 @@ export class IosDriver implements Driver {
     return wire as unknown as TreeNode;
   }
 
-  async waitForIdle(_timeoutMs: number): Promise<boolean> {
+  /// Query the simulator for currently-running UIKit application
+  /// bundle ids. Output of `simctl spawn <udid> launchctl list`
+  /// includes one row per launched job; UIKit apps are exposed as
+  /// labels of the form `UIKitApplication:<bundleId>[<pid>][...`.
+  /// We extract the `<bundleId>` slice. On failure or if no apps
+  /// are running, returns an empty array.
+  private async listRunningUiKitBundleIds(): Promise<string[]> {
+    const { stdout } = await execAsync(
+      `xcrun simctl spawn ${this.opts.udid} launchctl list`,
+      { timeout: 5_000 },
+    );
+    const ids = new Set<string>();
+    for (const line of stdout.split("\n")) {
+      const m = /UIKitApplication:([^\s\[]+)/.exec(line);
+      if (m && m[1]) ids.add(m[1]);
+    }
+    return [...ids];
+  }
+
+  async waitForIdle(_timeoutMs: number, _opts?: CallOptions): Promise<boolean> {
     // capabilities.canWaitForIdle === false; core should not
     // invoke this. Defensive no-op.
     return true;
@@ -300,15 +340,19 @@ export class IosDriver implements Driver {
 
   // ── Gesture primitives ──────────────────────────────────────
 
-  async tap(point: Point): Promise<void> {
-    await this.tcp.call("tapAt", { x: point.x, y: point.y });
+  async tap(point: Point, opts?: CallOptions): Promise<void> {
+    await this.tcp.call("tapAt", { x: point.x, y: point.y }, { signal: opts?.signal });
   }
 
-  async longPress(point: Point, durationMs: number): Promise<void> {
-    await this.tcp.call("longPressAt", { x: point.x, y: point.y, durationMs });
+  async longPress(point: Point, durationMs: number, opts?: CallOptions): Promise<void> {
+    await this.tcp.call(
+      "longPressAt",
+      { x: point.x, y: point.y, durationMs },
+      { signal: opts?.signal },
+    );
   }
 
-  async dispatchGesture(gesture: Gesture): Promise<void> {
+  async dispatchGesture(gesture: Gesture, opts?: CallOptions): Promise<void> {
     if (gesture.pointers.length > 1 && !this._capabilities.canMultiPointer) {
       throw new Error(
         `iOS driver cannot dispatch ${gesture.pointers.length}-pointer gesture: ` +
@@ -327,46 +371,84 @@ export class IosDriver implements Driver {
         ...(w.pressure !== undefined ? { pressure: w.pressure } : {}),
       })),
     }));
-    await this.tcp.call("dispatchPointer", { pointers });
+    await this.tcp.call("dispatchPointer", { pointers }, { signal: opts?.signal });
   }
 
-  async swipe(from: Point, to: Point, durationMs: number): Promise<void> {
-    await this.tcp.call("swipe", {
-      fromX: from.x,
-      fromY: from.y,
-      toX: to.x,
-      toY: to.y,
-      durationMs,
-    });
+  async swipe(
+    from: Point,
+    to: Point,
+    durationMs: number,
+    opts?: CallOptions,
+  ): Promise<void> {
+    await this.tcp.call(
+      "swipe",
+      {
+        fromX: from.x,
+        fromY: from.y,
+        toX: to.x,
+        toY: to.y,
+        durationMs,
+      },
+      { signal: opts?.signal },
+    );
   }
 
   // ── Text input ──────────────────────────────────────────────
 
-  async inputText(text: string): Promise<void> {
+  async inputText(text: string, opts?: CallOptions): Promise<void> {
     // Uses iOS native `XCUIApplication.typeText()` under the hood
     // via the Swift `typeText` command. Requires a focused field.
-    await this.tcp.call("typeText", { text });
+    await this.tcp.call("typeText", { text }, { signal: opts?.signal });
   }
 
-  async eraseText(count: number): Promise<void> {
-    // Swift driver has `clearFocusedInput` which bulk-sends
-    // delete keys to the focused field. The arg name on the
-    // wire is `maxDeletes` — Swift caps it at 500 to avoid
-    // runaway repeat counts.
-    await this.tcp.call("clearFocusedInput", { maxDeletes: count });
+  async eraseText(count: number, opts?: CallOptions): Promise<void> {
+    // Swift driver sends delete keystrokes to the focused field via a 4-strategy
+    // priority chain. maxDeletes is capped at 500 on the Swift side.
+    // When all strategies fail, the runner returns {ok:false} with a JSON-encoded
+    // diagnostic in the error string; we re-throw as ClearTextFailedError so
+    // callers can inspect which strategies ran and what value remained.
+    try {
+      await this.tcp.call(
+        "clearFocusedInput",
+        { maxDeletes: count },
+        { signal: opts?.signal },
+      );
+    } catch (err) {
+      if (err instanceof TcpClientError && err.code === "driver-error") {
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(err.message);
+        } catch {
+          throw err;
+        }
+        if (
+          parsed !== null &&
+          typeof parsed === "object" &&
+          (parsed as Record<string, unknown>)["code"] === "clear-text-failed"
+        ) {
+          const p = parsed as ClearFailureDiagnostic & { code: string };
+          throw new ClearTextFailedError({
+            strategiesTried: p.strategiesTried ?? [],
+            lastValue: p.lastValue ?? null,
+            focusedElementType: p.focusedElementType ?? "unknown",
+            hasHardwareKeyboard: p.hasHardwareKeyboard ?? false,
+          });
+        }
+      }
+      throw err;
+    }
   }
 
-  async pressKey(key: KeyCode): Promise<KeyResult> {
-    const data = await this.tcp.call("pressKey", { key });
-    // Swift `PressKeyCommand` returns `{key, affordanceFound,
-    // strategy}`. `affordanceFound=true` means a verifiable
-    // control was used (nav_bar_back, home device press, enter
-    // into focused field); `false` means a best-effort gesture
-    // was dispatched but the driver cannot confirm any effect
-    // (e.g. edge_swipe_best_effort for iOS back gesture). We
-    // surface that directly as the `KeyResult` ok flag, and
-    // pass the strategy name through as `reason` for agent
-    // observability.
+  async pressKey(key: KeyCode, opts?: CallOptions): Promise<KeyResult> {
+    const data = await this.tcp.call("pressKey", { key }, { signal: opts?.signal });
+    // The Swift runner returns {key, affordanceFound, strategy}.
+    // affordanceFound=true means a verifiable control was used
+    // (nav_bar_back, home device press, enter into focused field);
+    // false means a best-effort gesture was dispatched but the
+    // driver cannot confirm any effect (e.g. edge_swipe_best_effort
+    // for iOS back gesture). We surface that directly as the
+    // KeyResult ok flag, and pass the strategy name through as
+    // reason for agent observability.
     const affordanceFound = data.affordanceFound === true;
     const strategy = typeof data.strategy === "string" ? data.strategy : undefined;
     return {
@@ -375,8 +457,8 @@ export class IosDriver implements Driver {
     };
   }
 
-  async hideKeyboard(): Promise<KeyResult> {
-    const data = await this.tcp.call("hideKeyboard", {});
+  async hideKeyboard(opts?: CallOptions): Promise<KeyResult> {
+    const data = await this.tcp.call("hideKeyboard", {}, { signal: opts?.signal });
     const ok = data.ok === true;
     const strategy =
       typeof data.strategy === "string" ? data.strategy : undefined;
@@ -385,25 +467,33 @@ export class IosDriver implements Driver {
 
   // ── App lifecycle ────────────────────────────────────────────
 
-  async launchApp(bundleId: string, _args?: LaunchArgs): Promise<void> {
-    await this.tcp.call("launchApp", { bundleId });
+  async launchApp(
+    bundleId: string,
+    args?: LaunchArgs,
+    opts?: CallOptions,
+  ): Promise<void> {
+    const noReset = args?.noReset === true;
+    if (noReset && this.lastLaunchedBundleId === bundleId) {
+      return;
+    }
+    await this.tcp.call("launchApp", { bundleId, noReset }, { signal: opts?.signal });
     this.lastLaunchedBundleId = bundleId;
   }
 
-  async stopApp(bundleId: string): Promise<void> {
-    await this.tcp.call("forceStopApp", { bundleId });
+  async stopApp(bundleId: string, opts?: CallOptions): Promise<void> {
+    await this.tcp.call("forceStopApp", { bundleId }, { signal: opts?.signal });
     if (this.lastLaunchedBundleId === bundleId) {
       this.lastLaunchedBundleId = "";
     }
   }
 
-  async killApp(bundleId: string): Promise<void> {
+  async killApp(bundleId: string, opts?: CallOptions): Promise<void> {
     // iOS distinction between stop and kill is not meaningful at
     // the XCUITest layer — both go through `forceStopApp`.
-    await this.stopApp(bundleId);
+    await this.stopApp(bundleId, opts);
   }
 
-  async currentForeground(): Promise<ForegroundInfo> {
+  async currentForeground(_opts?: CallOptions): Promise<ForegroundInfo> {
     // The Swift driver tracks the last-launched bundle id; it
     // does NOT query the system for the "true" foreground app
     // (iOS sandboxing would require private APIs). That's fine
@@ -413,7 +503,7 @@ export class IosDriver implements Driver {
     };
   }
 
-  async listApps(): Promise<readonly InstalledApp[]> {
+  async listApps(_opts?: CallOptions): Promise<readonly InstalledApp[]> {
     // listApps on iOS is host-side — the Swift XCUITest runner has
     // no listApps command. We call xcrun directly from the host.
     if (this.opts.kind === "simulator") {
@@ -472,13 +562,13 @@ export class IosDriver implements Driver {
 
   // ── Media + device info ─────────────────────────────────────
 
-  async screenshot(): Promise<Uint8Array> {
-    const data = await this.tcp.call("screenshot", {});
+  async screenshot(opts?: CallOptions): Promise<Uint8Array> {
+    const data = await this.tcp.call("screenshot", {}, { signal: opts?.signal });
     const base64 = (data.base64 as string) ?? "";
     return Buffer.from(base64, "base64");
   }
 
-  async deviceInfo(): Promise<DeviceInfo> {
+  async deviceInfo(_opts?: CallOptions): Promise<DeviceInfo> {
     return {
       platform: "ios",
       platformVersion: "unknown",
@@ -488,8 +578,8 @@ export class IosDriver implements Driver {
     };
   }
 
-  async screenSize(): Promise<Size> {
-    const data = await this.tcp.call("getScreenSize", {});
+  async screenSize(opts?: CallOptions): Promise<Size> {
+    const data = await this.tcp.call("getScreenSize", {}, { signal: opts?.signal });
     return {
       width: (data.width as number) ?? 0,
       height: (data.height as number) ?? 0,

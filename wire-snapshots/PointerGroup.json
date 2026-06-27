@@ -1,0 +1,258 @@
+{
+  "$ref": "#/definitions/PointerGroup",
+  "definitions": {
+    "PointerGroup": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Author-chosen pointer id. Any string — used only to distinguish parallel pointers in the multi-pointer form."
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "down"
+                  },
+                  "target": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "selector": {
+                            "type": "object",
+                            "properties": {
+                              "text": {
+                                "type": "string",
+                                "description": "Match element by its visible text (the string the user sees). Use for buttons, labels, menu items. YAML shorthand: a bare string like `tap: \"Login\"` expands to `{ text: \"Login\", label: \"Login\" }` for Flutter parity."
+                              },
+                              "id": {
+                                "type": "string",
+                                "description": "Match element by its stable resource id (Android `resource-id`) or accessibility id (iOS). Preferred when the app exposes them — survives i18n and copy changes. Example: `id: com.app:id/login_btn`."
+                              },
+                              "label": {
+                                "type": "string",
+                                "description": "Match element by its accessibility label. Flutter exposes visible text as `label`; native Android/iOS use `text`. Setting both lets priority broadening try each platform's convention without the author knowing which."
+                              },
+                              "hint": {
+                                "type": "string",
+                                "description": "Match element by its input hint / placeholder. Use for text fields whose only identifier is the placeholder text (e.g. `hint: \"Search products\"`)."
+                              },
+                              "role": {
+                                "type": "string",
+                                "description": "Constrain the match to a semantic role. Common values: 'button', 'text-field', 'image', 'link', 'checkbox', 'switch', 'container'. Narrow broad text matches — e.g. `{ text: 'Home', role: 'button' }` avoids matching a 'Home' menu item."
+                              },
+                              "nth": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "description": "When multiple elements match, pick the nth one (0-indexed). Use sparingly — `nth` is brittle under layout changes. Prefer adding `role` or a more specific `text`."
+                              }
+                            },
+                            "additionalProperties": false,
+                            "description": "Element selector. Every field is optional, but at least one must be set for the selector to be useful. In YAML, a bare string shorthand — e.g. `tap: \"Login\"` — is equivalent to `tap: { text: \"Login\", label: \"Login\" }`."
+                          }
+                        },
+                        "required": [
+                          "selector"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Resolve to the centre of the matched element at dispatch time."
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "point": {
+                            "type": "object",
+                            "properties": {
+                              "x": {
+                                "type": "number",
+                                "description": "Screen x in points."
+                              },
+                              "y": {
+                                "type": "number",
+                                "description": "Screen y in points."
+                              }
+                            },
+                            "required": [
+                              "x",
+                              "y"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "point"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Absolute screen coordinates in points (the same unit the `get_ui_tree` MCP tool emits as `@cx,cy`)."
+                      }
+                    ],
+                    "description": "Target of a `down` or `move` pointer action: a selector or an absolute coordinate."
+                  },
+                  "pressure": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Pressure applied at this action, in the range [0.0, 1.0]. Drivers without the `canPressure` capability reject scripts that set this — iOS 3D Touch, Android API 26+ stroke pressure."
+                  }
+                },
+                "required": [
+                  "type",
+                  "target"
+                ],
+                "additionalProperties": false,
+                "description": "Touch down at the resolved target. A pointer sequence must open with `down`."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "move"
+                  },
+                  "target": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "selector": {
+                            "type": "object",
+                            "properties": {
+                              "text": {
+                                "type": "string",
+                                "description": "Match element by its visible text (the string the user sees). Use for buttons, labels, menu items. YAML shorthand: a bare string like `tap: \"Login\"` expands to `{ text: \"Login\", label: \"Login\" }` for Flutter parity."
+                              },
+                              "id": {
+                                "type": "string",
+                                "description": "Match element by its stable resource id (Android `resource-id`) or accessibility id (iOS). Preferred when the app exposes them — survives i18n and copy changes. Example: `id: com.app:id/login_btn`."
+                              },
+                              "label": {
+                                "type": "string",
+                                "description": "Match element by its accessibility label. Flutter exposes visible text as `label`; native Android/iOS use `text`. Setting both lets priority broadening try each platform's convention without the author knowing which."
+                              },
+                              "hint": {
+                                "type": "string",
+                                "description": "Match element by its input hint / placeholder. Use for text fields whose only identifier is the placeholder text (e.g. `hint: \"Search products\"`)."
+                              },
+                              "role": {
+                                "type": "string",
+                                "description": "Constrain the match to a semantic role. Common values: 'button', 'text-field', 'image', 'link', 'checkbox', 'switch', 'container'. Narrow broad text matches — e.g. `{ text: 'Home', role: 'button' }` avoids matching a 'Home' menu item."
+                              },
+                              "nth": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "description": "When multiple elements match, pick the nth one (0-indexed). Use sparingly — `nth` is brittle under layout changes. Prefer adding `role` or a more specific `text`."
+                              }
+                            },
+                            "additionalProperties": false,
+                            "description": "Element selector. Every field is optional, but at least one must be set for the selector to be useful. In YAML, a bare string shorthand — e.g. `tap: \"Login\"` — is equivalent to `tap: { text: \"Login\", label: \"Login\" }`."
+                          }
+                        },
+                        "required": [
+                          "selector"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Resolve to the centre of the matched element at dispatch time."
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "point": {
+                            "type": "object",
+                            "properties": {
+                              "x": {
+                                "type": "number",
+                                "description": "Screen x in points."
+                              },
+                              "y": {
+                                "type": "number",
+                                "description": "Screen y in points."
+                              }
+                            },
+                            "required": [
+                              "x",
+                              "y"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "point"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Absolute screen coordinates in points (the same unit the `get_ui_tree` MCP tool emits as `@cx,cy`)."
+                      }
+                    ],
+                    "description": "Target of a `down` or `move` pointer action: a selector or an absolute coordinate."
+                  },
+                  "pressure": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Pressure applied at this action, in the range [0.0, 1.0]. Drivers without the `canPressure` capability reject scripts that set this — iOS 3D Touch, Android API 26+ stroke pressure."
+                  }
+                },
+                "required": [
+                  "type",
+                  "target"
+                ],
+                "additionalProperties": false,
+                "description": "Drag the active pointer to a new target. Duration per move comes from `moveDurationMs` on the enclosing `pointer` step."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "wait"
+                  },
+                  "ms": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Hold duration in milliseconds."
+                  }
+                },
+                "required": [
+                  "type",
+                  "ms"
+                ],
+                "additionalProperties": false,
+                "description": "Hold the current pointer position for `ms` milliseconds. Used to produce long-press and dwell gestures."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "up"
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "additionalProperties": false,
+                "description": "Release the pointer. A pointer sequence must close with `up`."
+              }
+            ],
+            "description": "One primitive in a pointer sequence. W3C Actions semantics."
+          },
+          "minItems": 1,
+          "description": "This pointer's time-ordered action list. Must open with `down` and close with `up`."
+        }
+      },
+      "required": [
+        "id",
+        "actions"
+      ],
+      "additionalProperties": false,
+      "description": "One pointer's action list, used in the multi-pointer form (`pointer.pointers`). Pointers align on a shared wall clock anchored at the earliest `down`."
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

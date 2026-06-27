@@ -1,0 +1,48 @@
+{
+  "name": "@atomyx/sidecar",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Atomyx sidecar — Node entrypoint that exposes the core runtime (driver + script) as line-delimited JSON-RPC on stdio for desktop hosts (Tauri) to consume.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "atomyx-sidecar": "./dist/index.js"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./infra": "./dist/infra/index.js",
+    "./features/device": "./dist/features/device/index.js",
+    "./features/app": "./dist/features/app/index.js",
+    "./features/script": "./dist/features/script/index.js",
+    "./features/inspection": "./dist/features/inspection/index.js",
+    "./features/input": "./dist/features/input/index.js",
+    "./features/meta": "./dist/features/meta/index.js",
+    "./testing": "./dist/testing/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "build:bundle": "node ./build-bundle.mjs",
+    "test": "node --import tsx --test $(find src -name '*.test.ts')",
+    "depcruise": "depcruise --config .dependency-cruiser.cjs src",
+    "api:check": "api-extractor run",
+    "api:update": "api-extractor run --local"
+  },
+  "dependencies": {
+    "@atomyx/android-driver": "0.1.0",
+    "@atomyx/core": "0.1.0",
+    "@atomyx/driver": "0.1.0",
+    "@atomyx/ios-driver": "0.1.0",
+    "@atomyx/ios-sim-driver": "0.1.0",
+    "@atomyx/script": "0.1.0",
+    "@atomyx/shared": "0.1.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "dependency-cruiser": "^16.0.0",
+    "esbuild": "^0.25.0"
+  }
+}

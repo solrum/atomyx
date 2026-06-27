@@ -70,6 +70,15 @@ struct PointerPath: Equatable {
 /// Dispatches a gesture. The coordinate backend accepts single-
 /// pointer paths only; the event-record backend accepts any number
 /// of parallel pointers aligned on a shared clock.
+///
+/// Gestures are device-global: coordinates address the active
+/// scene, not an owning app. Callers do NOT have to launch or
+/// attach to an app before dispatching — the XCUITest daemon
+/// routes the synthesized events to whichever app is currently
+/// frontmost. The event-record backend bypasses XCUIApplication
+/// entirely; the coordinate backend constructs a Springboard
+/// handle internally so `XCUICoordinate` arithmetic resolves
+/// against full-screen frame geometry.
 protocol EventSynthesizer {
     var capabilities: EventCapabilities { get }
 
@@ -86,5 +95,5 @@ protocol EventSynthesizer {
     /// Dispatch the gesture synchronously — returns when the
     /// underlying XCUITest call completes. Throws
     /// `SynthesizerError` on refusal or dispatch failure.
-    func dispatch(pointers: [PointerPath], in app: XCUIApplication) throws
+    func dispatch(pointers: [PointerPath]) throws
 }

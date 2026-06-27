@@ -124,7 +124,9 @@ describe("IosDriver.hierarchy", () => {
       const btn = tree.children[0]!;
       assert.equal(btn.attributes["id"], "login");
       assert.equal(btn.attributes["label"], "Sign in");
-      assert.equal(btn.attributes["text"], "Sign in"); // mirrored
+      // Button is not a text leaf; `text` is intentionally absent
+      // so the dump distinguishes view+a11y from staticText leaves.
+      assert.equal(btn.attributes["text"], undefined);
       assert.equal(btn.attributes["role"], "button");
       assert.equal(btn.clickable, true);
       // calls should include dumpRawTree
@@ -281,6 +283,47 @@ describe("IosDriver app lifecycle", () => {
 
       const fg = await driver.currentForeground();
       assert.equal(fg.bundleId, "com.example.app");
+    } finally {
+      await close();
+    }
+  });
+
+  it("launchApp with noReset:true skips TCP when bundleId already tracked", async () => {
+    const { driver, calls, close } = await setup(okHandler);
+    try {
+      await driver.launchApp("com.example.app");
+      const launchCallsBefore = calls.filter((c) => c.type === "launchApp").length;
+
+      await driver.launchApp("com.example.app", { noReset: true });
+      const launchCallsAfter = calls.filter((c) => c.type === "launchApp").length;
+
+      assert.equal(launchCallsAfter, launchCallsBefore);
+    } finally {
+      await close();
+    }
+  });
+
+  it("launchApp with noReset:true relaunches when bundleId differs", async () => {
+    const { driver, calls, close } = await setup(okHandler);
+    try {
+      await driver.launchApp("com.example.first");
+      await driver.launchApp("com.example.second", { noReset: true });
+      const launches = calls.filter((c) => c.type === "launchApp");
+      assert.equal(launches.length, 2);
+      assert.equal(launches[1]!.args.bundleId, "com.example.second");
+      assert.equal(launches[1]!.args.noReset, true);
+    } finally {
+      await close();
+    }
+  });
+
+  it("launchApp without noReset always dispatches even when already tracked", async () => {
+    const { driver, calls, close } = await setup(okHandler);
+    try {
+      await driver.launchApp("com.example.app");
+      await driver.launchApp("com.example.app");
+      const launches = calls.filter((c) => c.type === "launchApp");
+      assert.equal(launches.length, 2);
     } finally {
       await close();
     }

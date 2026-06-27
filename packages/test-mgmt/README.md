@@ -13,15 +13,13 @@ repository to agents.
 
 ## Planned packages
 
-- `packages/test-mgmt/` — `@atomyx/test-mgmt` — module main:
-  case models, YAML spec parser, report storage abstractions,
-  query interface.
-- `packages/mcp/` — `@atomyx/test-mgmt-mcp` — MCP server
-  exposing case repository operations to agents.
-- `packages/cli/` — `@atomyx/test-mgmt-cli` — CLI binary
-  (`atomyx-test`).
-- `packages/storage-file/` — `@atomyx/test-mgmt-storage-file` —
-  default filesystem storage backend.
+- `@atomyx/test-mgmt` — module main: case models, YAML spec
+  parser, report storage abstractions, query interface.
+- `@atomyx/test-mgmt-mcp` — MCP server exposing case repository
+  operations to agents.
+- `@atomyx/test-mgmt-cli` — CLI binary (`atomyx-test`).
+- `@atomyx/test-mgmt-storage-file` — default filesystem storage
+  backend.
 - Additional storage adapters may ship as separate packages if
   downstream integrations need them.
 

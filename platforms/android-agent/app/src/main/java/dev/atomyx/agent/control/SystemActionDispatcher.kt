@@ -9,9 +9,9 @@ import android.content.Intent
  * Global / OS-scope actions that don't touch the gesture pipeline:
  * navigation keys (back / home), app launch, force-stop.
  *
- * Kept separate from [GestureDispatcher] and [InputDispatcher]
- * because these paths route through `performGlobalAction` or
- * `Context` directly — they never build a `GestureDescription`
+ * Kept separate from [GestureDispatcher] and the keyboard/input
+ * classes because these paths route through `performGlobalAction`
+ * or `Context` directly — they never build a `GestureDescription`
  * or read the focused-node tree.
  */
 class SystemActionDispatcher(

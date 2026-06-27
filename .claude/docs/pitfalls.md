@@ -221,11 +221,11 @@ Order = severity (most likely to bite a new contributor first).
   one — see `IosXctestController.toCompactElement`).
 
 - **`XCUIElementQuery.waitForExistence(timeout:)` can false-negative
-  even on short timeouts.** On app screens with a custom keyboard
-  mounted, `app.keyboards.element(boundBy: 0).waitForExistence(
-  timeout: 0.2)` returns false despite the keyboard being present in
-  the same tick's `app.snapshot()`. For anything requiring reliable
-  detection, prefer snapshot walk over element-query polling.
+  even on short timeouts.** Verified against kabuappStation where
+  `app.keyboards.element(boundBy: 0).waitForExistence(timeout: 0.2)`
+  returned false despite the keyboard being present in the same
+  tick's `app.snapshot()`. For anything requiring reliable detection,
+  prefer snapshot walk over element-query polling.
 
 - **Unbounded recursion on deeply-nested trees.** Flutter / React
   Native apps routinely nest 30+ `other` wrapper layers. Any tree
@@ -273,7 +273,7 @@ Order = severity (most likely to bite a new contributor first).
 ### Flutter / cross-platform assumptions
 
 - **Flutter apps do NOT universally use custom keypads.** Some
-  banking apps use the iOS
+  banking apps (e.g. `inc.guide.kabuappStation.dev`) use the iOS
   system keyboard and native `typeText()` works directly. When
   designing a custom-keypad fallback, do NOT assume every Flutter
   app needs it — check `getKeyboard()` first, branch on
@@ -443,16 +443,21 @@ Order = severity (most likely to bite a new contributor first).
 - **Nested-Scrollable gesture arbitration is unreliable
   with synthesized swipes.** A vertical `ListView` sitting
   inside another vertical `ListView` (or any
-  `Scrollable`-in-`Scrollable` arrangement) routes
+  `Scrollable`-in-`Scrollable` arrangement) will route
   XCUITest-synthesized swipes intermittently to the outer
   scrollable, even when the swipe coordinates land inside
   the inner one. Manual MCP `swipe` commands work; rapid-
-  succession `dispatchGesture` calls do not. Until a
-  higher-level `scrollIntoView` drives nested scrollables
-  explicitly, prefer flat scrollable hierarchies in test
-  fixtures, or use MCP-level swipe (which routes through
-  `SwipeCommand` and works consistently for single
-  dispatches).
+  succession `dispatchGesture` calls do not. The
+  `examples/atomyx-demo` Gestures screen used to include a
+  flick-scroll fixture (50-row inner ListView) that
+  triggered exactly this bug — the smoke would scroll the
+  outer page past the next test's fixture and inflate
+  unrelated counters. Fixture removed. Until Atomyx ships
+  a higher-level `scrollIntoView` that drives nested
+  scrollables explicitly, prefer flat scrollable
+  hierarchies in test fixtures, or use MCP-level swipe
+  (which routes through `SwipeCommand` and works
+  consistently for single dispatches).
 
 - **Multi-pointer dispatch fails mid-inertia.** iOS rejects
   `XCSynthesizedEventRecord` multi-pointer dispatches that

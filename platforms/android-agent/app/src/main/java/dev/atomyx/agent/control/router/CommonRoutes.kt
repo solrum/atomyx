@@ -202,7 +202,7 @@ class ClearFocusedInputRoute : Route {
     override val method = NanoHTTPD.Method.POST
     override val path = "/actions/clear_focused_input"
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
-        val result = services.input.clearFocusedInput()
+        val result = services.focusedInputClearer.clearFocusedInput()
         return RouteResponse.ok(toJson(mapOf("ok" to result.success, "reason" to result.reason)))
     }
 }
@@ -211,7 +211,7 @@ class HideKeyboardRoute : Route {
     override val method = NanoHTTPD.Method.POST
     override val path = "/actions/hide_keyboard"
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
-        val result = services.input.hideKeyboard()
+        val result = services.keyboardHider.hideKeyboard()
         return RouteResponse.ok(toJson(mapOf("ok" to result.success, "reason" to result.reason)))
     }
 }
@@ -311,7 +311,7 @@ class TypeKeyboardRoute : Route {
         val text = body.get("text").asString
         val perKeyDelayMs = body.get("perKeyDelayMs")?.takeIf { !it.isJsonNull }?.asLong ?: 80L
         val clearFirst = body.get("clearFirst")?.takeIf { !it.isJsonNull }?.asBoolean ?: true
-        val result = services.input.typeViaKeyboard(text, perKeyDelayMs, clearFirst)
+        val result = services.keyboardTyper.typeViaKeyboard(text, perKeyDelayMs, clearFirst)
         return RouteResponse.ok(toJson(mapOf(
             "success" to result.success,
             "typed" to result.typed,

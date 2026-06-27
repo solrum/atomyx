@@ -389,9 +389,8 @@ unverified scenarios, not missing implementation.
 ### CI coverage (pending)
 
 A CI matrix + weekly cron against the latest Xcode beta is
-planned to catch private-symbol drift before users. The
-workflow file (`.github/workflows/ios.yml`) is not yet checked
-in; until it lands, run the Flutter pointer smoke manually
+planned to catch private-symbol drift before users. Until a CI
+workflow is committed, run the Flutter pointer smoke manually
 (local script — see `platforms/ios-agent/Makefile` targets)
 after any change to the Swift bridge or before each release.
 

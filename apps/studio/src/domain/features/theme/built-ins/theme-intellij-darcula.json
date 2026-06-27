@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "intellij-darcula",
+  "label": "IntelliJ · Darcula",
+  "monacoBase": "vs-dark",
+  "attributes": {
+    "EDITOR_BACKGROUND": { "background": "#2b2b2b", "foreground": "#2b2b2b" },
+    "EDITOR_FOREGROUND": { "foreground": "#a9b7c6" },
+    "EDITOR_LINE_HIGHLIGHT_BG": { "background": "#323232", "foreground": "#323232" },
+    "EDITOR_SELECTION_BG": { "background": "#214283", "foreground": "#214283" },
+    "EDITOR_CARET": { "foreground": "#bbbbbb" },
+    "EDITOR_GUTTER_BG": { "background": "#313335", "foreground": "#313335" },
+    "EDITOR_GUTTER_FG": { "foreground": "#606366" },
+
+    "ATOMYX_KEYWORD": { "foreground": "#cc7832", "fontStyle": "bold" },
+    "ATOMYX_COMMAND_BARE": { "foreground": "#cc7832", "fontStyle": "bold" },
+    "ATOMYX_SELECTOR": { "foreground": "#9876aa" },
+    "ATOMYX_VARIABLE": { "foreground": "#9876aa", "fontStyle": "italic" },
+    "ATOMYX_VARIABLE_UNDEFINED": { "foreground": "#ff6b68", "fontStyle": "italic" },
+
+    "SYNTAX_STRING": { "foreground": "#6a8759" },
+    "SYNTAX_NUMBER": { "foreground": "#6897bb" },
+    "SYNTAX_BOOLEAN": { "foreground": "#cc7832", "fontStyle": "bold" },
+    "SYNTAX_NULL": { "foreground": "#cc7832", "fontStyle": "bold" },
+    "SYNTAX_COMMENT": { "foreground": "#808080", "fontStyle": "italic" },
+
+    "DIAGNOSTIC_ERROR_FG": { "foreground": "#ff6b68" },
+    "DIAGNOSTIC_ERROR_BG": { "background": "#522e2e", "foreground": "#522e2e" },
+    "DIAGNOSTIC_WARNING_FG": { "foreground": "#bbb529" },
+    "DIAGNOSTIC_WARNING_BG": { "background": "#4a4a1e", "foreground": "#4a4a1e" },
+    "DIAGNOSTIC_INFO_FG": { "foreground": "#6897bb" },
+    "DIAGNOSTIC_HINT_FG": { "foreground": "#808080" },
+
+    "RUN_STEP_PENDING": { "foreground": "#808080" },
+    "RUN_STEP_RUNNING": { "foreground": "#ffc66d" },
+    "RUN_STEP_PASS": { "foreground": "#6a8759" },
+    "RUN_STEP_FAIL": { "foreground": "#ff6b68" },
+    "RUN_STEP_SKIP": { "foreground": "#808080" },
+    "RUN_STEP_CURRENT_BG": { "background": "#323232", "foreground": "#323232" }
+  }
+}

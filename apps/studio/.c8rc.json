@@ -1,0 +1,21 @@
+{
+  "all": true,
+  "extension": [".ts"],
+  "include": ["src/domain/**/*.ts", "src/state/**/*.ts"],
+  "exclude": [
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.mock.ts",
+    "**/index.ts",
+    "**/*.contract.ts",
+    "**/*.port.ts",
+    "**/*.types.ts",
+    "**/types.ts"
+  ],
+  "reporter": ["text-summary"],
+  "check-coverage": true,
+  "lines": 60,
+  "branches": 85,
+  "functions": 72,
+  "statements": 60
+}

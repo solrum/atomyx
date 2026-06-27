@@ -53,7 +53,7 @@ describe("iosElementTypeToRole", () => {
 });
 
 describe("normalizeIosTree", () => {
-  it("maps canonical attribute keys from legacy fields", () => {
+  it("maps canonical attribute keys from wire fields", () => {
     const raw: IosRawElement = {
       elementType: "button",
       identifier: "login_btn",
@@ -63,8 +63,11 @@ describe("normalizeIosTree", () => {
     };
     const wire = normalizeIosTree(raw);
     assert.equal(wire.attributes["id"], "login_btn");
+    // Non-text elementType keeps the a11y label in `label`; `text`
+    // stays empty so consumers can tell a button apart from a text
+    // leaf at attribute level.
     assert.equal(wire.attributes["label"], "Sign in");
-    assert.equal(wire.attributes["text"], "Sign in"); // mirrored from label
+    assert.equal(wire.attributes["text"], undefined);
     assert.equal(wire.attributes["class"], "button");
     assert.equal(wire.attributes["role"], "button");
     assert.equal(wire.attributes["bounds"], "100,200,300,260");
@@ -138,7 +141,9 @@ describe("normalizeIosTree", () => {
     const wire = normalizeIosTree(raw);
     assert.equal(wire.children.length, 2);
     assert.equal(wire.children[0]!.attributes["role"], "button");
-    assert.equal(wire.children[0]!.attributes["text"], "Save");
+    // Button keeps a11y label in `label`, no `text` mirror.
+    assert.equal(wire.children[0]!.attributes["label"], "Save");
+    assert.equal(wire.children[0]!.attributes["text"], undefined);
     assert.equal(wire.children[1]!.attributes["role"], "text-field");
     assert.equal(wire.children[1]!.attributes["text"], "a@b.com");
     assert.equal(wire.attributes["role"], "container");
@@ -177,5 +182,244 @@ describe("normalizeIosTree", () => {
   it("leaves focused undefined when raw field is missing", () => {
     const wire = normalizeIosTree({ elementType: "staticText" });
     assert.equal(wire.focused, undefined);
+  });
+
+  it("plumbs selected through to node-level boolean", () => {
+    const wire = normalizeIosTree({
+      elementType: "button",
+      label: "Active tab",
+      selected: true,
+    });
+    assert.equal(wire.selected, true);
+  });
+
+  it("surfaces title and a11y traits via ext:* attribute keys", () => {
+    const wire = normalizeIosTree({
+      elementType: "button",
+      label: "Save",
+      title: "Save document",
+      traits: ["button", "selected"],
+    });
+    assert.equal(wire.attributes["ext:ios-title"], "Save document");
+    assert.equal(wire.attributes["ext:ios-traits"], "button,selected");
+  });
+
+  it("plumbs visible through to node-level boolean", () => {
+    const onScreen = normalizeIosTree({
+      elementType: "button",
+      label: "Save",
+      visible: true,
+    });
+    assert.equal(onScreen.visible, true);
+    const offScreen = normalizeIosTree({
+      elementType: "cell",
+      label: "Row 50",
+      visible: false,
+    });
+    assert.equal(offScreen.visible, false);
+  });
+
+  it("leaves visible undefined when raw field is missing", () => {
+    const wire = normalizeIosTree({ elementType: "staticText" });
+    assert.equal(wire.visible, undefined);
+  });
+
+  it("surfaces ext:ios-accessible flag verbatim", () => {
+    const leaf = normalizeIosTree({
+      elementType: "staticText",
+      label: "Hello",
+      accessible: true,
+    });
+    assert.equal(leaf.attributes["ext:ios-accessible"], "true");
+    const container = normalizeIosTree({
+      elementType: "other",
+      accessible: false,
+    });
+    assert.equal(container.attributes["ext:ios-accessible"], "false");
+  });
+
+  it("emits ext:ios-a11y-bounds only when distinct from layout bounds", () => {
+    const same = normalizeIosTree({
+      elementType: "button",
+      bounds: { left: 0, top: 0, right: 100, bottom: 50 },
+      accessibilityFrame: { left: 0, top: 0, right: 100, bottom: 50 },
+    });
+    assert.equal(same.attributes["ext:ios-a11y-bounds"], "0,0,100,50");
+    const distinct = normalizeIosTree({
+      elementType: "button",
+      bounds: { left: 0, top: 0, right: 100, bottom: 50 },
+      accessibilityFrame: { left: 5, top: 5, right: 105, bottom: 55 },
+    });
+    assert.equal(distinct.attributes["ext:ios-a11y-bounds"], "5,5,105,55");
+  });
+});
+
+describe("normalizeIosTree — trait-driven role", () => {
+  it("button trait wins over staticText elementType (Flutter button merge)", () => {
+    const wire = normalizeIosTree({
+      elementType: "staticText",
+      label: "Tất cả",
+      traits: ["button", "staticText"],
+    });
+    assert.equal(wire.attributes["role"], "button");
+    assert.equal(wire.clickable, true);
+    // Label routed as a11y description, not visible text — the
+    // node is a button, not a text leaf.
+    assert.equal(wire.attributes["label"], "Tất cả");
+    assert.equal(wire.attributes["text"], undefined);
+  });
+
+  it("image+staticText traits collapse to container (Flutter merged card)", () => {
+    const wire = normalizeIosTree({
+      elementType: "image",
+      label: "MacBook Pro M3 14 inch\n35.900.000đ\nĐang đăng",
+      traits: ["image", "staticText"],
+    });
+    assert.equal(wire.attributes["role"], "container");
+    assert.equal(wire.attributes["label"], "MacBook Pro M3 14 inch\n35.900.000đ\nĐang đăng");
+    assert.equal(wire.attributes["text"], undefined);
+  });
+
+  it("button+image traits collapse to container (icon button card)", () => {
+    const wire = normalizeIosTree({
+      elementType: "button",
+      label: "Open menu",
+      traits: ["button", "image"],
+    });
+    assert.equal(wire.attributes["role"], "container");
+  });
+
+  it("staticText trait alone yields role=text with label routed to text", () => {
+    const wire = normalizeIosTree({
+      elementType: "staticText",
+      label: "Welcome",
+      traits: ["staticText"],
+    });
+    assert.equal(wire.attributes["role"], "text");
+    assert.equal(wire.attributes["text"], "Welcome");
+    assert.equal(wire.attributes["label"], undefined);
+  });
+
+  it("image trait alone yields role=image", () => {
+    const wire = normalizeIosTree({
+      elementType: "image",
+      label: "Avatar",
+      traits: ["image"],
+    });
+    assert.equal(wire.attributes["role"], "image");
+  });
+
+  it("header trait yields role=heading with text routing", () => {
+    const wire = normalizeIosTree({
+      elementType: "staticText",
+      label: "Section title",
+      traits: ["header", "staticText"],
+    });
+    assert.equal(wire.attributes["role"], "heading");
+    assert.equal(wire.attributes["text"], "Section title");
+  });
+
+  it("link trait yields role=link and clickable", () => {
+    const wire = normalizeIosTree({
+      elementType: "staticText",
+      label: "Read more",
+      traits: ["link", "staticText"],
+    });
+    assert.equal(wire.attributes["role"], "link");
+    assert.equal(wire.clickable, true);
+  });
+
+  it("searchField trait wins over elementType image", () => {
+    const wire = normalizeIosTree({
+      elementType: "image",
+      traits: ["searchField"],
+    });
+    assert.equal(wire.attributes["role"], "search-field");
+  });
+
+  it("keyboardKey trait yields role=key", () => {
+    const wire = normalizeIosTree({
+      elementType: "other",
+      label: "Q",
+      traits: ["keyboardKey"],
+    });
+    assert.equal(wire.attributes["role"], "key");
+  });
+
+  it("falls back to elementType mapping when traits are absent", () => {
+    const wire = normalizeIosTree({ elementType: "button", label: "Sign in" });
+    assert.equal(wire.attributes["role"], "button");
+  });
+
+  it("falls back to label-shape heuristic when traits are absent and elementType is image", () => {
+    const wire = normalizeIosTree({
+      elementType: "image",
+      label: "MacBook Pro M3 14 inch\n35.900.000đ\nĐang đăng",
+    });
+    // No traits → label-shape detector promotes to container.
+    assert.equal(wire.attributes["role"], "container");
+  });
+
+  it("staticText trait + tall bounds demotes role to container (Flutter merged card)", () => {
+    // Gangan marketplace card: trait says staticText, but bounds
+    // height (108 px) far exceeds a real one-line text leaf
+    // (~25 px). Discriminator is geometric — the merged card
+    // contains an icon above and a label below.
+    const wire = normalizeIosTree({
+      elementType: "staticText",
+      label: "Xe máy",
+      traits: ["staticText"],
+      bounds: { left: 18, top: 229, right: 110, bottom: 337 },
+    });
+    assert.equal(wire.attributes["role"], "container");
+  });
+
+  it("staticText trait with normal bounds stays text", () => {
+    const wire = normalizeIosTree({
+      elementType: "staticText",
+      label: "Hồ Chí Minh, VN",
+      traits: ["staticText"],
+      bounds: { left: 23, top: 80, right: 335, bottom: 105 },
+    });
+    assert.equal(wire.attributes["role"], "text");
+  });
+
+  it("image trait + tall bounds demotes role to container (icon-only card)", () => {
+    // Pure-icon card variant: Flutter merge collapses an icon
+    // tile (no visible label) into a single image leaf with
+    // traits=["image"]. Bounds height (~120 px) outranges any
+    // real icon glyph (~24-44 px), proving it is a merged region.
+    const wire = normalizeIosTree({
+      elementType: "image",
+      traits: ["image"],
+      bounds: { left: 18, top: 229, right: 110, bottom: 350 },
+    });
+    assert.equal(wire.attributes["role"], "container");
+  });
+
+  it("image trait with normal bounds stays image", () => {
+    const wire = normalizeIosTree({
+      elementType: "image",
+      traits: ["image"],
+      bounds: { left: 26, top: 161, right: 46, bottom: 180 },
+    });
+    assert.equal(wire.attributes["role"], "image");
+  });
+
+  it("staticText trait without bounds stays text (no signal to override)", () => {
+    const wire = normalizeIosTree({
+      elementType: "staticText",
+      label: "Some label",
+      traits: ["staticText"],
+    });
+    assert.equal(wire.attributes["role"], "text");
+  });
+
+  it("keyboard elementType always wins (Orchestra hardcode)", () => {
+    const wire = normalizeIosTree({
+      elementType: "keyboard",
+      traits: ["button"], // would otherwise force role=button
+    });
+    assert.equal(wire.attributes["role"], "keyboard");
   });
 });

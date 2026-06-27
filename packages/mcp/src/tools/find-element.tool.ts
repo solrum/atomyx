@@ -25,7 +25,7 @@ export const findElementTool = defineTool({
   async execute(args, ctx) {
     const orchestra = orchestraOrFail(ctx);
     const selector = compileSelectorInput(args);
-    const cursor = await orchestra.findOne(selector);
+    const cursor = await orchestra.findOne(selector, { signal: ctx.signal });
     if (!cursor) {
       return { found: false };
     }

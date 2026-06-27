@@ -184,6 +184,51 @@ describe("TcpClient framing", () => {
   });
 });
 
+describe("TcpClient abort signal", () => {
+  it("rejects pending call with AbortError when external signal aborts", async () => {
+    // Server never responds — only the abort signal can free the
+    // waiter. Without signal threading this test would hang.
+    const server = await startFakeServer(() => {
+      /* swallow */
+    });
+    const client = new TcpClient({ host: "127.0.0.1", port: server.port });
+    try {
+      await client.connect();
+      const controller = new AbortController();
+      const startedAt = Date.now();
+      const pending = client.call("ping", {}, { signal: controller.signal });
+      setTimeout(() => controller.abort(new DOMException("budget elapsed", "AbortError")), 50);
+      const err = await pending.catch((e) => e);
+      const elapsedMs = Date.now() - startedAt;
+      assert.ok(elapsedMs < 500, `expected fast abort, got ${elapsedMs}ms`);
+      assert.equal((err as Error).name, "AbortError");
+      assert.match((err as Error).message, /budget elapsed/);
+    } finally {
+      await client.disconnect();
+      await server.close();
+    }
+  });
+
+  it("rejects synchronously when the signal is already aborted", async () => {
+    const server = await startFakeServer((req, respond) =>
+      respond({ id: req.id, ok: true, data: {} }),
+    );
+    const client = new TcpClient({ host: "127.0.0.1", port: server.port });
+    try {
+      await client.connect();
+      const controller = new AbortController();
+      controller.abort(new DOMException("pre-aborted", "AbortError"));
+      const err = await client
+        .call("ping", {}, { signal: controller.signal })
+        .catch((e) => e);
+      assert.equal((err as Error).name, "AbortError");
+    } finally {
+      await client.disconnect();
+      await server.close();
+    }
+  });
+});
+
 describe("TcpClient connect failure", () => {
   it("rejects when the port has no server", async () => {
     const client = new TcpClient({

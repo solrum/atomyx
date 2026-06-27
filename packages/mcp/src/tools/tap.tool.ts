@@ -40,9 +40,9 @@ export const tapTool = defineTool({
     const orchestra = orchestraOrFail(ctx);
     if (args.selector) {
       const selector = compileSelectorInput(args.selector);
-      return orchestra.tap(selector);
+      return orchestra.tap(selector, { signal: ctx.signal });
     }
-    await orchestra.tapAt({ x: args.x!, y: args.y! });
+    await orchestra.tapAt({ x: args.x!, y: args.y! }, { signal: ctx.signal });
     return { ok: true, detail: `tapped at (${args.x},${args.y})` };
   },
 });
