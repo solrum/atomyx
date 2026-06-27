@@ -130,6 +130,9 @@ atomyx-local/
 **/packages/*/scripts/
 **/apps/*/scripts/
 platforms/*/scripts/
+# CI gate scripts that MUST ship (referenced by package.json gates)
+!apps/studio/scripts/
+!apps/studio/scripts/check-feature-api.mjs
 /scripts/bench-ios-type.mjs
 /scripts/ios-driver-call.mjs
 /scripts/ios-flutter-pointer-smoke.mjs

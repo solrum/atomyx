@@ -6,14 +6,16 @@ on:
       - main
     paths:
       - "apps/studio/**"
-      - "packages/shared/**"
+      - "shared/**"
       - "packages/script/**"
+      - "package-lock.json"
       - ".github/workflows/studio-ci.yml"
   pull_request:
     paths:
       - "apps/studio/**"
-      - "packages/shared/**"
+      - "shared/**"
       - "packages/script/**"
+      - "package-lock.json"
       - ".github/workflows/studio-ci.yml"
 
 concurrency:
@@ -39,7 +41,11 @@ jobs:
 
       - name: Install deps
         run: npm ci
-        working-directory: .
+        working-directory: ${{ github.workspace }}
+
+      - name: Build workspace deps
+        run: npm run build
+        working-directory: ${{ github.workspace }}
 
       - name: Typecheck
         run: npm run typecheck
