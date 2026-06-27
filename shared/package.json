@@ -1,9 +1,5 @@
 {
-<<<<<<<< HEAD:packages/driver-wire/package.json
-  "name": "@atomyx/driver-wire",
-========
   "name": "@atomyx/shared",
->>>>>>>> 67f953e (feat: viewport-aware scroll + 4-strategy clear-text chain):shared/package.json
   "version": "0.1.0",
   "private": true,
   "description": "Cross-module contracts — types plus zod schemas that validate them at runtime. Consumed by core, driver, script, mcp, cli, studio.",
@@ -32,7 +28,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/solrum/atomyx.git",
-    "directory": "packages/driver-wire"
+    "directory": "shared"
   },
   "bugs": {
     "url": "https://github.com/solrum/atomyx/issues"
