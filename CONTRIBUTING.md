@@ -1,227 +1,219 @@
 # Contributing to Atomyx
 
-Atomyx is an open-source mobile test orchestration framework at `v0.1.0`.
-Contributions from humans and AI agents are welcome — bug reports, driver
-adapters, script engine fixes, platform coverage, documentation.
+Atomyx is an open-source mobile test orchestration framework at
+`v0.1.0` (domain `atomyx.dev`). Contributions from humans and AI
+agents are welcome: bug reports, driver adapters, script engine
+fixes, platform coverage, documentation.
 
-## First-time setup
+The runtime is a Go core (`core/`, module `dev.atomyx`) that builds
+three binaries: the `atomyx` CLI, the `atomyx-mcp` stdio server for
+AI agents, and the `atomyx-runtime` sidecar. Two native agents drive
+the device side: an Android APK (`platforms/android-agent/`) and an
+iOS XCUITest runner (`platforms/ios-agent/`).
 
-Node 22 is required (see `.nvmrc`). If you use nvm:
+## Prerequisites
+
+- **Go 1.25** (see `core/go.mod`). Every core change builds, vets,
+  lints, and tests under this toolchain.
+- **Android**: the Android SDK plus `adb` on your `PATH`, for
+  building and running the Android agent APK and for any change
+  touching `core/internal/androiddriver`.
+- **iOS**: Xcode and `xcodegen` (`brew install xcodegen`), for
+  building the iOS XCUITest runner and for any change touching
+  `core/internal/iosdriver` or `core/internal/iossimdriver`. A
+  physical-device run additionally needs an Apple Developer team ID
+  and `libimobiledevice` for `iproxy`.
+
+You do not need both mobile toolchains to contribute to the core
+runtime alone. A change confined to `core/internal/script`,
+`core/internal/runner`, or `core/internal/mcp` builds and tests with
+only Go installed.
+
+## Build
+
+Build the core binaries from the repository root:
 
 ```bash
-nvm use
+make build-core
 ```
 
-Then clone and install:
+This delegates to `core/Makefile`, which builds every command under
+`core/cmd/` (`atomyx`, `atomyx-mcp`, `atomyx-runtime`, and the two
+schema generators) into `core/bin/`. Building the core directly
+works the same way:
 
 ```bash
-git clone https://github.com/solrum/atomyx.git
-cd atomyx
-npm run setup   # npm ci + husky git hooks
+cd core
+make build
 ```
 
-`npm run setup` installs all workspace dependencies and wires the husky
-pre-commit and pre-push hooks. You should see a confirmation that hooks
-were installed.
-
-This sets up TypeScript packages only. Native toolchains (Android APK,
-iOS XCUITest runner) require additional steps — see
-[`.claude/docs/android.md`](./.claude/docs/android.md) and
-[`.claude/docs/ios.md`](./.claude/docs/ios.md).
+Android and iOS builds run through their own platform-native
+tooling. See the "Native agents" section below.
 
 ## Quality gates
 
-Atomyx is local-first — there is no CI server. Correctness is the
-contributor's responsibility before pushing.
+There is no hosted CI. Run `make -C core check` from the repository
+root before opening a pull request that touches `core/**`; it runs
+every gate below in order and stops at the first failure. Each gate
+also runs on its own from `core/`:
 
-### Fast gate (run often)
-
-```bash
-npm run check:fast
-```
-
-Runs lint, TypeScript typecheck, filename-prefix lint, and banned-phrase
-scan. Takes a few seconds. Run this before committing.
-
-### Full gate (run before push)
-
-```bash
-npm run check
-```
-
-Runs everything: lint, typecheck, dep-cruiser, feature-api lint,
-prefix lint, phrase lint, doc-path lint, tests, coverage check, API
-snapshots, wire schema snapshots, audit, and license check. The pre-push
-hook runs this automatically.
-
-**Audit note**: the `audit` step runs at `--audit-level=critical`. A set
-of high-severity CVEs in `fast-uri` and `ajv` (transitive via
-`@modelcontextprotocol/sdk`) are excluded because no upstream fix is
-available and the affected code paths (URL parsing inside MCP's JSON
-Schema validator) are not reachable from user-controlled input in Atomyx.
-Re-evaluate when a fixed `@modelcontextprotocol/sdk` version ships.
-
-### Hooks
-
-- **Pre-commit**: runs lint-staged on changed files.
-- **Pre-push**: runs `npm run check`.
-
-Do not bypass hooks with `--no-verify` unless you have already run the
-full gate locally and confirmed it is green.
-
-## The rules
-
-Atomyx has codified rules with enforcement gates. Read the relevant rule
-before making a change — skipping this step is the most common reason
-PRs are sent back.
-
-| You are about to… | Read |
+| Gate | Local command |
 |---|---|
-| Design or evaluate a module or feature boundary | [`.claude/docs/architecture.md`](./.claude/docs/architecture.md) |
-| Create a new file or feature in any TS package or app | [`.claude/rules/feature-structure.md`](./.claude/rules/feature-structure.md) |
-| Export anything from a feature's `index.ts` | [`.claude/rules/feature-api.md`](./.claude/rules/feature-api.md) |
-| Edit anything under `apps/studio/` | [`.claude/rules/studio-architecture.md`](./.claude/rules/studio-architecture.md) |
-| Write or edit any comment or docstring | [`.claude/rules/comments.md`](./.claude/rules/comments.md) |
-| Write or edit any markdown file | [`.claude/rules/docs.md`](./.claude/rules/docs.md) |
-| Write or edit Studio tests | [`.claude/rules/studio-testing.md`](./.claude/rules/studio-testing.md) |
-| Edit Android or iOS agent code, or tool-layer code | [`.claude/docs/pitfalls.md`](./.claude/docs/pitfalls.md) |
+| Format | `gofmt -l .` (must print nothing) |
+| Build | `go build ./...` |
+| Vet | `go vet ./...` |
+| Layer-import lint | `go-arch-lint check --project-path .` |
+| Lint | `golangci-lint run ./...` (pinned to `v2.13.2`) |
+| Comment gate | `bash scripts/check-comments.sh` |
+| Schema freshness | `bash scripts/check-schema-fresh.sh` |
+| Test | `go test -race ./...` |
 
-Each rule has an associated enforcement gate (dep-cruiser, ESLint,
-lint scripts, node:test coverage). Rules drift without enforcement — the
-gate is the rule.
+Install `go-arch-lint` with
+`go install github.com/fe3dback/go-arch-lint@latest` and
+`golangci-lint` with
+`go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2`.
+Both installed binaries land in `$(go env GOPATH)/bin`, so make sure
+that directory is on your `PATH`.
 
-## Adding a feature
+Some tests bind local TCP ports (transport, iOS launcher, Android
+launcher, and process-teardown tests). Running the suite on a
+machine that blocks local port binding, or inside a sandbox with the
+same restriction, fails those tests for a reason unrelated to your
+change, so run them on a host that allows it.
 
-A new feature is one folder and one composition-root line. Removing it
-is one folder delete and one line delete. No other file should change.
+`go test -race ./...` is the test gate `make -C core check` runs. A
+single `-race` pass can still miss a flake in genuinely concurrent
+code, so when you touch concurrency or timing-sensitive code, also
+run `go test -race -count=10 ./path/to/package/...` before you
+consider it solid.
 
-Follow the checklist in
-[`.claude/rules/feature-structure.md`](./.claude/rules/feature-structure.md)
-for the folder shape and the checklist in
-[`.claude/rules/feature-api.md`](./.claude/rules/feature-api.md)
-for the `index.ts` contract. Both checklists must be green before a
-feature PR is considered complete.
+## Where things live
 
-## Editing a public API
+- `core/internal/driver`: the `Driver` port every platform adapter
+  implements, and the contract the rest of the runtime depends on.
+- `core/internal/orchestra`: the command layer above `Driver`
+  (selector resolution, scroll-into-view, obscurement detection,
+  priority broadening).
+- Driver adapters: `core/internal/androiddriver`,
+  `core/internal/iosdriver` (physical device),
+  `core/internal/iossimdriver` (simulator), and
+  `core/internal/driver/mock` (the in-memory `MockDriver` used by
+  tests that need no device).
+- `core/internal/script`: the YML script schema and parser.
+  `core/internal/runner`: the step executor that runs a parsed
+  script against an `Orchestra`.
+- `core/internal/mcp`: the MCP tool surface `atomyx-mcp` serves.
+- `core/internal/conformance`: the differential conformance corpus
+  that pins script and expression behavior against golden fixtures.
 
-Any change to a domain port, a wire schema, or a zod schema exported
-from `@atomyx/shared` is a breaking change and requires a changeset:
+## Adding a script step
 
-```bash
-npx changeset add
-```
+A step is a `CommandDefinition` implementation in its own
+`<name>_command.go` file under `core/internal/runner`, appended to
+the registry `DefaultCommands` returns in
+`core/internal/runner/commands.go`. No other file changes to make a
+new step available to the parser and the runner.
 
-Select the affected packages and pick a semver bump (`patch`, `minor`,
-or `major`). Commit the generated changeset file alongside your code
-change. One changeset per PR.
-
-If the change affects API snapshots or wire snapshots, regenerate them:
-
-```bash
-npm run api:check        # check — fails if snapshots are stale
-node scripts/snapshot-wire-schema.mjs   # regenerate wire snapshots
-```
-
-Commit the updated snapshot files in the same PR as the change.
-
-## Tests
-
-Tests are colocated with the code they cover (`foo.test.ts` next to
-`foo.ts`), never in a parallel `tests/` tree.
-
-The runner is `node:test`. Run a single package:
-
-```bash
-cd packages/driver
-npm test
-```
-
-Run all packages:
+After adding or changing a step's fields, regenerate the checked-in
+JSON Schema and confirm it is still fresh:
 
 ```bash
-npm test
+cd core
+make gen-schema
+bash scripts/check-schema-fresh.sh
 ```
 
-### DOM-free invariant
+The schema freshness gate fails when the committed schema no longer
+matches the Go structs it describes, so run `make gen-schema` and
+commit the regenerated file in the same change.
 
-Tests under `domain/` and `state/` in `apps/studio/` must run under
-`node:test` with no bundler, no `jsdom`, and no React. A test that
-imports `react`, `react-dom`, or touches `document` or `window` fails
-at load time — that is intentional. If a test needs the DOM, the code
-under test belongs in `ui/`, not `domain/` or `state/`.
+## Adding an MCP tool
 
-### Coverage ratchet
+A tool is a `register<Name>Tool(server, tc)` function in its own
+`<name>_tool.go` file under `core/internal/mcp`, called from
+`NewServer` in `core/internal/mcp/server.go`. The function declares
+the tool's JSON input schema and its handler, and receives a shared
+`ToolContext` carrying the device session, storage, run store, clock,
+and logger.
 
-Coverage is measured by `c8` over the `domain/` and `state/` layers in
-`apps/studio/`. The floor in `apps/studio/.c8rc.json` only ever goes
-up. When new tests raise measured coverage, raise the floor to match
-in the same PR. Never lower it to make a failing build green.
+Before adding a tool, confirm no existing tool can absorb the intent
+through a parameter. Atomyx keeps a deliberately small tool surface
+because overlapping tools measurably confuse the agents that consume
+it. Growing the surface is a last resort, not a first instinct.
 
-## Banned phrases
+## Native agents
 
-These phrases are blocked by `npm run lint:phrases` and must not appear
-in source files or docs:
-
-- **Milestone refs** — words like "Phase", "Batch", "Sprint", "Week",
-  or "Milestone" followed by a number. Project-plan concepts don't
-  travel with the source; describe the current state instead.
-- **Past-thing refs** — phrases that name a thing that no longer exists
-  (e.g. "the old X", "X was no longer used"). Describe what IS; git
-  log owns what WAS.
-- **ADR refs in code** — phrases like "per ADR-NNN" or "see ADR-NNN"
-  in source or doc files. State the constraint inline, not by reference
-  to a document the reader may not have.
-- **SHIPPED status markers** — words like "SHIPPED" followed by a date.
-  Docs describe present state; git keeps history.
-- **Code-style comments inside template literals** (`//`, `/* */`) —
-  they leak into user-facing strings.
-
-## Commits and PRs
-
-Follow the conventional commit format used throughout the repo:
-
-```
-feat(scope): short imperative description
-
-Body explains WHY when the change is non-obvious. Keep the subject
-under 72 characters. Reference issues with Fixes #N or Refs #N.
-```
-
-Common scopes: `android`, `ios`, `mcp`, `cli`, `driver`, `script`,
-`studio`, `core`, `shared`, `skills`.
-
-One concept per commit. A PR may contain multiple commits; each must
-build and test green on its own.
-
-- Do not use `--no-verify` or `--no-gpg-sign`.
-- Co-authored-by trailers are fine for AI-assisted changes.
-
-### PR description
-
-Include:
-
-1. **What** — one sentence on the user-visible change.
-2. **Why** — the motivating problem, with a linked issue when one exists.
-3. **How** — the design decision and any tradeoff.
-4. **Test plan** — what you ran. For device-facing changes, name the
-   platform, OS version, and app you tested against.
-
-## Releases
-
-Releases are maintainer-only and run from a local machine:
+**Android** (`platforms/android-agent/`): a Kotlin APK. Run its unit
+tests with:
 
 ```bash
-npm run release
+cd platforms/android-agent
+./gradlew :app:testDebugUnitTest
 ```
 
-This runs `changeset version` to apply pending changesets, then
-`npm run check` to confirm the build is green, then `changeset publish`
-to push packages to the registry. Do not run this as a contributor.
+Build the debug APK with `./gradlew :app:assembleDebug` when a
+change needs on-device verification.
+
+**iOS** (`platforms/ios-agent/`): a Swift XCUITest bundle, driven
+through its own `Makefile`:
+
+```bash
+cd platforms/ios-agent
+make setup   # xcodegen + build-for-testing (simulator)
+make test    # unit tests, no simulator UI needed
+make serve   # runs the driver against a booted simulator, blocks
+```
+
+A physical-device run additionally needs `cp device.env.example
+device.env` (edited with your device UDID and team ID), then
+`make setup-device` and `make serve-device`.
+
+## Commits
+
+Atomyx follows conventional commits: `type(scope): imperative
+summary`, for example `fix(android): fail a reset launch when the
+app cannot actually be stopped`. Common types are `feat`, `fix`,
+`refactor`, `test`, `docs`, `ci`, `chore`, and `perf`. Common scopes
+are `core`, `android`, `ios`, `cli`, `driver`, `script`. A change
+that breaks a public contract carries a `!` after the scope, for
+example `refactor(core)!: unify the pointer step on a single touches
+list`, with the breaking change explained in the commit body.
+
+Keep the subject under about 72 characters. Use the body to explain
+why the change is needed when that is not obvious from the subject
+alone. One concept per commit. A pull request may hold several
+commits, and each should build and test green on its own.
+
+## Comments
+
+Comments explain why, not what. A well-named function or variable
+does not need a comment restating its name in prose. Do not leave
+`TODO`, placeholder, or stub comments, because the production bar applies
+from the first commit a piece of code lands in.
+
+Two additional constraints are enforced by
+`core/scripts/check-comments.sh`:
+
+- No comment anchors current behavior to a prior TypeScript
+  implementation. Describe what the current Go code does, not what
+  it replaced.
+- No comment uses an em dash or a right arrow as a stand-in for a
+  connecting word ("because", "so", "then"). Write the word, or
+  split into two sentences.
+
+## Docs
+
+Documentation is written in English, in the present tense, and
+describes the current contract rather than the history of how it
+was built. Do not reference a past implementation, a milestone
+number, or a file path that does not exist. Every path, command, and
+API symbol named in a doc must exist in the repository at the time
+you write it.
 
 ## License
 
-Atomyx is Apache 2.0. By contributing, you agree your code ships under
-the same terms. Do not submit code with incompatible licenses. Do not
-copy from GPL projects.
+Atomyx is MIT. By contributing, you agree your code ships
+under the same terms. Do not submit code with incompatible licenses,
+and do not copy from GPL projects.
 
 See [`LICENSE`](./LICENSE) for the full text.

@@ -1,0 +1,10 @@
+{
+  "name": "assert-expr-false",
+  "description": "assertExpr fails the step when the expression evaluates to false",
+  "yaml": "appId: com.test\nname: assert expr false\nenv:\n  x: \"1\"\n---\n- assertExpr:\n    expr: \"number(x) == 2\"\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

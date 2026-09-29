@@ -1,9 +1,8 @@
 //! Atomyx Studio Tauri backend.
 //!
 //! Responsibilities kept intentionally narrow:
-//!   - Own the core-runtime child process — a Node sidecar
-//!     bundled as `sidecar.cjs` that loads `@atomyx/driver` +
-//!     `@atomyx/script` in-process. Forwards Studio's `runtime_*`
+//!   - Own the core-runtime child process, the Atomyx Go runtime
+//!     binary spawned as a sidecar. Forwards Studio's `runtime_*`
 //!     invokes as line-delimited JSON-RPC over stdio and streams
 //!     events back via Tauri Channels.
 //!   - Own the on-disk Studio artifact store + settings file +
@@ -44,8 +43,8 @@ pub fn run() {
             // mirror_scrcpy_* command takes it as managed state.
             app.manage::<Arc<SessionRegistry>>(Arc::new(SessionRegistry::new()));
 
-            // Spawn the Node sidecar once per Studio process. Every
-            // runtime_* command borrows it as managed state.
+            // Spawn the Atomyx runtime sidecar once per Studio process.
+            // Every runtime_* command borrows it as managed state.
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 match Sidecar::spawn(Some(&handle)).await {

@@ -1,0 +1,276 @@
+{
+  "calls": [
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    }
+  ],
+  "durationMs": 5000,
+  "events": [
+    {
+      "command": "handle",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "handle: \"1 branch\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "handle"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"1 branch\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "handle",
+      "depth": 0,
+      "detail": "handle: no branch matched within 5000ms (otherwise: fail)",
+      "durationMs": 5000,
+      "line": 5,
+      "ok": false,
+      "stepIndex": 0,
+      "summary": "handle: \"1 branch\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "handle"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"1 branch\""
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": 0,
+  "ok": false,
+  "passedSteps": 0,
+  "screenshots": [],
+  "scriptName": "handle timeout fail",
+  "steps": [
+    {
+      "command": "handle",
+      "detail": "handle: no branch matched within 5000ms (otherwise: fail)",
+      "durationMs": 5000,
+      "ok": false,
+      "stepIndex": 0
+    }
+  ],
+  "totalSteps": 1
+}

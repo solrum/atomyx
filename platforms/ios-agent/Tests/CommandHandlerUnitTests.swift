@@ -1,5 +1,5 @@
 import XCTest
-// Types from the same bundle resolve directly — no import needed.
+// Types from the same bundle resolve directly, so no import is needed.
 // `@testable import` doesn't apply to UI test bundles.
 
 /// Unit tests for command handlers. Use `MockXCUIBridge` to run without
@@ -150,6 +150,16 @@ final class CommandHandlerUnitTests: XCTestCase {
         XCTAssertEqual(resp.error, "missing x/y (numbers)")
     }
 
+    func testTapAtDispatchFailureReturnsFixedMessage() {
+        let cmd = TapAtCommand(synthesizer: FailingEventSynthesizer())
+        let req = Request(id: 1, type: "tapAt", args: ["x": 10, "y": 20])
+        let resp = cmd.handle(req, bridge: MockXCUIBridge(), state: DriverState())
+
+        XCTAssertFalse(resp.ok)
+        XCTAssertEqual(resp.error, "The tap could not be dispatched on this device.")
+        assertNoLeakedImplementationDetail(resp.error)
+    }
+
     // MARK: - ForceStopAppCommand
 
     func testForceStopAppRejectsMissingBundleId() {
@@ -199,6 +209,18 @@ final class CommandHandlerUnitTests: XCTestCase {
         XCTAssertTrue(resp.error?.contains("missing") == true)
     }
 
+    func testSwipeDispatchFailureReturnsFixedMessage() {
+        let cmd = SwipeCommand(synthesizer: FailingEventSynthesizer())
+        let req = Request(id: 1, type: "swipe", args: [
+            "fromX": 0, "fromY": 0, "toX": 100, "toY": 100,
+        ])
+        let resp = cmd.handle(req, bridge: MockXCUIBridge(), state: DriverState())
+
+        XCTAssertFalse(resp.ok)
+        XCTAssertEqual(resp.error, "The swipe could not be dispatched on this device.")
+        assertNoLeakedImplementationDetail(resp.error)
+    }
+
     // MARK: - LongPressAtCommand
 
     func testLongPressRejectsMissingCoordinates() {
@@ -210,11 +232,21 @@ final class CommandHandlerUnitTests: XCTestCase {
         XCTAssertEqual(resp.error, "missing x/y (numbers)")
     }
 
+    func testLongPressDispatchFailureReturnsFixedMessage() {
+        let cmd = LongPressAtCommand(synthesizer: FailingEventSynthesizer())
+        let req = Request(id: 1, type: "longPressAt", args: ["x": 10, "y": 20])
+        let resp = cmd.handle(req, bridge: MockXCUIBridge(), state: DriverState())
+
+        XCTAssertFalse(resp.ok)
+        XCTAssertEqual(resp.error, "The long press could not be dispatched on this device.")
+        assertNoLeakedImplementationDetail(resp.error)
+    }
+
     // MARK: - PressKeyCommand
 
     /// Build a PressKeyCommand wired to a registry of `FakePressKeyStrategy`
-    /// instances. Each test composes the registry it needs — no mocks
-    /// on the bridge side (bridge.pressKey no longer exists).
+    /// instances. Each test composes the registry it needs, so no mocks
+    /// are needed on the bridge side (bridge.pressKey no longer exists).
     private func makePressKeyCommand(
         strategies: [FakePressKeyStrategy],
         fallback: FakePressKeyStrategy = FakePressKeyStrategy(
@@ -409,19 +441,17 @@ final class CommandHandlerUnitTests: XCTestCase {
 
     // MARK: - ClearFocusedInputCommand stages
     //
-    // The command's two-stage clear — ⌘A + ⌫ (fast path) with an
-    // exact-length delete-loop fallback — reads the focused value
-    // directly from `app.snapshot()`. Our MockXCUIBridge doesn't
-    // synthesize snapshots, so the mock path here always reports
-    // `focusedValueLength == 0` → the command takes the
-    // "already-empty" early-out. That's sufficient to verify the
-    // dispatch wiring; the realistic integration test lives in the
-    // host-side bench (`scripts/bench-ios-type.mjs`) which exercises
-    // the full fast-path + fallback against a live simulator.
+    // The clear-text strategy chain reads the focused field's value
+    // through `XCUIBridge.focusedFieldValue`, so a mock can report a
+    // focused field with an empty value without a live simulator app.
+    // The realistic integration test lives in the host-side bench
+    // (`scripts/bench-ios-type.mjs`), which exercises the full
+    // fast-path and fallback strategies against a live simulator.
 
     func testClearFocusedInputShortCircuitsWhenFieldEmpty() {
         let cmd = ClearFocusedInputCommand()
         let bridge = MockXCUIBridge()
+        bridge.focusedFieldBehavior = { "" }
         let state = mockState()
 
         let req = Request(id: 1, type: "clearFocusedInput", args: [:])
@@ -429,7 +459,7 @@ final class CommandHandlerUnitTests: XCTestCase {
 
         XCTAssertTrue(resp.ok)
         XCTAssertEqual(resp.data["strategy"] as? String, "already-empty")
-        // No keystrokes dispatched at all — no focus, no content.
+        // No keystrokes dispatched at all, since there is no focus and no content.
         XCTAssertEqual(bridge.typeKeyCalls.count, 0)
         XCTAssertEqual(bridge.typeTextCalls.count, 0)
     }
@@ -677,7 +707,7 @@ final class CommandHandlerUnitTests: XCTestCase {
     func testResponseOkEncode() {
         let resp = Response.ok(id: 3, data: ["pong": true])
         let encoded = String(data: resp.encode(), encoding: .utf8)!
-        // Order-independent check — JSON key ordering is not guaranteed.
+        // Order-independent check, because JSON key ordering is not guaranteed.
         XCTAssertTrue(encoded.contains("\"ok\":true"))
         XCTAssertTrue(encoded.contains("\"id\":3"))
         XCTAssertTrue(encoded.contains("\"pong\":true"))
@@ -851,7 +881,7 @@ final class CommandHandlerUnitTests: XCTestCase {
         XCTAssertFalse(caps.canPressure)
     }
 
-    // MARK: - Command → PointerPath shape
+    // MARK: - Command to PointerPath shape
 
     func testTapAtBuildsTwoWaypointPathAtSamePoint() {
         let path = TapAtCommand.buildPath(x: 100, y: 200)
@@ -875,7 +905,7 @@ final class CommandHandlerUnitTests: XCTestCase {
 
     func testLongPressEnforcesMinimumPress() {
         let path = LongPressAtCommand.buildPath(x: 0, y: 0, durationMs: 10)
-        // 10ms → 0.01s but floor is 0.05s
+        // 10ms maps to 0.01s but floor is 0.05s
         XCTAssertEqual(path.waypoints[1].atOffsetSeconds, 0.05)
     }
 
@@ -900,14 +930,14 @@ final class CommandHandlerUnitTests: XCTestCase {
         let path = SwipeCommand.buildPath(
             fromX: 0, fromY: 0, toX: 10, toY: 10, durationMs: 0
         )
-        // 0ms → 0s but floor is 0.05s (matches CoordinateSynthesizer)
+        // 0ms maps to 0s but floor is 0.05s (matches CoordinateSynthesizer)
         XCTAssertEqual(path.waypoints[1].atOffsetSeconds, 0.05)
     }
 
     // MARK: - EventRecordSynthesizer (M2.3)
 
     func testEventRecordBackendAdvertisesFullCapabilities() {
-        // Capability shape is a static property of the type —
+        // Capability shape is a static property of the type, so this
         // does not exercise the probe. Verifies the backend
         // type-checks against the protocol and advertises the
         // full W3C surface.
@@ -919,7 +949,7 @@ final class CommandHandlerUnitTests: XCTestCase {
     func testEventRecordBackendProbeWritesDiagnosticLog() {
         // Touch `isAvailable` to force the one-shot probe, then
         // verify the diagnostic log captured something. We do
-        // NOT assert the probe result — unit tests may run in a
+        // NOT assert the probe result, because unit tests may run in a
         // context where the XCUITest daemon can't dispatch
         // synthesized events; that's the point of having a
         // fallback path via `CoordinateSynthesizer`.
@@ -934,9 +964,9 @@ final class CommandHandlerUnitTests: XCTestCase {
 
     /// The bridge exists because the XCTest daemon's XPC reply
     /// invokes our completion block with sentinel pointer 0x1
-    /// instead of nil/NSError*. A regression in the helper —
+    /// instead of nil/NSError*. A regression in the helper, such as
     /// removing `__unsafe_unretained` from the parameter, or
-    /// reintroducing a Swift closure capture — re-crashes the
+    /// reintroducing a Swift closure capture, re-crashes the
     /// agent. This test exercises the happy path so any change
     /// to the helper's signature breaks the build deterministically
     /// instead of waiting for a sim run.
@@ -964,7 +994,7 @@ final class CommandHandlerUnitTests: XCTestCase {
 
         typealias CompletionBlock = @convention(block) (UnsafeRawPointer?) -> Void
         let invoke = unsafeBitCast(block, to: CompletionBlock.self)
-        // Sentinel value the daemon was observed to send — not a
+        // Sentinel value the daemon was observed to send, not a
         // real ObjC object. The helper MUST NOT retain it.
         invoke(UnsafeRawPointer(bitPattern: 0x1))
 
@@ -974,7 +1004,7 @@ final class CommandHandlerUnitTests: XCTestCase {
     // MARK: - EventSynthesizerFactory
 
     func testFactoryReturnsConcreteSynthesizer() {
-        // `make()` is internal — no env var, no overrides. It
+        // `make()` is internal, with no env var and no overrides. It
         // returns either backend depending on the runtime probe;
         // both implement EventSynthesizer.
         let syn = EventSynthesizerFactory.make()
@@ -1040,9 +1070,51 @@ final class CommandHandlerUnitTests: XCTestCase {
             )
         )
     }
+
+    // MARK: - DispatchPointerCommand
+
+    func testDispatchPointerPatternNotExpressibleForwardsFieldLevelReason() {
+        let cmd = DispatchPointerCommand(synthesizer: FailingEventSynthesizer(
+            error: SynthesizerError.patternNotExpressible(reason: "pointer 'p1' has no waypoints")
+        ))
+        let req = Request(id: 1, type: "dispatchPointer", args: [
+            "pointers": [["id": "p1", "waypoints": [["phase": "down", "x": 0, "y": 0, "atOffsetSeconds": 0]]]],
+        ])
+        let resp = cmd.handle(req, bridge: MockXCUIBridge(), state: DriverState())
+
+        XCTAssertFalse(resp.ok)
+        XCTAssertEqual(resp.error, "The pointer description is invalid: pointer 'p1' has no waypoints")
+        assertNoLeakedImplementationDetail(resp.error)
+    }
+
+    func testDispatchPointerPrivateSymbolMissingReturnsFixedMessage() {
+        let cmd = DispatchPointerCommand(synthesizer: FailingEventSynthesizer(
+            error: SynthesizerError.privateSymbolMissing(symbol: "XCSynthesizedEventRecord (see probe log)")
+        ))
+        let req = Request(id: 1, type: "dispatchPointer", args: [
+            "pointers": [["id": "p1", "waypoints": [["phase": "down", "x": 0, "y": 0, "atOffsetSeconds": 0]]]],
+        ])
+        let resp = cmd.handle(req, bridge: MockXCUIBridge(), state: DriverState())
+
+        XCTAssertFalse(resp.ok)
+        XCTAssertEqual(resp.error, "The gesture could not be dispatched on this device.")
+        assertNoLeakedImplementationDetail(resp.error)
+    }
+
+    func testDispatchPointerUnexpectedErrorReturnsFixedMessage() {
+        let cmd = DispatchPointerCommand(synthesizer: FailingEventSynthesizer(error: FailingEventSynthesizer.FailureKind.generic))
+        let req = Request(id: 1, type: "dispatchPointer", args: [
+            "pointers": [["id": "p1", "waypoints": [["phase": "down", "x": 0, "y": 0, "atOffsetSeconds": 0]]]],
+        ])
+        let resp = cmd.handle(req, bridge: MockXCUIBridge(), state: DriverState())
+
+        XCTAssertFalse(resp.ok)
+        XCTAssertEqual(resp.error, "The gesture could not be dispatched on this device.")
+        assertNoLeakedImplementationDetail(resp.error)
+    }
 }
 
-/// Mock `XCUIBridge` for unit tests — records every call so tests
+/// Mock `XCUIBridge` for unit tests. Records every call so tests
 /// can assert command handlers invoked the bridge with the expected
 /// args. Behavior of individual methods is configurable via the
 /// `*Behavior` closures below.
@@ -1053,7 +1125,7 @@ final class CommandHandlerUnitTests: XCTestCase {
 /// `state.currentApp`; tests that invoke subsequent bridge methods
 /// with that ref are fine because `MockXCUIBridge` ignores the `app`
 /// parameter on every method. Tests must NOT call `.launch()` on the
-/// returned ref — that would require a real simulator.
+/// returned ref, since that would require a real simulator.
 final class MockXCUIBridge: XCUIBridge {
     var tapCalls: [(CGFloat, CGFloat)] = []
     var terminateCalls: [String] = []
@@ -1069,12 +1141,12 @@ final class MockXCUIBridge: XCUIBridge {
     var keyboardBehavior: () -> KeyboardInfoResult = { .notVisible }
 
     /// Override to simulate `hideKeyboard` outcome. Default is
-    /// notVisible — matches the common case where no keyboard is up.
+    /// notVisible, matching the common case where no keyboard is up.
     var hideKeyboardBehavior: () -> HideKeyboardResult = { .notVisible }
     var hideKeyboardCallCount = 0
 
     /// Override to simulate raw tree dump outcome. Default returns
-    /// nil (snapshot failure) — tests set this to a preset nested
+    /// nil (snapshot failure). Tests set this to a preset nested
     /// dict when they want a happy path.
     var rawTreeBehavior: () -> [String: Any]? = { nil }
 
@@ -1083,6 +1155,10 @@ final class MockXCUIBridge: XCUIBridge {
     var screenSizeBehavior: () -> CGSize = {
         CGSize(width: 430, height: 932)
     }
+
+    /// Override to simulate the focused field's value. Default is nil,
+    /// meaning no element reports keyboard focus.
+    var focusedFieldBehavior: () -> String? = { nil }
 
     func launchApp(bundleId: String) -> XCUIApplication {
         launchCalls.append(bundleId)
@@ -1146,6 +1222,10 @@ final class MockXCUIBridge: XCUIBridge {
     func getScreenSize(app _: XCUIApplication) -> CGSize {
         return screenSizeBehavior()
     }
+
+    func focusedFieldValue(app _: XCUIApplication) -> String? {
+        return focusedFieldBehavior()
+    }
 }
 
 /// Helper: build a DriverState with a pre-set `currentApp` reference
@@ -1158,7 +1238,7 @@ private func mockState(bundleId: String = "com.example.mock") -> DriverState {
 }
 
 /// Test double for `PressKeyStrategy`. Records call count, last `key`
-/// passed, and whether the `app` parameter was non-nil — enough for
+/// passed, and whether the `app` parameter was non-nil, which is enough for
 /// command-level tests to prove routing and guard behavior without
 /// touching XCUI primitives. Returns a canned `PressKeyResult`.
 final class FakePressKeyStrategy: PressKeyStrategy {
@@ -1181,5 +1261,56 @@ final class FakePressKeyStrategy: PressKeyStrategy {
         lastKey = key
         lastAppWasNonNil = app != nil
         return result
+    }
+}
+
+/// Test double for `EventSynthesizer` that always throws a preset
+/// error from `dispatch(pointers:)`. `CoordinateSynthesizer`'s own
+/// waypoint validation only rejects a pattern the command builders
+/// never emit, so a command test that wants to exercise the
+/// dispatch-failure reply needs a synthesizer that fails on demand.
+struct FailingEventSynthesizer: EventSynthesizer {
+    /// Stand-in for a failure with no useful Swift type name of its
+    /// own, the same shape a foreign framework error would take.
+    enum FailureKind: Error {
+        case generic
+    }
+
+    let capabilities = EventCapabilities(canMultiPointer: false, canPressure: false)
+    let mechanismName = "failing-test-double"
+    let probeLog: String? = nil
+    let error: Error
+
+    init(error: Error = FailureKind.generic) {
+        self.error = error
+    }
+
+    func dispatch(pointers: [PointerPath]) throws -> [Data] {
+        throw error
+    }
+}
+
+/// Fails the test if `message` names a Swift type, an Apple private
+/// XCTest symbol, or another implementation detail that must never
+/// cross the tool boundary in a failure reply. The message must
+/// instead be a fixed, human-readable sentence.
+private func assertNoLeakedImplementationDetail(
+    _ message: String?, file: StaticString = #filePath, line: UInt = #line
+) {
+    guard let message else {
+        XCTFail("expected a non-nil error message", file: file, line: line)
+        return
+    }
+    let forbidden = [
+        "XCSynth", "XCPointer", "XCTRunner", "NSError", "Error Domain",
+        "SynthesizerError", "EventRecordSynthesizer", "CommandHandler",
+        "FailureKind", "Optional(",
+    ]
+    for term in forbidden {
+        XCTAssertFalse(
+            message.contains(term),
+            "error message leaked implementation detail \"\(term)\": \(message)",
+            file: file, line: line
+        )
     }
 }

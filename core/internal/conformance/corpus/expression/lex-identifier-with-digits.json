@@ -1,0 +1,11 @@
+{
+  "name": "lex-identifier-with-digits",
+  "description": "an identifier variable name containing trailing digits.",
+  "expr": "foo123",
+  "variables": {
+    "foo123": {
+      "type": "number",
+      "number": "1"
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "assert-api-multi-key-order-divergence",
+  "description": "assertApi fails two body keys at once, declared out of alphabetical order, proving the failure message lists them in declaration order on both sides",
+  "yaml": "appId: com.test\nname: assert api multi key\nproxy: optional\nenv: {}\n---\n- launchApp\n- capture: \"GET /api/profile as: profileRsp\"\n- assertApi:\n    from: profileRsp\n    body:\n      \"$.zzz\": expectedZ\n      \"$.aaa\": expectedA\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  },
+  "network": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/api/profile",
+        "status": 200,
+        "headers": {},
+        "body": { "name": "qa" },
+        "timestampMs": 0
+      }
+    ]
+  }
+}

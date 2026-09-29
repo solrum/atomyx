@@ -1,0 +1,11 @@
+{
+  "booleanValue": false,
+  "errorKind": "eval",
+  "kind": "error",
+  "message": "division by zero at position 14",
+  "numberBits": "",
+  "numberText": "",
+  "position": 14,
+  "stringValue": "",
+  "valueType": ""
+}

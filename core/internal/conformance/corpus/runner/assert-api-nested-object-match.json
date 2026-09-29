@@ -1,0 +1,22 @@
+{
+  "name": "assert-api-nested-object-match",
+  "description": "assertApi's body assertion passes when the expected value is a nested object that deep-equals the captured value, proving a script-parsed OrderedMap compares correctly against the captured plain map",
+  "yaml": "appId: com.test\nname: assert api nested object match\nproxy: optional\nenv: {}\n---\n- launchApp\n- capture: \"GET /api/user as: userRsp\"\n- assertApi:\n    from: userRsp\n    body:\n      \"$.user\":\n        id: 1\n        name: Ann\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  },
+  "network": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/api/user",
+        "status": 200,
+        "headers": {},
+        "body": { "user": { "id": 1, "name": "Ann" } },
+        "timestampMs": 0
+      }
+    ]
+  }
+}

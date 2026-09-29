@@ -1,0 +1,41 @@
+[
+  {
+    "result": {
+      "content": [
+        {
+          "active": {
+            "connectedAt": "\u003cnormalized\u003e",
+            "id": "mock-device",
+            "kind": "simulator",
+            "platform": "android"
+          },
+          "ok": true
+        }
+      ],
+      "isError": false
+    },
+    "tool": "select_device"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "appeared": [],
+          "classification": "still_loading",
+          "currentSnapshot": [
+            "[[no-selector]] container",
+            "[resourceId=\"retry_btn\"] button (clickable)",
+            "[resourceId=\"spinner\"] progressbar"
+          ],
+          "dialogLabels": [],
+          "hint": "A loading indicator is visible on screen (no overlay). The request has not completed. Consider increasing timeoutMs, or investigate whether the backend is hung.",
+          "ok": false,
+          "targetStateChanged": "no change",
+          "waitedMs": "\u003cnormalized\u003e"
+        }
+      ],
+      "isError": false
+    },
+    "tool": "tap_and_wait_transition"
+  }
+]

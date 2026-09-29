@@ -1,0 +1,10 @@
+{
+  "name": "capture-no-adapter-configured",
+  "description": "capture fails with a fixed detail when no NetworkCapture adapter is configured for the run",
+  "yaml": "appId: com.test\nname: capture no adapter\nenv: {}\n---\n- launchApp\n- capture: \"POST /api/login as: loginRsp\"\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

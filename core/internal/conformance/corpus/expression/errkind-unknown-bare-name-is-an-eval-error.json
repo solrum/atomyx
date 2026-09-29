@@ -1,0 +1,5 @@
+{
+  "name": "errkind-unknown-bare-name-is-an-eval-error",
+  "description": "referencing the same unknown name bare, with no call, is an evaluation-time undefined-variable error.",
+  "expr": "foo"
+}

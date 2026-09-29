@@ -1,0 +1,5 @@
+{
+  "name": "matrix-literal-mod-boolean-boolean",
+  "description": "literal boolean \"%\" literal boolean",
+  "expr": "true % true"
+}

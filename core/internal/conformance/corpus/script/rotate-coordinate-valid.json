@@ -1,0 +1,5 @@
+{
+  "name": "rotate-coordinate-valid",
+  "description": "rotate with a coordinate center, degrees, and an explicit radius parses to a RotateStep.",
+  "yaml": "- launchApp\n- rotate:\n    center: { x: 200, y: 400 }\n    degrees: 90\n    radius: 120\n"
+}

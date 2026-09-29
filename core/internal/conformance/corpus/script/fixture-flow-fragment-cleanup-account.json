@@ -1,0 +1,5 @@
+{
+  "name": "fixture-flow-fragment-cleanup-account",
+  "description": "Real example flow fragment (steps only, no config document): tap, waitFor, capture with ${var} interpolation, assertApi, screenshot.",
+  "yaml": "# Sub-flow: tear down test data after a flow completes. Composed\n# at the end of a parent script so the parent's captures and\n# extracted variables (e.g. ${newUserId}) are still in scope.\n- tap:\n    label: \"Profile\"\n    role: button\n- waitFor: \"Settings\"\n- tap: \"Settings\"\n- waitFor: \"Delete account\"\n\n- tap: \"Delete account\"\n- waitFor: \"Are you sure?\"\n\n- capture: \"DELETE /api/v1/users/${newUserId} as: deleteRsp\"\n- tap: \"Yes, delete\"\n\n- assertApi:\n    from: deleteRsp\n    status: 204\n\n- waitFor: \"Account deleted\"\n- screenshot: account-deleted\n"
+}

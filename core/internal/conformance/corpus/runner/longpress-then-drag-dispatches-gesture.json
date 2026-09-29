@@ -1,0 +1,10 @@
+{
+  "name": "longpress-then-drag-dispatches-gesture",
+  "description": "a longPress with a thenSwipeTo is a hold-then-drag and dispatches through the waypoint gesture path, not the coordinate Swipe primitive.",
+  "yaml": "appId: com.test\nname: longpress then drag\nenv: {}\n---\n- launchApp\n- longPress:\n    at: { x: 10, y: 20 }\n    holdMs: 600\n    thenSwipeTo: { x: 100, y: 200 }\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

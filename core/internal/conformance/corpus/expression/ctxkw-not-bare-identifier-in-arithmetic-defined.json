@@ -1,0 +1,11 @@
+{
+  "name": "ctxkw-not-bare-identifier-in-arithmetic-defined",
+  "description": "the keyword not, reached only through the primary grammar rule inside an arithmetic right operand, resolves as a variable rather than a unary operator.",
+  "expr": "1 + not",
+  "variables": {
+    "not": {
+      "type": "number",
+      "number": "5"
+    }
+  }
+}

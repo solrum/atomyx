@@ -1,0 +1,41 @@
+format: atomyx/v1
+appId: dev.atomyx.demo
+name: Sign in
+description: |
+  Reusable sign-in flow. Loaded via `requires` or `runFlow` from a
+  parent script. Runs in the parent's context, so the parent's
+  variables are in scope, including its own `email` and `password`.
+tags:
+  - flow
+  - login
+
+# The demo app keeps its navigation state across a plain relaunch, so
+# a prior run that ended on the Dashboard leaves the Dashboard on
+# screen instead of the Sign in screen this flow expects. Sign out
+# first when that is the case, so the flow always starts from the
+# same known screen.
+preconditions:
+  - check:
+      notVisible: "Dashboard"
+    setup:
+      - tap: "Sign out"
+      - waitFor: "Confirm"
+      - tap: "Confirm"
+      - waitFor: "Sign in"
+---
+- launchApp
+- waitFor: "Sign in"
+
+- type:
+    into:
+      role: text-field
+      nth: 0
+    text: ${email}
+- type:
+    into:
+      role: text-field
+      nth: 1
+    text: ${password}
+
+- tap: "Login"
+- waitFor: "Dashboard"

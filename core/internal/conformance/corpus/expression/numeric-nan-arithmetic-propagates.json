@@ -1,0 +1,11 @@
+{
+  "name": "numeric-nan-arithmetic-propagates",
+  "description": "arithmetic on NaN propagates NaN.",
+  "expr": "nanVar + 1",
+  "variables": {
+    "nanVar": {
+      "type": "number",
+      "number": "NaN"
+    }
+  }
+}

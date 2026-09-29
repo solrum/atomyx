@@ -1,0 +1,5 @@
+{
+  "name": "invalid-capture-var-name",
+  "description": "a capture variable name starting with a digit must be REJECTED.",
+  "yaml": "- launchApp\n- capture: { pattern: \"POST /api/login\", as: \"1bad\" }\n"
+}

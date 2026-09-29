@@ -1,0 +1,5 @@
+{
+  "name": "invalid-missing-project",
+  "description": "A config missing the required project field fails schema validation.",
+  "yaml": "apps:\n  - id: main\n    platform: android\n    appId: com.example.app\nenvironments:\n  staging:\n    app: main\n"
+}

@@ -1,0 +1,94 @@
+{
+  "parsed": {
+    "_stepLines": [
+      4,
+      7,
+      8,
+      9,
+      11,
+      12,
+      14,
+      15,
+      17,
+      21,
+      22
+    ],
+    "appId": "",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Untitled script",
+    "steps": [
+      {
+        "command": "tap",
+        "selector": {
+          "label": "Profile",
+          "role": "button"
+        }
+      },
+      {
+        "command": "waitFor",
+        "selector": {
+          "label": "Settings",
+          "text": "Settings"
+        }
+      },
+      {
+        "command": "tap",
+        "selector": {
+          "label": "Settings",
+          "text": "Settings"
+        }
+      },
+      {
+        "command": "waitFor",
+        "selector": {
+          "label": "Delete account",
+          "text": "Delete account"
+        }
+      },
+      {
+        "command": "tap",
+        "selector": {
+          "label": "Delete account",
+          "text": "Delete account"
+        }
+      },
+      {
+        "command": "waitFor",
+        "selector": {
+          "label": "Are you sure?",
+          "text": "Are you sure?"
+        }
+      },
+      {
+        "as": "deleteRsp",
+        "command": "capture",
+        "pattern": "DELETE /api/v1/users/${newUserId}"
+      },
+      {
+        "command": "tap",
+        "selector": {
+          "label": "Yes, delete",
+          "text": "Yes, delete"
+        }
+      },
+      {
+        "command": "assertApi",
+        "from": "deleteRsp",
+        "status": 204
+      },
+      {
+        "command": "waitFor",
+        "selector": {
+          "label": "Account deleted",
+          "text": "Account deleted"
+        }
+      },
+      {
+        "command": "screenshot",
+        "label": "account-deleted"
+      }
+    ]
+  },
+  "valid": true
+}

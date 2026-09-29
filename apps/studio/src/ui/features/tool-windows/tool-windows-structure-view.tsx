@@ -15,10 +15,11 @@ export function StructureView({
 }) {
   const { tabs, activePath } = useEditor();
   const active = tabs.find((t) => t.path === activePath);
+  const activeContent = active?.content;
 
   const nodes = useMemo(
-    () => (active ? buildOutline(active.content) : []),
-    [active?.content],
+    () => (activeContent !== undefined ? buildOutline(activeContent) : []),
+    [activeContent],
   );
 
   if (!active) {

@@ -1,0 +1,5 @@
+{
+  "name": "unary-minus-boolean-literal-rejected",
+  "description": "unary minus rejects a boolean literal.",
+  "expr": "-true"
+}

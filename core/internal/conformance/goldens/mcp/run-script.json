@@ -1,0 +1,58 @@
+[
+  {
+    "result": {
+      "content": [
+        {
+          "active": {
+            "connectedAt": "\u003cnormalized\u003e",
+            "id": "mock-device",
+            "kind": "simulator",
+            "platform": "android"
+          },
+          "ok": true
+        }
+      ],
+      "isError": false
+    },
+    "tool": "select_device"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "artifacts": {},
+          "durationMs": "\u003cnormalized\u003e",
+          "ok": true,
+          "passedSteps": 3,
+          "scriptName": "login tap",
+          "steps": [
+            {
+              "command": "launchApp",
+              "detail": "Launched com.example.app",
+              "durationMs": "\u003cnormalized\u003e",
+              "ok": true,
+              "stepIndex": 0
+            },
+            {
+              "command": "tap",
+              "detail": "tapped at (215,325)",
+              "durationMs": "\u003cnormalized\u003e",
+              "ok": true,
+              "stepIndex": 1
+            },
+            {
+              "command": "assertVisible",
+              "detail": "Element is visible",
+              "durationMs": "\u003cnormalized\u003e",
+              "ok": true,
+              "stepIndex": 2
+            }
+          ],
+          "totalSteps": 3
+        }
+      ],
+      "isError": false
+    },
+    "tool": "run_script"
+  }
+]

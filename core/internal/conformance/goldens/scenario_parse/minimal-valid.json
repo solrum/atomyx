@@ -1,0 +1,9 @@
+{
+  "parsed": {
+    "name": "Checkout regression",
+    "scripts": [
+      "flows/login.yml"
+    ]
+  },
+  "valid": true
+}

@@ -1,0 +1,16 @@
+{
+  "name": "compile-selector-hint-for-inputs",
+  "description": "hint is the lowest-priority content field, useful when nothing else resolves",
+  "function": "compileSelector",
+  "selector": { "hint": "Email address" },
+  "tree": {
+    "attributes": { "role": "container" },
+    "children": [
+      {
+        "attributes": { "role": "text-field", "id": "email", "hint": "Email address" },
+        "children": [],
+        "enabled": true
+      }
+    ]
+  }
+}

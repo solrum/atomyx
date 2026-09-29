@@ -1,0 +1,109 @@
+{
+  "name": "suite-mixed-entries",
+  "description": "A suite with two script entries sharing the same script path at different positions and one scenario entry with a nested child, exactly one entry failing, verifying suite totals and nested scope scoping for same-path siblings.",
+  "kind": "suite",
+  "metadata": {
+    "runId": "44444444-4444-4444-8444-444444444444",
+    "label": "Regression suite",
+    "startedAt": "2026-01-04T08:00:00.000Z",
+    "finishedAt": "2026-01-04T08:00:05.000Z",
+    "durationMs": 5000,
+    "command": "suite",
+    "platform": "ios"
+  },
+  "result": {
+    "suiteName": "Regression suite",
+    "ok": false,
+    "total": 3,
+    "passed": 2,
+    "failed": 1,
+    "durationMs": 5000,
+    "entries": [
+      {
+        "path": "scripts/smoke.yml",
+        "kind": "script",
+        "status": "passed",
+        "durationMs": 1000,
+        "result": {
+          "scriptName": "Smoke test",
+          "ok": true,
+          "steps": [
+            { "stepIndex": 0, "command": "launchApp", "ok": true, "durationMs": 1000 }
+          ],
+          "totalSteps": 1,
+          "passedSteps": 1,
+          "durationMs": 1000
+        }
+      },
+      {
+        "path": "scenarios/checkout.yml",
+        "kind": "scenario",
+        "status": "failed",
+        "durationMs": 2500,
+        "result": {
+          "scenarioName": "Checkout scenario",
+          "ok": false,
+          "totalScripts": 2,
+          "passedScripts": 1,
+          "durationMs": 2500,
+          "scripts": [
+            {
+              "scriptIndex": 0,
+              "scriptPath": "scripts/add-to-cart.yml",
+              "status": "passed",
+              "durationMs": 1200,
+              "result": {
+                "scriptName": "Add to cart",
+                "ok": true,
+                "steps": [
+                  { "stepIndex": 0, "command": "tap", "ok": true, "detail": "tapped #add-to-cart", "durationMs": 1200 }
+                ],
+                "totalSteps": 1,
+                "passedSteps": 1,
+                "durationMs": 1200
+              }
+            },
+            {
+              "scriptIndex": 1,
+              "scriptPath": "scripts/pay.yml",
+              "status": "failed",
+              "durationMs": 1300,
+              "result": {
+                "scriptName": "Pay",
+                "ok": false,
+                "steps": [
+                  { "stepIndex": 0, "command": "tap", "ok": false, "detail": "element not found: #pay-button", "durationMs": 1300 }
+                ],
+                "totalSteps": 1,
+                "passedSteps": 0,
+                "failedAtStep": 0,
+                "durationMs": 1300
+              }
+            }
+          ]
+        }
+      },
+      {
+        "path": "scripts/smoke.yml",
+        "kind": "script",
+        "status": "passed",
+        "durationMs": 1500,
+        "result": {
+          "scriptName": "Smoke test",
+          "ok": true,
+          "steps": [
+            { "stepIndex": 0, "command": "launchApp", "ok": true, "durationMs": 1500 }
+          ],
+          "totalSteps": 1,
+          "passedSteps": 1,
+          "durationMs": 1500
+        }
+      }
+    ]
+  },
+  "screenshots": [
+    { "scope": "0::scripts/smoke.yml", "label": "smoke first run" },
+    { "scope": "1::scenarios/checkout.yml::0::scripts/add-to-cart.yml", "label": "cart populated" },
+    { "scope": "2::scripts/smoke.yml", "label": "smoke second run" }
+  ]
+}

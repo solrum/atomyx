@@ -1,0 +1,6 @@
+{
+  "name": "env-select-named",
+  "description": "An explicit --env selects that named environment out of several.",
+  "yaml": "project: Demo\napps:\n  - id: main\n    platform: android\n    appId: com.example.app\n  - id: alt\n    platform: ios\n    appId: com.example.alt\nenvironments:\n  staging:\n    app: main\n  prod:\n    app: alt\n",
+  "envName": "prod"
+}

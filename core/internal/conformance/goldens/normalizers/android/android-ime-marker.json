@@ -1,0 +1,43 @@
+{
+  "attributes": {
+    "bounds": "0,1200,1080,1920",
+    "class": "android.inputmethodservice.KeyboardView",
+    "ext:isIme": "true",
+    "role": "other"
+  },
+  "children": [
+    {
+      "attributes": {
+        "bounds": "0,1300,100,1400",
+        "class": "android.view.View",
+        "label": "a",
+        "role": "button"
+      },
+      "children": [],
+      "clickable": true,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "bounds": "980,1300,1080,1400",
+        "class": "android.view.View",
+        "label": "enter",
+        "role": "button"
+      },
+      "children": [],
+      "clickable": true,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    }
+  ],
+  "clickable": false,
+  "enabled": true,
+  "focused": false,
+  "selected": false,
+  "visible": true
+}

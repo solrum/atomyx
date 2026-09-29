@@ -1,0 +1,11 @@
+{
+  "name": "numeric-infinity-equality",
+  "description": "infinity compares equal to itself.",
+  "expr": "inf == inf",
+  "variables": {
+    "inf": {
+      "type": "number",
+      "number": "Infinity"
+    }
+  }
+}

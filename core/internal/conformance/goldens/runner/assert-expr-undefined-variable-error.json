@@ -1,0 +1,55 @@
+{
+  "calls": [],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "assertExpr",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "assertExpr",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "assertExpr"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "assertExpr",
+      "depth": 0,
+      "detail": "Cannot evaluate assertion \"neverSet == 1\": variable \"neverSet\" is not defined at position 0",
+      "durationMs": 0,
+      "line": 5,
+      "ok": false,
+      "stepIndex": 0,
+      "summary": "assertExpr",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "assertExpr"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": 0,
+  "ok": false,
+  "passedSteps": 0,
+  "screenshots": [],
+  "scriptName": "assert expr eval error",
+  "steps": [
+    {
+      "command": "assertExpr",
+      "detail": "Cannot evaluate assertion \"neverSet == 1\": variable \"neverSet\" is not defined at position 0",
+      "durationMs": 0,
+      "ok": false,
+      "stepIndex": 0
+    }
+  ],
+  "totalSteps": 1
+}

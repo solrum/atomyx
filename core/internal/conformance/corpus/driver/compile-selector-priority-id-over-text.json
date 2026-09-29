@@ -1,0 +1,17 @@
+{
+  "name": "compile-selector-priority-id-over-text",
+  "description": "id is tried before text and short-circuits broadening even when the text field would not have matched",
+  "function": "compileSelector",
+  "selector": { "id": "login_btn", "text": "nonexistent" },
+  "tree": {
+    "attributes": { "role": "container" },
+    "children": [
+      {
+        "attributes": { "role": "button", "id": "login_btn", "text": "Sign in" },
+        "children": [],
+        "enabled": true,
+        "clickable": true
+      }
+    ]
+  }
+}

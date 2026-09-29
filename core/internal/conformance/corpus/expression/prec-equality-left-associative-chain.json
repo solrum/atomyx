@@ -1,0 +1,5 @@
+{
+  "name": "prec-equality-left-associative-chain",
+  "description": "equality is left-associative, so a chain compares the running boolean result against the next operand.",
+  "expr": "1 == 1 == true"
+}

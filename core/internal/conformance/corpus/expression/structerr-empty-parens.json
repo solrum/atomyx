@@ -1,0 +1,5 @@
+{
+  "name": "structerr-empty-parens",
+  "description": "an empty parenthesized group with no inner expression.",
+  "expr": "()"
+}

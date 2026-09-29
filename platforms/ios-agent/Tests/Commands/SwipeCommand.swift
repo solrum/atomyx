@@ -2,8 +2,8 @@ import Foundation
 import CoreGraphics
 
 /// Drag from one point to another in device-global point space.
-/// The synthesizer dispatches to the currently frontmost app —
-/// no `launchApp` required.
+/// The synthesizer dispatches to the currently frontmost app, so
+/// no `launchApp` is required.
 ///
 /// Request args:
 ///   - `fromX`, `fromY` (required, numeric)
@@ -12,7 +12,7 @@ import CoreGraphics
 ///     before the drag starts. Emitted as the `atOffsetSeconds`
 ///     of the `move` waypoint; the coordinate backend maps this
 ///     to `XCUICoordinate.press(forDuration:thenDragTo:)`. The
-///     drag motion itself runs at XCUITest's internal speed —
+///     drag motion itself runs at XCUITest's internal speed and is
 ///     not directly parameterizable via this XCUITest API.
 ///     Total gesture duration ≈ durationMs + drag.
 ///
@@ -49,7 +49,8 @@ final class SwipeCommand: CommandHandler {
         do {
             try synthesizer.dispatch(pointers: [path])
         } catch {
-            return .error(id: request.id, message: "swipe dispatch failed: \(error)")
+            NSLog("[atomyx] swipe dispatch failed: \(error)")
+            return .error(id: request.id, message: "The swipe could not be dispatched on this device.")
         }
         return .ok(id: request.id, data: [
             "fromX": fromX, "fromY": fromY,

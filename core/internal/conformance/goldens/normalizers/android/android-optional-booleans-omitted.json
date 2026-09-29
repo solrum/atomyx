@@ -1,0 +1,8 @@
+{
+  "attributes": {
+    "class": "android.widget.TextView",
+    "role": "text",
+    "text": "hello"
+  },
+  "children": []
+}

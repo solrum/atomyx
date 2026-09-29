@@ -1,0 +1,6 @@
+{
+  "name": "bucket-bounds-negative-boundary",
+  "description": "a coordinate exactly on a bucket boundary floors to that boundary's own bucket, on both a positive and a negative edge",
+  "function": "bucketBounds",
+  "bounds": "-50,-100,0,50"
+}

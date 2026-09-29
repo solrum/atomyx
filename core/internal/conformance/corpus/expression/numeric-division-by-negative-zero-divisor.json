@@ -1,0 +1,11 @@
+{
+  "name": "numeric-division-by-negative-zero-divisor",
+  "description": "dividing by a variable holding negative zero.",
+  "expr": "5 / negZero",
+  "variables": {
+    "negZero": {
+      "type": "number",
+      "number": "-0"
+    }
+  }
+}

@@ -2,7 +2,7 @@ format: atomyx/v1
 appId: dev.atomyx.demo
 name: API-driven branching
 description: |
-  Routes the UI based on the captured login response — different
+  Routes the UI based on the captured login response, since different
   body shapes drive different post-login flows. Demonstrates
   `branch` (deterministic routing on a captured request) versus
   `handle` (visibility-polling on the live UI).
@@ -14,6 +14,20 @@ proxy: required
 env:
   email: qa+branch@atomyx.test
   password: super-secret
+
+# The demo app keeps its navigation state across a plain relaunch, so
+# a prior run that ended on the Dashboard leaves the Dashboard on
+# screen instead of the Sign in screen this script expects. Sign out
+# first when that is the case, so the script always starts from the
+# same known screen.
+preconditions:
+  - check:
+      notVisible: "Dashboard"
+    setup:
+      - tap: "Sign out"
+      - waitFor: "Confirm"
+      - tap: "Confirm"
+      - waitFor: "Sign in"
 ---
 - launchApp
 - waitFor: "Sign in"
@@ -37,7 +51,7 @@ env:
 - branch:
     from: loginRsp
     on:
-      # Step-up auth required — server returns 200 + a flag.
+      # Step-up auth required, so the server returns 200 with a flag.
       - match:
           status: 200
           body:
@@ -53,7 +67,7 @@ env:
               role: button
           - waitFor: "Dashboard"
 
-      # Brand-new account — onboarding wizard.
+      # Brand-new account, so show the onboarding wizard.
       - match:
           status: 200
           body:
@@ -63,7 +77,7 @@ env:
           - tap: "Get started"
           - waitFor: "Dashboard"
 
-      # Plain happy path — already onboarded user.
+      # Plain happy path for an already onboarded user.
       - match:
           status: 200
           body:
@@ -71,7 +85,7 @@ env:
         do:
           - waitFor: "Dashboard"
 
-      # Wrong credentials — assert the error UI surfaced.
+      # Wrong credentials, so assert the error UI surfaced.
       - match:
           status: 401
         do:

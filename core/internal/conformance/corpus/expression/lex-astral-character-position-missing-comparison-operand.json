@@ -1,0 +1,5 @@
+{
+  "name": "lex-astral-character-position-missing-comparison-operand",
+  "description": "a trailing equality operator with no right operand reports the correct position after a longer string literal containing an astral character.",
+  "expr": "\"😀x\" =="
+}

@@ -1,0 +1,25 @@
+{
+  "name": "branch-do-file-invalid-exception",
+  "description": "branch's matching case names a do file that exists but fails to parse, reporting the parse failure as an \"Exception: \" detail",
+  "yaml": "appId: com.test\nname: branch invalid do file\nproxy: optional\n---\n- launchApp\n- capture: \"POST /login as: loginRsp\"\n- branch:\n    from: loginRsp\n    on:\n      - match:\n          status: 200\n        do: \"{{DIR}}/invalid-branch-do.yml\"\n",
+  "flowFiles": {
+    "invalid-branch-do.yml": "appId: com.bad\n"
+  },
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  },
+  "network": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/login",
+        "status": 200,
+        "headers": {},
+        "body": {},
+        "timestampMs": 0
+      }
+    ]
+  }
+}

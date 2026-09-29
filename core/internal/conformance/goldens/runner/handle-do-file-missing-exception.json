@@ -1,0 +1,124 @@
+{
+  "calls": [
+    {
+      "args": [
+        "com.test",
+        {}
+      ],
+      "method": "launchApp"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 4,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "line": 4,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "handle",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "handle: \"1 branch\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "handle"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"1 branch\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "handle",
+      "depth": 0,
+      "detail": "Exception: ENOENT: no such file or directory, open '{{TMPDIR}}/missing-handle-do.yml'",
+      "durationMs": 0,
+      "line": 5,
+      "ok": false,
+      "stepIndex": 1,
+      "summary": "handle: \"1 branch\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "handle"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"1 branch\""
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": 1,
+  "ok": false,
+  "passedSteps": 1,
+  "screenshots": [],
+  "scriptName": "handle missing do file",
+  "steps": [
+    {
+      "command": "launchApp",
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    },
+    {
+      "command": "handle",
+      "detail": "Exception: ENOENT: no such file or directory, open '{{TMPDIR}}/missing-handle-do.yml'",
+      "durationMs": 0,
+      "ok": false,
+      "stepIndex": 1
+    }
+  ],
+  "totalSteps": 2
+}

@@ -1,0 +1,5 @@
+{
+  "name": "lex-multi-digit-integer",
+  "description": "a multi-digit integer literal.",
+  "expr": "123456789"
+}

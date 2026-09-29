@@ -1,0 +1,5 @@
+{
+  "name": "matrix-literal-sub-string-string",
+  "description": "literal string \"-\" literal string",
+  "expr": "\"a\" - \"a\""
+}

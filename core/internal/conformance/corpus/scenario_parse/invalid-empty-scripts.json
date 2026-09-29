@@ -1,0 +1,6 @@
+{
+  "name": "invalid-empty-scripts",
+  "description": "an empty scripts array must be REJECTED with zod's exact array-min-length issue message.",
+  "yaml": "name: Checkout regression\nscripts: []\n",
+  "expectErrorText": true
+}

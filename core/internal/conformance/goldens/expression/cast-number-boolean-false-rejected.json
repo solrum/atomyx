@@ -1,0 +1,11 @@
+{
+  "booleanValue": false,
+  "errorKind": "eval",
+  "kind": "error",
+  "message": "cannot convert a boolean to a number, compare it directly instead at position 7",
+  "numberBits": "",
+  "numberText": "",
+  "position": 7,
+  "stringValue": "",
+  "valueType": ""
+}

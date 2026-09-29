@@ -29,7 +29,7 @@ const PATH_EXTENSIONS = new Set([
 // Path-like prefixes: if a candidate starts with one of these it is treated
 // as a file path regardless of extension
 const PATH_PREFIXES = [
-  "./", "../", "packages/", "apps/", "platforms/", "shared/",
+  "./", "../", "apps/", "platforms/",
   "scripts/", ".claude/", "src/",
 ];
 
@@ -45,14 +45,28 @@ function hasGlob(s) {
   return /[*?[\]]/.test(s);
 }
 
+function hasSpace(s) {
+  return /\s/.test(s);
+}
+
+// Strips a trailing markdown-anchor fragment (`#some-heading`) so a link
+// into a section of a file, such as `./mcp-tools.md#press_key`, is checked
+// against the file it points into rather than a path that includes the
+// anchor.
+function stripAnchor(s) {
+  const i = s.indexOf("#");
+  return i === -1 ? s : s.slice(0, i);
+}
+
 function looksLikePath(s) {
-  if (isUrl(s) || hasVariables(s) || hasGlob(s)) return false;
-  if (!s.includes("/") && !PATH_EXTENSIONS.has("." + s.split(".").pop())) return false;
-  for (const p of PATH_PREFIXES) {
-    if (s.startsWith(p)) return true;
+  if (isUrl(s) || hasVariables(s) || hasGlob(s) || hasSpace(s)) return false;
+  const p = stripAnchor(s);
+  if (!p.includes("/") && !PATH_EXTENSIONS.has("." + p.split(".").pop())) return false;
+  for (const prefix of PATH_PREFIXES) {
+    if (p.startsWith(prefix)) return true;
   }
-  const ext = "." + s.split(".").pop();
-  return PATH_EXTENSIONS.has(ext) && s.includes("/");
+  const ext = "." + p.split(".").pop();
+  return PATH_EXTENSIONS.has(ext) && p.includes("/");
 }
 
 const ALLOW_PATH_RE = /<!--\s*atomyx-allow-path:\s*(.+?)\s*-->/g;
@@ -147,10 +161,14 @@ export function run() {
     const candidates = extractCandidates(content);
 
     for (const { path: candidate, line } of candidates) {
+      // Resolve the file the candidate points at, not the section
+      // anchor (`#heading`) it may carry.
+      const pathPart = stripAnchor(candidate);
+
       // Try to resolve relative to the md file's directory first,
       // then relative to ROOT as a fallback (for repo-root-relative paths)
-      const resolvedFromMd = resolve(mdDir, candidate);
-      const resolvedFromRoot = resolve(ROOT, candidate);
+      const resolvedFromMd = resolve(mdDir, pathPart);
+      const resolvedFromRoot = resolve(ROOT, pathPart);
 
       if (existsSync(resolvedFromMd) || existsSync(resolvedFromRoot)) continue;
 
@@ -175,7 +193,7 @@ export function run() {
   });
 
   for (const v of violations) {
-    process.stdout.write(`${v.file}:${v.line}: path does not exist — "${v.path}"\n`);
+    process.stdout.write(`${v.file}:${v.line}: path does not exist: "${v.path}"\n`);
   }
 
   if (violations.length > 0) {

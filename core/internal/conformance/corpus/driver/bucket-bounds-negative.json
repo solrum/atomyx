@@ -1,0 +1,6 @@
+{
+  "name": "bucket-bounds-negative",
+  "description": "negative bounds coordinates quantize by floor division, not truncation toward zero, matching JavaScript's Math.floor",
+  "function": "bucketBounds",
+  "bounds": "-25,-75,-60,25"
+}

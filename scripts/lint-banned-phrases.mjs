@@ -24,51 +24,51 @@ const SCAN_EXTENSIONS = new Set([".ts", ".tsx", ".mjs", ".js", ".md", ".kt", ".s
 
 /**
  * Each rule has:
- *   pattern  — RegExp applied to the line text
- *   message  — human-readable violation description
- *   skipFile — optional function(filePath) => boolean to skip certain files
+ *   pattern: RegExp applied to the line text
+ *   message: human-readable violation description
+ *   skipFile: optional function(filePath) => boolean to skip certain files
  */
 const RULES = [
   {
     pattern: /\b(Phase|Batch|Sprint|Week|Milestone)\s+\d+\b/,
-    message: "milestone reference — use present-state description instead",
+    message: "milestone reference: use a present-state description instead",
   },
   {
     pattern: /\b(legacy|deprecated|retired|removed)\s+(the\s+|this\s+)?\w+/i,
-    message: "refers to a removed thing — describe the present, not the past",
+    message: "refers to a removed thing: describe the present, not the past",
     skipFile: (f) => f.includes("CHANGELOG") || f.includes("decisions/"),
   },
   {
     pattern: /\bSHIPPED\s*\(\d{4}/,
-    message: "shipping marker — remove status markers from source files",
+    message: "shipping marker: remove status markers from source files",
   },
   {
     pattern: /\bper\s+ADR-\d+\b/i,
-    message: "ADR reference in code — state the rule inline instead",
+    message: "ADR reference in code: state the rule inline instead",
   },
   {
     pattern: /\bsee\s+ADR-\d+\b/i,
-    message: "ADR reference in code — state the rule inline instead",
+    message: "ADR reference in code: state the rule inline instead",
   },
   {
     pattern: /\bobservation-driven\s+(refactor|wait\s+primitives)\b/i,
-    message: "internal codename — use the current API name",
+    message: "internal codename: use the current API name",
   },
   {
     pattern: /\bsidecar\s+(split|extraction)\b/i,
-    message: "internal codename — use a present-state description",
+    message: "internal codename: use a present-state description",
   },
   {
     pattern: /\bfeature-api\s+migration\b/i,
-    message: "internal codename — use a present-state description",
+    message: "internal codename: use a present-state description",
   },
   {
     pattern: /\bDI\s+migration\b/i,
-    message: "internal codename — use a present-state description",
+    message: "internal codename: use a present-state description",
   },
   {
     pattern: /\bstate\s+feature\s+batch\b/i,
-    message: "internal codename — use a present-state description",
+    message: "internal codename: use a present-state description",
   },
 ];
 
@@ -85,8 +85,8 @@ function findCommentInTemplateLiteral(lines, filePath) {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    // Toggle inTemplate on unescaped backticks (simple heuristic — not
-    // full JS parser; good enough for catching the obvious leak pattern)
+    // Toggle inTemplate on unescaped backticks (simple heuristic, not
+    // a full JS parser, but good enough for catching the obvious leak pattern)
     let j = 0;
     while (j < line.length) {
       if (line[j] === "\\" ) { j += 2; continue; }
@@ -100,7 +100,7 @@ function findCommentInTemplateLiteral(lines, filePath) {
           file: relative(ROOT, filePath),
           line: i + 1,
           col: line.indexOf("//") !== -1 ? line.indexOf("//") + 1 : line.indexOf("/*") + 1,
-          message: "code-style comment inside template literal — may leak into user-facing string",
+          message: "code-style comment inside template literal, which may leak into a user-facing string",
           match: (line.match(/\/\/[^\n]*|\/\*[^*]*\*\//)?.[0] ?? "").trim().slice(0, 60),
         });
       }
@@ -194,7 +194,7 @@ export function run() {
 
   for (const v of violations) {
     process.stdout.write(
-      `${v.file}:${v.line}:${v.col}: ${v.message} — matched: "${v.match}"\n`
+      `${v.file}:${v.line}:${v.col}: ${v.message} (matched: "${v.match}")\n`
     );
   }
 

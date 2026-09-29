@@ -1,0 +1,11 @@
+{
+  "found": true,
+  "result": {
+    "obscured": true,
+    "obscurer": {
+      "id": "shared-card",
+      "label": "",
+      "role": "container"
+    }
+  }
+}

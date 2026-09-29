@@ -42,17 +42,26 @@ class HttpControlServer(
     override fun serve(session: IHTTPSession): Response = try {
         // /health works without accessibility connected
         if (session.uri == "/health" && session.method == Method.GET) {
-            val connected = servicesHolder.get() != null
-            return newFixedLengthResponse(
-                Response.Status.OK,
-                "application/json",
-                """{"ok":true,"accessibilityConnected":$connected}""",
+            val instance = servicesHolder.get()?.accessibility
+            val decision = HealthEvaluator.evaluate(
+                HealthFacts(
+                    serviceConnected = instance != null,
+                    registeredWithSystem = instance?.isRegisteredWithSystem() ?: false,
+                    canReadScreen = instance?.canReadScreen() ?: false,
+                ),
             )
+            val status = if (decision.ok) Response.Status.OK else Response.Status.SERVICE_UNAVAILABLE
+            val body = buildString {
+                append("""{"ok":${decision.ok},"accessibilityConnected":${decision.accessibilityConnected}""")
+                decision.reason?.let { append(""","reason":"$it"""") }
+                append("}")
+            }
+            return newFixedLengthResponse(status, "application/json", body)
         }
 
         val services = servicesHolder.get() ?: return toResponse(
             RouteResponse.serviceUnavailable(
-                "AccessibilityService not connected — enable Atomyx accessibility in Settings",
+                "AccessibilityService not connected. Enable Atomyx accessibility in Settings",
             ),
         )
 
@@ -68,7 +77,7 @@ class HttpControlServer(
         toResponse(response)
     } catch (e: Exception) {
         Log.e(TAG, "control server error", e)
-        toResponse(RouteResponse.internalError(e.message ?: "internal error"))
+        toResponse(RouteResponse.internalError("Internal error."))
     }
 
     private fun buildRoutes(): List<Route> = listOf(

@@ -1,0 +1,13 @@
+{
+  "name": "device-select-not-found",
+  "description": "selectDevice for an id absent from the last snapshot forces one rescan before reporting the device unknown as a plain InternalError, with no dedicated wire error code, on both engines.",
+  "deviceSnapshots": [
+    [
+      { "id": "mock-2", "platform": "ios", "name": "Mock Simulator", "kind": "simulator", "state": "online" }
+    ]
+  ],
+  "steps": [
+    { "method": "selectDevice", "params": { "id": "ghost" } },
+    { "method": "selectDevice", "params": {} }
+  ]
+}

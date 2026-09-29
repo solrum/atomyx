@@ -1,0 +1,11 @@
+{
+  "booleanValue": false,
+  "errorKind": "eval",
+  "kind": "error",
+  "message": "cannot use string value \"😀\" in arithmetic, convert it with number(...) at position 0",
+  "numberBits": "",
+  "numberText": "",
+  "position": 0,
+  "stringValue": "",
+  "valueType": ""
+}

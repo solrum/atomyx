@@ -1,0 +1,11 @@
+{
+  "name": "pinch-two-touch-gesture",
+  "description": "a pinch with a coordinate center builds two symmetric touches and dispatches a two-pointer gesture when the driver reports canMultiPointer.",
+  "yaml": "appId: com.test\nname: pinch coord\nenv: {}\n---\n- launchApp\n- pinch:\n    center: { x: 200, y: 200 }\n    startGap: 40\n    endGap: 120\n",
+  "driver": {
+    "capabilities": { "canMultiPointer": true },
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

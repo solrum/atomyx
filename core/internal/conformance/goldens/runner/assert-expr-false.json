@@ -1,0 +1,55 @@
+{
+  "calls": [],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "assertExpr",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 6,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "assertExpr",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "assertExpr"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "assertExpr",
+      "depth": 0,
+      "detail": "Assertion failed: \"number(x) == 2\" did not hold",
+      "durationMs": 0,
+      "line": 6,
+      "ok": false,
+      "stepIndex": 0,
+      "summary": "assertExpr",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "assertExpr"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": 0,
+  "ok": false,
+  "passedSteps": 0,
+  "screenshots": [],
+  "scriptName": "assert expr false",
+  "steps": [
+    {
+      "command": "assertExpr",
+      "detail": "Assertion failed: \"number(x) == 2\" did not hold",
+      "durationMs": 0,
+      "ok": false,
+      "stepIndex": 0
+    }
+  ],
+  "totalSteps": 1
+}

@@ -1,0 +1,5 @@
+{
+  "name": "lex-string-containing-other-quote-unescaped-single",
+  "description": "a single-quoted string containing unescaped double quotes.",
+  "expr": "'she said \"hi\"'"
+}

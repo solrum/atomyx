@@ -1,0 +1,72 @@
+{
+  "events": [
+    {
+      "event": "deviceConnected",
+      "payload": {
+        "id": "mock-1",
+        "kind": "emulator",
+        "name": "Mock Device",
+        "platform": "android",
+        "state": "online"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "method": "selectDevice",
+      "result": {
+        "id": "mock-1",
+        "kind": "emulator",
+        "name": "Mock Device",
+        "platform": "android",
+        "state": "online"
+      }
+    },
+    {
+      "method": "getUiTree",
+      "result": {
+        "attributes": {},
+        "children": [
+          {
+            "attributes": {
+              "text": "Login"
+            },
+            "children": []
+          }
+        ]
+      }
+    },
+    {
+      "method": "getUiTree",
+      "result": {
+        "attributes": {},
+        "children": [
+          {
+            "attributes": {
+              "text": "Login"
+            },
+            "children": []
+          }
+        ]
+      }
+    },
+    {
+      "method": "invalidateUiCache",
+      "result": null
+    },
+    {
+      "method": "getUiTree",
+      "result": {
+        "attributes": {},
+        "children": [
+          {
+            "attributes": {
+              "text": "Login"
+            },
+            "children": []
+          }
+        ]
+      }
+    }
+  ]
+}

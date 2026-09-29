@@ -1,0 +1,12 @@
+[
+  {
+    "attributes": {
+      "id": "cancel_btn",
+      "role": "button",
+      "text": "Cancel"
+    },
+    "children": [],
+    "clickable": true,
+    "enabled": true
+  }
+]

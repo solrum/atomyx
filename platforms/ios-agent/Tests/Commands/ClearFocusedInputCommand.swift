@@ -5,12 +5,12 @@ import XCTest
 /// priority chain. Strategies are tried in order until one succeeds or all
 /// are exhausted.
 ///
-/// Chain order (fastest → most universal):
+/// Chain order (fastest to most universal):
 ///
-///   1. SelectAllShortcutStrategy  — ⌘A + ⌫ (O(1) keystrokes).
-///   2. TripleTapStrategy          — triple-tap select + ⌫.
-///   3. LongPressMenuStrategy      — long-press system edit menu → "Select All"/"Cut".
-///   4. ExactLengthDeleteStrategy  — reads value length, sends exactly N ⌫ keys.
+///   1. SelectAllShortcutStrategy: ⌘A + ⌫ (O(1) keystrokes).
+///   2. TripleTapStrategy: triple-tap select + ⌫.
+///   3. LongPressMenuStrategy: long-press system edit menu, then "Select All"/"Cut".
+///   4. ExactLengthDeleteStrategy: reads value length, sends exactly N ⌫ keys.
 ///
 /// After each `.attempted` result the chain polls the focused field (up to 500 ms)
 /// to confirm the value is empty before advancing. A strategy returning `.success`
@@ -34,7 +34,7 @@ final class ClearFocusedInputCommand: CommandHandler {
 
     func handle(_ request: Request, bridge: XCUIBridge, state: DriverState) -> Response {
         guard let app = state.currentApp else {
-            return .error(id: request.id, message: "no app launched — call launchApp first")
+            return .error(id: request.id, message: "no app launched, call launchApp first")
         }
 
         let hardCap = max(0, min((request.args["maxDeletes"] as? Int) ?? 500, 500))
@@ -66,7 +66,8 @@ final class ClearFocusedInputCommand: CommandHandler {
             }
             return .error(id: request.id, message: jsonString)
         } catch {
-            return .error(id: request.id, message: "clearFocusedInput: unexpected error: \(error)")
+            NSLog("[atomyx] clearFocusedInput failed: \(error)")
+            return .error(id: request.id, message: "The input field could not be cleared on this device.")
         }
     }
 }

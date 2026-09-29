@@ -1,0 +1,6 @@
+{
+  "name": "invalid-extract-values-non-string",
+  "description": "extract.values entries that are not strings (number, boolean, object) must be REJECTED with zod's exact record-value issue message.",
+  "yaml": "appId: dev.atomyx.demo\nname: Extract non-string values\n---\n- capture: \"POST /api/v1/auth/login as: loginRsp\"\n- extract:\n    from: loginRsp\n    values:\n      accessToken: 42\n      isAdmin: true\n      profile: { name: value }\n",
+  "expectErrorText": true
+}

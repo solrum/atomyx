@@ -1,0 +1,5 @@
+{
+  "name": "step-type-bare-string-shorthand",
+  "description": "type bare-string shorthand targets the currently focused field, with no `into` selector.",
+  "yaml": "- launchApp\n- type: \"hello\"\n"
+}

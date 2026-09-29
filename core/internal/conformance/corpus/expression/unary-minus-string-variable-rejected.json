@@ -1,0 +1,11 @@
+{
+  "name": "unary-minus-string-variable-rejected",
+  "description": "unary minus rejects a string variable.",
+  "expr": "-s",
+  "variables": {
+    "s": {
+      "type": "string",
+      "string": "a"
+    }
+  }
+}

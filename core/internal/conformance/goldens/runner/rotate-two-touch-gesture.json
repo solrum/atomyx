@@ -1,0 +1,283 @@
+{
+  "calls": [
+    {
+      "args": [
+        "com.test",
+        {}
+      ],
+      "method": "launchApp"
+    },
+    {
+      "args": [
+        {
+          "pointers": [
+            {
+              "id": "rotate-1",
+              "waypoints": [
+                {
+                  "atOffsetSeconds": 0,
+                  "phase": "down",
+                  "point": {
+                    "x": 300,
+                    "y": 200
+                  }
+                },
+                {
+                  "atOffsetSeconds": 0.025,
+                  "phase": "move",
+                  "point": {
+                    "x": 298.078528040323,
+                    "y": 219.50903220161283
+                  }
+                },
+                {
+                  "atOffsetSeconds": 0.05,
+                  "phase": "move",
+                  "point": {
+                    "x": 292.3879532511287,
+                    "y": 238.26834323650897
+                  }
+                },
+                {
+                  "atOffsetSeconds": 0.07500000000000001,
+                  "phase": "move",
+                  "point": {
+                    "x": 283.14696123025453,
+                    "y": 255.55702330196021
+                  }
+                },
+                {
+                  "atOffsetSeconds": 0.1,
+                  "phase": "move",
+                  "point": {
+                    "x": 270.71067811865476,
+                    "y": 270.71067811865476
+                  }
+                },
+                {
+                  "atOffsetSeconds": 0.125,
+                  "phase": "move",
+                  "point": {
+                    "x": 255.55702330196024,
+                    "y": 283.14696123025453
+                  }
+                },
+                {
+                  "atOffsetSeconds": 0.15,
+                  "phase": "move",
+                  "point": {
+                    "x": 238.268343236509,
+                    "y": 292.3879532511287
+                  }
+                },
+                {
+                  "atOffsetSeconds": 0.175,
+                  "phase": "move",
+                  "point": {
+                    "x": 219.50903220161283,
+                    "y": 298.078528040323
+                  }
+                },
+                {
+                  "atOffsetSeconds": 0.19999999999999998,
+                  "phase": "move",
+                  "point": {
+                    "x": 200,
+                    "y": 300
+                  }
+                },
+                {
+                  "atOffsetSeconds": 0.19999999999999998,
+                  "phase": "up",
+                  "point": {
+                    "x": 200,
+                    "y": 300
+                  }
+                }
+              ]
+            },
+            {
+              "id": "rotate-2",
+              "waypoints": [
+                {
+                  "atOffsetSeconds": 0,
+                  "phase": "down",
+                  "point": {
+                    "x": 100,
+                    "y": 200
+                  }
+                },
+                {
+                  "atOffsetSeconds": 0.025,
+                  "phase": "move",
+                  "point": {
+                    "x": 101.92147195967695,
+                    "y": 180.4909677983872
+                  }
+                },
+                {
+                  "atOffsetSeconds": 0.05,
+                  "phase": "move",
+                  "point": {
+                    "x": 107.61204674887131,
+                    "y": 161.7316567634911
+                  }
+                },
+                {
+                  "atOffsetSeconds": 0.07500000000000001,
+                  "phase": "move",
+                  "point": {
+                    "x": 116.85303876974548,
+                    "y": 144.44297669803976
+                  }
+                },
+                {
+                  "atOffsetSeconds": 0.1,
+                  "phase": "move",
+                  "point": {
+                    "x": 129.28932188134524,
+                    "y": 129.28932188134524
+                  }
+                },
+                {
+                  "atOffsetSeconds": 0.125,
+                  "phase": "move",
+                  "point": {
+                    "x": 144.4429766980397,
+                    "y": 116.85303876974552
+                  }
+                },
+                {
+                  "atOffsetSeconds": 0.15,
+                  "phase": "move",
+                  "point": {
+                    "x": 161.73165676349106,
+                    "y": 107.61204674887132
+                  }
+                },
+                {
+                  "atOffsetSeconds": 0.175,
+                  "phase": "move",
+                  "point": {
+                    "x": 180.49096779838715,
+                    "y": 101.92147195967696
+                  }
+                },
+                {
+                  "atOffsetSeconds": 0.19999999999999998,
+                  "phase": "move",
+                  "point": {
+                    "x": 199.99999999999997,
+                    "y": 100
+                  }
+                },
+                {
+                  "atOffsetSeconds": 0.19999999999999998,
+                  "phase": "up",
+                  "point": {
+                    "x": 199.99999999999997,
+                    "y": 100
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "method": "dispatchGesture"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "line": 5,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "rotate",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 6,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "rotate",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "rotate"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "rotate",
+      "depth": 0,
+      "detail": "rotate 90 degrees",
+      "durationMs": 0,
+      "line": 6,
+      "ok": true,
+      "stepIndex": 1,
+      "summary": "rotate",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "rotate"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 2,
+  "screenshots": [],
+  "scriptName": "rotate coord",
+  "steps": [
+    {
+      "command": "launchApp",
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    },
+    {
+      "command": "rotate",
+      "detail": "rotate 90 degrees",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 1
+    }
+  ],
+  "totalSteps": 2
+}

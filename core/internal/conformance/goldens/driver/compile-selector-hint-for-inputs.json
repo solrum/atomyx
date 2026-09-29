@@ -1,0 +1,11 @@
+[
+  {
+    "attributes": {
+      "hint": "Email address",
+      "id": "email",
+      "role": "text-field"
+    },
+    "children": [],
+    "enabled": true
+  }
+]

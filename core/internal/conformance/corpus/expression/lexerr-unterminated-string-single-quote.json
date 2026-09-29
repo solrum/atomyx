@@ -1,0 +1,5 @@
+{
+  "name": "lexerr-unterminated-string-single-quote",
+  "description": "a single-quoted string with no closing quote.",
+  "expr": "'abc"
+}

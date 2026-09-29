@@ -1,0 +1,18 @@
+{
+  "name": "assert-exists-success",
+  "description": "assertExists with no timeout does a single instant check and passes when the selector is present",
+  "yaml": "appId: com.test\nname: assert exists success\nenv: {}\n---\n- launchApp\n- assertExists: Ready\n",
+  "driver": {
+    "hierarchies": [
+      {
+        "attributes": {},
+        "children": [
+          {
+            "attributes": { "text": "Ready", "label": "Ready", "bounds": "0,0,10,10" },
+            "children": []
+          }
+        ]
+      }
+    ]
+  }
+}

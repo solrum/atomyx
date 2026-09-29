@@ -1,0 +1,11 @@
+{
+  "name": "ctxkw-bool-bare-identifier",
+  "description": "the cast name bool resolves as a variable when not followed by a call.",
+  "expr": "bool",
+  "variables": {
+    "bool": {
+      "type": "boolean",
+      "boolean": false
+    }
+  }
+}

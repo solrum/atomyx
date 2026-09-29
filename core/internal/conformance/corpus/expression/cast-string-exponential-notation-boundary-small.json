@@ -1,0 +1,11 @@
+{
+  "name": "cast-string-exponential-notation-boundary-small",
+  "description": "string() switches to exponential notation just below the small-magnitude boundary (1e-7).",
+  "expr": "string(small)",
+  "variables": {
+    "small": {
+      "type": "number",
+      "number": "0.0000001"
+    }
+  }
+}

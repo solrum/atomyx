@@ -1,0 +1,11 @@
+{
+  "name": "numeric-infinity-divided-by-infinity",
+  "description": "infinity divided by infinity produces NaN.",
+  "expr": "inf / inf",
+  "variables": {
+    "inf": {
+      "type": "number",
+      "number": "Infinity"
+    }
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "name": "longpress-then-swipe-valid",
+  "description": "longPress with a selector `at` and a selector `thenSwipeTo` parses to a hold-then-drag LongPressStep.",
+  "yaml": "- launchApp\n- longPress:\n    at: \"Item A\"\n    holdMs: 600\n    thenSwipeTo: \"Drop zone\"\n"
+}

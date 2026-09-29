@@ -1,0 +1,166 @@
+{
+  "calls": [
+    {
+      "args": [
+        "back"
+      ],
+      "method": "pressKey"
+    },
+    {
+      "args": [
+        "back"
+      ],
+      "method": "pressKey"
+    }
+  ],
+  "durationMs": 450,
+  "events": [
+    {
+      "command": "back",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 6,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "back",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "back"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "back",
+      "depth": 0,
+      "detail": "Pressed back",
+      "durationMs": 0,
+      "line": 6,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "back",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "back"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "sleep",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 7,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "sleep: \"150ms\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "sleep"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"150ms\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "sleep",
+      "depth": 0,
+      "detail": "Slept 150ms",
+      "durationMs": 150,
+      "line": 7,
+      "ok": true,
+      "stepIndex": 1,
+      "summary": "sleep: \"150ms\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "sleep"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"150ms\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "back",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 8,
+      "ok": null,
+      "stepIndex": 2,
+      "summary": "back",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "back"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "back",
+      "depth": 0,
+      "detail": "Pressed back",
+      "durationMs": 0,
+      "line": 8,
+      "ok": true,
+      "stepIndex": 2,
+      "summary": "back",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "back"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 3,
+  "screenshots": [],
+  "scriptName": "step delay",
+  "steps": [
+    {
+      "command": "back",
+      "detail": "Pressed back",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    },
+    {
+      "command": "sleep",
+      "detail": "Slept 150ms",
+      "durationMs": 150,
+      "ok": true,
+      "stepIndex": 1
+    },
+    {
+      "command": "back",
+      "detail": "Pressed back",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 2
+    }
+  ],
+  "totalSteps": 3
+}

@@ -1,0 +1,29 @@
+{
+  "parsed": {
+    "_stepLines": [
+      1,
+      2,
+      3
+    ],
+    "appId": "",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Untitled script",
+    "steps": [
+      {
+        "command": "launchApp"
+      },
+      {
+        "command": "tap",
+        "selector": {
+          "label": "Continue",
+          "text": "Continue"
+        }
+      },
+      {
+        "command": "back"
+      }
+    ]
+  },
+  "valid": true
+}

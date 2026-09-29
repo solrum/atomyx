@@ -10,7 +10,7 @@ import Foundation
 /// `CommandHandlerUnitTests.swift` and use a `MockXCUIBridge` so they
 /// run without touching a simulator.
 ///
-/// `testServeCommands` is intentionally a **blocking** test — it calls
+/// `testServeCommands` is intentionally a **blocking** test. It calls
 /// `RunLoop.current.run()` and never returns. Mixing it with
 /// non-blocking unit tests in the same `xcodebuild test` invocation
 /// would deadlock. We solve this by driving class selection at the
@@ -39,7 +39,7 @@ final class AtomyxDriverAgent: XCTestCase {
 
         // The factory probes for the multi-pointer-capable backend
         // and falls back to the coordinate backend on probe failure.
-        // Backend selection is internal — no user-facing knob.
+        // Backend selection is internal. No user-facing knob.
         let synthesizer = EventSynthesizerFactory.make()
         NSLog("[atomyx] gesture synthesizer mechanism = \(synthesizer.mechanismName)")
 

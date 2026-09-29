@@ -1,0 +1,5 @@
+{
+  "name": "lexerr-unexpected-character-open-brace",
+  "description": "an unrecognized character ({) in the source.",
+  "expr": "{1}"
+}

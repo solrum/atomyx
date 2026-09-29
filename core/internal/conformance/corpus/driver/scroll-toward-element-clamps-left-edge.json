@@ -1,0 +1,8 @@
+{
+  "name": "scroll-toward-element-clamps-left-edge",
+  "description": "an element hugging the left screen edge clamps the swipe's horizontal coordinate 40 points in from the edge",
+  "function": "scrollTowardElement",
+  "bounds": { "left": 0, "top": -200, "right": 10, "bottom": -160 },
+  "screen": { "width": 430, "height": 932 },
+  "maxScrollFraction": 0.6
+}

@@ -1,0 +1,17 @@
+{
+  "name": "input-tap-ratio-success",
+  "description": "tapRatio against a selected mock device converts a normalized ratio to an absolute point using the driver's screen size and dispatches a tap with no error.",
+  "deviceSnapshots": [
+    [
+      { "id": "mock-1", "platform": "android", "name": "Mock Device", "kind": "emulator", "state": "online" }
+    ]
+  ],
+  "driver": {
+    "hierarchies": [{ "attributes": {}, "children": [] }],
+    "screen": { "width": 400, "height": 800 }
+  },
+  "steps": [
+    { "method": "selectDevice", "params": { "id": "mock-1" } },
+    { "method": "tapRatio", "params": { "xRatio": 0.5, "yRatio": 0.25 } }
+  ]
+}

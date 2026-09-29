@@ -1,0 +1,5 @@
+{
+  "name": "prec-parens-override-multiplication",
+  "description": "parentheses override the default multiplication-before-addition order.",
+  "expr": "(2 + 3) * 4"
+}

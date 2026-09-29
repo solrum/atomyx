@@ -1,0 +1,5 @@
+{
+  "name": "lex-double-quoted-string",
+  "description": "a double-quoted string literal.",
+  "expr": "\"hello\""
+}

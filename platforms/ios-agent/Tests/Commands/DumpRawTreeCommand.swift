@@ -2,7 +2,7 @@ import Foundation
 import XCTest
 
 /// Dump the accessibility tree as a nested dictionary. Preserves
-/// parent → child structure so host-side consumers that need
+/// parent-to-child structure so host-side consumers that need
 /// structural context (ancestor-descendant walks, preceding-
 /// sibling lookups, layout-aware matchers) can operate on it.
 ///
@@ -18,14 +18,14 @@ import XCTest
 ///     call.
 ///
 /// `XCUIApplication()` with no bundle id is intentionally not
-/// used here — the runner is a standalone XCTest bundle with no
+/// used here, because the runner is a standalone XCTest bundle with no
 /// `TEST_HOST`, so the no-arg resolver traps before the snapshot
 /// call lands.
 ///
 /// Response data:
 ///   - `root`: nested dict with fields
 ///     `{elementType, identifier, label, value?, enabled, bounds, children?}`
-///     — maps one-to-one onto the host-side raw-element wire type.
+///     maps one-to-one onto the host-side raw-element wire type.
 ///   - `bundleId` (optional): set when the runner had to attach
 ///     to a candidate to fulfil the request, so the host can
 ///     remember it for follow-up calls.
@@ -45,7 +45,7 @@ final class DumpRawTreeCommand: CommandHandler {
                     message: "no candidate bundle id is currently running in the foreground (\(candidates.count) tried)"
                 )
             }
-            // Cache for subsequent calls — the host saves a roundtrip
+            // Cache for subsequent calls, so the host saves a roundtrip
             // and we keep snapshot/touch routing consistent.
             state.currentApp = resolved.app
             state.currentBundleId = resolved.bundleId
@@ -54,12 +54,12 @@ final class DumpRawTreeCommand: CommandHandler {
         } else {
             return .error(
                 id: request.id,
-                message: "no app bound — pass bundleIdCandidates or call launchApp first"
+                message: "no app bound, pass bundleIdCandidates or call launchApp first"
             )
         }
 
         guard let root = bridge.dumpRawTree(app: app) else {
-            return .error(id: request.id, message: "snapshot failed — driver or simulator may be unresponsive")
+            return .error(id: request.id, message: "snapshot failed, driver or simulator may be unresponsive")
         }
 
         var data: [String: Any] = ["root": root]
@@ -69,7 +69,7 @@ final class DumpRawTreeCommand: CommandHandler {
 
     /// Probe each candidate via `XCUIApplication.state` and return
     /// the first one currently in `.runningForeground`. Background
-    /// or not-running apps are skipped. Probing is cheap — it does
+    /// or not-running apps are skipped. Probing is cheap because it does
     /// not require launching or attaching, only an inspect of the
     /// application proxy state.
     private static func firstForegroundCandidate(_ bundleIds: [String]) -> (app: XCUIApplication, bundleId: String)? {

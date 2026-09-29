@@ -1,0 +1,5 @@
+{
+  "name": "var-undefined-reference",
+  "description": "referencing a variable with no binding at all.",
+  "expr": "missing"
+}

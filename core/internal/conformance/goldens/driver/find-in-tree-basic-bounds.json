@@ -1,0 +1,24 @@
+{
+  "bounds": {
+    "bottom": 60,
+    "left": 10,
+    "right": 110,
+    "top": 20
+  },
+  "found": true,
+  "node": {
+    "attributes": {
+      "bounds": "10,20,110,60",
+      "id": "login_btn",
+      "role": "button",
+      "text": "Sign in"
+    },
+    "children": [],
+    "clickable": true,
+    "enabled": true
+  },
+  "point": {
+    "x": 60,
+    "y": 40
+  }
+}

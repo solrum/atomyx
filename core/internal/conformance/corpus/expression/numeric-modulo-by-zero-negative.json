@@ -1,0 +1,5 @@
+{
+  "name": "numeric-modulo-by-zero-negative",
+  "description": "taking a negative number modulo zero.",
+  "expr": "-5 % 0"
+}

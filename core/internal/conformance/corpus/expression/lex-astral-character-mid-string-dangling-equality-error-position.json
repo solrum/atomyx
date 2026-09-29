@@ -1,0 +1,5 @@
+{
+  "name": "lex-astral-character-mid-string-dangling-equality-error-position",
+  "description": "a trailing equality operator after a string with an astral character between two ASCII characters reports the error position in UTF-16 code units.",
+  "expr": "\"x😀y\" =="
+}

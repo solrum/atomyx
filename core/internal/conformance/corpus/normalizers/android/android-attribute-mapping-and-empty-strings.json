@@ -1,0 +1,58 @@
+{
+  "name": "android-attribute-mapping-and-empty-strings",
+  "description": "attribute key mapping and empty-string suppression",
+  "rawTree": {
+    "elementId": "root",
+    "className": "android.widget.LinearLayout",
+    "clickable": false,
+    "enabled": true,
+    "focused": false,
+    "selected": false,
+    "checkable": false,
+    "checked": false,
+    "visible": true,
+    "isIme": false,
+    "children": [
+      {
+        "elementId": "m1",
+        "className": "android.widget.EditText",
+        "resourceId": "com.example:id/email",
+        "text": "user@example.com",
+        "contentDesc": "Email address",
+        "hintText": "you@example.com",
+        "bounds": {
+          "left": 24,
+          "top": 100,
+          "right": 1056,
+          "bottom": 200
+        },
+        "clickable": true,
+        "enabled": true,
+        "focused": true,
+        "selected": false,
+        "checkable": false,
+        "checked": false,
+        "visible": true,
+        "isIme": false,
+        "children": []
+      },
+      {
+        "elementId": "m2",
+        "className": "",
+        "resourceId": "",
+        "text": "",
+        "contentDesc": "",
+        "hintText": "",
+        "clickable": false,
+        "enabled": false,
+        "focused": false,
+        "selected": false,
+        "checkable": false,
+        "checked": false,
+        "visible": false,
+        "isIme": false,
+        "children": []
+      }
+    ]
+  }
+}

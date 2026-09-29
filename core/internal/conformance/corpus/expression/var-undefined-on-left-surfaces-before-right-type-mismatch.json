@@ -1,0 +1,5 @@
+{
+  "name": "var-undefined-on-left-surfaces-before-right-type-mismatch",
+  "description": "an undefined variable on the left operand of + surfaces before the right operand is ever evaluated.",
+  "expr": "missing + true"
+}

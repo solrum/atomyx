@@ -1,0 +1,5 @@
+{
+  "name": "matrix-literal-lte-string-string",
+  "description": "literal string \"<=\" literal string",
+  "expr": "\"a\" <= \"a\""
+}

@@ -1,0 +1,53 @@
+{
+  "attributes": {
+    "bounds": "0,0,393,64",
+    "class": "cell",
+    "ext:ios-a11y-bounds": "0,2,393,62",
+    "ext:ios-accessible": "true",
+    "ext:ios-title": "Row title",
+    "ext:ios-traits": "button,selected",
+    "id": "ext-root",
+    "label": "Row",
+    "role": "button"
+  },
+  "children": [
+    {
+      "attributes": {
+        "class": "staticText",
+        "ext:ios-accessible": "false",
+        "id": "e01",
+        "role": "text",
+        "text": "Sub"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "staticText",
+        "id": "e02",
+        "role": "text",
+        "text": "Sub2"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "image",
+        "id": "e03",
+        "label": "Chevron",
+        "role": "image"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": false,
+      "visible": false
+    }
+  ],
+  "clickable": true,
+  "enabled": true,
+  "focused": false,
+  "selected": true,
+  "visible": true
+}

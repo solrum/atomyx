@@ -1,0 +1,11 @@
+{
+  "name": "unary-not-string-variable-rejected",
+  "description": "logical not rejects a string variable.",
+  "expr": "not s",
+  "variables": {
+    "s": {
+      "type": "string",
+      "string": "a"
+    }
+  }
+}

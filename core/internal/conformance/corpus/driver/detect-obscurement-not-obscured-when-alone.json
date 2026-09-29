@@ -1,0 +1,12 @@
+{
+  "name": "detect-obscurement-not-obscured-when-alone",
+  "description": "a target with no covering node reports obscured: false",
+  "function": "detectObscurement",
+  "selector": { "id": "target" },
+  "tree": {
+    "attributes": { "id": "root" },
+    "children": [
+      { "attributes": { "id": "target", "bounds": "100,100,200,150" }, "children": [] }
+    ]
+  }
+}

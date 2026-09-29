@@ -1,0 +1,5 @@
+{
+  "name": "precondition-check-both-visible-and-not-visible-invalid",
+  "description": "precondition check with both `visible` and `notVisible` set must be REJECTED.",
+  "yaml": "appId: com.example.app\nname: Smoke\nenv: {}\npreconditions:\n  - check: { visible: \"Home\", notVisible: \"Onboarding\" }\n    setup: flows/setup.yml\n---\n- launchApp\n"
+}

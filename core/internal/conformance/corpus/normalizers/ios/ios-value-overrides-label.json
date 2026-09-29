@@ -1,0 +1,71 @@
+{
+  "name": "ios-value-overrides-label",
+  "description": "value-overrides-label precedence and label routing by inferred role",
+  "rawTree": {
+    "elementType": "scrollView",
+    "identifier": "value-root",
+    "children": [
+      {
+        "elementType": "textField",
+        "identifier": "v01",
+        "label": "Email",
+        "value": "user@example.com",
+        "placeholderValue": "you@example.com"
+      },
+      {
+        "elementType": "textField",
+        "identifier": "v02",
+        "label": "Email",
+        "value": "",
+        "placeholderValue": "you@example.com"
+      },
+      {
+        "elementType": "staticText",
+        "identifier": "v03",
+        "label": "Welcome back"
+      },
+      {
+        "elementType": "staticText",
+        "identifier": "v04",
+        "label": "Welcome back",
+        "value": "42"
+      },
+      {
+        "elementType": "heading",
+        "identifier": "v05",
+        "label": "Section title",
+        "value": "Overridden"
+      },
+      {
+        "elementType": "button",
+        "identifier": "v06",
+        "label": "Play",
+        "value": "Paused"
+      },
+      {
+        "elementType": "staticText",
+        "identifier": "v07",
+        "label": "Card title",
+        "value": "Card value",
+        "bounds": {
+          "left": 0,
+          "top": 0,
+          "right": 200,
+          "bottom": 150
+        }
+      },
+      {
+        "elementType": "switch",
+        "identifier": "v08",
+        "label": "Wi-Fi",
+        "value": "1"
+      },
+      {
+        "elementType": "image",
+        "identifier": "v09",
+        "label": "",
+        "value": "only-a-value"
+      }
+    ]
+  }
+}

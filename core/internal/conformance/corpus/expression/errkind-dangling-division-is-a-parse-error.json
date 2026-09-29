@@ -1,0 +1,5 @@
+{
+  "name": "errkind-dangling-division-is-a-parse-error",
+  "description": "a trailing division operator with no right operand is a parse-time error.",
+  "expr": "1 /"
+}

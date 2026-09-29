@@ -1,0 +1,19 @@
+{
+  "name": "handle-flow-file-parent-variable",
+  "description": "handle's matching branch runs a file-referenced do block that interpolates a variable from the parent script's env, proving the flow file sees the parent's variables",
+  "yaml": "appId: com.test\nname: handle parent variable\nenv:\n  email: user@test.com\n---\n- launchApp\n- handle:\n    - when:\n        visible: Login\n      do: \"{{DIR}}/handle-do.yml\"\n",
+  "flowFiles": {
+    "handle-do.yml": "- type:\n    into: Email\n    text: \"${email}\"\n"
+  },
+  "driver": {
+    "hierarchies": [
+      {
+        "attributes": {},
+        "children": [
+          { "attributes": { "text": "Login", "label": "Login", "bounds": "40,300,390,350" }, "children": [], "clickable": true },
+          { "attributes": { "hint": "Email address", "label": "Email", "bounds": "40,400,390,450", "value": "" }, "children": [], "clickable": true, "focused": true }
+        ]
+      }
+    ]
+  }
+}

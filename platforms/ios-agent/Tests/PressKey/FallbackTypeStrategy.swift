@@ -3,12 +3,12 @@ import XCTest
 
 /// Default strategy for unknown keys. Types the raw key string into the
 /// focused field via `XCUIApplication.typeText`. Registered as the
-/// `fallback` of `PressKeyRegistry` — strategies registered by name
+/// `fallback` of `PressKeyRegistry`, where strategies registered by name
 /// win; everything else lands here.
 ///
 /// `key` is set to an empty sentinel because `PressKeyRegistry` never
-/// looks the fallback up by key — it's invoked from the registry's
-/// `resolve` default path.
+/// looks the fallback up by key. It's invoked from the registry's
+/// `resolve` default path instead.
 final class FallbackTypeStrategy: PressKeyStrategy {
     let key = ""
     let requiresApp = true

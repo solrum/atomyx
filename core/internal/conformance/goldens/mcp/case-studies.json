@@ -1,0 +1,34 @@
+[
+  {
+    "result": {
+      "content": [
+        {
+          "key": "case-studies/2026-09/obscured-dialog-dismissal",
+          "ok": true
+        }
+      ],
+      "isError": false
+    },
+    "tool": "add_case_study"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "count": 1,
+          "nextOffset": null,
+          "offset": 0,
+          "studies": [
+            {
+              "body": "# Obscured dialog dismissal\n\n**Trigger:** tap kept failing on a settings row hidden behind a confirm sheet\n\n**Solution:** dismiss the confirm sheet before retrying the tap\n\n**Example:**\n\n```\ntap({selector: {id: 'confirm-dismiss'}})\n```\n\n\u003cnormalized\u003e\n",
+              "key": "case-studies/2026-09/obscured-dialog-dismissal"
+            }
+          ],
+          "totalMatching": 1
+        }
+      ],
+      "isError": false
+    },
+    "tool": "get_case_studies"
+  }
+]

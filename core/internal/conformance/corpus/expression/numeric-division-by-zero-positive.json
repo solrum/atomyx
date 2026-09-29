@@ -1,0 +1,5 @@
+{
+  "name": "numeric-division-by-zero-positive",
+  "description": "dividing a positive number by zero.",
+  "expr": "5 / 0"
+}

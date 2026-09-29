@@ -14,7 +14,7 @@ import CoreGraphics
 ///     {
 ///       id: string,
 ///       waypoints: [
-///         { phase: "down"|"move"|"up", x: number, y: number,
+///         { phase: "down"|"move"|"up"|"capture", x: number, y: number,
 ///           atOffsetSeconds: number, pressure?: number }
 ///       ]
 ///     }
@@ -22,19 +22,24 @@ import CoreGraphics
 /// }
 /// ```
 ///
+/// Response data adds `capturedImages: [{ base64: string, mimeType:
+/// string }]` when the dispatched pointers carried at least one
+/// `capture` waypoint, one entry per waypoint in dispatch order. A
+/// sequence with no `capture` waypoint omits the field entirely.
+///
 /// Rejection paths:
-///   - Missing / malformed `pointers` → 400-style error response.
-///   - Out-of-range `pressure` (must be in `[0.0, 1.0]`) →
-///     400-style error response.
+///   - Missing / malformed `pointers` results in a 400-style error response.
+///   - Out-of-range `pressure` (must be in `[0.0, 1.0]`)
+///     results in a 400-style error response.
 ///   - Capability mismatch (multi-pointer or pressure on a
-///     backend without the capability) → surfaced via
+///     backend without the capability) is surfaced via
 ///     `SynthesizerError` and returned as a structured error
 ///     to the host so the YAML validator can map it to the
 ///     right POINTER_* code.
 ///
 /// Coordinates are in device-global point space. The synthesizer
 /// dispatches events through the XCUITest daemon to whichever app
-/// is currently frontmost — no `launchApp` required.
+/// is currently frontmost, so no `launchApp` is required.
 final class DispatchPointerCommand: CommandHandler {
     let type = "dispatchPointer"
 
@@ -60,21 +65,31 @@ final class DispatchPointerCommand: CommandHandler {
         } catch let err as DispatchPointerCommand.ParseError {
             return .error(id: request.id, message: err.description)
         } catch {
-            return .error(id: request.id, message: "pointer parse error: \(error)")
+            NSLog("[atomyx] dispatchPointer parse failed: \(error)")
+            return .error(id: request.id, message: "The pointer description could not be parsed.")
         }
 
+        let capturedImages: [Data]
         do {
-            try synthesizer.dispatch(pointers: pointers)
+            capturedImages = try synthesizer.dispatch(pointers: pointers)
         } catch let err as SynthesizerError {
-            return .error(id: request.id, message: "dispatch rejected: \(Self.describe(err))")
+            NSLog("[atomyx] dispatchPointer dispatch rejected: \(err)")
+            return .error(id: request.id, message: Self.describe(err))
         } catch {
-            return .error(id: request.id, message: "dispatch failed: \(error)")
+            NSLog("[atomyx] dispatchPointer dispatch failed: \(error)")
+            return .error(id: request.id, message: "The gesture could not be dispatched on this device.")
         }
 
-        return .ok(id: request.id, data: [
+        var data: [String: Any] = [
             "pointers": pointers.count,
             "mechanism": synthesizer.mechanismName,
-        ])
+        ]
+        if !capturedImages.isEmpty {
+            data["capturedImages"] = capturedImages.map { image in
+                ["base64": image.base64EncodedString(), "mimeType": "image/png"]
+            }
+        }
+        return .ok(id: request.id, data: data)
     }
 
     // MARK: - Parsing
@@ -128,14 +143,20 @@ final class DispatchPointerCommand: CommandHandler {
         )
     }
 
+    /// Maps a synthesizer failure to a fixed, human-readable message
+    /// safe to return to a tool caller. A private XCTest symbol name
+    /// or an internal dispatch reason must never cross the tool
+    /// boundary, so only `patternNotExpressible` forwards its detail,
+    /// because that detail is a field-level validation message this
+    /// file writes itself, never a reflection of a Swift type or an
+    /// Apple private symbol. The call site above already logs the
+    /// full error for every case.
     private static func describe(_ err: SynthesizerError) -> String {
         switch err {
         case .patternNotExpressible(let reason):
-            return "pattern not expressible: \(reason)"
-        case .privateSymbolMissing(let sym):
-            return "private symbol missing: \(sym)"
-        case .dispatchFailed(let reason):
-            return "dispatch failed: \(reason)"
+            return "The pointer description is invalid: \(reason)"
+        case .privateSymbolMissing, .dispatchFailed:
+            return "The gesture could not be dispatched on this device."
         }
     }
 }

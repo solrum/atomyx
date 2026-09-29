@@ -1,0 +1,15 @@
+{
+  "name": "matrix-variable-or-boolean-boolean",
+  "description": "variable boolean \"or\" variable boolean, proving lookup-typed values take the same path as literals.",
+  "expr": "lb or rb",
+  "variables": {
+    "lb": {
+      "type": "boolean",
+      "boolean": true
+    },
+    "rb": {
+      "type": "boolean",
+      "boolean": true
+    }
+  }
+}

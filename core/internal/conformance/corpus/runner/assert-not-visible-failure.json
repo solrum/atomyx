@@ -1,0 +1,15 @@
+{
+  "name": "assert-not-visible-failure",
+  "description": "assertNotVisible with no timeout does a single instant check and fails when the selector is actually present",
+  "yaml": "appId: com.test\nname: assert not visible failure\nenv: {}\n---\n- launchApp\n- assertNotVisible: Login\n",
+  "driver": {
+    "hierarchies": [
+      {
+        "attributes": {},
+        "children": [
+          { "attributes": { "text": "Login", "label": "Login", "bounds": "40,300,390,350" }, "children": [], "clickable": true }
+        ]
+      }
+    ]
+  }
+}

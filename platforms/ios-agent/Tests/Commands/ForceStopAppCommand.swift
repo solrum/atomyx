@@ -1,7 +1,7 @@
 import Foundation
 
 /// Terminate an app by bundle id. Safe to call on apps that aren't
-/// currently running — `XCUIApplication.terminate()` is idempotent.
+/// currently running, because `XCUIApplication.terminate()` is idempotent.
 ///
 /// If the terminated app matches the driver's tracked currentApp, the
 /// tracking is cleared so a subsequent `dumpTree` / `tapAt` fails fast

@@ -1,0 +1,5 @@
+{
+  "name": "step-pointer-single-pointer-form",
+  "description": "pointer step, single-touch form: down on a selector, wait, move to absolute coordinates, up.",
+  "yaml": "- launchApp\n- pointer:\n    touches:\n      - actions:\n          - down: \"Item A\"\n          - wait: 800\n          - move: { x: 300, y: 600 }\n          - up\n    moveDurationMs: 300\n"
+}

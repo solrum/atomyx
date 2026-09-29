@@ -1,0 +1,11 @@
+{
+  "name": "cast-string-negative-zero",
+  "description": "string() renders negative zero the same as positive zero.",
+  "expr": "string(negZero)",
+  "variables": {
+    "negZero": {
+      "type": "number",
+      "number": "-0"
+    }
+  }
+}

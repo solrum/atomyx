@@ -1,0 +1,21 @@
+{
+  "name": "compile-selector-stable-sort-equal-score",
+  "description": "candidates with an equal rank score keep their original document order",
+  "function": "compileSelector",
+  "selector": { "text": "Click" },
+  "tree": {
+    "attributes": { "role": "container" },
+    "children": [
+      {
+        "attributes": { "role": "button", "id": "a", "text": "Click" },
+        "children": [],
+        "clickable": true
+      },
+      {
+        "attributes": { "role": "button", "id": "b", "text": "Click" },
+        "children": [],
+        "clickable": true
+      }
+    ]
+  }
+}

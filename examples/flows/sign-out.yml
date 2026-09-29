@@ -1,0 +1,7 @@
+# Sub-flow: sign out at the end of a parent script's flow, so the
+# app returns to the Sign in screen regardless of which UI path the
+# parent's own steps took.
+- tap: "Sign out"
+- waitFor: "Confirm"
+- tap: "Confirm"
+- waitFor: "Sign in"

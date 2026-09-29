@@ -1,0 +1,5 @@
+{
+  "name": "ctxkw-not-bare-identifier-in-arithmetic-undefined",
+  "description": "the keyword not, reached only through the primary grammar rule inside an arithmetic right operand, fails at evaluation as an undefined variable rather than a unary operator.",
+  "expr": "1 + not"
+}

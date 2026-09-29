@@ -1,0 +1,30 @@
+{
+  "name": "tap-and-wait-transition-timeout-partial-transition",
+  "description": "tap_and_wait_transition times out with classification partial_transition when only waitForAppear is given and its anchor never appears on the one staged, unchanging screen.",
+  "driver": {
+    "hierarchy": {
+      "attributes": { "role": "container", "bounds": "0,0,430,932" },
+      "children": [
+        {
+          "attributes": { "role": "button", "id": "next_btn", "text": "Next", "bounds": "100,400,330,460" },
+          "children": [],
+          "enabled": true,
+          "clickable": true
+        }
+      ]
+    }
+  },
+  "steps": [
+    { "tool": "select_device", "args": { "platform": "android", "id": "mock-device" } },
+    {
+      "tool": "tap_and_wait_transition",
+      "args": {
+        "selector": { "id": "next_btn" },
+        "waitForAppear": { "id": "confirmation_screen" },
+        "timeoutMs": 20,
+        "maxTimeoutMs": 40,
+        "intervalMs": 5
+      }
+    }
+  ]
+}

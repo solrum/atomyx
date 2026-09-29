@@ -1,0 +1,5 @@
+{
+  "name": "lex-leading-zeros",
+  "description": "a number literal with leading zeros.",
+  "expr": "007"
+}

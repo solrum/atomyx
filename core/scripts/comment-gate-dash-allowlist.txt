@@ -1,0 +1,13 @@
+# Grandfathered hits for scripts/check-comments.sh's banned-character
+# check (the em dash and the right arrow).
+#
+# Format: one entry per line, exact path:line (not a substring, unlike
+# scripts/comment-gate-allowlist.txt, because a byte-parity entry below
+# names a specific line whose wording must not drift).
+#
+# This file may only shrink. Every entry here is a string kept
+# byte-identical to a TypeScript oracle string so the conformance
+# differential suite keeps passing, and stays until that oracle
+# retires. Do not add an entry for a line written after this gate
+# existed; fix the line instead. Blank lines and lines starting with #
+# are ignored.

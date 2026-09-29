@@ -21,8 +21,8 @@ yarn-error.log*
 .yarn/
 *.log
 
-# Repo uses npm workspaces with package-lock.json. Stray pnpm/yarn
-# lockfiles are extraneous and must not be committed.
+# apps/studio uses npm with a committed package-lock.json. Stray
+# pnpm/yarn lockfiles are extraneous and must not be committed.
 pnpm-lock.yaml
 yarn.lock
 
@@ -46,7 +46,7 @@ android/key.properties
 *.dex
 *.class
 *.jar
-!gradle/wrapper/gradle-wrapper.jar
+!platforms/android-agent/gradle/wrapper/gradle-wrapper.jar
 *.aar
 *.so
 hs_err_pid*
@@ -90,9 +90,6 @@ kotlin-js-store/
 Thumbs.db
 desktop.ini
 
-# ─── Husky ─────────────────────────────────────────────────────────
-.husky/_/
-
 # ─── Test coverage output ──────────────────────────────────────────
 .nyc_output/
 
@@ -123,18 +120,15 @@ platforms/ios-agent/AtomyxDriver.xcodeproj/
 atomyx-local/
 
 # ─── Local-only dev scripts ────────────────────────────────────────
-# Per-contributor scripts under any package's own `scripts/`. The
-# top-level `/scripts/` ships shared lint/snapshot/codemod tooling
-# and IS tracked, EXCEPT the legacy per-contributor probes listed
-# below.
-**/packages/*/scripts/
+# Per-contributor scripts under an app or platform's own `scripts/`.
+# The top-level `/scripts/` ships shared lint and style-check tooling
+# and IS tracked, EXCEPT the per-contributor probes listed below.
 **/apps/*/scripts/
 platforms/*/scripts/
-# CI gate scripts that MUST ship (referenced by package.json gates)
+# Check scripts that MUST ship (referenced by package.json gates)
 !apps/studio/scripts/
 !apps/studio/scripts/check-feature-api.mjs
 /scripts/bench-ios-type.mjs
-/scripts/ios-driver-call.mjs
 /scripts/ios-flutter-pointer-smoke.mjs
 /scripts/ios-pointer-smoke.mjs
 /scripts/mitm-capture-addon.py

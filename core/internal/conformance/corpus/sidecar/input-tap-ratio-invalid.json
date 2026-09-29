@@ -1,0 +1,14 @@
+{
+  "name": "input-tap-ratio-invalid",
+  "description": "tapRatio with a non-numeric xRatio fails on both engines with the same plain-error-turned-InternalError shape, before touching the driver.",
+  "deviceSnapshots": [
+    [
+      { "id": "mock-1", "platform": "android", "name": "Mock Device", "kind": "emulator", "state": "online" }
+    ]
+  ],
+  "driver": { "hierarchies": [{ "attributes": {}, "children": [] }] },
+  "steps": [
+    { "method": "selectDevice", "params": { "id": "mock-1" } },
+    { "method": "tapRatio", "params": { "xRatio": "not-a-number", "yRatio": 0.5 } }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "name": "step-pointer-multi-pointer-form",
+  "description": "pointer step, multi-touch form: two named touches, each with its own action sequence (a pinch gesture).",
+  "yaml": "- launchApp\n- pointer:\n    touches:\n      - id: \"p1\"\n        actions:\n          - down: { x: 100, y: 400 }\n          - move: { x: 50, y: 400 }\n          - up\n      - id: \"p2\"\n        actions:\n          - down: { x: 100, y: 500 }\n          - move: { x: 150, y: 500 }\n          - up\n"
+}

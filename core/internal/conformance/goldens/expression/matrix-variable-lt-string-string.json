@@ -1,0 +1,11 @@
+{
+  "booleanValue": false,
+  "errorKind": "eval",
+  "kind": "error",
+  "message": "cannot compare string value \"a\" and string value \"a\", both sides must be numbers at position 0",
+  "numberBits": "",
+  "numberText": "",
+  "position": 0,
+  "stringValue": "",
+  "valueType": ""
+}

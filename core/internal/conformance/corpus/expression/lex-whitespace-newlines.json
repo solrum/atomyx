@@ -1,0 +1,5 @@
+{
+  "name": "lex-whitespace-newlines",
+  "description": "newline characters surrounding an operator.",
+  "expr": "1\n+\n2"
+}

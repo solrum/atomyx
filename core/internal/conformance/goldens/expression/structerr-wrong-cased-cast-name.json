@@ -1,0 +1,11 @@
+{
+  "booleanValue": false,
+  "errorKind": "parse",
+  "kind": "error",
+  "message": "unknown function \"Number\", only number, string, and bool are callable at position 0",
+  "numberBits": "",
+  "numberText": "",
+  "position": 0,
+  "stringValue": "",
+  "valueType": ""
+}

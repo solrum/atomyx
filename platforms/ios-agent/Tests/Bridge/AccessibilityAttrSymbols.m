@@ -8,8 +8,8 @@
 /// XCTest stores per-snapshot extras in
 /// `XCUIElementSnapshot.additionalAttributes`, a dictionary keyed
 /// by integer-IDs that the daemon allocates at startup by hashing
-/// internal attribute strings. We need two of those keys —
-/// "is visible" and "is element" — to read true accessibility-
+/// internal attribute strings. We need two of those keys,
+/// "is visible" and "is element", to read true accessibility-
 /// runtime visibility and a11y-leaf flags out of a snapshot.
 ///
 /// The IDs are not stable across Xcode versions. The string names
@@ -20,7 +20,7 @@
 /// XCTest) to resolve them to the integer keys.
 ///
 /// Why all the indirection: `dlsym` against a UI test bundle's
-/// own binary cannot find symbols defined in XCTest.framework —
+/// own binary cannot find symbols defined in XCTest.framework, so
 /// we must dlopen the XCTest binary explicitly. The path is the
 /// `XCTestCase` class's bundle executable, which is reachable
 /// without hard-coding any framework path.
@@ -57,7 +57,7 @@ static void AtomyxResolveXCAXSymbols(void) {
     void *fnSym = AtomyxRetrieveXCTestSymbol("XCAXAccessibilityAttributesForStringAttributes");
     if (visibleStringSym == NULL || elementStringSym == NULL || fnSym == NULL) {
         // Symbol surface drifted (Xcode update). Caller's
-        // null-check on the public accessors handles this — we
+        // null-check on the public accessors handles this, so we
         // just don't populate the globals.
         return;
     }

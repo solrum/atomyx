@@ -1,0 +1,5 @@
+{
+  "name": "unary-not-boolean-literal",
+  "description": "logical not on a boolean literal.",
+  "expr": "not true"
+}

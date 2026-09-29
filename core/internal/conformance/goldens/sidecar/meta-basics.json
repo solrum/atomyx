@@ -1,0 +1,17 @@
+{
+  "events": null,
+  "steps": [
+    {
+      "method": "protocolVersion",
+      "result": {
+        "version": 1
+      }
+    },
+    {
+      "method": "ping",
+      "result": {
+        "ok": true
+      }
+    }
+  ]
+}

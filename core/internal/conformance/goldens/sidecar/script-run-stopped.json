@@ -1,0 +1,67 @@
+{
+  "events": [
+    {
+      "event": "deviceConnected",
+      "payload": {
+        "id": "mock-1",
+        "kind": "emulator",
+        "name": "Mock Device",
+        "platform": "android",
+        "state": "online"
+      }
+    },
+    {
+      "event": "runStarted",
+      "payload": {
+        "runId": "\u003cnormalized\u003e",
+        "scriptName": "stoppable",
+        "startedAt": "\u003cnormalized\u003e"
+      }
+    },
+    {
+      "event": "runStopRequested",
+      "payload": {
+        "runId": "\u003cnormalized\u003e"
+      }
+    },
+    {
+      "event": "runErrored",
+      "payload": {
+        "message": "\u003cnormalized\u003e",
+        "runId": "\u003cnormalized\u003e"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "method": "selectDevice",
+      "result": {
+        "id": "mock-1",
+        "kind": "emulator",
+        "name": "Mock Device",
+        "platform": "android",
+        "state": "online"
+      }
+    },
+    {
+      "method": "isRunning",
+      "result": {
+        "running": true
+      }
+    },
+    {
+      "method": "stopScript",
+      "result": null
+    },
+    {
+      "errorCode": "InternalError",
+      "method": "runScript"
+    },
+    {
+      "method": "isRunning",
+      "result": {
+        "running": false
+      }
+    }
+  ]
+}

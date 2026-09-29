@@ -1,0 +1,5 @@
+{
+  "name": "structerr-whitespace-only-source",
+  "description": "expression source containing only whitespace.",
+  "expr": "   "
+}

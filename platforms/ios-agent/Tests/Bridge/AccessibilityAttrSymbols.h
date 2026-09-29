@@ -5,8 +5,8 @@ NS_ASSUME_NONNULL_BEGIN
 /// Keys into `XCUIElementSnapshot.additionalAttributes` for the
 /// "is visible" and "is accessibility element" flags. The keys are
 /// `NSNumber*` integer IDs that the XCTest daemon assigns at
-/// runtime by hashing internal accessibility attribute strings —
-/// the IDs are NOT stable across Xcode releases, which is why we
+/// runtime by hashing internal accessibility attribute strings.
+/// The IDs are NOT stable across Xcode releases, which is why we
 /// resolve them at process load time via private symbols rather
 /// than hard-coding integers.
 ///

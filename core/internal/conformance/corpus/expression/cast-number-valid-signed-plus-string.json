@@ -1,0 +1,5 @@
+{
+  "name": "cast-number-valid-signed-plus-string",
+  "description": "number() accepts an explicitly positive-signed string.",
+  "expr": "number(\"+5\")"
+}

@@ -1,0 +1,5 @@
+{
+  "name": "cast-string-zero",
+  "description": "string() renders zero as \"0\".",
+  "expr": "string(0)"
+}

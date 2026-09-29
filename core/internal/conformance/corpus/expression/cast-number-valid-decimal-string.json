@@ -1,0 +1,5 @@
+{
+  "name": "cast-number-valid-decimal-string",
+  "description": "number() accepts a decimal string.",
+  "expr": "number(\"3.14\")"
+}

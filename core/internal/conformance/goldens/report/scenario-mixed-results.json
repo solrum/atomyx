@@ -1,0 +1,132 @@
+{
+  "kind": "scenario",
+  "metadata": {
+    "command": "run",
+    "durationMs": 3000,
+    "finishedAt": "2026-01-03T09:00:03.000Z",
+    "label": "Onboarding scenario",
+    "platform": "android",
+    "runId": "33333333-3333-4333-8333-333333333333",
+    "startedAt": "2026-01-03T09:00:00.000Z"
+  },
+  "reportVersion": 1,
+  "result": {
+    "durationMs": 3000,
+    "ok": false,
+    "passedScripts": 2,
+    "scenarioName": "Onboarding scenario",
+    "scripts": [
+      {
+        "durationMs": 1000,
+        "result": {
+          "durationMs": 1000,
+          "ok": true,
+          "passedSteps": 2,
+          "screenshots": [
+            {
+              "file": "01-0-scripts-sign-up-yml-account-created.png",
+              "label": "account created"
+            }
+          ],
+          "scriptName": "Sign up",
+          "steps": [
+            {
+              "command": "launchApp",
+              "durationMs": 400,
+              "ok": true,
+              "stepIndex": 0
+            },
+            {
+              "command": "tap",
+              "detail": "tapped #create-account",
+              "durationMs": 600,
+              "ok": true,
+              "stepIndex": 1
+            }
+          ],
+          "totalSteps": 2
+        },
+        "scriptIndex": 0,
+        "scriptPath": "scripts/sign-up.yml",
+        "status": "passed"
+      },
+      {
+        "durationMs": 900,
+        "result": {
+          "durationMs": 900,
+          "failedAtStep": 1,
+          "ok": false,
+          "passedSteps": 1,
+          "screenshots": [
+            {
+              "file": "02-1-scripts-verify-email-yml-verification-failed.png",
+              "label": "verification failed"
+            }
+          ],
+          "scriptName": "Verify email",
+          "steps": [
+            {
+              "command": "tap",
+              "detail": "tapped #resend",
+              "durationMs": 300,
+              "ok": true,
+              "stepIndex": 0
+            },
+            {
+              "command": "assertVisible",
+              "detail": "element not found: #verified-badge",
+              "durationMs": 600,
+              "ok": false,
+              "stepIndex": 1
+            }
+          ],
+          "totalSteps": 2
+        },
+        "scriptIndex": 1,
+        "scriptPath": "scripts/verify-email.yml",
+        "status": "failed"
+      },
+      {
+        "durationMs": 1100,
+        "result": {
+          "durationMs": 1100,
+          "ok": true,
+          "passedSteps": 2,
+          "screenshots": [
+            {
+              "file": "03-2-scripts-complete-profile-yml-profile-saved.png",
+              "label": "profile saved"
+            }
+          ],
+          "scriptName": "Complete profile",
+          "steps": [
+            {
+              "command": "type",
+              "durationMs": 500,
+              "ok": true,
+              "stepIndex": 0
+            },
+            {
+              "command": "tap",
+              "detail": "tapped #save",
+              "durationMs": 600,
+              "ok": true,
+              "stepIndex": 1
+            }
+          ],
+          "totalSteps": 2
+        },
+        "scriptIndex": 2,
+        "scriptPath": "scripts/complete-profile.yml",
+        "status": "passed"
+      },
+      {
+        "durationMs": 0,
+        "scriptIndex": 3,
+        "scriptPath": "scripts/final-review.yml",
+        "status": "skipped"
+      }
+    ],
+    "totalScripts": 4
+  }
+}

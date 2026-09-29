@@ -1,4 +1,4 @@
-# Atomyx — Code comment rules (repo overrides)
+# Atomyx: Code comment rules (repo overrides)
 
 Every rule in `~/.claude/rules/comments.md` applies. Read it first.
 This file adds Atomyx-specific constraints and examples on top.
@@ -7,7 +7,7 @@ This file adds Atomyx-specific constraints and examples on top.
 
 ## Repo languages
 
-Applies across all production languages in this repo: TypeScript,
+Applies across all production languages in this repo: Go,
 Kotlin, Swift, YAML.
 
 ---
@@ -28,7 +28,7 @@ things also must not appear in a comment:
   "pre-refactor behaviour". Describe the current symbol, not what
   it replaced.
 - **Sibling-product brand names**: user-facing strings must say
-  `Atomyx` — no earlier codename, no parent-org brand.
+  `Atomyx`, never an earlier codename or a parent-org brand.
 - **Internal codenames for past refactors**: "observation-driven
   refactor", "sidecar split", "feature-api migration". These are
   project-plan concepts; the current code describes what it is,
@@ -36,7 +36,7 @@ things also must not appear in a comment:
 
 ---
 
-## Platform notes — which platforms to list
+## Platform notes: which platforms to list
 
 When a `Platform notes` block (global §5) is warranted in Atomyx
 code, the relevant platforms are:
@@ -47,12 +47,12 @@ code, the relevant platforms are:
 - **React Native / Jetpack Compose** (add when first observed)
 
 Mention a platform only when its behavior forces caller-visible
-differences. iOS-only selector fields (`predicate`, `classChain`)
-silently ignored on Android is the canonical example — document it
-on the selector type, not on every caller.
+differences. Android gestures dispatch in physical pixels while Flutter
+lays out in logical pixels, so the caller-visible coordinate unit
+differs. Document it on the driver adapter rather than on every caller.
 
 Version-specific iOS quirks MAY name the version (e.g. `// iOS 15+
-exposes this via …`) because the quirk outlives the version — this
+exposes this via …`) because the quirk outlives the version. This
 is the version-exception at global §8.
 
 ---
@@ -70,4 +70,4 @@ not need to reason about:
   `ScrollController`, `MockDriver`, adapter class names) in a
   message that crosses the tool boundary.
 - Never name the bridge protocol (`JSON-RPC over stdio`, `HTTP on
-  :8765`) — consumers of the tool surface don't care.
+  :8765`) because consumers of the tool surface don't care.

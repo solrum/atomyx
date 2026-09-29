@@ -1,0 +1,5 @@
+{
+  "name": "lex-escape-double-quote-in-single-quoted",
+  "description": "an escaped double quote inside a single-quoted string.",
+  "expr": "'say \\\"hi\\\"'"
+}

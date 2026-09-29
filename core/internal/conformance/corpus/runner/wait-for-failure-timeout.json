@@ -1,0 +1,10 @@
+{
+  "name": "wait-for-failure-timeout",
+  "description": "waitFor with an explicit 0ms timeout on a missing selector fails with the not-found detail",
+  "yaml": "appId: com.test\nname: wait for failure\nenv: {}\n---\n- launchApp\n- waitFor:\n    text: Nonexistent\n    timeout: 0\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

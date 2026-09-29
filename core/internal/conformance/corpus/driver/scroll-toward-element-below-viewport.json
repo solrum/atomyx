@@ -1,0 +1,8 @@
+{
+  "name": "scroll-toward-element-below-viewport",
+  "description": "an element below the viewport center scrolls with content dragged bottom-to-top",
+  "function": "scrollTowardElement",
+  "bounds": { "left": 0, "top": 880, "right": 430, "bottom": 920 },
+  "screen": { "width": 430, "height": 932 },
+  "maxScrollFraction": 0.6
+}

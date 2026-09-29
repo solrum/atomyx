@@ -1,0 +1,11 @@
+{
+  "name": "numeric-nan-production-infinity-minus-infinity",
+  "description": "infinity minus infinity produces NaN.",
+  "expr": "inf - inf",
+  "variables": {
+    "inf": {
+      "type": "number",
+      "number": "Infinity"
+    }
+  }
+}

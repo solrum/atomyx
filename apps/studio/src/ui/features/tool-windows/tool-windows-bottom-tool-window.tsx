@@ -6,17 +6,17 @@ import { toolWindowRegistry } from "../../shell/tool-window-registry.js";
 
 export function BottomToolWindow() {
   const layout = useLayout();
-  const todosState = useTodos();
+  const { items: todoItems, refresh: refreshTodos, loading: todosLoading } = useTodos();
 
   const tabs = toolWindowRegistry.bySide("bottom");
   const active = tabs.find((d) => d.id === layout.bottomPane) ?? tabs[0];
   const activeBadge = active?.badge?.() ?? null;
 
   useEffect(() => {
-    if (layout.bottomPane === "todos" && todosState.items.length === 0) {
-      void todosState.refresh();
+    if (layout.bottomPane === "todos" && todoItems.length === 0) {
+      void refreshTodos();
     }
-  }, [layout.bottomPane, todosState.items.length, todosState.refresh]);
+  }, [layout.bottomPane, todoItems.length, refreshTodos]);
 
   const close = () => layout.setProblems(false);
 
@@ -49,10 +49,10 @@ export function BottomToolWindow() {
           <button
             type="button"
             aria-label="Refresh TODOs"
-            onClick={() => void todosState.refresh()}
+            onClick={() => void refreshTodos()}
             className="opacity-60 hover:opacity-100"
             style={{ color: "var(--fg-2)" }}
-            disabled={todosState.loading}
+            disabled={todosLoading}
           >
             <RotateCcw className="h-3 w-3" />
           </button>

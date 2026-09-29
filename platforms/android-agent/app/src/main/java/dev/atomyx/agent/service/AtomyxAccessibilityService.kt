@@ -4,13 +4,18 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Build
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityManager
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /**
@@ -20,7 +25,7 @@ import java.util.concurrent.TimeUnit
  *   3. Fire `onTreeMaybeChanged` hook so Atomyx's UiTreeService cache invalidates
  *
  * NO recording, NO touch interaction, NO coordinate streaming, NO upload.
- * Recording is out of scope for this agent — Atomyx is read-write
+ * Recording is out of scope for this agent, because Atomyx is read-write
  * exploration only.
  */
 class AtomyxAccessibilityService : AccessibilityService() {
@@ -29,7 +34,7 @@ class AtomyxAccessibilityService : AccessibilityService() {
     @Volatile private var latestForegroundActivity: String = ""
 
     /**
-     * Hook installed by AtomyxServices — invoked whenever any window
+     * Hook installed by AtomyxServices. Invoked whenever any window
      * state/content/visibility event fires, telling the UiTreeService
      * cache to mark itself dirty.
      */
@@ -42,6 +47,17 @@ class AtomyxAccessibilityService : AccessibilityService() {
         private const val MAX_SCREENSHOT_DIM = 540
         /** JPEG quality (0–100). 80 is a good trade-off: ~5–10× smaller than PNG. */
         private const val SCREENSHOT_QUALITY = 80
+
+        /**
+         * Runs `takeScreenshot`'s result callback and JPEG encode off
+         * the main thread, so a mid-gesture capture's encode never
+         * contends with the main-thread Looper that also delivers
+         * `AccessibilityService.dispatchGesture`'s completion
+         * callbacks.
+         */
+        private val screenshotExecutor: Executor = Executors.newSingleThreadExecutor { r ->
+            Thread(r, "atomyx-screenshot-encode").apply { isDaemon = true }
+        }
 
         @Volatile
         var instance: AtomyxAccessibilityService? = null
@@ -66,7 +82,7 @@ class AtomyxAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         instance = this
 
-        // AUGMENT — never REPLACE — the existing serviceInfo. Replacing it
+        // AUGMENT the existing serviceInfo. Never REPLACE it. Replacing it
         // with `AccessibilityServiceInfo()` clobbers values from accessibility_config.xml
         // (most notably canPerformGestures + canTakeScreenshot capabilities)
         // and causes service.windows to return empty until the service is re-bound.
@@ -101,7 +117,17 @@ class AtomyxAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
+        // The system uses this to pause event delivery temporarily, not to
+        // tear down the binding, so the instance stays published. /health's
+        // canReadScreen() probes the live service on every call regardless,
+        // so a service left unusable after an interrupt is still caught
+        // without needing a flag set here.
         Log.w(TAG, "Service interrupted")
+    }
+
+    override fun onUnbind(intent: Intent?): Boolean {
+        instance = null
+        return super.onUnbind(intent)
     }
 
     override fun onDestroy() {
@@ -110,7 +136,36 @@ class AtomyxAccessibilityService : AccessibilityService() {
     }
 
     /**
-     * Capture screenshot of the current screen as PNG bytes.
+     * Proves the service can currently produce a screen, not merely that its
+     * binder connection exists. The system can leave a service instance
+     * published while the underlying binding has gone bad without ever
+     * calling onUnbind or onDestroy, so /health must check this live rather
+     * than trust the published instance alone.
+     */
+    fun canReadScreen(): Boolean = try {
+        !windows.isNullOrEmpty()
+    } catch (e: Exception) {
+        Log.w(TAG, "canReadScreen error", e)
+        false
+    }
+
+    /**
+     * Confirms this component is still in the platform's own list of
+     * running accessibility services, catching a dropped binding that
+     * left the published instance in place.
+     */
+    fun isRegisteredWithSystem(): Boolean = try {
+        val manager = getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+        val expected = ComponentName(this, AtomyxAccessibilityService::class.java)
+        manager.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+            .any { ComponentName.unflattenFromString(it.id) == expected }
+    } catch (e: Exception) {
+        Log.w(TAG, "isRegisteredWithSystem error", e)
+        false
+    }
+
+    /**
+     * Capture screenshot of the current screen as JPEG bytes.
      * Requires API 30+ (AccessibilityService.takeScreenshot) and
      * canTakeScreenshot=true in accessibility config.
      */
@@ -124,7 +179,7 @@ class AtomyxAccessibilityService : AccessibilityService() {
         try {
             takeScreenshot(
                 android.view.Display.DEFAULT_DISPLAY,
-                mainExecutor,
+                screenshotExecutor,
                 object : TakeScreenshotCallback {
                     override fun onSuccess(screenshot: ScreenshotResult) {
                         try {

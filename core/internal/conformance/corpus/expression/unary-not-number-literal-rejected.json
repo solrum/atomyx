@@ -1,0 +1,5 @@
+{
+  "name": "unary-not-number-literal-rejected",
+  "description": "logical not rejects a number literal.",
+  "expr": "not 5"
+}

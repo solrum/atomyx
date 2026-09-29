@@ -1,0 +1,5 @@
+{
+  "name": "lexerr-bare-trailing-dot",
+  "description": "a number literal followed immediately by a stray trailing dot.",
+  "expr": "5."
+}

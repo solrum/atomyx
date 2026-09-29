@@ -1,0 +1,8 @@
+{
+  "name": "clamp-within-range",
+  "description": "a value already inside [min, max] passes through unchanged",
+  "function": "clamp",
+  "value": 75,
+  "min": 40,
+  "max": 100
+}

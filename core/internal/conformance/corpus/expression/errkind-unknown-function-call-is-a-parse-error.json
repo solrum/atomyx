@@ -1,0 +1,5 @@
+{
+  "name": "errkind-unknown-function-call-is-a-parse-error",
+  "description": "calling an unknown function name is a parse-time error.",
+  "expr": "foo(1)"
+}

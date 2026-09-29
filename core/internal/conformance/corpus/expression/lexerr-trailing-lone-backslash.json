@@ -1,0 +1,5 @@
+{
+  "name": "lexerr-trailing-lone-backslash",
+  "description": "a string ending in a backslash with nothing left to escape.",
+  "expr": "\"abc\\"
+}

@@ -1,0 +1,10 @@
+{
+  "name": "handle-timeout-otherwise-skip",
+  "description": "handle succeeds and skips when no branch matches within the default timeout and otherwise is skip",
+  "yaml": "appId: com.test\nname: handle timeout skip\nenv: {}\n---\n- handle:\n    - when:\n        visible: Nonexistent\n      do:\n        - back\n    - otherwise: skip\n- screenshot: after\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

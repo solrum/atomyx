@@ -1,0 +1,6 @@
+{
+  "name": "env-select-equals-syntax",
+  "description": "An --env value containing '=' is rejected as the retired KEY=VALUE injection syntax.",
+  "yaml": "project: Demo\napps:\n  - id: main\n    platform: android\n    appId: com.example.app\nenvironments:\n  staging:\n    app: main\n",
+  "envName": "FOO=bar"
+}

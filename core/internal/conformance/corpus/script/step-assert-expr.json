@@ -1,0 +1,5 @@
+{
+  "name": "step-assert-expr",
+  "description": "assertExpr carries its expression as an opaque string; this stage validates shape only, not the expression's semantics.",
+  "yaml": "- launchApp\n- assertExpr: { expr: \"qty == 5\" }\n- assertExpr: { expr: \"number(qtyAfter) == number(qtyBefore) + 5\" }\n"
+}

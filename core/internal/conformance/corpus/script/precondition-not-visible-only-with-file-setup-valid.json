@@ -1,0 +1,5 @@
+{
+  "name": "precondition-not-visible-only-with-file-setup-valid",
+  "description": "precondition with only `notVisible` set is valid, using a flow-fragment file path as setup.",
+  "yaml": "appId: com.example.app\nname: Smoke with precondition\nenv: {}\npreconditions:\n  - check: { notVisible: \"Onboarding\" }\n    setup: flows/dismiss-onboarding.yml\n---\n- launchApp\n"
+}

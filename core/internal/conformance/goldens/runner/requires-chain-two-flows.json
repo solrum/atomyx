@@ -1,0 +1,184 @@
+{
+  "calls": [],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "screenshot",
+      "depth": 1,
+      "detail": null,
+      "durationMs": null,
+      "line": null,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "screenshot: \"from-a\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "screenshot"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"from-a\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "screenshot",
+      "depth": 1,
+      "detail": "Screenshot saved as \"from-a\"",
+      "durationMs": 0,
+      "line": null,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "screenshot: \"from-a\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "screenshot"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"from-a\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "screenshot",
+      "depth": 1,
+      "detail": null,
+      "durationMs": null,
+      "line": null,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "screenshot: \"from-b\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "screenshot"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"from-b\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "screenshot",
+      "depth": 1,
+      "detail": "Screenshot saved as \"from-b\"",
+      "durationMs": 0,
+      "line": null,
+      "ok": true,
+      "stepIndex": 1,
+      "summary": "screenshot: \"from-b\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "screenshot"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"from-b\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "screenshot",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 8,
+      "ok": null,
+      "stepIndex": 2,
+      "summary": "screenshot: \"main\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "screenshot"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"main\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "screenshot",
+      "depth": 0,
+      "detail": "Screenshot saved as \"main\"",
+      "durationMs": 0,
+      "line": 8,
+      "ok": true,
+      "stepIndex": 2,
+      "summary": "screenshot: \"main\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "screenshot"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"main\""
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 1,
+  "screenshots": [
+    {
+      "dataLength": 0,
+      "label": "from-a"
+    },
+    {
+      "dataLength": 0,
+      "label": "from-b"
+    },
+    {
+      "dataLength": 0,
+      "label": "main"
+    }
+  ],
+  "scriptName": "requires chain",
+  "steps": [
+    {
+      "command": "screenshot",
+      "detail": "Screenshot saved as \"main\"",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    }
+  ],
+  "totalSteps": 1
+}

@@ -1,0 +1,4 @@
+# Schema files staged from the Go core (go/internal/script,
+# go/internal/config) by `npm run generate:schema`. The Go core is
+# the source of truth; these copies are a build artifact.
+src/domain/features/scripts/generated/

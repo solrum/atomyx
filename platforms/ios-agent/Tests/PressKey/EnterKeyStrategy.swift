@@ -2,7 +2,7 @@ import Foundation
 import XCTest
 
 /// `enter` = type a newline into whatever is focused. If no field is
-/// focused, `typeText` is a silent no-op on iOS — we still report
+/// focused, `typeText` is a silent no-op on iOS, but we still report
 /// `affordanceFound=true` because that matches the documented semantics
 /// shared with Android (`enter` = best-effort submit) and agents
 /// observe the outcome via state inspection after the call.

@@ -4,7 +4,7 @@ import Foundation
 /// the MCP channel. Returns the base64-encoded JPEG bytes in
 /// `data.base64` along with the format marker.
 ///
-/// Does NOT require a tracked app — `XCUIScreen.main.screenshot()` is
+/// Does NOT require a tracked app, because `XCUIScreen.main.screenshot()` is
 /// system-wide. Useful for debugging transitions where `dumpTree`
 /// comes back empty.
 final class ScreenshotCommand: CommandHandler {

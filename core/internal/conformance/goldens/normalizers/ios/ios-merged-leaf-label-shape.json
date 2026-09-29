@@ -1,0 +1,138 @@
+{
+  "attributes": {
+    "class": "scrollView",
+    "id": "label-root",
+    "role": "container"
+  },
+  "children": [
+    {
+      "attributes": {
+        "class": "image",
+        "id": "l01",
+        "label": "abcdefghijabcdefghijabcdefghijabcdefghij",
+        "role": "image"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "image",
+        "id": "l02",
+        "label": "abcdefghijabcdefghijabcdefghijabcdefghijk",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "image",
+        "id": "l03",
+        "label": "Save\nDraft",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "image",
+        "id": "l04",
+        "label": "Save",
+        "role": "image"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "image",
+        "id": "l05",
+        "role": "image"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "image",
+        "id": "l06",
+        "label": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+        "role": "image"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "image",
+        "id": "l07",
+        "label": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "staticText",
+        "id": "l08",
+        "label": "Icon\nTitle\nSubtitle\nRow",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "staticText",
+        "id": "l09",
+        "role": "text",
+        "text": "Icon\nTitle\nSubtitle"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "staticText",
+        "id": "l10",
+        "label": "abcdefghijabcdefghijabcdefghi\nabcdefghijabcdefghijabcdefghi\nabcdefghijabcdefghijabcdefghi\nabcdefghijabcdefghijabcdefghi",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "staticText",
+        "id": "l11",
+        "role": "text",
+        "text": "abcdefghijabcdefghijabcdefghij\nabcdefghijabcdefghijabcdefghi\nabcdefghijabcdefghijabcdefghi\nabcdefghijabcdefghijabcdefghi"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "staticText",
+        "id": "l12",
+        "role": "text"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "other",
+        "id": "l13",
+        "label": "Long label on a non-text non-image element type that exceeds forty characters",
+        "role": "other"
+      },
+      "children": [],
+      "clickable": false
+    }
+  ],
+  "clickable": false
+}

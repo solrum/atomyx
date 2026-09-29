@@ -1,0 +1,11 @@
+{
+  "booleanValue": false,
+  "errorKind": "eval",
+  "kind": "error",
+  "message": "modulo by zero at position 4",
+  "numberBits": "",
+  "numberText": "",
+  "position": 4,
+  "stringValue": "",
+  "valueType": ""
+}

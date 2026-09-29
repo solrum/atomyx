@@ -1,0 +1,5 @@
+{
+  "name": "env-select-omitted-multiple-envs",
+  "description": "Omitting --env with several declared environments applies none, falling back to CLI flags.",
+  "yaml": "project: Demo\napps:\n  - id: main\n    platform: android\n    appId: com.example.app\n  - id: alt\n    platform: ios\n    appId: com.example.alt\nenvironments:\n  staging:\n    app: main\n  prod:\n    app: alt\n"
+}

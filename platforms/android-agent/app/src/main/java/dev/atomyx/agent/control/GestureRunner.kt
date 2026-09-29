@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.graphics.Path
 import android.os.Build
+import dev.atomyx.agent.service.AtomyxAccessibilityService
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -23,11 +24,20 @@ import java.util.concurrent.atomic.AtomicReference
  *     `dispatchGesture` calls. Hold segments (adjacent same-
  *     coordinate waypoints) emit a minimal stroke then sleep the
  *     remainder at Kotlin level so no events flow while the
- *     pointer stays stationary — the only shape of input that
+ *     pointer stays stationary, the only shape of input that
  *     satisfies Flutter's long-press-first drag recognisers.
  *   - Multi-pointer paths (pinch, rotate, two-finger swipe) run
- *     through a single `GestureDescription` so concurrent timing
- *     stays honoured across pointers.
+ *     through [dispatchMultiPointer]: the same one-`GestureDescription`-
+ *     per-time-segment chaining as the single-pointer path, except
+ *     each segment holds one continued stroke per pointer still
+ *     active in it. Packing every pointer's sub-strokes into one
+ *     `GestureDescription` instead (as a single stroke-count-capped
+ *     description covering the whole gesture) loses angular fidelity
+ *     across the packed sub-stroke boundaries, which is why a rotate
+ *     built that way reads as no rotation at all; segmenting by time
+ *     keeps the sweep intact and keeps every description's stroke
+ *     count at the pointer count, well under the platform cap on
+ *     every supported API level.
  *
  * Threading contract:
  *
@@ -41,6 +51,12 @@ import java.util.concurrent.atomic.AtomicReference
 class GestureRunner(
     private val service: AccessibilityService,
     private val capabilities: GestureCapabilities = GestureCapabilities.DEFAULT,
+    // Defaults to the real accessibility screenshot surface; a test
+    // substitutes a fake here to exercise capture scheduling without
+    // an AccessibilityService.
+    private val screenshotCapture: () -> ByteArray? = {
+        (service as? AtomyxAccessibilityService)?.takeScreenshotJpeg()
+    },
 ) {
 
     /**
@@ -68,7 +84,7 @@ class GestureRunner(
              *
              *   - `canPressure`: the `AccessibilityService` gesture
              *     surface exposes no per-touch pressure API on any
-             *     current Android level — permanent `false`. The
+             *     current Android level, so it is a permanent `false`. The
              *     one place to flip if the platform ever adds a
              *     pressure-carrying stroke constructor.
              */
@@ -100,15 +116,27 @@ class GestureRunner(
     }
 
     /**
+     * Outcome of [dispatch]: the gesture's own completion result plus
+     * every screenshot taken at a `capture` waypoint, in the order
+     * those waypoints appeared across the dispatched pointers.
+     * [capturedImages] is empty when the gesture carried no `capture`
+     * waypoint.
+     */
+    data class DispatchOutcome(
+        val result: DispatchResult,
+        val capturedImages: List<ByteArray> = emptyList(),
+    )
+
+    /**
      * Validate + dispatch. Single-pointer gestures run through
-     * the multi-phase dispatcher — each waypoint segment becomes
+     * the multi-phase dispatcher, where each waypoint segment becomes
      * its own `GestureDescription` with `willContinue=true`
      * chaining, which keeps the pointer DOWN between dispatch
      * calls per the `AccessibilityService` contract. This lets
      * a "hold" segment be expressed as silent Kotlin-level sleep
      * between dispatches (no `ACTION_MOVE` events emitted),
      * which is the only way to satisfy Flutter's
-     * `DelayedMultiDragGestureRecognizer` — it rejects the
+     * `DelayedMultiDragGestureRecognizer`, because it rejects the
      * gesture if ANY move event arrives before its long-press
      * timer fires, regardless of delta magnitude. A single
      * `GestureDescription` with a zero-length hold stroke emits
@@ -117,20 +145,81 @@ class GestureRunner(
      * active window), which arms `onLongPress` but not
      * `onReorder`.
      *
-     * Multi-pointer gestures use the single-dispatch path —
-     * each pointer's segments stay in the same
-     * `GestureDescription` so concurrent timing is honoured.
+     * Multi-pointer gestures dispatch through [dispatchMultiPointer],
+     * which chains one `GestureDescription` per time segment across
+     * every still-active pointer, the same lockstep-across-dispatch
+     * shape [dispatchMultiPhase] uses for a single pointer.
      * Reorder-style multi-pointer is not a real use case; the
      * multi-phase hold-then-drag is single-pointer by shape.
+     *
+     * A `capture` waypoint carries no motion or stroke of its own; it
+     * marks a point in time, strictly between a pointer's opening
+     * `down` and closing `up`, where a screenshot is taken while the
+     * touch is still held. Every `capture` waypoint across all
+     * pointers is stripped before the waypoints below reach the
+     * stroke builders, and a background thread per waypoint sleeps
+     * until its own `atOffsetSeconds` elapses (measured from the top
+     * of this call, the same clock the stroke dispatch below advances
+     * against) before taking the screenshot. This runs concurrently
+     * with the gesture dispatch rather than pausing it: Android's
+     * continued-stroke gesture has no time-based continuation
+     * timeout (the system holds the touch open until the next
+     * `continueStroke` dispatch arrives, cancelling only when a real
+     * `MotionEvent` interrupts it), and a screenshot injects no
+     * `MotionEvent`, so it cannot cancel the held touch.
      */
-    fun dispatch(pointers: List<PointerPath>): DispatchResult {
+    fun dispatch(pointers: List<PointerPath>): DispatchOutcome {
         val validation = validate(pointers)
-        if (validation != null) return DispatchResult.Rejected(validation)
+        if (validation != null) return DispatchOutcome(DispatchResult.Rejected(validation))
 
-        if (pointers.size == 1) {
-            return dispatchMultiPhase(pointers[0])
+        val captureOffsetsSeconds = captureOffsets(pointers)
+        val captured = arrayOfNulls<ByteArray>(captureOffsetsSeconds.size)
+        val captureLatch = scheduleCaptures(captureOffsetsSeconds, captured)
+
+        val strippedPointers = pointers.map { ptr ->
+            ptr.copy(waypoints = ptr.waypoints.filter { it.phase != PHASE_CAPTURE })
         }
-        return dispatchSingleGesture(buildGesture(pointers))
+        val result = if (strippedPointers.size == 1) {
+            dispatchMultiPhase(strippedPointers[0])
+        } else {
+            dispatchMultiPointer(strippedPointers)
+        }
+
+        captureLatch?.await(CAPTURE_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        return DispatchOutcome(result, captured.map { it ?: ByteArray(0) })
+    }
+
+    /**
+     * Fires one daemon thread per capture offset, each sleeping until
+     * its own offset elapses before invoking [screenshotCapture] and
+     * recording the result at its index in [results]. Returns a latch
+     * that reaches zero once every thread has recorded a result (or
+     * null when there are no offsets to schedule), so [dispatch] can
+     * bound how long it waits for outstanding captures once the
+     * gesture itself has finished.
+     */
+    private fun scheduleCaptures(
+        offsetsSeconds: List<Double>,
+        results: Array<ByteArray?>,
+    ): CountDownLatch? {
+        if (offsetsSeconds.isEmpty()) return null
+        val latch = CountDownLatch(offsetsSeconds.size)
+        for ((index, offsetSeconds) in offsetsSeconds.withIndex()) {
+            val delayMs = (offsetSeconds * 1000.0).toLong().coerceAtLeast(0L)
+            Thread({
+                try {
+                    if (delayMs > 0) Thread.sleep(delayMs)
+                    results[index] = screenshotCapture()
+                } catch (_: InterruptedException) {
+                    // Leave results[index] null; dispatch() maps a
+                    // missing capture to an empty byte array rather
+                    // than blocking indefinitely.
+                } finally {
+                    latch.countDown()
+                }
+            }, "atomyx-gesture-capture-$index").apply { isDaemon = true }.start()
+        }
+        return latch
     }
 
     private fun dispatchSingleGesture(gesture: GestureDescription): DispatchResult {
@@ -149,14 +238,14 @@ class GestureRunner(
             }
         }
 
-        // `handler = null` → callback delivered on the service's
+        // `handler = null` means the callback is delivered on the service's
         // main thread. Safe because our caller is on a NanoHTTPD
-        // worker thread, never main; see the threading note in
+        // worker thread, never main. See the threading note in
         // the class doc.
         val accepted = service.dispatchGesture(gesture, callback, null)
         if (!accepted) {
             return DispatchResult.Rejected(
-                "service.dispatchGesture returned false — accessibility " +
+                "service.dispatchGesture returned false: accessibility " +
                     "service disconnected or gesture rejected before queueing",
             )
         }
@@ -174,7 +263,7 @@ class GestureRunner(
      *   - Hold segment (same-coordinate waypoints): emit a
      *     minimal `MIN_PRESS_MS` stroke then `Thread.sleep` the
      *     remainder. No events flow during the sleep because the
-     *     gesture has completed — but the pointer stays DOWN
+     *     gesture has completed, but the pointer stays DOWN
      *     because `willContinue=true` was set on the stroke.
      *   - Move segment (distinct coordinates): emit a full-
      *     duration stroke so the platform interpolates
@@ -264,87 +353,102 @@ class GestureRunner(
     private fun validate(pointers: List<PointerPath>): String? =
         validatePointers(pointers, capabilities)
 
-    private fun buildGesture(pointers: List<PointerPath>): GestureDescription {
-        val builder = GestureDescription.Builder()
-        for (ptr in pointers) {
-            for (stroke in buildStrokes(ptr)) {
-                builder.addStroke(stroke)
-            }
-        }
-        return builder.build()
-    }
-
     /**
-     * Build a chain of `StrokeDescription`s from one pointer's
-     * waypoints — ONE stroke per adjacent waypoint pair — linked
-     * via `continueStroke(willContinue = true)` so the platform
-     * preserves author-specified per-segment timing.
+     * Dispatch two or more pointers as a chain of `GestureDescription`s,
+     * one per time segment, each holding one continued
+     * `StrokeDescription` per pointer still active in that segment.
+     * This is [dispatchMultiPhase]'s lockstep-across-dispatch template
+     * generalized from one pointer to N: every pointer's stroke for a
+     * given segment rides in the same dispatch, so concurrent pointers
+     * stay in lockstep, and no single description ever holds more than
+     * `pointers.size` strokes.
      *
-     * Why this is not a single stroke with a composite Path:
-     *
-     *   `AccessibilityService.dispatchGesture` interpolates along
-     *   a single stroke's Path uniformly over `duration`. Author
-     *   `atOffsetSeconds` values between intermediate waypoints
-     *   are lost — a pointer that should hold for 1500ms and then
-     *   drag for 800ms becomes a uniform slide over 2300ms. Flutter
-     *   `DelayedMultiDragGestureRecognizer` (used by
-     *   `ReorderableListView`) requires the pointer to stay
-     *   stationary for `kLongPressTimeout` (500ms) before arming;
-     *   a uniform slide never satisfies that. The recognizer
-     *   never engages and the reorder silently fails.
-     *
-     * One stroke per segment lets Android honour each segment's
-     * duration distinctly — a stationary segment stays stationary
-     * for its full duration, a moving segment moves for its full
-     * duration. Chained via `continueStroke(willContinue=true)`,
-     * Android treats the sequence as one continuous touch from
-     * the pointer's perspective — gesture recognisers see
-     * `ACTION_DOWN` once, a stream of `ACTION_MOVE`, then one
-     * `ACTION_UP`.
-     *
-     * `MIN_PRESS_MS` floor is applied per-segment so a zero-gap
-     * between adjacent waypoints (e.g. `[down(0), up(0)]`) still
-     * produces a stroke with `duration > 0` — satisfies
-     * `StrokeDescription`'s precondition without altering author
-     * intent for longer segments.
+     * [planMultiPointerSegments] carries a continued stroke's start
+     * point forward as the previous stroke's end point for the same
+     * pointer; the platform requires that equality to accept the
+     * continuation, so this method only has to thread the previous
+     * [GestureDescription.StrokeDescription] per pointer index across
+     * segments, exactly as [dispatchMultiPhase] threads its single one.
      */
-    private fun buildStrokes(ptr: PointerPath): List<GestureDescription.StrokeDescription> {
-        val strokes = mutableListOf<GestureDescription.StrokeDescription>()
-        var prev = ptr.waypoints.first()
-        var prevStartMs = (prev.atOffsetSeconds * 1000.0).toLong().coerceAtLeast(0L)
+    private fun dispatchMultiPointer(pointers: List<PointerPath>): DispatchResult {
+        val prevStrokes = arrayOfNulls<GestureDescription.StrokeDescription>(pointers.size)
 
-        for (i in 1 until ptr.waypoints.size) {
-            val cur = ptr.waypoints[i]
-            val curOffsetMs = (cur.atOffsetSeconds * 1000.0).toLong()
-            val segDurationMs = (curOffsetMs - prevStartMs).coerceAtLeast(MIN_PRESS_MS)
-            val isLast = i == ptr.waypoints.size - 1
+        for (segment in planMultiPointerSegments(pointers)) {
+            if (segment.pointerSegments.isEmpty()) continue
 
-            val path = Path().apply {
-                moveTo(prev.x, prev.y)
-                lineTo(cur.x, cur.y)
+            val builder = GestureDescription.Builder()
+            for (seg in segment.pointerSegments) {
+                val path = Path().apply {
+                    moveTo(seg.fromX, seg.fromY)
+                    lineTo(seg.toX, seg.toY)
+                }
+                val prevStroke = prevStrokes[seg.pointerIndex]
+                val stroke = if (prevStroke == null) {
+                    GestureDescription.StrokeDescription(
+                        path, 0L, seg.strokeDurationMs, seg.willContinue,
+                    )
+                } else {
+                    prevStroke.continueStroke(
+                        path, 0L, seg.strokeDurationMs, seg.willContinue,
+                    )
+                }
+                builder.addStroke(stroke)
+                prevStrokes[seg.pointerIndex] = stroke
             }
 
-            val stroke = if (strokes.isEmpty()) {
-                GestureDescription.StrokeDescription(
-                    path, prevStartMs, segDurationMs, !isLast,
-                )
-            } else {
-                strokes.last().continueStroke(
-                    path, prevStartMs, segDurationMs, !isLast,
-                )
-            }
-            strokes.add(stroke)
+            val phaseResult = dispatchSingleGesture(builder.build())
+            if (phaseResult !is DispatchResult.Completed) return phaseResult
 
-            prev = cur
-            prevStartMs += segDurationMs
+            if (segment.postSleepMs > 0) {
+                try {
+                    Thread.sleep(segment.postSleepMs)
+                } catch (_: InterruptedException) {
+                    return DispatchResult.Cancelled
+                }
+            }
         }
-        return strokes
+        return DispatchResult.Completed
     }
 
     companion object {
         /**
+         * Waypoint phase marking a point strictly between a pointer's
+         * opening `down` and closing `up` where a screenshot is taken
+         * while the touch is still held. Carries no motion of its
+         * own; see the `dispatch` doc for how it is scheduled.
+         */
+        const val PHASE_CAPTURE = "capture"
+
+        /**
+         * Bounds how long [dispatch] waits for outstanding capture
+         * threads after the gesture dispatch itself has finished.
+         * Each capture is scheduled to fire well inside the gesture's
+         * own hold, so this bound only guards against a
+         * pathologically slow screenshot call.
+         */
+        const val CAPTURE_TIMEOUT_MS = 10_000L
+
+        /**
+         * Collects every `capture` waypoint's `atOffsetSeconds`,
+         * walking pointers and their waypoints in dispatch order so
+         * the result lines up with the order [dispatch]'s caller
+         * expects captured images back in. Extracted as a pure
+         * function, like [validatePointers], so unit tests can pin
+         * the ordering without an `AccessibilityService`.
+         */
+        fun captureOffsets(pointers: List<PointerPath>): List<Double> {
+            val offsets = mutableListOf<Double>()
+            for (ptr in pointers) {
+                for (w in ptr.waypoints) {
+                    if (w.phase == PHASE_CAPTURE) offsets.add(w.atOffsetSeconds)
+                }
+            }
+            return offsets
+        }
+
+        /**
          * Minimum stroke duration in ms. Floor applied when the
-         * author supplies a zero-duration segment — satisfies
+         * author supplies a zero-duration segment, satisfying
          * `StrokeDescription`'s `duration > 0` precondition while
          * keeping the 50ms value small enough that a tap registers
          * as a tap rather than a long-press.
@@ -410,6 +514,111 @@ class GestureRunner(
                 }
             }
             return null
+        }
+
+        /**
+         * One pointer's contribution to one time segment: the
+         * straight-line path endpoints, the stroke duration to issue
+         * for it, and whether that pointer's touch stays down once
+         * this segment's `GestureDescription` completes.
+         */
+        data class PointerSegment(
+            val pointerIndex: Int,
+            val fromX: Float,
+            val fromY: Float,
+            val toX: Float,
+            val toY: Float,
+            val strokeDurationMs: Long,
+            val willContinue: Boolean,
+        )
+
+        /**
+         * One `dispatchGesture` call's worth of work: every pointer's
+         * stroke for this time segment, plus the Kotlin-level sleep to
+         * add once the segment's `GestureDescription` completes so the
+         * segment's real-world duration matches whichever pointer
+         * authored the longest duration for it. The sleep is only
+         * nonzero when every pointer active in the segment issued a
+         * shorter stroke than its authored duration (the hold-segment
+         * case); when even one pointer's stroke runs the full authored
+         * duration, `dispatchGesture` already blocks that long waiting
+         * for it to finish.
+         */
+        data class DispatchSegment(
+            val pointerSegments: List<PointerSegment>,
+            val postSleepMs: Long,
+        )
+
+        /**
+         * Pure planner: turns N pointers' waypoint lists into an
+         * ordered list of [DispatchSegment]s, one per `dispatchGesture`
+         * call, generalizing [dispatchMultiPhase]'s one-pointer
+         * chaining to N pointers. For `pointers.size == 1` this
+         * produces the identical stroke durations, continuation flags,
+         * and sleep as the single-pointer path, segment for segment.
+         * Extracted as a pure function, like [validatePointers], so
+         * unit tests can pin segment counts, durations, and
+         * continuation flags without an `AccessibilityService`.
+         *
+         * A pointer whose waypoint list is shorter than another's
+         * finishes (its last segment carries `willContinue=false`) at
+         * its own final segment and is simply absent from every
+         * segment after that; the platform has already released that
+         * touch, so there is nothing left to continue.
+         */
+        fun planMultiPointerSegments(pointers: List<PointerPath>): List<DispatchSegment> {
+            val segmentCount = pointers.maxOf { it.waypoints.size - 1 }
+            val segments = mutableListOf<DispatchSegment>()
+
+            for (segmentIndex in 1..segmentCount) {
+                val pointerSegments = mutableListOf<PointerSegment>()
+                var intendedDurationMs = 0L
+                var issuedDurationMs = 0L
+
+                for ((pointerIndex, ptr) in pointers.withIndex()) {
+                    val waypoints = ptr.waypoints
+                    if (segmentIndex >= waypoints.size) continue
+
+                    val prev = waypoints[segmentIndex - 1]
+                    val cur = waypoints[segmentIndex]
+                    val prevOffsetMs = (prev.atOffsetSeconds * 1000.0).toLong().coerceAtLeast(0L)
+                    val curOffsetMs = (cur.atOffsetSeconds * 1000.0).toLong()
+                        .coerceAtLeast(prevOffsetMs)
+                    val segAuthorDurationMs = curOffsetMs - prevOffsetMs
+                    val isLastForPointer = segmentIndex == waypoints.size - 1
+                    val isZeroLength = prev.x == cur.x && prev.y == cur.y
+
+                    // Hold segments cap the issued stroke at MIN_PRESS_MS so the
+                    // platform does not spam same-coordinate ACTION_MOVE events for
+                    // the segment's full authored duration; the remainder is made up
+                    // by postSleepMs below (or, when another pointer's stroke in this
+                    // same segment runs longer, by dispatchGesture's own blocking
+                    // wait for that pointer to finish).
+                    val strokeDurationMs = if (isZeroLength) {
+                        MIN_PRESS_MS
+                    } else {
+                        segAuthorDurationMs.coerceAtLeast(MIN_PRESS_MS)
+                    }
+
+                    pointerSegments.add(
+                        PointerSegment(
+                            pointerIndex,
+                            prev.x, prev.y, cur.x, cur.y,
+                            strokeDurationMs, !isLastForPointer,
+                        ),
+                    )
+                    intendedDurationMs = maxOf(intendedDurationMs, segAuthorDurationMs)
+                    issuedDurationMs = maxOf(issuedDurationMs, strokeDurationMs)
+                }
+
+                segments.add(
+                    DispatchSegment(
+                        pointerSegments,
+                        (intendedDurationMs - issuedDurationMs).coerceAtLeast(0L),
+                    ),
+                )
+            }
+            return segments
         }
     }
 }

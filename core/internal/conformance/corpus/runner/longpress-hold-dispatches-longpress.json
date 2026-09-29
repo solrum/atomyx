@@ -1,0 +1,10 @@
+{
+  "name": "longpress-hold-dispatches-longpress",
+  "description": "a longPress with no thenSwipeTo dispatches through the LongPress coordinate primitive, holding for holdMs.",
+  "yaml": "appId: com.test\nname: longpress hold\nenv: {}\n---\n- launchApp\n- longPress:\n    at: { x: 30, y: 40 }\n    holdMs: 650\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

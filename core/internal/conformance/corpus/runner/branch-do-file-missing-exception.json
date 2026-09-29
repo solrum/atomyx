@@ -1,0 +1,22 @@
+{
+  "name": "branch-do-file-missing-exception",
+  "description": "branch's matching case names a do file that does not exist, reporting the read failure as an \"Exception: \" detail rather than a caller-crafted \"not found\" message, since the do-block resolution has no try/catch of its own on either side",
+  "yaml": "appId: com.test\nname: branch missing do file\nproxy: optional\n---\n- launchApp\n- capture: \"POST /login as: loginRsp\"\n- branch:\n    from: loginRsp\n    on:\n      - match:\n          status: 200\n        do: \"{{DIR}}/missing-branch-do.yml\"\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  },
+  "network": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/login",
+        "status": 200,
+        "headers": {},
+        "body": {},
+        "timestampMs": 0
+      }
+    ]
+  }
+}

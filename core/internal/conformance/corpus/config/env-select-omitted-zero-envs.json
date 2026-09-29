@@ -1,0 +1,5 @@
+{
+  "name": "env-select-omitted-zero-envs",
+  "description": "A config declaring zero environments applies none when --env is omitted.",
+  "yaml": "project: Demo\napps:\n  - id: main\n    platform: android\n    appId: com.example.app\nenvironments: {}\n"
+}

@@ -1,0 +1,11 @@
+{
+  "name": "numeric-nan-not-equal-with-itself",
+  "description": "NaN is always unequal to itself under !=.",
+  "expr": "nanVar != nanVar",
+  "variables": {
+    "nanVar": {
+      "type": "number",
+      "number": "NaN"
+    }
+  }
+}

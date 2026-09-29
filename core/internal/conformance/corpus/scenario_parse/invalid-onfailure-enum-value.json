@@ -1,0 +1,6 @@
+{
+  "name": "invalid-onfailure-enum-value",
+  "description": "an onFailure value outside stop/continue must be REJECTED with zod's exact invalid-enum-value issue message.",
+  "yaml": "name: Checkout regression\nscripts:\n  - flows/login.yml\nonFailure: retry\n",
+  "expectErrorText": true
+}

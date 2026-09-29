@@ -1,0 +1,5 @@
+{
+  "name": "fixture-flow-fragment-setup-fresh-user",
+  "description": "Real example flow fragment (steps only, no config document): launchApp, type/into, capture, assertApi, extract.",
+  "yaml": "# Sub-flow: provision a fresh test account before the main flow.\n# Loaded via `requires:` or `runFlow:` from a parent script. Runs\n# in the parent's context so any captures + extracted variables\n# survive the sub-flow boundary.\n- launchApp\n- waitFor: \"Sign up\"\n- tap: \"Sign up\"\n\n- type:\n    into:\n      id: signup_email\n    text: ${email}\n- type:\n    into:\n      id: signup_password\n    text: ${password}\n\n- capture: \"POST /api/v1/auth/signup as: signupRsp\"\n- tap: \"Create account\"\n\n- assertApi:\n    from: signupRsp\n    status: 201\n    body:\n      \"$.user.email\": ${email}\n\n- extract:\n    from: signupRsp\n    values:\n      newUserId: $.user.id\n\n- waitFor: \"Welcome\"\n- screenshot: account-created\n"
+}

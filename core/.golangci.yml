@@ -1,0 +1,107 @@
+# Lint gate for the Go module (module dev.atomyx, Go 1.25).
+#
+# The module is lint-clean. CI runs golangci-lint over the whole tree and
+# fails on any issue, so there is no grandfathered baseline and no nolint
+# list to rot. A finding means the change that introduced it is fixed
+# before merge. A handful of intentional exceptions carry an inline
+# nolint with a stated reason at their site.
+#
+# Linter selection guards six patterns found during review:
+#   - errcheck, govet:      silent error/panic swallowing
+#   - noctx, contextcheck:  missing timeouts, missing context propagation
+#   - errorlint:            errors not wrapped, not checked with errors.Is/As
+#   - bodyclose:            HTTP response bodies left open
+#   - revive (exported):    exported symbols missing doc comments
+#   - staticcheck, unused, ineffassign, misspell, nakedret, gocritic:
+#                           general correctness and clarity baseline
+#
+# The seventh pattern (comments anchoring behavior to the TypeScript
+# implementation) is not a lint rule, because no golangci-lint linter greps
+# comment text against a phrase list. It is enforced separately by
+# scripts/check-comments.sh, run as its own CI step.
+version: "2"
+
+run:
+  timeout: 5m
+
+issues:
+  # Report every finding. golangci-lint otherwise caps output at 50 per
+  # linter and 3 per identical message, which hid real issues behind the
+  # cap when the baseline was first measured. Zero caps keep the count
+  # honest so the tree cannot drift while the gate still shows a small
+  # number.
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - misspell
+    - bodyclose
+    - noctx
+    - contextcheck
+    - errorlint
+    - revive
+    - nakedret
+    - gocritic
+  # govet's shadow analyzer is intentionally left off (it is not in
+  # govet's default set). Every shadow hit surveyed across this tree was
+  # an inner `err := ...` reused within its own if or switch scope and
+  # handled immediately, the standard idiomatic pattern for repeated
+  # error checks, not a case where a stale outer value leaks past its
+  # shadow. Flagging that pattern tree-wide produced noise, not signal.
+  settings:
+    revive:
+      rules:
+        # Flags exported identifiers (functions, types, constants,
+        # package-level vars) that have no doc comment, and doc comments
+        # that do not start with the identifier name.
+        - name: exported
+          severity: warning
+          disabled: false
+    nakedret:
+      # A naked return is tolerated only in very short functions, where
+      # the reader can still see every named result on screen.
+      max-func-lines: 15
+  exclusions:
+    generated: lax
+    rules:
+      # Generated code is produced by cmd/gen-config-schema and
+      # cmd/gen-script-schema; it is regenerated from a schema, not
+      # hand-edited, so style and doc-comment lints add no value there.
+      - path: (^|/)zz_generated
+        linters:
+          - errcheck
+          - revive
+          - staticcheck
+          - unused
+      # The differential conformance suite asserts against a reference
+      # implementation and intentionally exercises edge cases (including
+      # deliberately unwrapped errors and short-lived HTTP calls) that
+      # would be defects in production code but are the point of the
+      # test itself.
+      - path: internal/conformance/.*_test\.go
+        linters:
+          - errcheck
+          - errorlint
+          - bodyclose
+          - noctx
+          - contextcheck
+      # internal/ and cmd/ hold no published Go API: the npm package is
+      # this project's public surface, so a doc comment requirement on
+      # every exported symbol here is ceremony without a consumer to
+      # serve it. Every other revive rule still runs on these paths.
+      - path: (^|/)(internal|cmd)/
+        linters:
+          - revive
+        text: "^exported:"
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

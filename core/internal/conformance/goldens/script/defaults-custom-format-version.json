@@ -1,0 +1,17 @@
+{
+  "parsed": {
+    "_stepLines": [
+      6
+    ],
+    "appId": "com.example.app",
+    "env": {},
+    "format": "atomyx/v2",
+    "name": "Future format",
+    "steps": [
+      {
+        "command": "launchApp"
+      }
+    ]
+  },
+  "valid": true
+}

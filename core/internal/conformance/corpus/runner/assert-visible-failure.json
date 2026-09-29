@@ -1,0 +1,10 @@
+{
+  "name": "assert-visible-failure",
+  "description": "assertVisible with no timeout does a single instant check and fails when the selector is absent",
+  "yaml": "appId: com.test\nname: assert visible failure\nenv: {}\n---\n- launchApp\n- assertVisible: Nonexistent\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

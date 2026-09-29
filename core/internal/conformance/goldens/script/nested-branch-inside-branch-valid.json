@@ -1,0 +1,70 @@
+{
+  "parsed": {
+    "_stepLines": [
+      6,
+      7,
+      8
+    ],
+    "appId": "com.example.app",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Nested branch",
+    "proxy": "required",
+    "steps": [
+      {
+        "command": "launchApp"
+      },
+      {
+        "as": "resp",
+        "command": "capture",
+        "pattern": "POST /api/x"
+      },
+      {
+        "command": "branch",
+        "default": [
+          {
+            "command": "screenshot",
+            "label": "outer-default"
+          }
+        ],
+        "from": "resp",
+        "on": [
+          {
+            "do": [
+              {
+                "command": "branch",
+                "default": [
+                  {
+                    "command": "screenshot",
+                    "label": "inner-default"
+                  }
+                ],
+                "from": "resp",
+                "on": [
+                  {
+                    "do": [
+                      {
+                        "command": "tap",
+                        "selector": {
+                          "label": "Confirm",
+                          "text": "Confirm"
+                        }
+                      }
+                    ],
+                    "match": {
+                      "status": 200
+                    }
+                  }
+                ]
+              }
+            ],
+            "match": {
+              "status": 200
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "valid": true
+}

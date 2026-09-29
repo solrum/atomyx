@@ -1,0 +1,209 @@
+[
+  {
+    "result": {
+      "content": [
+        {
+          "id": "\u003cnormalized\u003e",
+          "name": "login smoke",
+          "ok": true,
+          "source": "exploratory",
+          "startedAt": "\u003cnormalized\u003e"
+        }
+      ],
+      "isError": false
+    },
+    "tool": "start_run"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "id": "\u003cnormalized\u003e",
+          "ok": true,
+          "runId": "\u003cnormalized\u003e"
+        }
+      ],
+      "isError": false
+    },
+    "tool": "report_bug"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "bug": {
+            "description": "the button sits 4px off from the mock",
+            "id": "\u003cnormalized\u003e",
+            "runId": "\u003cnormalized\u003e",
+            "runName": "login smoke",
+            "timestamp": "\u003cnormalized\u003e",
+            "title": "button misaligned"
+          },
+          "ok": true
+        }
+      ],
+      "isError": false
+    },
+    "tool": "get_bug"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "bugs": [
+            {
+              "hasScreenshot": false,
+              "id": "\u003cnormalized\u003e",
+              "runId": "\u003cnormalized\u003e",
+              "runName": "login smoke",
+              "timestamp": "\u003cnormalized\u003e",
+              "title": "button misaligned"
+            }
+          ],
+          "count": 1,
+          "nextOffset": null,
+          "offset": 0,
+          "ok": true,
+          "totalMatching": 1
+        }
+      ],
+      "isError": false
+    },
+    "tool": "list_bugs"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "actionCount": 0,
+          "durationMs": "\u003cnormalized\u003e",
+          "findingsCount": 1,
+          "id": "\u003cnormalized\u003e",
+          "ok": true,
+          "status": "passed"
+        }
+      ],
+      "isError": false
+    },
+    "tool": "finish_run"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "count": 1,
+          "nextOffset": null,
+          "offset": 0,
+          "ok": true,
+          "runs": [
+            {
+              "actionCount": 0,
+              "durationMs": "\u003cnormalized\u003e",
+              "findingsCount": 1,
+              "finishedAt": "\u003cnormalized\u003e",
+              "id": "\u003cnormalized\u003e",
+              "name": "login smoke",
+              "source": "exploratory",
+              "startedAt": "\u003cnormalized\u003e",
+              "status": "passed"
+            }
+          ],
+          "totalMatching": 1
+        }
+      ],
+      "isError": false
+    },
+    "tool": "list_runs"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "ok": true,
+          "run": {
+            "actionCount": 0,
+            "durationMs": "\u003cnormalized\u003e",
+            "findings": [
+              {
+                "description": "the button sits 4px off from the mock",
+                "id": "\u003cnormalized\u003e",
+                "timestamp": "\u003cnormalized\u003e",
+                "title": "button misaligned"
+              }
+            ],
+            "finishedAt": "\u003cnormalized\u003e",
+            "id": "\u003cnormalized\u003e",
+            "name": "login smoke",
+            "source": "exploratory",
+            "startedAt": "\u003cnormalized\u003e",
+            "status": "passed",
+            "summary": "looks fine"
+          }
+        }
+      ],
+      "isError": false
+    },
+    "tool": "get_run"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "id": "\u003cnormalized\u003e",
+          "ok": true,
+          "summary": "updated after review"
+        }
+      ],
+      "isError": false
+    },
+    "tool": "update_run_summary"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "id": "\u003cnormalized\u003e",
+          "ok": true
+        }
+      ],
+      "isError": false
+    },
+    "tool": "delete_run"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "ok": false,
+          "reason": "\u003cnormalized\u003e"
+        }
+      ],
+      "isError": false
+    },
+    "tool": "get_run"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "id": "\u003cnormalized\u003e",
+          "ok": true
+        }
+      ],
+      "isError": false
+    },
+    "tool": "delete_bug"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "ok": false,
+          "reason": "\u003cnormalized\u003e"
+        }
+      ],
+      "isError": false
+    },
+    "tool": "get_bug"
+  }
+]

@@ -1,0 +1,5 @@
+{
+  "name": "lex-two-astral-characters-in-a-row-dangling-plus-error-position",
+  "description": "a trailing binary plus after a string containing two consecutive astral characters reports the error position in UTF-16 code units.",
+  "expr": "\"😀😀\" +"
+}

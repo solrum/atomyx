@@ -1,0 +1,5 @@
+{
+  "name": "matrix-literal-or-evaluates-right-surfaces-error",
+  "description": "or evaluates its right side when the left side is false, so a division by zero on the right surfaces.",
+  "expr": "false or (1 / 0 == 0)"
+}

@@ -1,0 +1,5 @@
+{
+  "name": "invalid-press-key-empty",
+  "description": "an empty pressKey key must be REJECTED.",
+  "yaml": "- launchApp\n- pressKey: \"\"\n"
+}

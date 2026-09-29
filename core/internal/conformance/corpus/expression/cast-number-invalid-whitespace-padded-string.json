@@ -1,0 +1,5 @@
+{
+  "name": "cast-number-invalid-whitespace-padded-string",
+  "description": "number() rejects a string padded with whitespace.",
+  "expr": "number(\" 5 \")"
+}

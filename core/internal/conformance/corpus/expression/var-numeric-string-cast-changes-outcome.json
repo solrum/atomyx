@@ -1,0 +1,11 @@
+{
+  "name": "var-numeric-string-cast-changes-outcome",
+  "description": "casting the same numeric-looking string variable with number() before comparing changes the outcome to true.",
+  "expr": "number(numStr) == 5",
+  "variables": {
+    "numStr": {
+      "type": "string",
+      "string": "5"
+    }
+  }
+}

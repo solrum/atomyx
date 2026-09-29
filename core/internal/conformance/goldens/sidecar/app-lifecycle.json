@@ -1,0 +1,40 @@
+{
+  "events": [
+    {
+      "event": "deviceConnected",
+      "payload": {
+        "id": "mock-1",
+        "kind": "emulator",
+        "name": "Mock Device",
+        "platform": "android",
+        "state": "online"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "method": "selectDevice",
+      "result": {
+        "id": "mock-1",
+        "kind": "emulator",
+        "name": "Mock Device",
+        "platform": "android",
+        "state": "online"
+      }
+    },
+    {
+      "method": "listApps",
+      "result": []
+    },
+    {
+      "method": "launchApp",
+      "result": null
+    },
+    {
+      "method": "currentForeground",
+      "result": {
+        "bundleId": "com.example.app"
+      }
+    }
+  ]
+}

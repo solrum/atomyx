@@ -1,0 +1,5 @@
+{
+  "name": "structerr-adjacent-number-literals",
+  "description": "two adjacent number literals with no operator between them.",
+  "expr": "1 2"
+}

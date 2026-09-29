@@ -1,0 +1,104 @@
+{
+  "calls": [
+    {
+      "args": [
+        "com.test",
+        {}
+      ],
+      "method": "launchApp"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "line": 5,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "pointer",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 6,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "pointer",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "pointer"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "pointer",
+      "depth": 0,
+      "detail": "POINTER_NO_OPENING_DOWN: action[2] is `capture` but no pointer is currently down",
+      "durationMs": 0,
+      "line": 6,
+      "ok": false,
+      "stepIndex": 1,
+      "summary": "pointer",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "pointer"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": 1,
+  "ok": false,
+  "passedSteps": 1,
+  "screenshots": [],
+  "scriptName": "pointer capture outside bracket",
+  "steps": [
+    {
+      "command": "launchApp",
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    },
+    {
+      "command": "pointer",
+      "detail": "POINTER_NO_OPENING_DOWN: action[2] is `capture` but no pointer is currently down",
+      "durationMs": 0,
+      "ok": false,
+      "stepIndex": 1
+    }
+  ],
+  "totalSteps": 2
+}

@@ -1,0 +1,5 @@
+{
+  "name": "cast-string-small-integer",
+  "description": "string() renders a small positive integer.",
+  "expr": "string(5)"
+}

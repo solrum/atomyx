@@ -1,0 +1,5 @@
+{
+  "name": "cast-number-invalid-infinity-string",
+  "description": "number() rejects the string \"Infinity\".",
+  "expr": "number(\"Infinity\")"
+}

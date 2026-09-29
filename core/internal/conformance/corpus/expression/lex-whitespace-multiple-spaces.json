@@ -1,0 +1,5 @@
+{
+  "name": "lex-whitespace-multiple-spaces",
+  "description": "multiple spaces surrounding an operator.",
+  "expr": "1   +   2"
+}

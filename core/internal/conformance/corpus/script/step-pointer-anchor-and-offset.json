@@ -1,0 +1,5 @@
+{
+  "name": "step-pointer-anchor-and-offset",
+  "description": "pointer target with an explicit selector wrapper carrying anchor and offset.",
+  "yaml": "- launchApp\n- pointer:\n    touches:\n      - actions:\n          - down:\n              selector: { id: \"menu_item\" }\n              anchor: bottomRight\n              offset: { dx: 24, dy: -12 }\n          - up\n"
+}

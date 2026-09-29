@@ -1,0 +1,11 @@
+{
+  "booleanValue": false,
+  "errorKind": "parse",
+  "kind": "error",
+  "message": "unknown escape sequence \"\\u\" in string literal at position 2",
+  "numberBits": "",
+  "numberText": "",
+  "position": 2,
+  "stringValue": "",
+  "valueType": ""
+}

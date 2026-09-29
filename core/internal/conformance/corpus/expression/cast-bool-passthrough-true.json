@@ -1,0 +1,5 @@
+{
+  "name": "cast-bool-passthrough-true",
+  "description": "bool() passes the boolean true through unchanged.",
+  "expr": "bool(true)"
+}

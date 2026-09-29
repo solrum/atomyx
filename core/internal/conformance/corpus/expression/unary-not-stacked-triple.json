@@ -1,0 +1,5 @@
+{
+  "name": "unary-not-stacked-triple",
+  "description": "three stacked logical not operators.",
+  "expr": "not not not true"
+}

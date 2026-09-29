@@ -1,0 +1,5 @@
+{
+  "name": "cast-string-boolean-false",
+  "description": "string() renders false as \"false\".",
+  "expr": "string(false)"
+}

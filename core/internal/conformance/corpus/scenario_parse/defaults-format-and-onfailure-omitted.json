@@ -1,0 +1,5 @@
+{
+  "name": "defaults-format-and-onfailure-omitted",
+  "description": "format and onFailure both omitted must parse with those fields absent, not defaulted — ScenarioDefinitionSchema carries no zod .default() for either, so the fallback in SCENARIO_DEFAULTS is applied only by a consumer that runs the parsed scenario, never by parseScenario itself.",
+  "yaml": "name: Smoke pass\ndescription: Fast pre-merge check\nscripts:\n  - flows/smoke.yml\n"
+}

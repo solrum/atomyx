@@ -1,0 +1,5 @@
+{
+  "name": "lexerr-invalid-escape-u",
+  "description": "an unsupported unicode escape sequence.",
+  "expr": "\"a\\u0041b\""
+}

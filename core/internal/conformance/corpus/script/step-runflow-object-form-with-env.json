@@ -1,0 +1,5 @@
+{
+  "name": "step-runflow-object-form-with-env",
+  "description": "runFlow object form names the sub-flow file plus extra env merged over the parent's variables.",
+  "yaml": "- launchApp\n- runFlow:\n    file: flows/login.yml\n    env:\n      email: other@test.com\n"
+}

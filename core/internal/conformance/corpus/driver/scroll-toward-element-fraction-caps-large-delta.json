@@ -1,0 +1,8 @@
+{
+  "name": "scroll-toward-element-fraction-caps-large-delta",
+  "description": "a very large vertical offset is clamped to maxScrollFraction of the screen height rather than swiping the full distance in one step",
+  "function": "scrollTowardElement",
+  "bounds": { "left": 0, "top": 4000, "right": 430, "bottom": 4040 },
+  "screen": { "width": 430, "height": 932 },
+  "maxScrollFraction": 0.3
+}

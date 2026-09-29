@@ -1,0 +1,5 @@
+{
+  "name": "structerr-wrong-cased-cast-name",
+  "description": "a capitalized cast name, which the whitelist matches case-sensitively.",
+  "expr": "Number(1)"
+}

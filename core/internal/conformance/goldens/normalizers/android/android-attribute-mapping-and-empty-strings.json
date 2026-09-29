@@ -1,0 +1,41 @@
+{
+  "attributes": {
+    "class": "android.widget.LinearLayout",
+    "role": "container"
+  },
+  "children": [
+    {
+      "attributes": {
+        "bounds": "24,100,1056,200",
+        "class": "android.widget.EditText",
+        "hint": "you@example.com",
+        "id": "com.example:id/email",
+        "label": "Email address",
+        "role": "text-field",
+        "text": "user@example.com"
+      },
+      "children": [],
+      "clickable": true,
+      "enabled": true,
+      "focused": true,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "role": "other"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": false,
+      "focused": false,
+      "selected": false,
+      "visible": false
+    }
+  ],
+  "clickable": false,
+  "enabled": true,
+  "focused": false,
+  "selected": false,
+  "visible": true
+}

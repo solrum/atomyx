@@ -1,0 +1,5 @@
+{
+  "name": "cast-bool-number-zero-rejected",
+  "description": "bool() rejects the number zero.",
+  "expr": "bool(0)"
+}

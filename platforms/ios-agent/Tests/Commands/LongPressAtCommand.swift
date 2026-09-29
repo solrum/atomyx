@@ -3,7 +3,7 @@ import CoreGraphics
 
 /// Long-press at raw point coordinates for a given duration, in
 /// device-global point space. The synthesizer dispatches to the
-/// currently frontmost app — no `launchApp` required.
+/// currently frontmost app, so no `launchApp` is required.
 ///
 /// Request args:
 ///   - `x`, `y` (required, numeric)
@@ -41,7 +41,8 @@ final class LongPressAtCommand: CommandHandler {
         do {
             try synthesizer.dispatch(pointers: [path])
         } catch {
-            return .error(id: request.id, message: "longPress dispatch failed: \(error)")
+            NSLog("[atomyx] longPressAt dispatch failed: \(error)")
+            return .error(id: request.id, message: "The long press could not be dispatched on this device.")
         }
         return .ok(id: request.id, data: [
             "x": x, "y": y, "durationMs": durationMs,

@@ -1,0 +1,17 @@
+{
+  "name": "android-checkable-without-checked",
+  "description": "regression pin for D2: checkable true with checked absent must omit checked, not default to false",
+  "rawTree": {
+    "elementId": "sw",
+    "className": "android.widget.Switch",
+    "contentDesc": "Airplane mode",
+    "clickable": true,
+    "enabled": true,
+    "focused": false,
+    "selected": false,
+    "checkable": true,
+    "visible": true,
+    "isIme": false,
+    "children": []
+  }
+}

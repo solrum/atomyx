@@ -1,0 +1,8 @@
+{
+  "name": "swipe-center-up",
+  "description": "scrollSearch's blind UP probe drags the center column downward to reveal items logically above",
+  "function": "swipeCenter",
+  "screen": { "width": 430, "height": 932 },
+  "direction": "up",
+  "maxScrollFraction": 0.6
+}

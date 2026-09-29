@@ -1,0 +1,5 @@
+{
+  "name": "structerr-dangling-keyword-not-alone",
+  "description": "the bare keyword not with no operand to negate.",
+  "expr": "not"
+}

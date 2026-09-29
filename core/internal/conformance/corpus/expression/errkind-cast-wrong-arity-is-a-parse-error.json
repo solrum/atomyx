@@ -1,0 +1,5 @@
+{
+  "name": "errkind-cast-wrong-arity-is-a-parse-error",
+  "description": "calling a cast function with too many arguments is a parse-time error.",
+  "expr": "number(1,2)"
+}

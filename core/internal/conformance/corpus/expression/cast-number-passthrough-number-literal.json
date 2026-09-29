@@ -1,0 +1,5 @@
+{
+  "name": "cast-number-passthrough-number-literal",
+  "description": "number() passes a number literal through unchanged.",
+  "expr": "number(5)"
+}

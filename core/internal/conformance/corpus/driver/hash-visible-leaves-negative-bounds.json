@@ -1,0 +1,12 @@
+{
+  "name": "hash-visible-leaves-negative-bounds",
+  "description": "a leaf with negative bounds coordinates (an element scrolled partly above the origin) still bucket-quantizes and hashes identically between Go and TypeScript",
+  "function": "hashVisibleLeaves",
+  "tree": {
+    "attributes": { "role": "container", "bounds": "-50,-200,430,732" },
+    "children": [
+      { "attributes": { "text": "Above origin", "bounds": "-25,-75,405,-15" }, "children": [] },
+      { "attributes": { "text": "On screen", "bounds": "0,300,430,340" }, "children": [] }
+    ]
+  }
+}

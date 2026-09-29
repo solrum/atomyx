@@ -1,0 +1,11 @@
+{
+  "name": "numeric-nan-production-infinity-mod-two",
+  "description": "infinity modulo a finite number produces NaN.",
+  "expr": "inf % 2",
+  "variables": {
+    "inf": {
+      "type": "number",
+      "number": "Infinity"
+    }
+  }
+}

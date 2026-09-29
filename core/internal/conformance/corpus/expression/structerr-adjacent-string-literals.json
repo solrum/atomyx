@@ -1,0 +1,5 @@
+{
+  "name": "structerr-adjacent-string-literals",
+  "description": "two adjacent string literals with no operator between them.",
+  "expr": "\"a\" \"b\""
+}

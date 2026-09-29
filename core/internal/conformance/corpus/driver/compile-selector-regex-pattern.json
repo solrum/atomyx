@@ -1,0 +1,23 @@
+{
+  "name": "compile-selector-regex-pattern",
+  "description": "a regex pattern with the case-insensitive flag matches across fields exactly like a literal string match would for an exact-case value",
+  "function": "compileSelector",
+  "selector": { "text": { "regex": "^cancel$", "flags": "i" } },
+  "tree": {
+    "attributes": { "role": "container" },
+    "children": [
+      {
+        "attributes": { "role": "button", "id": "login_btn", "text": "Sign in" },
+        "children": [],
+        "enabled": true,
+        "clickable": true
+      },
+      {
+        "attributes": { "role": "button", "id": "cancel_btn", "text": "Cancel" },
+        "children": [],
+        "enabled": true,
+        "clickable": true
+      }
+    ]
+  }
+}

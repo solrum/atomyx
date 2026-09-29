@@ -1,0 +1,5 @@
+{
+  "name": "step-pointer-capture-labeled",
+  "description": "pointer step, single-touch form: down, a labeled mid-gesture capture, move, an unlabeled capture, up.",
+  "yaml": "- launchApp\n- pointer:\n    touches:\n      - actions:\n          - down: \"Item A\"\n          - capture: before-drag\n          - move: { x: 300, y: 600 }\n          - capture\n          - up\n"
+}

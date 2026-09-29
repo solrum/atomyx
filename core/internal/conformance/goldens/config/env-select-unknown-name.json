@@ -1,0 +1,23 @@
+{
+  "config": {
+    "apps": [
+      {
+        "appId": "com.example.app",
+        "id": "main",
+        "platform": "android"
+      }
+    ],
+    "environments": {
+      "staging": {
+        "app": "main"
+      }
+    },
+    "project": "Demo"
+  },
+  "envRefError": null,
+  "found": true,
+  "issuePaths": [],
+  "resolved": null,
+  "schemaValid": true,
+  "selectError": "Environment \"missing\" not found in /atomyx.config.yaml. Available environments: staging."
+}

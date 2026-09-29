@@ -1,0 +1,126 @@
+{
+  "parsed": {
+    "_stepLines": [
+      13,
+      14,
+      15,
+      19,
+      24,
+      29,
+      34,
+      55,
+      56
+    ],
+    "appId": "dev.atomyx.demo",
+    "description": "Test login with handle for OTP vs direct dashboard",
+    "env": {
+      "email": "otp@example.com",
+      "otp_code": "123456",
+      "password": "secret123"
+    },
+    "format": "atomyx/v1",
+    "name": "Login flow — with OTP branching",
+    "steps": [
+      {
+        "command": "launchApp"
+      },
+      {
+        "command": "sleep",
+        "ms": 1000
+      },
+      {
+        "command": "waitFor",
+        "selector": {
+          "label": "Sign in",
+          "text": "Sign in"
+        }
+      },
+      {
+        "command": "type",
+        "into": {
+          "nth": 0,
+          "role": "text-field"
+        },
+        "text": "otp@example.com"
+      },
+      {
+        "command": "type",
+        "into": {
+          "nth": 1,
+          "role": "text-field"
+        },
+        "text": "secret123"
+      },
+      {
+        "command": "tap",
+        "selector": {
+          "label": "Login",
+          "text": "Login"
+        }
+      },
+      {
+        "branches": [
+          {
+            "do": [
+              {
+                "command": "type",
+                "into": {
+                  "nth": 0,
+                  "role": "text-field"
+                },
+                "text": "123456"
+              },
+              {
+                "command": "tap",
+                "selector": {
+                  "label": "Verify",
+                  "role": "button"
+                }
+              },
+              {
+                "command": "waitFor",
+                "selector": {
+                  "label": "Dashboard",
+                  "text": "Dashboard"
+                },
+                "timeoutMs": 10000
+              }
+            ],
+            "when": {
+              "visible": "Enter OTP"
+            }
+          },
+          {
+            "do": [
+              {
+                "command": "screenshot",
+                "label": "direct_login"
+              }
+            ],
+            "when": {
+              "visible": "Dashboard"
+            }
+          }
+        ],
+        "command": "handle",
+        "otherwise": "fail"
+      },
+      {
+        "command": "assertVisible",
+        "selector": {
+          "label": "Welcome",
+          "text": "Welcome"
+        }
+      },
+      {
+        "command": "screenshot",
+        "label": "login_complete"
+      }
+    ],
+    "tags": [
+      "login",
+      "branching"
+    ]
+  },
+  "valid": true
+}

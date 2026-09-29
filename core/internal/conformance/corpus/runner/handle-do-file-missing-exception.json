@@ -1,0 +1,15 @@
+{
+  "name": "handle-do-file-missing-exception",
+  "description": "handle's matching branch names a do file that does not exist, reporting the read failure as an \"Exception: \" detail rather than a caller-crafted \"not found\" message, since the do-block resolution has no try/catch of its own on either side",
+  "yaml": "appId: com.test\nname: handle missing do file\n---\n- launchApp\n- handle:\n    - when:\n        visible: X\n      do: \"{{DIR}}/missing-handle-do.yml\"\n",
+  "driver": {
+    "hierarchies": [
+      {
+        "attributes": {},
+        "children": [
+          { "attributes": { "text": "X", "label": "X", "bounds": "0,0,10,10" }, "children": [], "clickable": true }
+        ]
+      }
+    ]
+  }
+}

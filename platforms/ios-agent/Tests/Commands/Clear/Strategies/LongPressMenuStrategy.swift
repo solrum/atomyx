@@ -5,8 +5,8 @@ import XCTest
 /// TextInput in some modes) that ignore triple-tap selection but still render
 /// the iOS system context menu.
 ///
-/// Vietnamese system keyboards expose "Chọn tất cả" instead of "Select All" —
-/// both variants are checked so the strategy is locale-tolerant.
+/// Vietnamese system keyboards expose "Chọn tất cả" instead of "Select All",
+/// so both variants are checked, keeping the strategy locale-tolerant.
 struct LongPressMenuStrategy: ClearTextStrategy {
     var name: String { "long-press-menu" }
 
@@ -41,7 +41,7 @@ struct LongPressMenuStrategy: ClearTextStrategy {
             }
             Thread.sleep(forTimeInterval: 0.1)
         }
-        // No menu appeared — dismiss any partial interaction state and skip.
+        // No menu appeared, so dismiss any partial interaction state and skip.
         context.app.tap()
         return .skipped
     }

@@ -1,0 +1,5 @@
+{
+  "name": "pointer-empty-touches-invalid",
+  "description": "pointer with an empty `touches` list must be REJECTED.",
+  "yaml": "- launchApp\n- pointer:\n    touches: []\n"
+}

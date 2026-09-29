@@ -1,0 +1,21 @@
+{
+  "name": "compile-selector-skips-ranking-with-nth",
+  "description": "nth is positional, so it preserves document order and skips the clickable/focused ranking pass entirely",
+  "function": "compileSelector",
+  "selector": { "text": "Verify", "nth": 0 },
+  "tree": {
+    "attributes": { "role": "container" },
+    "children": [
+      {
+        "attributes": { "role": "text", "text": "Verify" },
+        "children": []
+      },
+      {
+        "attributes": { "role": "button", "id": "verify_btn", "text": "Verify" },
+        "children": [],
+        "enabled": true,
+        "clickable": true
+      }
+    ]
+  }
+}

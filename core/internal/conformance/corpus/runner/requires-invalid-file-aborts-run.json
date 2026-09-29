@@ -1,0 +1,14 @@
+{
+  "name": "requires-invalid-file-aborts-run",
+  "description": "a required flow file that fails to parse aborts the whole run with an error instead of a graceful failed ScriptResult, matching the TypeScript runner's requires loop having no try/catch around parseScript",
+  "yaml": "appId: com.test\nname: requires invalid file\nrequires:\n  - \"{{DIR}}/invalid-required.yml\"\n---\n- launchApp\n",
+  "flowFiles": {
+    "invalid-required.yml": "appId: com.bad\n"
+  },
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  },
+  "expectRunError": true
+}

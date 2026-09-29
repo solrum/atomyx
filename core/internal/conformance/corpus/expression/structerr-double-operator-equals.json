@@ -1,0 +1,5 @@
+{
+  "name": "structerr-double-operator-equals",
+  "description": "two consecutive equality operators.",
+  "expr": "1 == == 2"
+}

@@ -1,0 +1,86 @@
+{
+  "name": "scenario-mixed-results",
+  "description": "A scenario with four child scripts: two passing scripts each with a screenshot at their own scoped position, one failing script, and one skipped script with no result, verifying scenario totals and per-child screenshot scoping.",
+  "kind": "scenario",
+  "metadata": {
+    "runId": "33333333-3333-4333-8333-333333333333",
+    "label": "Onboarding scenario",
+    "startedAt": "2026-01-03T09:00:00.000Z",
+    "finishedAt": "2026-01-03T09:00:03.000Z",
+    "durationMs": 3000,
+    "command": "run",
+    "platform": "android"
+  },
+  "result": {
+    "scenarioName": "Onboarding scenario",
+    "ok": false,
+    "totalScripts": 4,
+    "passedScripts": 2,
+    "durationMs": 3000,
+    "scripts": [
+      {
+        "scriptIndex": 0,
+        "scriptPath": "scripts/sign-up.yml",
+        "status": "passed",
+        "durationMs": 1000,
+        "result": {
+          "scriptName": "Sign up",
+          "ok": true,
+          "steps": [
+            { "stepIndex": 0, "command": "launchApp", "ok": true, "durationMs": 400 },
+            { "stepIndex": 1, "command": "tap", "ok": true, "detail": "tapped #create-account", "durationMs": 600 }
+          ],
+          "totalSteps": 2,
+          "passedSteps": 2,
+          "durationMs": 1000
+        }
+      },
+      {
+        "scriptIndex": 1,
+        "scriptPath": "scripts/verify-email.yml",
+        "status": "failed",
+        "durationMs": 900,
+        "result": {
+          "scriptName": "Verify email",
+          "ok": false,
+          "steps": [
+            { "stepIndex": 0, "command": "tap", "ok": true, "detail": "tapped #resend", "durationMs": 300 },
+            { "stepIndex": 1, "command": "assertVisible", "ok": false, "detail": "element not found: #verified-badge", "durationMs": 600 }
+          ],
+          "totalSteps": 2,
+          "passedSteps": 1,
+          "failedAtStep": 1,
+          "durationMs": 900
+        }
+      },
+      {
+        "scriptIndex": 2,
+        "scriptPath": "scripts/complete-profile.yml",
+        "status": "passed",
+        "durationMs": 1100,
+        "result": {
+          "scriptName": "Complete profile",
+          "ok": true,
+          "steps": [
+            { "stepIndex": 0, "command": "type", "ok": true, "durationMs": 500 },
+            { "stepIndex": 1, "command": "tap", "ok": true, "detail": "tapped #save", "durationMs": 600 }
+          ],
+          "totalSteps": 2,
+          "passedSteps": 2,
+          "durationMs": 1100
+        }
+      },
+      {
+        "scriptIndex": 3,
+        "scriptPath": "scripts/final-review.yml",
+        "status": "skipped",
+        "durationMs": 0
+      }
+    ]
+  },
+  "screenshots": [
+    { "scope": "0::scripts/sign-up.yml", "label": "account created" },
+    { "scope": "1::scripts/verify-email.yml", "label": "verification failed" },
+    { "scope": "2::scripts/complete-profile.yml", "label": "profile saved" }
+  ]
+}

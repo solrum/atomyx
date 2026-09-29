@@ -27,7 +27,7 @@ final class GetKeyboardCommand: CommandHandler {
 
     func handle(_ request: Request, bridge: XCUIBridge, state: DriverState) -> Response {
         guard let app = state.currentApp else {
-            return .error(id: request.id, message: "no app launched — call launchApp first")
+            return .error(id: request.id, message: "no app launched, call launchApp first")
         }
 
         let info = bridge.getKeyboard(app: app)

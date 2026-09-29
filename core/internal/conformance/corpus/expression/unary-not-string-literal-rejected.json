@@ -1,0 +1,5 @@
+{
+  "name": "unary-not-string-literal-rejected",
+  "description": "logical not rejects a string literal.",
+  "expr": "not \"a\""
+}

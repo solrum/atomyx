@@ -1,0 +1,14 @@
+{
+  "name": "inspection-screenshot",
+  "description": "screenshot against a selected mock device returns the driver's (empty) capture, base64-encoded.",
+  "deviceSnapshots": [
+    [
+      { "id": "mock-1", "platform": "android", "name": "Mock Device", "kind": "emulator", "state": "online" }
+    ]
+  ],
+  "driver": { "hierarchies": [{ "attributes": {}, "children": [] }] },
+  "steps": [
+    { "method": "selectDevice", "params": { "id": "mock-1" } },
+    { "method": "screenshot" }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "run-flow-parent-variable-and-own-env",
+  "description": "runFlow's own env override wins over a parent variable of the same name, while a parent variable with no override still interpolates into the loaded flow",
+  "yaml": "appId: com.test\nname: run flow env merge\nenv:\n  greeting: parent-hi\n  email: user@test.com\n---\n- launchApp\n- runFlow:\n    file: \"{{DIR}}/subflow.yml\"\n    env:\n      greeting: step-hi\n",
+  "flowFiles": {
+    "subflow.yml": "- type:\n    into: Email\n    text: \"${greeting} ${email}\"\n"
+  },
+  "driver": {
+    "hierarchies": [
+      {
+        "attributes": {},
+        "children": [
+          { "attributes": { "hint": "Email address", "label": "Email", "bounds": "40,400,390,450", "value": "" }, "children": [], "clickable": true, "focused": true }
+        ]
+      }
+    ]
+  }
+}

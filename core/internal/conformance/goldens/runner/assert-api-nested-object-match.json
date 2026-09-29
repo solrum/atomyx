@@ -1,0 +1,209 @@
+{
+  "calls": [
+    {
+      "args": [
+        "com.test",
+        {}
+      ],
+      "method": "launchApp"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 6,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "line": 6,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "capture",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 7,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "capture: userRsp ← \"GET /api/user\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "capture"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "userRsp"
+        },
+        {
+          "kind": "punct",
+          "text": " ← "
+        },
+        {
+          "kind": "string",
+          "text": "\"GET /api/user\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "capture",
+      "depth": 0,
+      "detail": "Captured GET /api/user returning status 200 as \"userRsp\"",
+      "durationMs": 0,
+      "line": 7,
+      "ok": true,
+      "stepIndex": 1,
+      "summary": "capture: userRsp ← \"GET /api/user\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "capture"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "userRsp"
+        },
+        {
+          "kind": "punct",
+          "text": " ← "
+        },
+        {
+          "kind": "string",
+          "text": "\"GET /api/user\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "assertApi",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 8,
+      "ok": null,
+      "stepIndex": 2,
+      "summary": "assertApi: $userRsp with body×1",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "assertApi"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "$userRsp"
+        },
+        {
+          "kind": "punct",
+          "text": " with "
+        },
+        {
+          "kind": "string",
+          "text": "body×1"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "assertApi",
+      "depth": 0,
+      "detail": "API assertion passed for \"userRsp\" (GET /api/user)",
+      "durationMs": 0,
+      "line": 8,
+      "ok": true,
+      "stepIndex": 2,
+      "summary": "assertApi: $userRsp with body×1",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "assertApi"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "$userRsp"
+        },
+        {
+          "kind": "punct",
+          "text": " with "
+        },
+        {
+          "kind": "string",
+          "text": "body×1"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 3,
+  "screenshots": [],
+  "scriptName": "assert api nested object match",
+  "steps": [
+    {
+      "command": "launchApp",
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    },
+    {
+      "command": "capture",
+      "detail": "Captured GET /api/user returning status 200 as \"userRsp\"",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 1
+    },
+    {
+      "command": "assertApi",
+      "detail": "API assertion passed for \"userRsp\" (GET /api/user)",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 2
+    }
+  ],
+  "totalSteps": 3
+}

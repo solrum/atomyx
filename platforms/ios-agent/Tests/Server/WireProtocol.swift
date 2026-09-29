@@ -4,7 +4,7 @@ import Foundation
 /// and every CommandHandler.
 ///
 /// Wire format (one per line):
-///   → { "id": N, "type": "...", "args": { ... } }
+///   request:  { "id": N, "type": "...", "args": { ... } }
 ///   ← { "id": N, "ok": true,  "data":  { ... } }
 ///   ← { "id": N, "ok": false, "error": "..."    }
 

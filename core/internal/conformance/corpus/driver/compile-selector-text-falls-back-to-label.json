@@ -1,0 +1,17 @@
+{
+  "name": "compile-selector-text-falls-back-to-label",
+  "description": "when the caller provides text but not label, a text query also tries the label attribute, because a button with no text attribute may only carry an accessibility label",
+  "function": "compileSelector",
+  "selector": { "text": "Sign in" },
+  "tree": {
+    "attributes": { "role": "container" },
+    "children": [
+      {
+        "attributes": { "role": "button", "id": "login_btn", "label": "Sign in" },
+        "children": [],
+        "enabled": true,
+        "clickable": true
+      }
+    ]
+  }
+}

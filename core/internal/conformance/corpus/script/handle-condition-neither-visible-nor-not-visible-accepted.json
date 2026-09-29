@@ -1,0 +1,5 @@
+{
+  "name": "handle-condition-neither-visible-nor-not-visible-accepted",
+  "description": "a handle branch's `when` with neither `visible` nor `notVisible` set is accepted, unlike a precondition check, because HandleConditionSchema carries no zod refine enforcing exactly one of the two.",
+  "yaml": "- launchApp\n- handle:\n    - when: {}\n      do:\n        - back\n    - otherwise: skip\n"
+}

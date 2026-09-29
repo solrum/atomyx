@@ -1,0 +1,26 @@
+{
+  "name": "run-script",
+  "description": "run_script parses a minimal YAML script and executes it against the active device, returning a structured ScriptResult with per-step and overall durationMs normalized.",
+  "driver": {
+    "apps": ["com.example.app"],
+    "hierarchy": {
+      "attributes": { "role": "container", "bounds": "0,0,430,932" },
+      "children": [
+        {
+          "attributes": { "text": "Login", "label": "Login", "bounds": "40,300,390,350" },
+          "children": [],
+          "clickable": true
+        }
+      ]
+    }
+  },
+  "steps": [
+    { "tool": "select_device", "args": { "platform": "android", "id": "mock-device" } },
+    {
+      "tool": "run_script",
+      "args": {
+        "script": "appId: com.example.app\nname: login tap\nenv: {}\n---\n- launchApp\n- tap: Login\n- assertVisible: Login\n"
+      }
+    }
+  ]
+}

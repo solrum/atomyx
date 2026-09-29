@@ -1,0 +1,88 @@
+{
+  "name": "android-checkable-checked-rule",
+  "description": "checkable/checked coupling across roles",
+  "rawTree": {
+    "elementId": "root",
+    "className": "android.widget.LinearLayout",
+    "clickable": false,
+    "enabled": true,
+    "focused": false,
+    "selected": false,
+    "checkable": false,
+    "checked": false,
+    "visible": true,
+    "isIme": false,
+    "children": [
+      {
+        "elementId": "k1",
+        "className": "android.widget.CheckBox",
+        "text": "Accept terms",
+        "clickable": true,
+        "enabled": true,
+        "focused": false,
+        "selected": false,
+        "checkable": true,
+        "checked": true,
+        "visible": true,
+        "isIme": false,
+        "children": []
+      },
+      {
+        "elementId": "k2",
+        "className": "android.widget.Switch",
+        "contentDesc": "Wi-Fi",
+        "clickable": true,
+        "enabled": true,
+        "focused": false,
+        "selected": false,
+        "checkable": true,
+        "checked": false,
+        "visible": true,
+        "isIme": false,
+        "children": []
+      },
+      {
+        "elementId": "k3",
+        "className": "android.widget.TextView",
+        "text": "Not a toggle",
+        "clickable": false,
+        "enabled": true,
+        "focused": false,
+        "selected": false,
+        "checkable": false,
+        "checked": true,
+        "visible": true,
+        "isIme": false,
+        "children": []
+      },
+      {
+        "elementId": "k4",
+        "className": "android.widget.CheckedTextView",
+        "text": "Checked label",
+        "clickable": true,
+        "enabled": true,
+        "focused": false,
+        "selected": false,
+        "checkable": true,
+        "checked": true,
+        "visible": true,
+        "isIme": false,
+        "children": []
+      },
+      {
+        "elementId": "k5",
+        "className": "android.widget.ToggleButton",
+        "text": "ON",
+        "clickable": true,
+        "enabled": true,
+        "focused": false,
+        "selected": false,
+        "checkable": true,
+        "checked": false,
+        "visible": true,
+        "isIme": false,
+        "children": []
+      }
+    ]
+  }
+}

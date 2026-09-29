@@ -1,0 +1,11 @@
+{
+  "name": "var-negative-infinity-direct",
+  "description": "a variable holding negative infinity, returned bare.",
+  "expr": "negInfVar",
+  "variables": {
+    "negInfVar": {
+      "type": "number",
+      "number": "-Infinity"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+[
+  {
+    "attributes": {
+      "id": "verify_btn",
+      "role": "button",
+      "text": "Verify"
+    },
+    "children": [],
+    "clickable": true,
+    "enabled": true
+  },
+  {
+    "attributes": {
+      "role": "text",
+      "text": "Verify"
+    },
+    "children": []
+  }
+]

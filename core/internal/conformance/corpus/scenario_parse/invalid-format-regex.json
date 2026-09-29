@@ -1,0 +1,6 @@
+{
+  "name": "invalid-format-regex",
+  "description": "a format string not matching 'atomyx-scenario/v<n>' must be REJECTED with the schema's custom regex message.",
+  "yaml": "format: v1\nname: Checkout regression\nscripts:\n  - flows/login.yml\n",
+  "expectErrorText": true
+}

@@ -1,0 +1,196 @@
+{
+  "calls": [
+    {
+      "args": [
+        "com.test",
+        {}
+      ],
+      "method": "launchApp"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "line": 5,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "waitFor",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 6,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "waitFor: element.text = \"Nonexistent\" (timeout=\"0ms\")",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "waitFor"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "element"
+        },
+        {
+          "kind": "punct",
+          "text": "."
+        },
+        {
+          "kind": "identifier",
+          "text": "text"
+        },
+        {
+          "kind": "punct",
+          "text": " = "
+        },
+        {
+          "kind": "string",
+          "text": "\"Nonexistent\""
+        },
+        {
+          "kind": "punct",
+          "text": " ("
+        },
+        {
+          "kind": "identifier",
+          "text": "timeout"
+        },
+        {
+          "kind": "punct",
+          "text": "="
+        },
+        {
+          "kind": "string",
+          "text": "\"0ms\""
+        },
+        {
+          "kind": "punct",
+          "text": ")"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "waitFor",
+      "depth": 0,
+      "detail": "Element not found within 0ms",
+      "durationMs": 0,
+      "line": 6,
+      "ok": false,
+      "stepIndex": 1,
+      "summary": "waitFor: element.text = \"Nonexistent\" (timeout=\"0ms\")",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "waitFor"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "element"
+        },
+        {
+          "kind": "punct",
+          "text": "."
+        },
+        {
+          "kind": "identifier",
+          "text": "text"
+        },
+        {
+          "kind": "punct",
+          "text": " = "
+        },
+        {
+          "kind": "string",
+          "text": "\"Nonexistent\""
+        },
+        {
+          "kind": "punct",
+          "text": " ("
+        },
+        {
+          "kind": "identifier",
+          "text": "timeout"
+        },
+        {
+          "kind": "punct",
+          "text": "="
+        },
+        {
+          "kind": "string",
+          "text": "\"0ms\""
+        },
+        {
+          "kind": "punct",
+          "text": ")"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": 1,
+  "ok": false,
+  "passedSteps": 1,
+  "screenshots": [],
+  "scriptName": "wait for failure",
+  "steps": [
+    {
+      "command": "launchApp",
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    },
+    {
+      "command": "waitFor",
+      "detail": "Element not found within 0ms",
+      "durationMs": 0,
+      "ok": false,
+      "stepIndex": 1
+    }
+  ],
+  "totalSteps": 2
+}

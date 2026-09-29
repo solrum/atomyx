@@ -1,0 +1,5 @@
+{
+  "name": "cast-structure-nested-string-of-bool-then-number-rejected",
+  "description": "number() applied to the result of string(true) is rejected because \"true\" is not numeric text.",
+  "expr": "number(string(true))"
+}

@@ -1,0 +1,5 @@
+{
+  "name": "invalid-handle-empty-branches",
+  "description": "a handle step with zero branches must be REJECTED.",
+  "yaml": "- launchApp\n- handle: []\n"
+}

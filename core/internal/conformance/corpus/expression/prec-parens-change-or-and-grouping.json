@@ -1,0 +1,5 @@
+{
+  "name": "prec-parens-change-or-and-grouping",
+  "description": "parenthesizing the or changes the result compared to default and-binds-tighter grouping.",
+  "expr": "(true or false) and false"
+}

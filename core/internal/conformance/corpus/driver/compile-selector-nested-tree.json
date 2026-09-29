@@ -1,0 +1,50 @@
+{
+  "name": "compile-selector-nested-tree",
+  "description": "the pre-order walk finds a match several levels deep inside a nested container hierarchy, ordered before its later siblings' subtrees",
+  "function": "compileSelector",
+  "selector": { "id": "target" },
+  "tree": {
+    "attributes": { "role": "container", "id": "root" },
+    "children": [
+      {
+        "attributes": { "role": "container", "id": "sidebar" },
+        "children": [
+          {
+            "attributes": { "role": "cell", "id": "sidebar_item_1", "text": "Home" },
+            "children": []
+          }
+        ]
+      },
+      {
+        "attributes": { "role": "container", "id": "main" },
+        "children": [
+          {
+            "attributes": { "role": "container", "id": "card" },
+            "children": [
+              {
+                "attributes": { "role": "container", "id": "card_header" },
+                "children": [
+                  {
+                    "attributes": { "role": "button", "id": "target", "text": "Buy now" },
+                    "children": [],
+                    "enabled": true,
+                    "clickable": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "attributes": { "role": "container", "id": "footer" },
+        "children": [
+          {
+            "attributes": { "role": "cell", "id": "footer_item", "text": "About" },
+            "children": []
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "name": "lexerr-invalid-escape-x",
+  "description": "an unsupported escape sequence naming x.",
+  "expr": "\"a\\xb\""
+}

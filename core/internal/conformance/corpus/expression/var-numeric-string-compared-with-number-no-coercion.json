@@ -1,0 +1,11 @@
+{
+  "name": "var-numeric-string-compared-with-number-no-coercion",
+  "description": "a numeric-looking string variable compared with == against a number never coerces, so the comparison is false.",
+  "expr": "numStr == 5",
+  "variables": {
+    "numStr": {
+      "type": "string",
+      "string": "5"
+    }
+  }
+}

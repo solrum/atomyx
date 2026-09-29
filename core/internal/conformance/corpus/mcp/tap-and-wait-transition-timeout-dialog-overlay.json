@@ -1,0 +1,67 @@
+{
+  "name": "tap-and-wait-transition-timeout-dialog-overlay",
+  "description": "tap_and_wait_transition times out with classification dialog_or_error_shown when a full-screen dialog overlay with a short-labeled action button appears after the tap. Staged with a two-stage hierarchySequence (clean screen, then the same screen plus the overlay) so the overlay reads as newly appeared relative to the pre-tap read; the tap target's own bounds stay outside the overlay so the tap itself is never rejected as obscured.",
+  "driver": {
+    "hierarchySequence": [
+      {
+        "hierarchy": {
+          "attributes": { "role": "container", "bounds": "0,0,430,932" },
+          "children": [
+            {
+              "attributes": { "role": "button", "id": "submit_btn", "text": "Submit", "bounds": "100,850,330,910" },
+              "children": [],
+              "enabled": true,
+              "clickable": true
+            }
+          ]
+        },
+        "repeat": 1
+      },
+      {
+        "hierarchy": {
+          "attributes": { "role": "container", "bounds": "0,0,430,932" },
+          "children": [
+            {
+              "attributes": { "role": "button", "id": "submit_btn", "text": "Submit", "bounds": "100,850,330,910" },
+              "children": [],
+              "enabled": true,
+              "clickable": true
+            },
+            {
+              "attributes": { "role": "dialog", "id": "error-dialog", "bounds": "0,0,430,700" },
+              "children": [
+                {
+                  "attributes": {
+                    "role": "label",
+                    "id": "error-message",
+                    "label": "Something went wrong",
+                    "bounds": "40,300,390,360"
+                  },
+                  "children": []
+                },
+                {
+                  "attributes": { "role": "button", "id": "error-ok-btn", "label": "OK", "bounds": "165,600,265,650" },
+                  "children": [],
+                  "clickable": true
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "steps": [
+    { "tool": "select_device", "args": { "platform": "android", "id": "mock-device" } },
+    {
+      "tool": "tap_and_wait_transition",
+      "args": {
+        "selector": { "id": "submit_btn" },
+        "waitForAppear": { "id": "confirmed_label" },
+        "timeoutMs": 20,
+        "maxTimeoutMs": 40,
+        "intervalMs": 5
+      }
+    }
+  ]
+}

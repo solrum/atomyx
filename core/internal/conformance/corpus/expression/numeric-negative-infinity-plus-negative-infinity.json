@@ -1,0 +1,11 @@
+{
+  "name": "numeric-negative-infinity-plus-negative-infinity",
+  "description": "negative infinity plus negative infinity remains negative infinity.",
+  "expr": "negInf + negInf",
+  "variables": {
+    "negInf": {
+      "type": "number",
+      "number": "-Infinity"
+    }
+  }
+}

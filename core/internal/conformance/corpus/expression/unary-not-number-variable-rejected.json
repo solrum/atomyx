@@ -1,0 +1,11 @@
+{
+  "name": "unary-not-number-variable-rejected",
+  "description": "logical not rejects a number variable.",
+  "expr": "not n",
+  "variables": {
+    "n": {
+      "type": "number",
+      "number": "5"
+    }
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "name": "prec-paren-transparency-wrapped",
+  "description": "the same arithmetic type error wrapped in parentheses, which must not introduce a new AST layer.",
+  "expr": "(1 + \"a\")"
+}

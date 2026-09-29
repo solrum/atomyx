@@ -1,0 +1,22 @@
+[
+  {
+    "attributes": {
+      "id": "login_btn",
+      "role": "button",
+      "text": "Sign in"
+    },
+    "children": [],
+    "clickable": true,
+    "enabled": true
+  },
+  {
+    "attributes": {
+      "id": "cancel_btn",
+      "role": "button",
+      "text": "Cancel"
+    },
+    "children": [],
+    "clickable": true,
+    "enabled": true
+  }
+]

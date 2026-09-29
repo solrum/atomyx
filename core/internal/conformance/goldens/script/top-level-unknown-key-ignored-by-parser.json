@@ -1,0 +1,17 @@
+{
+  "parsed": {
+    "_stepLines": [
+      6
+    ],
+    "appId": "com.example.app",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Smoke",
+    "steps": [
+      {
+        "command": "launchApp"
+      }
+    ]
+  },
+  "valid": true
+}

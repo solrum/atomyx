@@ -1,0 +1,6 @@
+{
+  "name": "bucket-bounds-empty",
+  "description": "an empty bounds string passes through unchanged rather than being split into four empty parts",
+  "function": "bucketBounds",
+  "bounds": ""
+}

@@ -1,0 +1,11 @@
+{
+  "name": "ctxkw-string-bare-identifier",
+  "description": "the cast name string resolves as a variable when not followed by a call.",
+  "expr": "string",
+  "variables": {
+    "string": {
+      "type": "string",
+      "string": "yo"
+    }
+  }
+}

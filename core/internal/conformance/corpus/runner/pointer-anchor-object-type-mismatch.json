@@ -1,0 +1,13 @@
+{
+  "name": "pointer-anchor-object-type-mismatch",
+  "description": "a sub-flow's pointer target anchor given an object instead of a string reports the mismatch as \"got object\", proving a script-parsed nested mapping renders its JavaScript typeof rather than its Go type name",
+  "yaml": "appId: com.test\nname: pointer anchor type mismatch\n---\n- launchApp\n- runFlow:\n    file: \"{{DIR}}/bad-anchor.yml\"\n",
+  "flowFiles": {
+    "bad-anchor.yml": "appId: com.bad\n---\n- pointer:\n    touches:\n      - actions:\n          - down:\n              selector:\n                id: target\n              anchor: {}\n          - up\n"
+  },
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

@@ -1,0 +1,122 @@
+package config
+
+const (
+	// PlatformAndroid and PlatformIOS are the two values AppEntry.Platform accepts.
+	PlatformAndroid = "android"
+	PlatformIOS     = "ios"
+
+	// LaunchModeFresh and LaunchModeAttach are the two values LaunchPolicy.Mode accepts.
+	LaunchModeFresh  = "fresh"
+	LaunchModeAttach = "attach"
+
+	// PreconditionsSkip and PreconditionsForce are the two values AtomyxConfig.Preconditions accepts.
+	PreconditionsSkip  = "skip"
+	PreconditionsForce = "force"
+
+	// ReportFormatHTML and ReportFormatJSON are the two values a Report.Formats entry accepts.
+	ReportFormatHTML = "html"
+	ReportFormatJSON = "json"
+)
+
+// AppEntry is one app variant a project can run, matching
+// AppEntrySchema in atomyx-config.schema.ts.
+type AppEntry struct {
+	ID       string  `json:"id"`
+	Platform string  `json:"platform"`
+	AppID    string  `json:"appId"`
+	Artifact *string `json:"artifact,omitempty"`
+}
+
+// EnvironmentEntry is one named environment, matching
+// EnvironmentEntrySchema.
+//
+// Vars is a pointer so a document that writes `vars: {}` marshals as
+// a present, empty object, distinct from omitting `vars` entirely, because
+// encoding/json's omitempty treats a nil and a zero-length map the
+// same way, which a plain (non-pointer) map field cannot avoid.
+type EnvironmentEntry struct {
+	App    string             `json:"app"`
+	Vars   *map[string]string `json:"vars,omitempty"`
+	Device *string            `json:"device,omitempty"`
+	Proxy  *string            `json:"proxy,omitempty"`
+}
+
+// LaunchPolicy is the project-wide default launch policy, matching
+// LaunchPolicySchema.
+type LaunchPolicy struct {
+	Mode      *string `json:"mode,omitempty"`
+	ClearData *bool   `json:"clearData,omitempty"`
+}
+
+// Report is the default report output configuration, matching
+// ReportSchema.
+type Report struct {
+	Formats []string `json:"formats"`
+	OutDir  string   `json:"outDir"`
+}
+
+// SuiteEntry is one named test selector, matching SuiteEntrySchema.
+//
+// Tags and Globs are pointers for the same reason as
+// EnvironmentEntry.Vars: a present-but-empty array must marshal as
+// `[]`, not be dropped the way omitempty would drop a plain
+// zero-length slice.
+type SuiteEntry struct {
+	Tags  *[]string `json:"tags,omitempty"`
+	Globs *[]string `json:"globs,omitempty"`
+}
+
+// AtomyxConfig is the top-level Atomyx project config, matching
+// AtomyxConfigSchema and its z.infer'd AtomyxConfig type.
+//
+// EnvironmentOrder holds the declaration order of Environments' keys
+// as they appeared in the source YAML document, carried alongside the
+// map only so SelectEnvironment can list "Available environments" in
+// a stable, reproducible order, since a plain Go map has no iteration
+// order of its own.
+type AtomyxConfig struct {
+	Project          string                      `json:"project"`
+	Apps             []AppEntry                  `json:"apps"`
+	Environments     map[string]EnvironmentEntry `json:"environments"`
+	EnvironmentOrder []string                    `json:"-"`
+	Launch           *LaunchPolicy               `json:"launch,omitempty"`
+	Preconditions    *string                     `json:"preconditions,omitempty"`
+	Report           *Report                     `json:"report,omitempty"`
+	Suites           *map[string]SuiteEntry      `json:"suites,omitempty"`
+	TestRoots        *[]string                   `json:"testRoots,omitempty"`
+	DataRoots        *[]string                   `json:"dataRoots,omitempty"`
+}
+
+// LoadedConfig is a project config that was found and validated, plus
+// the absolute path it was read from. Every `${ENV:NAME}` placeholder
+// inside an environment's `vars` has already been substituted from
+// the process environment by the time a LoadedConfig exists.
+type LoadedConfig struct {
+	Path   string
+	Config AtomyxConfig
+}
+
+// LoadOptions selects how Load locates a config file. An empty
+// ConfigPath means discovery; a non-empty one bypasses discovery and
+// is resolved relative to Cwd.
+type LoadOptions struct {
+	Cwd        string
+	ConfigPath string
+}
+
+// ResolvedEnvironment is one config environment resolved to concrete
+// values a run can use directly: the app id it targets, its
+// variables, and the device and proxy defaults it declares.
+//
+// Platform always comes from the selected app's own Platform field,
+// never from the environment. An environment has no platform
+// override.
+type ResolvedEnvironment struct {
+	Name     string            `json:"name"`
+	AppID    string            `json:"appId"`
+	Vars     map[string]string `json:"vars"`
+	Platform string            `json:"platform"`
+	DeviceID *string           `json:"deviceId,omitempty"`
+	Proxy    *string           `json:"proxy,omitempty"`
+	Artifact *string           `json:"artifact,omitempty"`
+}

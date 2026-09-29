@@ -1,0 +1,5 @@
+{
+  "name": "cast-number-invalid-empty-string",
+  "description": "number() rejects an empty string.",
+  "expr": "number(\"\")"
+}

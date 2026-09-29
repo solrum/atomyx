@@ -1,0 +1,10 @@
+{
+  "name": "handle-timeout-otherwise-fail",
+  "description": "handle fails the step once no branch matches within the default timeout, having polled the clock to its deadline",
+  "yaml": "appId: com.test\nname: handle timeout fail\nenv: {}\n---\n- handle:\n    - when:\n        visible: Nonexistent\n      do:\n        - back\n    - otherwise: fail\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

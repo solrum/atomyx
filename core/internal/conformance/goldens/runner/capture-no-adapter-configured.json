@@ -1,0 +1,136 @@
+{
+  "calls": [
+    {
+      "args": [
+        "com.test",
+        {}
+      ],
+      "method": "launchApp"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "line": 5,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "capture",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 6,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "capture: loginRsp ← \"POST /api/login\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "capture"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "loginRsp"
+        },
+        {
+          "kind": "punct",
+          "text": " ← "
+        },
+        {
+          "kind": "string",
+          "text": "\"POST /api/login\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "capture",
+      "depth": 0,
+      "detail": "No network capture adapter configured. Pass --proxy to the CLI or set captureConfig in runner options.",
+      "durationMs": 0,
+      "line": 6,
+      "ok": false,
+      "stepIndex": 1,
+      "summary": "capture: loginRsp ← \"POST /api/login\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "capture"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "loginRsp"
+        },
+        {
+          "kind": "punct",
+          "text": " ← "
+        },
+        {
+          "kind": "string",
+          "text": "\"POST /api/login\""
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": 1,
+  "ok": false,
+  "passedSteps": 1,
+  "screenshots": [],
+  "scriptName": "capture no adapter",
+  "steps": [
+    {
+      "command": "launchApp",
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    },
+    {
+      "command": "capture",
+      "detail": "No network capture adapter configured. Pass --proxy to the CLI or set captureConfig in runner options.",
+      "durationMs": 0,
+      "ok": false,
+      "stepIndex": 1
+    }
+  ],
+  "totalSteps": 2
+}

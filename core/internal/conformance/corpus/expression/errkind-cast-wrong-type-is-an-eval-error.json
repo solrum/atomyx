@@ -1,0 +1,5 @@
+{
+  "name": "errkind-cast-wrong-type-is-an-eval-error",
+  "description": "calling a cast function with an argument of the wrong type is an evaluation-time error.",
+  "expr": "number(true)"
+}

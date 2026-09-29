@@ -1,0 +1,5 @@
+{
+  "name": "defaults-single-doc-with-steps-key",
+  "description": "single YAML document combining config and a `steps:` key, instead of the two-document --- form.",
+  "yaml": "appId: com.example.app\nname: Single document form\nenv: {}\nsteps:\n  - launchApp\n  - tap: \"Login\"\n"
+}

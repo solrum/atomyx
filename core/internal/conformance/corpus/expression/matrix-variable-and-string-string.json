@@ -1,0 +1,15 @@
+{
+  "name": "matrix-variable-and-string-string",
+  "description": "variable string \"and\" variable string, proving lookup-typed values take the same path as literals.",
+  "expr": "ls and rs",
+  "variables": {
+    "ls": {
+      "type": "string",
+      "string": "a"
+    },
+    "rs": {
+      "type": "string",
+      "string": "a"
+    }
+  }
+}

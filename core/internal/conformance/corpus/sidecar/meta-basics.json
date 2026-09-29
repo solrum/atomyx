@@ -1,0 +1,8 @@
+{
+  "name": "meta-basics",
+  "description": "protocolVersion and ping report the same handshake values with no device involved. listMethods is intentionally excluded: this Go build registers fewer feature groups than the full TypeScript sidecar (ios-agent, android-agent, and mirror-input are out of scope), so its method list is a strict, expected subset rather than a match.",
+  "steps": [
+    { "method": "protocolVersion" },
+    { "method": "ping" }
+  ]
+}

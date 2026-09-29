@@ -1,0 +1,10 @@
+{
+  "name": "run-flow-missing-file-not-found",
+  "description": "runFlow's target file does not exist, reporting \"Sub-flow file not found\" with the resolved absolute path as a normal failed step rather than aborting the run",
+  "yaml": "appId: com.test\nname: runFlow missing file\n---\n- launchApp\n- runFlow:\n    file: \"{{DIR}}/missing-sub-flow.yml\"\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

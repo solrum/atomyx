@@ -12,10 +12,10 @@ import dev.atomyx.agent.control.UiTreeService
  * focused the target field before invoking.
  *
  * Strategy order:
- *   1. SetTextStrategy — ACTION_SET_TEXT("") on the focused node.
- *   2. SelectAllKeyEventStrategy — ACTION_SET_SELECTION(0,len) + ACTION_CUT.
- *   3. LongPressSelectAllStrategy — long-press → poll for menu → tap → cut.
- *   4. KeypadBackspaceStrategy — tap an on-screen backspace key N times.
+ *   1. SetTextStrategy: ACTION_SET_TEXT("") on the focused node.
+ *   2. SelectAllKeyEventStrategy: ACTION_SET_SELECTION(0,len) + ACTION_CUT.
+ *   3. LongPressSelectAllStrategy: long-press, then poll for menu, then tap, then cut.
+ *   4. KeypadBackspaceStrategy: tap an on-screen backspace key N times.
  */
 class ClearTextChain(
     private val service: AccessibilityService,
@@ -33,7 +33,7 @@ class ClearTextChain(
         val root = service.rootInActiveWindow
             ?: return TapResult(false, "no active window")
         val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-            ?: return TapResult(false, "no input-focused node — tap the target field first")
+            ?: return TapResult(false, "no input-focused node, so tap the target field first")
 
         val initialText: String
         val hintText: CharSequence?
@@ -83,7 +83,7 @@ class ClearTextChain(
     private fun verifyCleared(hintText: CharSequence?): Boolean {
         val root = service.rootInActiveWindow ?: return false
         val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-            ?: return true // node gone — field cleared or dismissed
+            ?: return true // node gone, which means the field was cleared or dismissed
         return try {
             val text = focused.text?.toString() ?: ""
             text.isEmpty() || (!hintText.isNullOrEmpty() && text.contentEquals(hintText))

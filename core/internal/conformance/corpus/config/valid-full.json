@@ -1,0 +1,6 @@
+{
+  "name": "valid-full",
+  "description": "A config exercising every optional field validates and resolves the named environment.",
+  "yaml": "project: Demo\napps:\n  - id: main\n    platform: android\n    appId: com.example.app\n    artifact: /builds/app.apk\n  - id: alt\n    platform: ios\n    appId: com.example.alt\nenvironments:\n  staging:\n    app: main\n    device: emulator-5554\n    proxy: staging-proxy\n    vars:\n      apiUrl: https://staging.example.com\n  prod:\n    app: alt\nlaunch:\n  mode: fresh\n  clearData: true\npreconditions: skip\nreport:\n  formats: [html, json]\n  outDir: reports\nsuites:\n  smoke:\n    tags: [smoke]\n  regression:\n    globs: [\"tests/regression/**\"]\ntestRoots: [tests]\ndataRoots: [fixtures]\n",
+  "envName": "staging"
+}

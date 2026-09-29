@@ -1,8 +1,7 @@
-//! Node sidecar process manager.
+//! Atomyx runtime sidecar process manager.
 //!
-//! Spawns `node <script>` where `<script>` is the compiled
-//! `@atomyx/sidecar` entrypoint. Owns the stdio pipes and routes
-//! JSON-RPC traffic:
+//! Spawns the Atomyx Go runtime binary directly and owns the stdio
+//! pipes, routing JSON-RPC traffic:
 //!
 //!   - responses (with `id`) resolve the matching pending future
 //!   - events (with `event`) are fanned out on a broadcast channel
@@ -40,22 +39,19 @@ pub struct Sidecar {
 
 impl Sidecar {
     pub async fn spawn(app_handle: Option<&tauri::AppHandle>) -> StudioResult<Arc<Self>> {
-        let script = resolve_sidecar_script(app_handle)?;
-        let node_bin =
-            std::env::var("ATOMYX_NODE_BIN").unwrap_or_else(|_| "node".to_string());
+        let binary = resolve_runtime_binary(app_handle)?;
+        ensure_executable(&binary);
 
-        let mut cmd = Command::new(&node_bin);
-        cmd.arg(&script)
-            .stdin(Stdio::piped())
+        let mut cmd = Command::new(&binary);
+        cmd.stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
 
         let mut child = cmd.spawn().map_err(|e| {
             StudioError::Message(format!(
-                "failed to spawn sidecar ({} {}): {}",
-                node_bin,
-                script.display(),
+                "failed to spawn sidecar ({}): {}",
+                binary.display(),
                 e
             ))
         })?;
@@ -202,40 +198,55 @@ async fn handle_line(
     }
 }
 
-fn resolve_sidecar_script(app_handle: Option<&tauri::AppHandle>) -> StudioResult<PathBuf> {
+/// Best-effort executable-bit guarantee. A bundled resource copy of
+/// the binary can lose its mode bits during packaging, so restore
+/// the owner-execute bit before every spawn attempt. Failures are
+/// ignored: a missing or unreadable file is caught by the spawn
+/// call right after, which reports a clearer error.
+#[cfg(unix)]
+fn ensure_executable(path: &std::path::Path) {
+    use std::os::unix::fs::PermissionsExt;
+    if let Ok(meta) = std::fs::metadata(path) {
+        let mut perms = meta.permissions();
+        if perms.mode() & 0o100 == 0 {
+            perms.set_mode(0o755);
+            let _ = std::fs::set_permissions(path, perms);
+        }
+    }
+}
+
+#[cfg(not(unix))]
+fn ensure_executable(_path: &std::path::Path) {}
+
+fn resolve_runtime_binary(app_handle: Option<&tauri::AppHandle>) -> StudioResult<PathBuf> {
     // Explicit override wins for CI / integration tests.
-    if let Ok(p) = std::env::var("ATOMYX_SIDECAR_SCRIPT") {
+    if let Ok(p) = std::env::var("ATOMYX_RUNTIME_BIN") {
         let path = PathBuf::from(p);
         if path.exists() {
             return Ok(path);
         }
     }
 
-    // Production: Tauri-bundled resource under Resources/sidecar.cjs.
+    // Production: Tauri-bundled resource under Resources/atomyx-runtime.
     if let Some(app) = app_handle {
         use tauri::Manager;
         if let Ok(res) = app.path().resource_dir() {
-            let bundled = res.join("sidecar.cjs");
+            let bundled = res.join("atomyx-runtime");
             if bundled.exists() {
                 return Ok(bundled);
-            }
-            let bundled_js = res.join("sidecar.js");
-            if bundled_js.exists() {
-                return Ok(bundled_js);
             }
         }
     }
 
-    // Development layouts, relative to the process cwd.
+    // Development layout: the repo-root core build output, discovered
+    // by walking up from the process cwd until core/bin/atomyx-runtime
+    // is found.
     let here = std::env::current_dir()
         .map_err(|e| StudioError::Message(e.to_string()))?;
     let candidates = [
-        here.join("../../packages/sidecar/dist-bundle/sidecar.cjs"),
-        here.join("../../../packages/sidecar/dist-bundle/sidecar.cjs"),
-        here.join("packages/sidecar/dist-bundle/sidecar.cjs"),
-        here.join("../../packages/sidecar/dist/index.js"),
-        here.join("../../../packages/sidecar/dist/index.js"),
-        here.join("packages/sidecar/dist/index.js"),
+        here.join("../../core/bin/atomyx-runtime"),
+        here.join("../../../core/bin/atomyx-runtime"),
+        here.join("core/bin/atomyx-runtime"),
     ];
     for c in candidates {
         if c.exists() {
@@ -244,6 +255,6 @@ fn resolve_sidecar_script(app_handle: Option<&tauri::AppHandle>) -> StudioResult
     }
 
     Err(StudioError::Message(
-        "sidecar script not found — set ATOMYX_SIDECAR_SCRIPT, build packages/sidecar, or install Atomyx Studio from a bundle".into(),
+        "runtime binary not found — set ATOMYX_RUNTIME_BIN, run `make build-core`, or install Atomyx Studio from a bundle".into(),
     ))
 }

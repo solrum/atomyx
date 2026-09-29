@@ -38,6 +38,11 @@ data class RouteResponse(
             "application/json",
             """{"error":"$message"}""",
         )
+        fun badRequest(message: String) = RouteResponse(
+            NanoHTTPD.Response.Status.BAD_REQUEST,
+            "application/json",
+            """{"error":"${message.replace("\"", "\\\"")}"}""",
+        )
         fun serviceUnavailable(message: String) = RouteResponse(
             NanoHTTPD.Response.Status.SERVICE_UNAVAILABLE,
             "application/json",

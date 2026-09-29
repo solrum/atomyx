@@ -1,0 +1,19 @@
+[
+  {
+    "attributes": {
+      "hint": "Email",
+      "id": "b",
+      "role": "text-field"
+    },
+    "children": [],
+    "focused": true
+  },
+  {
+    "attributes": {
+      "hint": "Email",
+      "id": "a",
+      "role": "text-field"
+    },
+    "children": []
+  }
+]

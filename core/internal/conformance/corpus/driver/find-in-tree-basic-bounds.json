@@ -1,0 +1,17 @@
+{
+  "name": "find-in-tree-basic-bounds",
+  "description": "the first match's bounds attribute resolves to a parsed rectangle and its geometric center point",
+  "function": "find-in-tree",
+  "selector": { "id": "login_btn" },
+  "tree": {
+    "attributes": { "role": "container" },
+    "children": [
+      {
+        "attributes": { "role": "button", "id": "login_btn", "text": "Sign in", "bounds": "10,20,110,60" },
+        "children": [],
+        "enabled": true,
+        "clickable": true
+      }
+    ]
+  }
+}

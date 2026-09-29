@@ -1,0 +1,11 @@
+{
+  "name": "var-bare-boolean",
+  "description": "a bare boolean variable reference.",
+  "expr": "b",
+  "variables": {
+    "b": {
+      "type": "boolean",
+      "boolean": true
+    }
+  }
+}

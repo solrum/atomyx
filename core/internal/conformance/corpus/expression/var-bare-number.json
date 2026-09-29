@@ -1,0 +1,11 @@
+{
+  "name": "var-bare-number",
+  "description": "a bare number variable reference.",
+  "expr": "n",
+  "variables": {
+    "n": {
+      "type": "number",
+      "number": "42"
+    }
+  }
+}

@@ -3,13 +3,13 @@ import CoreGraphics
 
 /// Tap at raw point coordinates in device-global point space
 /// (origin = top-left of the full screen). The synthesizer
-/// dispatches to whichever app is currently frontmost — no
-/// `launchApp` required.
+/// dispatches to whichever app is currently frontmost, so no
+/// `launchApp` is required.
 ///
 /// Request args: `x` and `y` as Double | Int | String (parsed).
 ///
 /// Coordinate space is POINTS, not pixels. iPhone 16 Pro Max reports
-/// 440×956 via `XCUIApplication.frame` — slightly larger than the
+/// 440×956 via `XCUIApplication.frame`, slightly larger than the
 /// nominal 430×932 logical size, likely because the reported frame
 /// includes the status bar / home indicator safe areas. Callers should
 /// compute target coordinates from the element midpoints returned by
@@ -17,14 +17,14 @@ import CoreGraphics
 ///
 /// Dispatch routes through `EventSynthesizer` rather than
 /// calling `XCUICoordinate.tap()` directly. The shared waypoint
-/// shape means a tap is just a single-waypoint pointer path —
+/// shape means a tap is just a single-waypoint pointer path, so
 /// the same backend that dispatches a pinch dispatches a tap.
 final class TapAtCommand: CommandHandler {
     let type = "tapAt"
 
     /// Gesture dispatch posts its completion block to the main
     /// queue and waits on a semaphore. Running this on main would
-    /// deadlock — so tapAt joins dispatchPointer on the background
+    /// deadlock, so tapAt joins dispatchPointer on the background
     /// accept queue.
     let requiresMainThread = false
 
@@ -46,7 +46,8 @@ final class TapAtCommand: CommandHandler {
         do {
             try synthesizer.dispatch(pointers: [path])
         } catch {
-            return .error(id: request.id, message: "tap dispatch failed: \(error)")
+            NSLog("[atomyx] tapAt dispatch failed: \(error)")
+            return .error(id: request.id, message: "The tap could not be dispatched on this device.")
         }
         return .ok(id: request.id, data: ["x": x, "y": y])
     }

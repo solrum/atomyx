@@ -1,0 +1,5 @@
+{
+  "name": "invalid-top-level-unknown-key",
+  "description": "An unrecognized top-level key fails the strict object check.",
+  "yaml": "project: Demo\napps:\n  - id: main\n    platform: android\n    appId: com.example.app\nenvironments:\n  staging:\n    app: main\nbogusTopLevelField: nope\n"
+}

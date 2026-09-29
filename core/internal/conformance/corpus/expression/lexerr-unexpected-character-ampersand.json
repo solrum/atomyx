@@ -1,0 +1,5 @@
+{
+  "name": "lexerr-unexpected-character-ampersand",
+  "description": "an unrecognized character (&) in the source.",
+  "expr": "1 & 2"
+}

@@ -1,0 +1,323 @@
+{
+  "calls": [
+    {
+      "args": [
+        "com.test",
+        {}
+      ],
+      "method": "launchApp"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 6,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "line": 6,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "capture",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 7,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "capture: loginRsp ← \"POST /api/v1/auth/login\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "capture"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "loginRsp"
+        },
+        {
+          "kind": "punct",
+          "text": " ← "
+        },
+        {
+          "kind": "string",
+          "text": "\"POST /api/v1/auth/login\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "capture",
+      "depth": 0,
+      "detail": "Captured POST /api/v1/auth/login returning status 200 as \"loginRsp\"",
+      "durationMs": 0,
+      "line": 7,
+      "ok": true,
+      "stepIndex": 1,
+      "summary": "capture: loginRsp ← \"POST /api/v1/auth/login\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "capture"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "loginRsp"
+        },
+        {
+          "kind": "punct",
+          "text": " ← "
+        },
+        {
+          "kind": "string",
+          "text": "\"POST /api/v1/auth/login\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "assertApi",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 8,
+      "ok": null,
+      "stepIndex": 2,
+      "summary": "assertApi: $loginRsp with status=200, body×1",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "assertApi"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "$loginRsp"
+        },
+        {
+          "kind": "punct",
+          "text": " with "
+        },
+        {
+          "kind": "string",
+          "text": "status=200, body×1"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "assertApi",
+      "depth": 0,
+      "detail": "API assertion passed for \"loginRsp\" (POST /api/v1/auth/login)",
+      "durationMs": 0,
+      "line": 8,
+      "ok": true,
+      "stepIndex": 2,
+      "summary": "assertApi: $loginRsp with status=200, body×1",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "assertApi"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "$loginRsp"
+        },
+        {
+          "kind": "punct",
+          "text": " with "
+        },
+        {
+          "kind": "string",
+          "text": "status=200, body×1"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "extract",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 13,
+      "ok": null,
+      "stepIndex": 3,
+      "summary": "extract: $loginRsp into userId",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "extract"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "$loginRsp"
+        },
+        {
+          "kind": "punct",
+          "text": " into "
+        },
+        {
+          "kind": "string",
+          "text": "userId"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "extract",
+      "depth": 0,
+      "detail": "Extracted: userId=42",
+      "durationMs": 0,
+      "line": 13,
+      "ok": true,
+      "stepIndex": 3,
+      "summary": "extract: $loginRsp into userId",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "extract"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "$loginRsp"
+        },
+        {
+          "kind": "punct",
+          "text": " into "
+        },
+        {
+          "kind": "string",
+          "text": "userId"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "assertExpr",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 17,
+      "ok": null,
+      "stepIndex": 4,
+      "summary": "assertExpr",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "assertExpr"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "assertExpr",
+      "depth": 0,
+      "detail": "Assertion passed: \"userId == \"42\"\"",
+      "durationMs": 0,
+      "line": 17,
+      "ok": true,
+      "stepIndex": 4,
+      "summary": "assertExpr",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "assertExpr"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 5,
+  "screenshots": [],
+  "scriptName": "api happy path",
+  "steps": [
+    {
+      "command": "launchApp",
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    },
+    {
+      "command": "capture",
+      "detail": "Captured POST /api/v1/auth/login returning status 200 as \"loginRsp\"",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 1
+    },
+    {
+      "command": "assertApi",
+      "detail": "API assertion passed for \"loginRsp\" (POST /api/v1/auth/login)",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 2
+    },
+    {
+      "command": "extract",
+      "detail": "Extracted: userId=42",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 3
+    },
+    {
+      "command": "assertExpr",
+      "detail": "Assertion passed: \"userId == \"42\"\"",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 4
+    }
+  ],
+  "totalSteps": 5
+}

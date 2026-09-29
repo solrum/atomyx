@@ -1,0 +1,135 @@
+{
+  "name": "ios-traits-priority",
+  "description": "traitsToRole priority ordering across overlapping trait sets",
+  "rawTree": {
+    "elementType": "other",
+    "identifier": "traits-root",
+    "children": [
+      {
+        "elementType": "staticText",
+        "identifier": "p01",
+        "label": "Search",
+        "traits": [
+          "staticText",
+          "image",
+          "button",
+          "link",
+          "header",
+          "keyboardKey",
+          "searchField"
+        ]
+      },
+      {
+        "elementType": "button",
+        "identifier": "p02",
+        "label": "A",
+        "traits": [
+          "staticText",
+          "image",
+          "button",
+          "link",
+          "header",
+          "keyboardKey"
+        ]
+      },
+      {
+        "elementType": "button",
+        "identifier": "p03",
+        "label": "Title",
+        "traits": [
+          "staticText",
+          "image",
+          "button",
+          "link",
+          "header"
+        ]
+      },
+      {
+        "elementType": "staticText",
+        "identifier": "p04",
+        "label": "Terms",
+        "traits": [
+          "staticText",
+          "image",
+          "button",
+          "link"
+        ]
+      },
+      {
+        "elementType": "staticText",
+        "identifier": "p05",
+        "label": "Card",
+        "traits": [
+          "button",
+          "image"
+        ]
+      },
+      {
+        "elementType": "staticText",
+        "identifier": "p06",
+        "label": "Submit",
+        "traits": [
+          "button",
+          "staticText"
+        ]
+      },
+      {
+        "elementType": "button",
+        "identifier": "p07",
+        "label": "Icon + text",
+        "traits": [
+          "image",
+          "staticText"
+        ]
+      },
+      {
+        "elementType": "button",
+        "identifier": "p08",
+        "label": "Photo",
+        "traits": [
+          "image"
+        ]
+      },
+      {
+        "elementType": "button",
+        "identifier": "p09",
+        "label": "Caption",
+        "traits": [
+          "staticText"
+        ]
+      },
+      {
+        "elementType": "button",
+        "identifier": "p10",
+        "label": "Tab one",
+        "traits": [
+          "selected",
+          "notEnabled",
+          "adjustable",
+          "summaryElement"
+        ]
+      },
+      {
+        "elementType": "cell",
+        "identifier": "p11",
+        "label": "Row",
+        "traits": []
+      },
+      {
+        "elementType": "cell",
+        "identifier": "p12",
+        "label": "Row",
+        "traits": null
+      },
+      {
+        "elementType": "keyboard",
+        "identifier": "p13",
+        "traits": [
+          "button",
+          "searchField",
+          "header"
+        ]
+      }
+    ]
+  }
+}

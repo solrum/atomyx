@@ -1,0 +1,5 @@
+{
+  "name": "invalid-assert-api-status-out-of-range",
+  "description": "an assertApi status outside 100-599 must be REJECTED.",
+  "yaml": "- launchApp\n- assertApi: { from: loginRsp, status: 999 }\n"
+}

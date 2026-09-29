@@ -1,0 +1,234 @@
+version: 3
+workdir: .
+
+allow:
+  depOnAnyVendor: true
+  ignoreNotFoundComponents: true
+
+commonComponents:
+  - clock
+  - logging
+  - version
+
+components:
+  clock:
+    in: internal/clock
+  logging:
+    in: internal/logging
+  version:
+    in: internal/version
+  diag:
+    in: internal/diag
+  wire:
+    in: internal/wire
+  transport:
+    in: internal/transport
+  driver:
+    in: internal/driver
+  drivermock:
+    in: internal/driver/mock
+  drivertest:
+    in: internal/driver/drivertest
+  process:
+    in: internal/process
+  androiddriver:
+    in: internal/androiddriver
+  iosdriver:
+    in: internal/iosdriver
+  iossimdriver:
+    in: internal/iossimdriver
+  orchestra:
+    in: internal/orchestra
+  script:
+    in: internal/script
+  expression:
+    in: internal/script/expression
+  runner:
+    in: internal/runner
+  scenario:
+    in: internal/scenario
+  netcapture:
+    in: internal/netcapture
+  conformance:
+    in: internal/conformance
+  device:
+    in: internal/device
+  suite:
+    in: internal/suite
+  sidecar:
+    in: internal/sidecar
+  cli:
+    in: internal/cli
+  skills:
+    in: internal/skills
+  storage:
+    in: internal/storage
+  mcp:
+    in: internal/mcp
+  config:
+    in: internal/config
+  report:
+    in: internal/report
+  cmd:
+    in: cmd/**
+
+deps:
+  diag:
+    mayDependOn:
+      - diag
+  wire:
+    anyVendorDeps: true
+  transport:
+    mayDependOn:
+      - wire
+      - diag
+  driver:
+    mayDependOn:
+      - wire
+      - transport
+  drivermock:
+    mayDependOn:
+      - wire
+      - driver
+      - drivermock
+      - drivertest
+      - diag
+  drivertest:
+    mayDependOn:
+      - wire
+      - driver
+      - drivermock
+      - diag
+  process:
+    anyVendorDeps: true
+    mayDependOn:
+      - diag
+  androiddriver:
+    mayDependOn:
+      - wire
+      - transport
+      - driver
+      - process
+      - androiddriver
+      - drivertest
+      - diag
+  iosdriver:
+    mayDependOn:
+      - wire
+      - transport
+      - driver
+      - process
+      - iosdriver
+      - drivertest
+      - diag
+  iossimdriver:
+    mayDependOn:
+      - wire
+      - transport
+      - driver
+      - process
+      - iosdriver
+      - iossimdriver
+      - drivertest
+      - diag
+  orchestra:
+    mayDependOn:
+      - wire
+      - driver
+      - drivermock
+      - diag
+  script:
+    mayDependOn:
+      - wire
+      - driver
+      - orchestra
+  runner:
+    mayDependOn:
+      - wire
+      - driver
+      - drivermock
+      - orchestra
+      - script
+      - expression
+      - diag
+  scenario:
+    mayDependOn:
+      - wire
+      - driver
+      - drivermock
+      - orchestra
+      - script
+      - runner
+  netcapture:
+    mayDependOn:
+      - runner
+  conformance:
+    anyProjectDeps: true
+  device:
+    mayDependOn:
+      - wire
+      - driver
+      - androiddriver
+      - iosdriver
+      - iossimdriver
+      - transport
+      - orchestra
+      - process
+      - drivermock
+  suite:
+    anyVendorDeps: true
+  sidecar:
+    mayDependOn:
+      - wire
+      - device
+      - driver
+      - drivermock
+      - orchestra
+      - process
+      - script
+      - expression
+      - runner
+      - scenario
+  cli:
+    mayDependOn:
+      - wire
+      - driver
+      - drivermock
+      - orchestra
+      - script
+      - expression
+      - runner
+      - device
+      - netcapture
+      - report
+      - config
+      - scenario
+      - suite
+      - skills
+      - diag
+  skills:
+    anyVendorDeps: true
+  storage:
+    anyVendorDeps: true
+  mcp:
+    mayDependOn:
+      - wire
+      - driver
+      - drivermock
+      - orchestra
+      - script
+      - expression
+      - runner
+      - device
+      - storage
+      - diag
+      - netcapture
+  config:
+    anyVendorDeps: true
+  report:
+    mayDependOn:
+      - runner
+      - scenario
+      - config
+  cmd:
+    anyProjectDeps: true

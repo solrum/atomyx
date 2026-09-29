@@ -1,0 +1,150 @@
+{
+  "attributes": {
+    "class": "other",
+    "id": "traits-root",
+    "role": "other"
+  },
+  "children": [
+    {
+      "attributes": {
+        "class": "staticText",
+        "ext:ios-traits": "staticText,image,button,link,header,keyboardKey,searchField",
+        "id": "p01",
+        "label": "Search",
+        "role": "search-field"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "button",
+        "ext:ios-traits": "staticText,image,button,link,header,keyboardKey",
+        "id": "p02",
+        "label": "A",
+        "role": "key"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "button",
+        "ext:ios-traits": "staticText,image,button,link,header",
+        "id": "p03",
+        "role": "heading",
+        "text": "Title"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "staticText",
+        "ext:ios-traits": "staticText,image,button,link",
+        "id": "p04",
+        "label": "Terms",
+        "role": "link"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "staticText",
+        "ext:ios-traits": "button,image",
+        "id": "p05",
+        "label": "Card",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "staticText",
+        "ext:ios-traits": "button,staticText",
+        "id": "p06",
+        "label": "Submit",
+        "role": "button"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "button",
+        "ext:ios-traits": "image,staticText",
+        "id": "p07",
+        "label": "Icon + text",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "button",
+        "ext:ios-traits": "image",
+        "id": "p08",
+        "label": "Photo",
+        "role": "image"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "button",
+        "ext:ios-traits": "staticText",
+        "id": "p09",
+        "role": "text",
+        "text": "Caption"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "button",
+        "ext:ios-traits": "selected,notEnabled,adjustable,summaryElement",
+        "id": "p10",
+        "label": "Tab one",
+        "role": "button"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "cell",
+        "id": "p11",
+        "label": "Row",
+        "role": "cell"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "cell",
+        "id": "p12",
+        "label": "Row",
+        "role": "cell"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "keyboard",
+        "ext:ios-traits": "button,searchField,header",
+        "id": "p13",
+        "role": "keyboard"
+      },
+      "children": [],
+      "clickable": true
+    }
+  ],
+  "clickable": false
+}

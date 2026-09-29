@@ -1,0 +1,137 @@
+{
+  "attributes": {
+    "class": "window",
+    "id": "click-root",
+    "role": "container"
+  },
+  "children": [
+    {
+      "attributes": {
+        "class": "group",
+        "id": "c01",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "group",
+        "ext:ios-traits": "button",
+        "id": "c02",
+        "role": "button"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "group",
+        "ext:ios-traits": "link",
+        "id": "c03",
+        "role": "link"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "bounds": "0,0,200,150",
+        "class": "staticText",
+        "ext:ios-traits": "button",
+        "id": "c04",
+        "label": "Merged card",
+        "role": "button"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "staticText",
+        "id": "c05",
+        "role": "text",
+        "text": "Plain text"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "cell",
+        "id": "c06",
+        "role": "cell"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "key",
+        "id": "c07",
+        "label": "q",
+        "role": "key"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "keyboard",
+        "id": "c08",
+        "role": "keyboard"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "tab",
+        "id": "c09",
+        "role": "other"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "toggle",
+        "id": "c10",
+        "role": "switch"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "popupButton",
+        "id": "c11",
+        "role": "button"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "image",
+        "ext:ios-traits": "image,button",
+        "id": "c12",
+        "label": "Icon card",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "other",
+        "ext:ios-traits": "selected",
+        "id": "c13",
+        "role": "other"
+      },
+      "children": [],
+      "clickable": false
+    }
+  ],
+  "clickable": false
+}

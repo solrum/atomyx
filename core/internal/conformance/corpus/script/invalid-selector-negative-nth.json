@@ -1,0 +1,5 @@
+{
+  "name": "invalid-selector-negative-nth",
+  "description": "a selector's negative `nth` must be REJECTED.",
+  "yaml": "- launchApp\n- tap: { text: \"Item\", nth: -1 }\n"
+}

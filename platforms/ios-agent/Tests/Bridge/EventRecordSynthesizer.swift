@@ -13,7 +13,7 @@ import XCTest
 /// Concrete classes (`XCSynthesizedEventRecord`,
 /// `XCPointerEventPath`) do NOT go through message forwarding
 /// and therefore fail `as?` protocol casts even when the
-/// selectors exist — we dispatch those via direct IMP casts
+/// selectors exist, so we dispatch those via direct IMP casts
 /// (see `impAs` below).
 @objc private protocol _AtomyxDaemonSessionXPC {
     @objc(_XCT_synthesizeEvent:completion:)
@@ -22,11 +22,11 @@ import XCTest
 
 /// XCSynthesizedEventRecord-based gesture synthesizer. This is
 /// the ONLY file in the repo that touches `XCSynth*` /
-/// `XCPointerEventPath` symbols — a grep for
+/// `XCPointerEventPath` symbols. A grep for
 /// `NSClassFromString("XCSynth` returns exactly one match (here).
 /// All access goes through Objective-C runtime reflection
 /// (`NSClassFromString`, `performSelector:`, IMP cast) so the
-/// binary carries no static references to those classes — if a
+/// binary carries no static references to those classes. If a
 /// symbol is missing at runtime, the probe fails and the factory
 /// falls back to `CoordinateSynthesizer`. The caller is
 /// responsible for honouring the probe result: never attempt to
@@ -66,7 +66,7 @@ final class EventRecordSynthesizer: EventSynthesizer {
         Self.lastProbeLog.isEmpty ? nil : Self.lastProbeLog
     }
 
-    func dispatch(pointers: [PointerPath]) throws {
+    func dispatch(pointers: [PointerPath]) throws -> [Data] {
         guard Self.isAvailable else {
             throw SynthesizerError.privateSymbolMissing(
                 symbol: "XCSynthesizedEventRecord (see probe log)"
@@ -113,7 +113,22 @@ final class EventRecordSynthesizer: EventSynthesizer {
             )
         }
 
-        try Self.dispatchRecord(record)
+        let captureOffsets = Self.captureOffsets(in: pointers)
+        return try Self.dispatchRecord(record, captureOffsets: captureOffsets)
+    }
+
+    /// Collects every `capture` waypoint's `atOffsetSeconds`, walking
+    /// pointers and their waypoints in order so the result lines up
+    /// with the order `dispatch`'s caller expects captured images
+    /// back in.
+    private static func captureOffsets(in pointers: [PointerPath]) -> [Double] {
+        var offsets: [Double] = []
+        for pointer in pointers {
+            for waypoint in pointer.waypoints where waypoint.phase == .capture {
+                offsets.append(waypoint.atOffsetSeconds)
+            }
+        }
+        return offsets
     }
 
     // MARK: - Path construction
@@ -136,7 +151,7 @@ final class EventRecordSynthesizer: EventSynthesizer {
         // Instantiate an XCPointerEventPath starting at the first
         // down waypoint's point + offset. See `dispatch` above
         // for the rationale on `class_createInstance` vs `alloc`.
-        // The init takes a `CGPoint` + `double` — primitives that
+        // The init takes a `CGPoint` + `double`, primitives that
         // `perform` can't marshal. We call the init via
         // NSInvocation to pass the primitive values correctly.
         guard let pathAny = class_createInstance(pathClass, 0),
@@ -152,7 +167,7 @@ final class EventRecordSynthesizer: EventSynthesizer {
         // waypoints with non-strictly-increasing offsets (the
         // init already recorded offset=first.atOffsetSeconds;
         // every subsequent event must be strictly later).
-        // Authors commonly emit `[down(0), up(0)]` for a tap —
+        // Authors commonly emit `[down(0), up(0)]` for a tap, so
         // we bump the next offset by a 10ms floor if it would
         // otherwise be non-increasing. 10ms matches XCUITest's
         // typical tap duration and comfortably exceeds the
@@ -160,6 +175,15 @@ final class EventRecordSynthesizer: EventSynthesizer {
         let minOffsetDelta: Double = 0.01
         var lastEmittedOffset = first.atOffsetSeconds
         for (i, wp) in pointer.waypoints.enumerated() {
+            // `capture` waypoints carry no XCPointerEventPath event of
+            // their own (the screenshot they schedule is driven off
+            // their raw atOffsetSeconds by the caller, see
+            // `captureOffsets`); skip them here so they neither
+            // perturb the strictly-increasing offset bump below nor
+            // hit the exhaustive phase switch.
+            if wp.phase == .capture {
+                continue
+            }
             let rawOffset = wp.atOffsetSeconds
             let effectiveOffset: Double
             if i == 0 {
@@ -184,6 +208,12 @@ final class EventRecordSynthesizer: EventSynthesizer {
                 try Self.invokeMove(on: path, toPoint: wp.point, atOffset: effectiveOffset)
             case .up:
                 try Self.invokeLiftUp(on: path, atOffset: effectiveOffset)
+            case .capture:
+                // Unreachable: the guard above this loop's body
+                // already `continue`s past every `capture` waypoint
+                // before this switch runs. Present so the switch
+                // stays exhaustive over `Phase`.
+                continue
             }
 
             if let pressure = wp.pressure {
@@ -202,7 +232,7 @@ final class EventRecordSynthesizer: EventSynthesizer {
     // argument types (CGPoint by value, Double). NSInvocation is
     // unavailable in Swift. The reliable path is to grab the raw
     // IMP from the ObjC runtime and cast it to a function pointer
-    // with the correct signature — Swift calls the function
+    // with the correct signature, and Swift calls the function
     // directly with full primitive ABI support.
 
     private static func invokeInit(
@@ -255,7 +285,17 @@ final class EventRecordSynthesizer: EventSynthesizer {
 
     // MARK: - Dispatch
 
-    private static func dispatchRecord(_ record: NSObject) throws {
+    /// Bounds how long `dispatchRecord` waits for every scheduled
+    /// mid-gesture capture to finish after the synthesized gesture
+    /// itself has already completed. Each capture is scheduled to
+    /// fire well inside the gesture's hold (strictly between its
+    /// `down` and `up`), so by the time the gesture's own completion
+    /// semaphore signals, every capture has normally already run;
+    /// this bound only guards against a pathologically slow
+    /// screenshot call.
+    private static let captureCompletionTimeoutSeconds: TimeInterval = 10
+
+    private static func dispatchRecord(_ record: NSObject, captureOffsets: [Double]) throws -> [Data] {
         guard let sessionCls = NSClassFromString("XCTRunnerDaemonSession") as? NSObject.Type else {
             throw SynthesizerError.privateSymbolMissing(symbol: "XCTRunnerDaemonSession")
         }
@@ -281,7 +321,7 @@ final class EventRecordSynthesizer: EventSynthesizer {
         // auto-retains the argument and crashes; even
         // `(AnyObject?)` crashes via `swift_unknownObjectRetain`.
         // Build the block in Objective-C so it never touches the
-        // argument — see AtomyxBlockHelper.m for the rationale.
+        // argument. See AtomyxBlockHelper.m for the rationale.
         // Capture-free block: pass the semaphore in as a parameter
         // to the ObjC helper so the resulting block has no Swift
         // captures. XPC's _Block_copy doesn't survive Swift-
@@ -307,13 +347,37 @@ final class EventRecordSynthesizer: EventSynthesizer {
             )
         }
 
+        // Mid-gesture screenshots run on a queue independent of the
+        // one `synthesizeEvent:completion:` posts its completion
+        // block to, each scheduled to fire at its capture waypoint's
+        // offset into the gesture so the touch is still down when
+        // the screenshot is taken. Scheduling starts here, immediately
+        // before the dispatch call below, so a capture's delay lines
+        // up with the same `atOffsetSeconds` clock the gesture itself
+        // is timed against (both are anchored at the first `down`).
+        var captured = [Data?](repeating: nil, count: captureOffsets.count)
+        let captureLock = NSLock()
+        let captureGroup = DispatchGroup()
+        let captureQueue = DispatchQueue(label: "dev.atomyx.ios-agent.gesture-capture")
+        let scheduleStart = DispatchTime.now()
+        for (index, offsetSeconds) in captureOffsets.enumerated() {
+            captureGroup.enter()
+            captureQueue.asyncAfter(deadline: scheduleStart + offsetSeconds) {
+                let pngData = XCUIScreen.main.screenshot().pngRepresentation
+                captureLock.lock()
+                captured[index] = pngData
+                captureLock.unlock()
+                captureGroup.leave()
+            }
+        }
+
         _ = session.perform(
             NSSelectorFromString("synthesizeEvent:completion:"),
             with: record,
             with: block
         )
 
-        // Cap at 30 s — well above any real gesture duration. The
+        // Cap at 30 s, well above any real gesture duration. The
         // daemon's completion has been observed to fire 1–2 s after
         // dispatch on a healthy session.
         let outcome = semaphore.wait(timeout: .now() + 30)
@@ -322,6 +386,17 @@ final class EventRecordSynthesizer: EventSynthesizer {
                 reason: "private gesture dispatch timed out after 30 s"
             )
         }
+
+        if !captureOffsets.isEmpty {
+            let captureOutcome = captureGroup.wait(timeout: .now() + captureCompletionTimeoutSeconds)
+            if captureOutcome == .timedOut {
+                throw SynthesizerError.dispatchFailed(
+                    reason: "mid-gesture screenshot capture timed out after \(Int(captureCompletionTimeoutSeconds)) s"
+                )
+            }
+        }
+
+        return captured.map { $0 ?? Data() }
     }
 
     // MARK: - Probe
@@ -341,7 +416,7 @@ final class EventRecordSynthesizer: EventSynthesizer {
         func step(_ message: String) { log += message + "\n" }
 
         // 1. Class lookups. Distinguish "class missing from runtime"
-        // from "class present but not NSObject-derived" — the latter
+        // from "class present but not NSObject-derived". The latter
         // can happen if Apple re-parents a private class to a pure
         // Swift base type, in which case `NSClassFromString` finds
         // it but the `as? NSObject.Type` cast fails.
@@ -352,7 +427,7 @@ final class EventRecordSynthesizer: EventSynthesizer {
             guard let nsCls = raw as? NSObject.Type else {
                 return (nil,
                     "class \(name) present but not NSObject-derived " +
-                    "(cast `as? NSObject.Type` failed — Apple may have re-parented it)"
+                    "(cast `as? NSObject.Type` failed, Apple may have re-parented it)"
                 )
             }
             return (nsCls, nil)
@@ -409,7 +484,7 @@ final class EventRecordSynthesizer: EventSynthesizer {
         guard sessionCls.perform(NSSelectorFromString("sharedSession"))?.takeUnretainedValue() != nil else {
             return ProbeOutcome(
                 ok: false,
-                log: log + "XCTRunnerDaemonSession.sharedSession returned nil — test context is not live"
+                log: log + "XCTRunnerDaemonSession.sharedSession returned nil, test context is not live"
             )
         }
         step("sharedSession proxy reachable")

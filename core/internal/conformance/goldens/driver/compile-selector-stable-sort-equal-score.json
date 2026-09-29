@@ -1,0 +1,20 @@
+[
+  {
+    "attributes": {
+      "id": "a",
+      "role": "button",
+      "text": "Click"
+    },
+    "children": [],
+    "clickable": true
+  },
+  {
+    "attributes": {
+      "id": "b",
+      "role": "button",
+      "text": "Click"
+    },
+    "children": [],
+    "clickable": true
+  }
+]

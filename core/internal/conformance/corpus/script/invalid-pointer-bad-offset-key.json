@@ -1,0 +1,5 @@
+{
+  "name": "invalid-pointer-bad-offset-key",
+  "description": "a pointer target offset carrying a key other than dx or dy (here the coordinate-form `y` instead of `dy`) must be REJECTED.",
+  "yaml": "- launchApp\n- pointer:\n    touches:\n      - actions:\n          - down:\n              selector: { id: \"menu_item\" }\n              offset: { dx: 5, y: 10 }\n          - up\n"
+}

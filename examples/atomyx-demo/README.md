@@ -18,13 +18,13 @@ rest of the tool surface.
 
 ## Test flows
 
-- **Login → Dashboard**: email `user@example.com` + any password
-- **Login → OTP → Dashboard**: email containing `otp` (e.g. `otp@example.com`)
+- **Login then Dashboard**: email `user@example.com` + any password
+- **Login then OTP then Dashboard**: email containing `otp` (e.g. `otp@example.com`)
 - **Login fail**: empty email or password
-- **Dashboard → Settings → back**
-- **Dashboard → Products**
-- **Dashboard → Gestures**: drives the five pointer fixtures; each card surfaces a counter / status string the script can assert against
-- **Dashboard → Sign out → confirm → Login**
+- **Dashboard then Settings then back**
+- **Dashboard then Products**
+- **Dashboard then Gestures**: drives the five pointer fixtures; each card surfaces a counter / status string the script can assert against
+- **Dashboard then Sign out then confirm then Login**
 
 ## Gestures fixture identifiers
 
@@ -35,7 +35,7 @@ with the pointer action each exercises:
 |---|---|---|
 | `gesture-tap-target` / `gesture-tap-count` | counter increments per tap | `[down, up]` at one point |
 | `gesture-longpress-target` / `gesture-longpress-count` | counter on long-press, container turns green | `[down, up]` with ≥500 ms hold |
-| `gesture-drag-target` / `gesture-drag-status` | status `idle` → `dragging` → `released`, dx/dy update | `[down, move…, up]` |
+| `gesture-drag-target` / `gesture-drag-status` | status `idle` then `dragging` then `released`, dx/dy update | `[down, move…, up]` |
 | `gesture-reorder-target` / `gesture-reorder-state` | comma-joined order updates after a row moves | press-and-drag (`[down, wait, move, up]`) |
 | `gesture-flick-target` / `gesture-flick-bottom-hits` | counter increments when the list reaches Item 50 | flick (fast `[down, move, up]`) |
 
@@ -53,5 +53,5 @@ flutter run
 
 ## Matching YML scripts
 
-- `examples/test-login-flow.yml` — login + OTP branching + handle
+- `examples/test-login-flow.yml` is login + OTP branching + handle
   (exercised end-to-end against this fixture)

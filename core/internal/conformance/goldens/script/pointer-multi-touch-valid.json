@@ -1,0 +1,57 @@
+{
+  "parsed": {
+    "_stepLines": [
+      1,
+      2
+    ],
+    "appId": "",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Untitled script",
+    "steps": [
+      {
+        "command": "launchApp"
+      },
+      {
+        "command": "pointer",
+        "touches": [
+          {
+            "actions": [
+              {
+                "target": {
+                  "selector": {
+                    "label": "Item A",
+                    "text": "Item A"
+                  }
+                },
+                "type": "down"
+              },
+              {
+                "type": "up"
+              }
+            ],
+            "id": "p1"
+          },
+          {
+            "actions": [
+              {
+                "target": {
+                  "selector": {
+                    "label": "Item B",
+                    "text": "Item B"
+                  }
+                },
+                "type": "down"
+              },
+              {
+                "type": "up"
+              }
+            ],
+            "id": "p2"
+          }
+        ]
+      }
+    ]
+  },
+  "valid": true
+}

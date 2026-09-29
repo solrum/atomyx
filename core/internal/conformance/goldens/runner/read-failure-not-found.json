@@ -1,0 +1,140 @@
+{
+  "calls": [
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    }
+  ],
+  "durationMs": 5000,
+  "events": [
+    {
+      "command": "read",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "read",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "read"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "read",
+      "depth": 0,
+      "detail": "Cannot read \"value\": element not found within 5000ms",
+      "durationMs": 5000,
+      "line": 5,
+      "ok": false,
+      "stepIndex": 0,
+      "summary": "read",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "read"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": 0,
+  "ok": false,
+  "passedSteps": 0,
+  "screenshots": [],
+  "scriptName": "read failure",
+  "steps": [
+    {
+      "command": "read",
+      "detail": "Cannot read \"value\": element not found within 5000ms",
+      "durationMs": 5000,
+      "ok": false,
+      "stepIndex": 0
+    }
+  ],
+  "totalSteps": 1
+}

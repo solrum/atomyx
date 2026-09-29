@@ -1,0 +1,5 @@
+{
+  "name": "structerr-dangling-operator-leading-star",
+  "description": "a leading multiplication operator with no left operand.",
+  "expr": "*3"
+}

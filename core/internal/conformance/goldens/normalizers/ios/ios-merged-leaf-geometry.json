@@ -1,0 +1,177 @@
+{
+  "attributes": {
+    "class": "scrollView",
+    "id": "geo-root",
+    "role": "container"
+  },
+  "children": [
+    {
+      "attributes": {
+        "bounds": "0,0,200,70",
+        "class": "staticText",
+        "id": "g01",
+        "label": "Card title",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "bounds": "0,0,200,69",
+        "class": "staticText",
+        "id": "g02",
+        "role": "text",
+        "text": "Card title"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "bounds": "0,100,200,169.5",
+        "class": "staticText",
+        "id": "g03",
+        "role": "text",
+        "text": "Card title"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "bounds": "0,100,200,170.5",
+        "class": "staticText",
+        "id": "g04",
+        "label": "Card title",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "bounds": "0,0,200,70",
+        "class": "image",
+        "id": "g05",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "bounds": "0,0,40,40",
+        "class": "image",
+        "id": "g06",
+        "label": "Logo",
+        "role": "image"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "bounds": "0,0,200,300",
+        "class": "button",
+        "id": "g07",
+        "label": "Tall button",
+        "role": "button"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "bounds": "0,0,393,400",
+        "class": "cell",
+        "id": "g08",
+        "label": "Tall cell",
+        "role": "cell"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "bounds": "0,0,200,150",
+        "class": "staticText",
+        "id": "g09",
+        "role": "text",
+        "text": "Card title"
+      },
+      "children": [
+        {
+          "attributes": {
+            "class": "image",
+            "id": "g09c",
+            "label": "Icon",
+            "role": "image"
+          },
+          "children": [],
+          "clickable": false
+        }
+      ],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "staticText",
+        "id": "g10",
+        "role": "text",
+        "text": "Card title"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "bounds": "0,0,200,150",
+        "class": "staticText",
+        "ext:ios-traits": "staticText",
+        "id": "g11",
+        "label": "Trait says text",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "bounds": "0,0,200,150",
+        "class": "staticText",
+        "ext:ios-traits": "button",
+        "id": "g12",
+        "label": "Trait says button",
+        "role": "button"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "bounds": "0,0,200,150",
+        "class": "staticText",
+        "ext:ios-traits": "header",
+        "id": "g13",
+        "role": "heading",
+        "text": "Trait says header"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "bounds": "0,0,200,150",
+        "class": "image",
+        "ext:ios-traits": "image",
+        "id": "g14",
+        "label": "Trait says image",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false
+    }
+  ],
+  "clickable": false
+}

@@ -3,7 +3,7 @@ import Foundation
 /// Launch an app by bundle id and update driver state so subsequent
 /// inspect / action commands know which `XCUIApplication` to use.
 ///
-/// XCUITest cannot query arbitrary foreground apps — every inspect
+/// XCUITest cannot query arbitrary foreground apps. Every inspect
 /// or tap must run against an `XCUIApplication` reference the
 /// driver has already launched. `launchApp` is therefore not just a
 /// convenience: it is the state-setting operation that makes every
@@ -15,7 +15,7 @@ import Foundation
 /// a tap to a running app does not wipe its in-memory state. When
 /// the driver has no record of the bundle (`currentApp == nil` or
 /// `currentBundleId != bundleId`), `noReset` falls back to a fresh
-/// launch — the request would otherwise be unfulfillable.
+/// launch, because the request would otherwise be unfulfillable.
 final class LaunchAppCommand: CommandHandler {
     let type = "launchApp"
 

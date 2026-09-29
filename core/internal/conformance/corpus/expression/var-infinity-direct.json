@@ -1,0 +1,11 @@
+{
+  "name": "var-infinity-direct",
+  "description": "a variable holding positive infinity, returned bare.",
+  "expr": "infVar",
+  "variables": {
+    "infVar": {
+      "type": "number",
+      "number": "Infinity"
+    }
+  }
+}

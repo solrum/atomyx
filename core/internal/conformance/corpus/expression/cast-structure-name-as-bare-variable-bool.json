@@ -1,0 +1,11 @@
+{
+  "name": "cast-structure-name-as-bare-variable-bool",
+  "description": "the identifier \"bool\" resolves to a variable when not followed by a call.",
+  "expr": "bool",
+  "variables": {
+    "bool": {
+      "type": "boolean",
+      "boolean": true
+    }
+  }
+}

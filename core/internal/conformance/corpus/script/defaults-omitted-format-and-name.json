@@ -1,0 +1,5 @@
+{
+  "name": "defaults-omitted-format-and-name",
+  "description": "format and name both omitted: defaults to 'atomyx/v1' and 'Untitled script'.",
+  "yaml": "appId: com.example.app\nenv: {}\n---\n- launchApp\n"
+}

@@ -1,0 +1,75 @@
+{
+  "name": "ios-merged-leaf-label-shape",
+  "description": "isMergedSemanticLeaf label-length gate (40 UTF-16 units) and line-count/average-length gate (3 lines, 30 chars)",
+  "rawTree": {
+    "elementType": "scrollView",
+    "identifier": "label-root",
+    "children": [
+      {
+        "elementType": "image",
+        "identifier": "l01",
+        "label": "abcdefghijabcdefghijabcdefghijabcdefghij"
+      },
+      {
+        "elementType": "image",
+        "identifier": "l02",
+        "label": "abcdefghijabcdefghijabcdefghijabcdefghijk"
+      },
+      {
+        "elementType": "image",
+        "identifier": "l03",
+        "label": "Save\nDraft"
+      },
+      {
+        "elementType": "image",
+        "identifier": "l04",
+        "label": "Save"
+      },
+      {
+        "elementType": "image",
+        "identifier": "l05",
+        "label": ""
+      },
+      {
+        "elementType": "image",
+        "identifier": "l06",
+        "label": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀"
+      },
+      {
+        "elementType": "image",
+        "identifier": "l07",
+        "label": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀"
+      },
+      {
+        "elementType": "staticText",
+        "identifier": "l08",
+        "label": "Icon\nTitle\nSubtitle\nRow"
+      },
+      {
+        "elementType": "staticText",
+        "identifier": "l09",
+        "label": "Icon\nTitle\nSubtitle"
+      },
+      {
+        "elementType": "staticText",
+        "identifier": "l10",
+        "label": "abcdefghijabcdefghijabcdefghi\nabcdefghijabcdefghijabcdefghi\nabcdefghijabcdefghijabcdefghi\nabcdefghijabcdefghijabcdefghi"
+      },
+      {
+        "elementType": "staticText",
+        "identifier": "l11",
+        "label": "abcdefghijabcdefghijabcdefghij\nabcdefghijabcdefghijabcdefghi\nabcdefghijabcdefghijabcdefghi\nabcdefghijabcdefghijabcdefghi"
+      },
+      {
+        "elementType": "staticText",
+        "identifier": "l12",
+        "label": ""
+      },
+      {
+        "elementType": "other",
+        "identifier": "l13",
+        "label": "Long label on a non-text non-image element type that exceeds forty characters"
+      }
+    ]
+  }
+}

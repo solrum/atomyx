@@ -1,0 +1,5 @@
+{
+  "name": "lex-escape-backslash-in-single-quoted",
+  "description": "an escaped backslash inside a single-quoted string.",
+  "expr": "'a\\\\b'"
+}

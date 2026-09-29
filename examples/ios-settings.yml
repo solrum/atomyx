@@ -1,0 +1,17 @@
+format: atomyx/v1
+appId: com.apple.Preferences
+name: iOS Settings navigation
+description: |
+  Navigates into General and back out again using only the stock
+  Settings app, so it runs on any iOS simulator with no extra app
+  installed.
+tags:
+  - ios
+  - smoke
+---
+- launchApp
+- waitFor: "General"
+- tap: "General"
+- assertVisible: "About"
+- tap: "Settings"
+- waitFor: "General"

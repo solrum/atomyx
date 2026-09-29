@@ -1,0 +1,69 @@
+{
+  "attributes": {
+    "bounds": "0,0,1080,1920",
+    "class": "android.widget.FrameLayout",
+    "role": "container"
+  },
+  "children": [
+    {
+      "attributes": {
+        "bounds": "-50,-120,0,-20",
+        "class": "android.widget.TextView",
+        "role": "text",
+        "text": "offscreen above"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": false
+    },
+    {
+      "attributes": {
+        "bounds": "0,0,0,0",
+        "class": "android.widget.TextView",
+        "role": "text",
+        "text": "degenerate"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": false
+    },
+    {
+      "attributes": {
+        "class": "android.widget.TextView",
+        "role": "text",
+        "text": "no bounds at all"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "bounds": "2147483646,0,2147483647,1",
+        "class": "android.widget.TextView",
+        "role": "text",
+        "text": "large"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    }
+  ],
+  "clickable": false,
+  "enabled": true,
+  "focused": false,
+  "selected": false,
+  "visible": true
+}

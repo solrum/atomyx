@@ -1,0 +1,5 @@
+{
+  "name": "prec-and-binds-tighter-than-or",
+  "description": "and binds tighter than or.",
+  "expr": "true or false and false"
+}

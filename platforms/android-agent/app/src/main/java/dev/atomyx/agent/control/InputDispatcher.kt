@@ -12,15 +12,15 @@ import android.view.accessibility.AccessibilityNodeInfo
  *
  * Strategy chain for `typeViaKeyboard`:
  *
- *   1. `ACTION_SET_TEXT` — native EditText + Flutter Semantics
+ *   1. `ACTION_SET_TEXT`, because native EditText and Flutter Semantics
  *      text fields accept this atomically. Verified by a polling
  *      read so `obscureText: true` Flutter inputs (which accept
  *      the action but drop the write) fall through.
- *   2. System IME per-key tap — when the system keyboard is
- *      visible, tap each character's key via the IME's reported
- *      key bounds. Handles numeric↔qwerty layout switches.
- *   3. On-screen keypad — when no system IME is visible (custom
- *      Flutter banking / OTP keypads), scan the compact tree for
+ *   2. System IME per-key tap, used when the system keyboard is
+ *      visible, tapping each character's key via the IME's reported
+ *      key bounds. Handles numeric to qwerty layout switches.
+ *   3. On-screen keypad, used when no system IME is visible (custom
+ *      Flutter banking / OTP keypads), scanning the compact tree for
  *      clickable elements with short labels matching each char.
  */
 class InputDispatcher(
@@ -49,7 +49,7 @@ class InputDispatcher(
             clearFocusedFieldBestEffort(perKeyDelayMs)
         }
 
-        // Fast path — ACTION_SET_TEXT. Bypasses keyboard layout
+        // Fast path: ACTION_SET_TEXT. Bypasses keyboard layout
         // entirely and is reliable on native EditText + most Flutter
         // inputs. Returns null when the action is rejected OR when
         // verification confirms the write didn't land (obscureText
@@ -64,7 +64,7 @@ class InputDispatcher(
         val kb = waitForKeyboardReady(maxWaitMs = 2000L)
 
         // No system IME? The app may render a custom in-app keypad
-        // (common for banking / OTP flows — a11y exposes the keys as
+        // (common for banking / OTP flows, where a11y exposes the keys as
         // clickable Flutter / Compose / native views with short
         // labels). Scan and tap those directly.
         if (kb == null) {
@@ -74,7 +74,7 @@ class InputDispatcher(
         var currentKb: KeyboardInfo = kb
         var labelMap = buildLabelMap(currentKb)
 
-        // Keyboard reports visible but no keys extracted — some
+        // Keyboard reports visible but no keys extracted, because some
         // custom system IMEs (e.g. Samsung Honeyboard on certain
         // layouts) surface keys in ways getKeyboardInfo can't
         // introspect. Fall back to the generic compact-tree scanner.
@@ -98,7 +98,7 @@ class InputDispatcher(
                 }
             }
 
-            // Still missing — fall through to the on-screen-keys
+            // Still missing, so fall through to the on-screen-keys
             // scanner for the remaining characters. Restart from 0
             // to keep the contract "all or nothing per strategy".
             if (key == null) {
@@ -229,7 +229,7 @@ class InputDispatcher(
     /**
      * Locate a backspace / clear / delete key on the current screen by
      * matching the label / contentDesc against a wide set of language- and
-     * icon-independent patterns. Structural — works on any locale, any
+     * icon-independent patterns. Structural, so it works on any locale, any
      * keypad style.
      */
     private fun findBackspaceKey(summary: List<CompactElement>): CompactElement? {
@@ -258,12 +258,12 @@ class InputDispatcher(
 
     /**
      * Type by tapping ON-SCREEN clickable elements whose label matches each
-     * character. Used when no system IME is visible — typical for Flutter /
+     * character. Used when no system IME is visible, typical for Flutter and
      * native banking apps that render a custom in-app numeric keypad as part
      * of their own view tree (digits exposed as clickable views with
      * contentDesc / text matching "0".."9").
      *
-     * Builds a label→element map ONCE at start (single tree dump), then taps
+     * Builds a label-to-element map ONCE at start (single tree dump), then taps
      * keys without re-dumping for each character.
      */
     private fun typeViaOnScreenKeys(text: String, perKeyDelayMs: Long): TypeResult {
@@ -271,8 +271,8 @@ class InputDispatcher(
         val summary = uiTree.dumpCompact()
 
         // Build TWO label maps: one from elements inside the IME window
-        // (system keyboard keys — Samsung Honeyboard etc), one from
-        // non-IME elements (custom in-app keypads — Flutter banking apps).
+        // (system keyboard keys, including Samsung Honeyboard etc), one from
+        // non-IME elements (custom in-app keypads, including Flutter banking apps).
         // Prefer IME keys when both exist; fall back to non-IME otherwise.
         val imeMap = mutableMapOf<String, CompactElement>()
         val nonImeMap = mutableMapOf<String, CompactElement>()
@@ -322,7 +322,7 @@ class InputDispatcher(
 
     private fun waitForKeyboardReady(maxWaitMs: Long): KeyboardInfo? {
         val deadline = System.currentTimeMillis() + maxWaitMs
-        // Fast path: check immediately — if the IME is already up (common
+        // Fast path: check immediately, since if the IME is already up (common
         // when fill_input_at_coordinates just tapped the field), skip sleep.
         uiTree.markDirty()
         val immediate = uiTree.getKeyboardInfo()
@@ -353,12 +353,12 @@ class InputDispatcher(
      * If the current keyboard does not contain the needed character, try
      * tapping a layout-switch key and re-read. Most Android soft keyboards
      * expose:
-     *   - "?123" / "123" / "12!?"  → switch from letters to numbers/symbols
-     *   - "ABC" / "abc"            → switch from numbers back to letters
-     *   - "あいう" / "ABC" / "ｱｲｳ"  → switch input mode (Japanese IMEs)
+     *   - "?123" / "123" / "12!?"  switches from letters to numbers/symbols
+     *   - "ABC" / "abc"            switches from numbers back to letters
+     *   - "あいう" / "ABC" / "ｱｲｳ"  switches input mode (Japanese IMEs)
      *
-     * We pick the switch key based on what `needle` is — digit needs a numeric
-     * layout, letter needs an alphabet layout. Returns the new keyboard info
+     * We pick the switch key based on what `needle` is, since a digit needs a numeric
+     * layout and a letter needs an alphabet layout. Returns the new keyboard info
      * after switch, or null if no useful switch key was found.
      */
     private fun trySwitchLayoutFor(needle: String, current: KeyboardInfo): KeyboardInfo? {
@@ -370,7 +370,7 @@ class InputDispatcher(
         } else if (isLetter) {
             listOf("abc", "ABC", "あいう")
         } else {
-            // Symbol or other — try the symbol page.
+            // Symbol or other, so try the symbol page.
             listOf("?123", "123", "=\\<", "@#&")
         }
 
@@ -392,18 +392,18 @@ class InputDispatcher(
     /**
      * Clear the currently focused input by finding the focused editable node
      * via the accessibility API and performing ACTION_SET_TEXT with an empty
-     * string. Works even when the field has no stable selector — which is the
+     * string. Works even when the field has no stable selector, which is the
      * common case for Flutter apps where text fields are exposed as plain
      * views without resourceId / contentDesc. Caller must focus the target
      * first with a tap.
      */
     fun clearFocusedInput(): TapResult {
         val root = service.rootInActiveWindow
-            ?: return TapResult(false, "no active window — is the device unlocked?")
+            ?: return TapResult(false, "no active window, is the device unlocked?")
         val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-            ?: return TapResult(false, "no input-focused node — tap the target field first")
+            ?: return TapResult(false, "no input-focused node, tap the target field first")
         try {
-            // Strategy 1: ACTION_SET_TEXT — fast path for native EditText
+            // Strategy 1: ACTION_SET_TEXT, the fast path for native EditText
             // and Flutter inputs that proxy through Semantics.
             val args = Bundle().apply {
                 putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "")
@@ -412,7 +412,7 @@ class InputDispatcher(
                 return TapResult(true, "ok via ACTION_SET_TEXT")
             }
 
-            // Strategy 2: backspace via on-screen keypad — for Flutter custom
+            // Strategy 2: backspace via on-screen keypad, for Flutter custom
             // inputs that don't accept ACTION_SET_TEXT.
             val existing = focused.text?.toString() ?: ""
             if (existing.isEmpty()) return TapResult(true, "ok (already empty)")
@@ -441,13 +441,13 @@ class InputDispatcher(
 
     /**
      * Dismiss the on-screen keyboard without triggering navigation.
-     * Uses GLOBAL_ACTION_BACK only when a keyboard is visible — if no
+     * Uses GLOBAL_ACTION_BACK only when a keyboard is visible. If no
      * keyboard is showing, this is a no-op (safe to call anytime).
      */
     fun hideKeyboard(): TapResult {
         uiTree.markDirty()
         val kb = uiTree.getKeyboardInfo()
-        if (!kb.visible) return TapResult(true, "keyboard not visible — no-op")
+        if (!kb.visible) return TapResult(true, "keyboard not visible, no-op")
         service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
         // Poll until the IME window disappears instead of a fixed
         // 300ms sleep. Exponential backoff (50/100/200 ms, ~1s cap)
@@ -462,6 +462,6 @@ class InputDispatcher(
             if (!after.visible) return TapResult(true, "keyboard dismissed")
             wait = minOf(wait * 2, 200L)
         }
-        return TapResult(true, "keyboard dismiss dispatched (poll timeout — IME may still animate)")
+        return TapResult(true, "keyboard dismiss dispatched (poll timeout, IME may still animate)")
     }
 }

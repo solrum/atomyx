@@ -1,0 +1,5 @@
+{
+  "name": "lex-empty-double-quoted-string",
+  "description": "an empty double-quoted string.",
+  "expr": "\"\""
+}

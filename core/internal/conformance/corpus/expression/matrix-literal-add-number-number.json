@@ -1,0 +1,5 @@
+{
+  "name": "matrix-literal-add-number-number",
+  "description": "literal number \"+\" literal number",
+  "expr": "3 + 3"
+}

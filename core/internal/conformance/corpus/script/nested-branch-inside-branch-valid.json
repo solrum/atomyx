@@ -1,0 +1,5 @@
+{
+  "name": "nested-branch-inside-branch-valid",
+  "description": "a valid branch step nested two levels deep inside another branch case's `do`, proving the schema's full-depth recursion does not reject a runtime-valid script.",
+  "yaml": "appId: com.example.app\nname: Nested branch\nenv: {}\nproxy: required\n---\n- launchApp\n- capture: \"POST /api/x as: resp\"\n- branch:\n    from: resp\n    on:\n      - match: { status: 200 }\n        do:\n          - branch:\n              from: resp\n              on:\n                - match: { status: 200 }\n                  do:\n                    - tap: \"Confirm\"\n              default:\n                - screenshot: inner-default\n    default:\n      - screenshot: outer-default\n"
+}

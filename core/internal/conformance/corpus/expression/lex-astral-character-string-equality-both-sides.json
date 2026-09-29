@@ -1,0 +1,5 @@
+{
+  "name": "lex-astral-character-string-equality-both-sides",
+  "description": "two string literals each containing the same astral character compare equal.",
+  "expr": "\"😀\" == \"😀\""
+}

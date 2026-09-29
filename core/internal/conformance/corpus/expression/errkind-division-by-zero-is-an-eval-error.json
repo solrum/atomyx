@@ -1,0 +1,5 @@
+{
+  "name": "errkind-division-by-zero-is-an-eval-error",
+  "description": "dividing by the literal zero is an evaluation-time error.",
+  "expr": "1 / 0"
+}

@@ -1,0 +1,5 @@
+{
+  "name": "step-runflow-bare-string-form",
+  "description": "runFlow bare-string shorthand names the sub-flow file directly, with no env override.",
+  "yaml": "- launchApp\n- runFlow: flows/login.yml\n"
+}

@@ -1,0 +1,82 @@
+{
+  "attributes": {
+    "class": "android.widget.LinearLayout",
+    "role": "container"
+  },
+  "children": [
+    {
+      "attributes": {
+        "class": "android.widget.CheckBox",
+        "role": "checkbox",
+        "text": "Accept terms"
+      },
+      "checked": true,
+      "children": [],
+      "clickable": true,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.widget.Switch",
+        "label": "Wi-Fi",
+        "role": "switch"
+      },
+      "checked": false,
+      "children": [],
+      "clickable": true,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.widget.TextView",
+        "role": "text",
+        "text": "Not a toggle"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.widget.CheckedTextView",
+        "role": "text",
+        "text": "Checked label"
+      },
+      "checked": true,
+      "children": [],
+      "clickable": true,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.widget.ToggleButton",
+        "role": "button",
+        "text": "ON"
+      },
+      "checked": false,
+      "children": [],
+      "clickable": true,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    }
+  ],
+  "clickable": false,
+  "enabled": true,
+  "focused": false,
+  "selected": false,
+  "visible": true
+}

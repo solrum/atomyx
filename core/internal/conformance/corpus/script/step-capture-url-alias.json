@@ -1,0 +1,5 @@
+{
+  "name": "step-capture-url-alias",
+  "description": "capture object form accepts `url` as an alias for `pattern`.",
+  "yaml": "- launchApp\n- capture:\n    url: \"POST /api/v1/auth/login\"\n    as: loginRsp\n"
+}

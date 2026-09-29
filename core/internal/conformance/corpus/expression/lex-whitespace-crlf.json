@@ -1,0 +1,5 @@
+{
+  "name": "lex-whitespace-crlf",
+  "description": "CRLF line endings surrounding an operator.",
+  "expr": "1\r\n+\r\n2"
+}

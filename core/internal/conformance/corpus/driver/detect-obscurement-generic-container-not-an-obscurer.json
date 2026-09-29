@@ -1,0 +1,13 @@
+{
+  "name": "detect-obscurement-generic-container-not-an-obscurer",
+  "description": "a covering node with role container and no id or label is treated as a transparent layout wrapper, not an obscurer",
+  "function": "detectObscurement",
+  "selector": { "id": "target" },
+  "tree": {
+    "attributes": { "id": "root" },
+    "children": [
+      { "attributes": { "id": "target", "bounds": "100,100,200,150" }, "children": [] },
+      { "attributes": { "role": "container", "bounds": "0,0,430,932" }, "children": [] }
+    ]
+  }
+}

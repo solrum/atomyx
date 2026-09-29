@@ -1,0 +1,5 @@
+{
+  "name": "defaults-flow-fragment-no-config",
+  "description": "a flow fragment (bare step sequence, single document, no config at all).",
+  "yaml": "- launchApp\n- tap: \"Continue\"\n- back\n"
+}

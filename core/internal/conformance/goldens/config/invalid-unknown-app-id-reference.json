@@ -1,0 +1,15 @@
+{
+  "config": null,
+  "envRefError": null,
+  "found": true,
+  "issuePaths": [
+    [
+      "environments",
+      "staging",
+      "app"
+    ]
+  ],
+  "resolved": null,
+  "schemaValid": false,
+  "selectError": null
+}

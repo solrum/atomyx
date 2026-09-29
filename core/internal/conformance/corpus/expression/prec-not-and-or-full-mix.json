@@ -1,0 +1,5 @@
+{
+  "name": "prec-not-and-or-full-mix",
+  "description": "not, and, and or combined in one expression exercise the full precedence chain.",
+  "expr": "not false and true or false"
+}

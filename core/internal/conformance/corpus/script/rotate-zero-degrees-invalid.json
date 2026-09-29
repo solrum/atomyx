@@ -1,0 +1,5 @@
+{
+  "name": "rotate-zero-degrees-invalid",
+  "description": "rotate with degrees of zero describes no rotation and must be REJECTED.",
+  "yaml": "- launchApp\n- rotate:\n    center: { x: 200, y: 400 }\n    degrees: 0\n"
+}

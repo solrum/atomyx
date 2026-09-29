@@ -1,0 +1,6 @@
+{
+  "name": "env-external-override-precedence",
+  "description": "external env passed to the parser overrides the script's own `env:` block on key collision, and leaves a script-only key untouched.",
+  "yaml": "appId: com.example.app\nname: Env precedence\nenv:\n  greeting: from-script\n  onlyScript: script-value\n---\n- type: \"${greeting} ${onlyScript}\"\n",
+  "externalEnv": { "greeting": "from-external" }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "rotate-two-touch-gesture",
+  "description": "a rotate with a coordinate center builds two arc touches and dispatches a two-pointer gesture when the driver reports canMultiPointer.",
+  "yaml": "appId: com.test\nname: rotate coord\nenv: {}\n---\n- launchApp\n- rotate:\n    center: { x: 200, y: 200 }\n    degrees: 90\n",
+  "driver": {
+    "capabilities": { "canMultiPointer": true },
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

@@ -15,6 +15,20 @@ env:
   email: qa+capture@atomyx.test
   password: super-secret
   expectedUserId: "u_42"
+
+# The demo app keeps its navigation state across a plain relaunch, so
+# a prior run that ended on the Dashboard leaves the Dashboard on
+# screen instead of the Sign in screen this script expects. Sign out
+# first when that is the case, so the script always starts from the
+# same known screen.
+preconditions:
+  - check:
+      notVisible: "Dashboard"
+    setup:
+      - tap: "Sign out"
+      - waitFor: "Confirm"
+      - tap: "Confirm"
+      - waitFor: "Sign in"
 ---
 - launchApp
 - waitFor: "Sign in"
@@ -30,7 +44,7 @@ env:
 
 # Arm the proxy to keep the next matching request, then drive the
 # UI action that triggers it. The capture step itself does not
-# wait for the response — the next assertApi against the same
+# wait for the response, since the next assertApi against the same
 # variable will block until the round-trip lands or the runner
 # times out.
 - capture: "POST /api/v1/auth/login as: loginRsp"

@@ -1,0 +1,88 @@
+{
+  "name": "ios-clickable-derivation",
+  "description": "clickable derivation from elementType whitelist and traits",
+  "rawTree": {
+    "elementType": "window",
+    "identifier": "click-root",
+    "children": [
+      {
+        "elementType": "group",
+        "identifier": "c01"
+      },
+      {
+        "elementType": "group",
+        "identifier": "c02",
+        "traits": [
+          "button"
+        ]
+      },
+      {
+        "elementType": "group",
+        "identifier": "c03",
+        "traits": [
+          "link"
+        ]
+      },
+      {
+        "elementType": "staticText",
+        "identifier": "c04",
+        "traits": [
+          "button"
+        ],
+        "label": "Merged card",
+        "bounds": {
+          "left": 0,
+          "top": 0,
+          "right": 200,
+          "bottom": 150
+        }
+      },
+      {
+        "elementType": "staticText",
+        "identifier": "c05",
+        "label": "Plain text"
+      },
+      {
+        "elementType": "cell",
+        "identifier": "c06"
+      },
+      {
+        "elementType": "key",
+        "identifier": "c07",
+        "label": "q"
+      },
+      {
+        "elementType": "keyboard",
+        "identifier": "c08"
+      },
+      {
+        "elementType": "tab",
+        "identifier": "c09"
+      },
+      {
+        "elementType": "toggle",
+        "identifier": "c10"
+      },
+      {
+        "elementType": "popupButton",
+        "identifier": "c11"
+      },
+      {
+        "elementType": "image",
+        "identifier": "c12",
+        "traits": [
+          "image",
+          "button"
+        ],
+        "label": "Icon card"
+      },
+      {
+        "elementType": "other",
+        "identifier": "c13",
+        "traits": [
+          "selected"
+        ]
+      }
+    ]
+  }
+}

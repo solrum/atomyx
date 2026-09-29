@@ -1,0 +1,34 @@
+{
+  "name": "tap-and-wait-transition-success",
+  "description": "tap_and_wait_transition succeeds on the first poll when the tap target and the appear-anchor are both already present on the one staged screen: ok:true, waitedMs (normalized), resolvedBy. Covers the success path only — see format.md for why the timeout path is out of scope.",
+  "driver": {
+    "hierarchy": {
+      "attributes": { "role": "container", "bounds": "0,0,430,932" },
+      "children": [
+        {
+          "attributes": { "role": "button", "id": "submit_btn", "text": "Submit", "bounds": "100,400,330,460" },
+          "children": [],
+          "enabled": true,
+          "clickable": true
+        },
+        {
+          "attributes": { "role": "label", "id": "welcome_label", "text": "Welcome" },
+          "children": []
+        }
+      ]
+    }
+  },
+  "steps": [
+    { "tool": "select_device", "args": { "platform": "android", "id": "mock-device" } },
+    {
+      "tool": "tap_and_wait_transition",
+      "args": {
+        "selector": { "id": "submit_btn" },
+        "waitForAppear": { "id": "welcome_label" },
+        "timeoutMs": 2000,
+        "maxTimeoutMs": 5000,
+        "intervalMs": 10
+      }
+    }
+  ]
+}

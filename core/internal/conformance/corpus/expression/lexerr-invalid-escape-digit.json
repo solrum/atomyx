@@ -1,0 +1,5 @@
+{
+  "name": "lexerr-invalid-escape-digit",
+  "description": "an unsupported escape sequence naming a digit.",
+  "expr": "\"a\\0b\""
+}

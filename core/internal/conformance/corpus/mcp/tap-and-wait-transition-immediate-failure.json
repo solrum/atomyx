@@ -1,0 +1,33 @@
+{
+  "name": "tap-and-wait-transition-immediate-failure",
+  "description": "tap_and_wait_transition returns ok:false immediately (classification tap_failed) when the tap itself fails because a dialog obscures the target, with no polling loop entered. Covers the immediate-failure path only — see format.md for why the timeout path is out of scope.",
+  "driver": {
+    "hierarchy": {
+      "attributes": { "role": "container", "bounds": "0,0,430,932" },
+      "children": [
+        {
+          "attributes": { "role": "cell", "id": "target", "bounds": "100,200,300,260" },
+          "children": [],
+          "enabled": true
+        },
+        {
+          "attributes": { "role": "dialog", "id": "confirm-sheet", "label": "Confirm", "bounds": "0,100,430,600" },
+          "children": []
+        }
+      ]
+    }
+  },
+  "steps": [
+    { "tool": "select_device", "args": { "platform": "android", "id": "mock-device" } },
+    {
+      "tool": "tap_and_wait_transition",
+      "args": {
+        "selector": { "id": "target" },
+        "waitForAppear": { "id": "does_not_matter" },
+        "timeoutMs": 2000,
+        "maxTimeoutMs": 5000,
+        "intervalMs": 10
+      }
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "name": "cast-number-invalid-nan-string",
+  "description": "number() rejects the string \"NaN\".",
+  "expr": "number(\"NaN\")"
+}

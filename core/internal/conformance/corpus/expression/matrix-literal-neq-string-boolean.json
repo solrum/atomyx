@@ -1,0 +1,5 @@
+{
+  "name": "matrix-literal-neq-string-boolean",
+  "description": "literal string \"!=\" literal boolean",
+  "expr": "\"a\" != true"
+}

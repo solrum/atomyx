@@ -1,0 +1,20 @@
+{
+  "name": "compile-selector-ranks-focused-above-non-focused",
+  "description": "equal clickability breaks the tie on focused state",
+  "function": "compileSelector",
+  "selector": { "hint": "Email" },
+  "tree": {
+    "attributes": { "role": "container" },
+    "children": [
+      {
+        "attributes": { "role": "text-field", "id": "a", "hint": "Email" },
+        "children": []
+      },
+      {
+        "attributes": { "role": "text-field", "id": "b", "hint": "Email" },
+        "children": [],
+        "focused": true
+      }
+    ]
+  }
+}

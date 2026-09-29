@@ -1,0 +1,5 @@
+{
+  "name": "lex-escape-tab",
+  "description": "a tab escape sequence inside a string.",
+  "expr": "\"col1\\tcol2\""
+}

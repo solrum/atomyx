@@ -1,0 +1,11 @@
+{
+  "name": "numeric-nan-production-infinity-times-zero",
+  "description": "infinity multiplied by zero produces NaN.",
+  "expr": "inf * 0",
+  "variables": {
+    "inf": {
+      "type": "number",
+      "number": "Infinity"
+    }
+  }
+}

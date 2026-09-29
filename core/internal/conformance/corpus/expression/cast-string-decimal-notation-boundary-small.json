@@ -1,0 +1,11 @@
+{
+  "name": "cast-string-decimal-notation-boundary-small",
+  "description": "string() uses decimal notation at the smallest magnitude boundary (1e-6).",
+  "expr": "string(small)",
+  "variables": {
+    "small": {
+      "type": "number",
+      "number": "0.000001"
+    }
+  }
+}

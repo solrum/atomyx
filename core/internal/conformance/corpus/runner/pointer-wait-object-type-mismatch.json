@@ -1,0 +1,13 @@
+{
+  "name": "pointer-wait-object-type-mismatch",
+  "description": "a sub-flow's pointer action wait given an object instead of a number reports the mismatch as \"got object\", proving a script-parsed nested mapping renders its JavaScript typeof rather than its Go type name",
+  "yaml": "appId: com.test\nname: pointer wait type mismatch\n---\n- launchApp\n- runFlow:\n    file: \"{{DIR}}/bad-wait.yml\"\n",
+  "flowFiles": {
+    "bad-wait.yml": "appId: com.bad\n---\n- pointer:\n    touches:\n      - actions:\n          - down:\n              x: 1\n              y: 1\n          - wait: {}\n          - up\n"
+  },
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

@@ -1,0 +1,211 @@
+{
+  "$id": "https://schemas.atomyx.dev/config.schema.json",
+  "$ref": "#/definitions/AtomyxConfig",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "AppEntry": {
+      "additionalProperties": false,
+      "description": "One app variant this project can run.",
+      "properties": {
+        "appId": {
+          "description": "Package name (Android) or bundle id (iOS) of the app under test.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "artifact": {
+          "description": "Path to the installable artifact for this app, if any.",
+          "type": "string"
+        },
+        "id": {
+          "description": "Identifier used to reference this app from an environment.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "platform": {
+          "description": "Target platform: 'android' or 'ios'.",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "platform",
+        "appId"
+      ],
+      "type": "object"
+    },
+    "AtomyxConfig": {
+      "additionalProperties": false,
+      "description": "Top-level Atomyx project config.",
+      "properties": {
+        "apps": {
+          "description": "App variants this project can run.",
+          "items": {
+            "$ref": "#/definitions/AppEntry"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "dataRoots": {
+          "description": "Directories the CLI searches for data-driven fixtures.",
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "environments": {
+          "additionalProperties": {
+            "$ref": "#/definitions/EnvironmentEntry"
+          },
+          "description": "Named environments, keyed by environment name.",
+          "type": "object"
+        },
+        "launch": {
+          "$ref": "#/definitions/LaunchPolicy"
+        },
+        "preconditions": {
+          "description": "Project-wide precondition override.",
+          "enum": [
+            "skip",
+            "force"
+          ],
+          "type": "string"
+        },
+        "project": {
+          "description": "Human-readable project name.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "report": {
+          "$ref": "#/definitions/Report"
+        },
+        "suites": {
+          "additionalProperties": {
+            "$ref": "#/definitions/SuiteEntry"
+          },
+          "description": "Named test selectors, keyed by suite name.",
+          "type": "object"
+        },
+        "testRoots": {
+          "description": "Directories the CLI searches for test scripts.",
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "project",
+        "apps",
+        "environments"
+      ],
+      "type": "object"
+    },
+    "EnvironmentEntry": {
+      "additionalProperties": false,
+      "description": "One named environment.",
+      "properties": {
+        "app": {
+          "description": "Id of the app entry this environment runs.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "device": {
+          "description": "Exact device identifier for this environment, as reported by list-devices.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "proxy": {
+          "description": "Proxy configuration reference for this environment.",
+          "type": "string"
+        },
+        "vars": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Variables available to scripts run under this environment.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "app"
+      ],
+      "type": "object"
+    },
+    "LaunchPolicy": {
+      "additionalProperties": false,
+      "description": "Default launch policy applied when a run does not override it.",
+      "properties": {
+        "clearData": {
+          "description": "When true and mode is 'fresh', reset the app's data to a clean state before launching.",
+          "type": "boolean"
+        },
+        "mode": {
+          "description": "Default launch mode. 'fresh' force-stops the app before launching a clean process; 'attach' reuses an already-foreground instance instead of relaunching.",
+          "enum": [
+            "fresh",
+            "attach"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Report": {
+      "additionalProperties": false,
+      "description": "Default report output configuration.",
+      "properties": {
+        "formats": {
+          "description": "Output formats to produce for a run report.",
+          "items": {
+            "enum": [
+              "html",
+              "json"
+            ],
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "outDir": {
+          "description": "Directory to write reports into.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "formats",
+        "outDir"
+      ],
+      "type": "object"
+    },
+    "SuiteEntry": {
+      "additionalProperties": false,
+      "description": "One named test selector.",
+      "properties": {
+        "globs": {
+          "description": "Select tests whose file path matches any of these globs.",
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "tags": {
+          "description": "Select tests whose tags include any of these values.",
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    }
+  }
+}

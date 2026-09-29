@@ -1,0 +1,17 @@
+{
+  "name": "detect-obscurement-ancestor-not-an-obscurer",
+  "description": "a distinctly labeled ancestor container whose frame encloses the target is not reported as an obscurer, even though its bounds also contain the target's midpoint",
+  "function": "detectObscurement",
+  "selector": { "id": "target" },
+  "tree": {
+    "attributes": { "id": "root" },
+    "children": [
+      {
+        "attributes": { "id": "list-panel", "role": "dialog", "label": "Settings", "bounds": "0,0,430,932" },
+        "children": [
+          { "attributes": { "id": "target", "bounds": "100,100,200,150" }, "children": [] }
+        ]
+      }
+    ]
+  }
+}

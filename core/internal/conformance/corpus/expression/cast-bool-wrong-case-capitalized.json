@@ -1,0 +1,5 @@
+{
+  "name": "cast-bool-wrong-case-capitalized",
+  "description": "bool() rejects a capitalized variant of true.",
+  "expr": "bool(\"True\")"
+}

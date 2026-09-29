@@ -1,0 +1,167 @@
+package device
+
+import (
+	"context"
+	"os"
+	"runtime"
+	"testing"
+
+	"dev.atomyx/internal/iosdriver"
+	"dev.atomyx/internal/iossimdriver"
+	"dev.atomyx/internal/process"
+)
+
+func TestMockDriverFactory_Build_ReturnsConnectedMockDriverAndOrchestra(t *testing.T) {
+	f := NewMockDriverFactory()
+	built, err := f.Build(context.Background(), Descriptor{ID: "d1", Platform: PlatformAndroid})
+	if err != nil {
+		t.Fatalf("Build() error = %v", err)
+	}
+	if built.Driver == nil || built.Orchestra == nil {
+		t.Fatalf("Build() = %+v, want a non-nil Driver and Orchestra", built)
+	}
+	if !built.Driver.IsConnected() {
+		t.Fatal("Build() returned a Driver that is not connected")
+	}
+}
+
+// fakeSimHidStarter is a device-free simHidStarter test double for
+// DriverFactory tests: it records every UDID it was asked to start
+// and returns a staged port or error, with no launcher, process, or
+// real helper involved.
+type fakeSimHidStarter struct {
+	port  int
+	err   error
+	calls []string
+}
+
+func (f *fakeSimHidStarter) StartSimHid(_ context.Context, udid string) (int, error) {
+	f.calls = append(f.calls, udid)
+	return f.port, f.err
+}
+
+// setEnv sets key to value for the duration of the test, restoring
+// whatever the environment held before.
+func setEnv(t *testing.T, key, value string) {
+	t.Helper()
+	saved, had := os.LookupEnv(key)
+	t.Cleanup(func() {
+		if had {
+			_ = os.Setenv(key, saved)
+		} else {
+			_ = os.Unsetenv(key)
+		}
+	})
+	_ = os.Setenv(key, value)
+}
+
+// stubArm64XcodeFloor stages runner so
+// iossimdriver.IsSimDirectSupported reports true, and resets its
+// memoized cache before and after the test so no other test observes
+// a stale result.
+func stubArm64XcodeFloor(t *testing.T, runner *process.Fake) {
+	t.Helper()
+	iossimdriver.ResetSimDirectCacheForTests()
+	t.Cleanup(iossimdriver.ResetSimDirectCacheForTests)
+	runner.Stub(process.ExactMatch("xcode-select", "-p"), process.Result{Stdout: "/Applications/Xcode.app/Contents/Developer\n"}, nil)
+	runner.Stub(
+		process.ExactMatch("plutil", "-extract", "DTXcode", "raw", "/Applications/Xcode.app/Contents/Info.plist"),
+		process.Result{Stdout: "1620\n"},
+		nil,
+	)
+}
+
+func TestDriverFactory_CreateDriver_SimHidOptInUnset_BuildsIosDriverWithoutStartingHelper(t *testing.T) {
+	setEnv(t, simHidOptInEnv, "")
+	starter := &fakeSimHidStarter{port: 4242}
+	runner := process.NewFake()
+	f := NewDriverFactory(DriverFactoryDeps{Runner: runner, SimHid: starter})
+
+	drv, err := f.createDriver(context.Background(), Descriptor{ID: "sim-1", Platform: PlatformIOS, Kind: KindSimulator})
+	if err != nil {
+		t.Fatalf("createDriver() error = %v", err)
+	}
+	if _, ok := drv.(*iosdriver.IosDriver); !ok {
+		t.Fatalf("createDriver() = %T, want *iosdriver.IosDriver when ATOMYX_SIM_HID is unset", drv)
+	}
+	if len(starter.calls) != 0 {
+		t.Fatalf("StartSimHid calls = %v, want none when ATOMYX_SIM_HID is unset", starter.calls)
+	}
+	if len(runner.Invocations()) != 0 {
+		t.Fatalf("Runner invocations = %+v, want none: the env gate short-circuits before probing Xcode", runner.Invocations())
+	}
+}
+
+func TestDriverFactory_CreateDriver_SimHidOptInSetAndSupported_StartsHelperAndBuildsIosSimDriver(t *testing.T) {
+	if runtime.GOARCH != "arm64" {
+		t.Skip("requires an arm64 host to reach the Xcode version probe IsSimDirectSupported performs")
+	}
+	setEnv(t, simHidOptInEnv, "1")
+	runner := process.NewFake()
+	stubArm64XcodeFloor(t, runner)
+	starter := &fakeSimHidStarter{port: 19876}
+	f := NewDriverFactory(DriverFactoryDeps{Runner: runner, SimHid: starter})
+
+	drv, err := f.createDriver(context.Background(), Descriptor{ID: "sim-1", Platform: PlatformIOS, Kind: KindSimulator})
+	if err != nil {
+		t.Fatalf("createDriver() error = %v", err)
+	}
+	if _, ok := drv.(*iossimdriver.IosSimDriver); !ok {
+		t.Fatalf("createDriver() = %T, want *iossimdriver.IosSimDriver", drv)
+	}
+	if len(starter.calls) != 1 || starter.calls[0] != "sim-1" {
+		t.Fatalf("StartSimHid calls = %v, want exactly one call for sim-1", starter.calls)
+	}
+}
+
+func TestDriverFactory_CreateDriver_SimHidStartFails_FallsBackToIosDriver(t *testing.T) {
+	if runtime.GOARCH != "arm64" {
+		t.Skip("requires an arm64 host to reach the Xcode version probe IsSimDirectSupported performs")
+	}
+	setEnv(t, simHidOptInEnv, "1")
+	runner := process.NewFake()
+	stubArm64XcodeFloor(t, runner)
+	starter := &fakeSimHidStarter{err: context.DeadlineExceeded}
+	f := NewDriverFactory(DriverFactoryDeps{Runner: runner, SimHid: starter})
+
+	drv, err := f.createDriver(context.Background(), Descriptor{ID: "sim-1", Platform: PlatformIOS, Kind: KindSimulator})
+	if err != nil {
+		t.Fatalf("createDriver() error = %v, want a fallback IosDriver instead of an error", err)
+	}
+	if _, ok := drv.(*iosdriver.IosDriver); !ok {
+		t.Fatalf("createDriver() = %T, want *iosdriver.IosDriver as the fallback when StartSimHid fails", drv)
+	}
+	if len(starter.calls) != 1 {
+		t.Fatalf("StartSimHid calls = %v, want exactly one attempt before falling back", starter.calls)
+	}
+}
+
+func TestDriverFactory_CreateDriver_NoSimHidManagerInjected_BuildsIosDriverEvenWithOptIn(t *testing.T) {
+	setEnv(t, simHidOptInEnv, "1")
+	runner := process.NewFake()
+	f := NewDriverFactory(DriverFactoryDeps{Runner: runner})
+
+	drv, err := f.createDriver(context.Background(), Descriptor{ID: "sim-1", Platform: PlatformIOS, Kind: KindSimulator})
+	if err != nil {
+		t.Fatalf("createDriver() error = %v", err)
+	}
+	if _, ok := drv.(*iosdriver.IosDriver); !ok {
+		t.Fatalf("createDriver() = %T, want *iosdriver.IosDriver when no SimHidManager is injected", drv)
+	}
+}
+
+func TestDriverFactory_CreateDriver_ExplicitHidPort_BuildsIosSimDriverWithoutStarter(t *testing.T) {
+	starter := &fakeSimHidStarter{}
+	f := NewDriverFactory(DriverFactoryDeps{Runner: process.NewFake(), SimHid: starter})
+
+	drv, err := f.createDriver(context.Background(), Descriptor{ID: "sim-1", Platform: PlatformIOS, Kind: KindSimulator, HidPort: 7777})
+	if err != nil {
+		t.Fatalf("createDriver() error = %v", err)
+	}
+	if _, ok := drv.(*iossimdriver.IosSimDriver); !ok {
+		t.Fatalf("createDriver() = %T, want *iossimdriver.IosSimDriver for an explicit HidPort", drv)
+	}
+	if len(starter.calls) != 0 {
+		t.Fatalf("StartSimHid calls = %v, want none when the descriptor already carries a HidPort", starter.calls)
+	}
+}

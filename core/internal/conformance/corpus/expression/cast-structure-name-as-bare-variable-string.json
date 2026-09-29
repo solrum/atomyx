@@ -1,0 +1,11 @@
+{
+  "name": "cast-structure-name-as-bare-variable-string",
+  "description": "the identifier \"string\" resolves to a variable when not followed by a call.",
+  "expr": "string",
+  "variables": {
+    "string": {
+      "type": "string",
+      "string": "hi"
+    }
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "name": "pinch-equal-gaps-invalid",
+  "description": "pinch whose startGap equals endGap describes no motion and must be REJECTED.",
+  "yaml": "- launchApp\n- pinch:\n    center: { x: 200, y: 400 }\n    startGap: 80\n    endGap: 80\n"
+}

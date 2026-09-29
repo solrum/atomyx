@@ -2,7 +2,7 @@
 
 > Format: `atomyx/v1`
 >
-> Write test scripts in YAML, run them on real devices — no code required.
+> Write test scripts in YAML, run them on real devices, with no code required.
 
 ## Quick Start
 
@@ -59,8 +59,10 @@ name: My test
 | `precondition` | No | Conditions that must be true before running |
 | `tags` | No | List of tags for filtering |
 | `env` | No | Variables available as `${name}` in steps |
-| `proxy` | No | `required` or `optional` (default) |
+| `proxy` | No | `required` or `optional` (default). `required` refuses the run before any step executes when no network capture adapter is configured. See Proxy Setup |
 | `requires` | No | Flow files to run before this script |
+| `preconditions` | No | Setup gates checked, and established when unmet, before steps run. See Preconditions |
+| `stepDelay` | No | Delay in ms inserted between each step. Default: 500 |
 
 ### Example with all config fields
 
@@ -88,6 +90,41 @@ env:
 
 ---
 
+## Preconditions
+
+`preconditions` declares run-once setup gates the runner checks
+before a script's steps run. Each entry pairs a `check` with a
+`setup` that runs when the check does not currently hold.
+
+| Field | Required | Description |
+|---|---|---|
+| `check` | Yes | `visible` or `notVisible` condition, exactly one of the two |
+| `setup` | Yes | Inline step list, or a string path to a flow fragment file |
+| `policy` | No | `ensure` (default), `always`, or `skip` |
+
+`policy` controls when `setup` runs:
+- `ensure`: run `setup` only when `check` does not currently hold,
+  then confirm `check` holds afterward
+- `always`: run `setup` every time, then confirm `check` holds
+  afterward
+- `skip`: this precondition is not evaluated or enforced at all
+
+```yaml
+preconditions:
+  - check:
+      visible: "Home"
+    setup: flows/login.yml
+  - check:
+      notVisible: "Onboarding banner"
+    setup:
+      - tap: "Dismiss"
+    policy: always
+---
+- tap: "Checkout"
+```
+
+---
+
 ## Variables
 
 Define in `env`, use with `${name}`:
@@ -109,6 +146,50 @@ Variables can also come from:
 - CLI: `--env email=other@test.com` (overrides script env)
 - `extract` command (runtime, from API responses)
 - Parent script (when used as sub-flow)
+
+The `read` command binds typed variables (string or boolean) into this
+same set, and `assertExpr` reads them by bare name in expressions. The
+`${name}` form above stays textual interpolation, applied once when
+the script is parsed.
+
+---
+
+## Expression Syntax
+
+The expression language used by `assertExpr` evaluates a boolean
+expression against the script's runtime variables.
+
+Values are string, number, or boolean. A variable keeps the type its
+producer gave it. The `read` command binds an element's real type, so
+the `value` field and other attribute fields are strings, and state
+fields are booleans.
+
+Variables are referenced by bare name and resolved when the step
+runs. This differs from `${name}`, which is textual interpolation
+applied once when the script is parsed.
+
+Operators:
+- Arithmetic: `+`, `-`, `*`, `/`, `%` on numbers
+- Comparison: `<`, `<=`, `>`, `>=` on numbers
+- Equality: `==`, `!=` between any two values
+- Logical: `and`, `or`, `not` on booleans
+
+Typing is strict, with no implicit coercion. Arithmetic requires
+numbers, logical operators require booleans, and a type mismatch is a
+clear error. Equality between two values of different types is
+simply false rather than an error. There is no truthiness: a number
+or a string is never treated as a boolean.
+
+Casts are the only way to change a type: `number(x)`, `string(x)`,
+`bool(x)`. `number` accepts a numeric string, `string` accepts any
+value, and `bool` accepts the strings `"true"` or `"false"`. A cast
+that cannot apply is a clear error, for example converting a boolean
+to a number.
+
+Precedence, loosest to tightest binding: `or`, then `and`, then
+`not`, then equality (`==`, `!=`), then comparison (`<`, `<=`, `>`,
+`>=`), then addition and subtraction, then multiplication, division,
+and modulo. Use parentheses to group.
 
 ---
 
@@ -152,6 +233,31 @@ Tap an element on screen.
     text: "Item"
     nth: 2
 ```
+
+A bare string shorthand sets both `text` and `label` to that value,
+so it matches an element by either its visible text or its
+accessibility label. Setting `text` explicitly without `label`
+mirrors the same value into `label`. Every selector field
+(`text`, `id`, `label`, `hint`, `role`, `nth`) is optional, and every
+command that takes a selector (`tap`, `waitFor`, `assertVisible`,
+`assertNotVisible`, `assertExists`, `read`, and pointer targets)
+accepts the same shorthand and field set.
+
+Every selector field matches by exact string equality: the element's
+entire attribute value must equal the field's value exactly, with
+matching case and no trimming of surrounding or embedded whitespace.
+There is no substring or partial match, and a YAML selector has no
+regex field.
+
+Flutter Semantics often merges a visible title and a subtitle into
+one label, so an element showing "Products" with a subtitle below it
+can carry the combined label "Products\nBrowse our catalog", newline
+included. A `text: "Products"` or `label: "Products"` selector does
+not match that element, because the full label is longer than the
+literal string. A YAML script cannot express a regex match for this
+case. Drive the same element through the MCP tool surface instead,
+where a `{"label": {"regex": "^Products"}}` selector matches the
+"Products" prefix regardless of what follows it.
 
 ### type
 
@@ -225,6 +331,79 @@ Assert an element is NOT visible.
     timeout: 5000
 ```
 
+### assertExists
+
+Assert a node matching the selector is present in the UI hierarchy.
+Unlike `assertVisible`, presence does not require the element to
+currently be visible on screen: an element scrolled out of the
+viewport or covered by another view still counts as existing.
+
+```yaml
+# Instant check
+- assertExists: "Row 12"
+
+# With polling timeout
+- assertExists:
+    id: "row_12"
+    timeout: 5000
+```
+
+### read
+
+Read one field of an element into a variable, keeping the field's real type.
+
+```yaml
+# Default field (value)
+- read:
+    selector: { id: "Z01-01-02/2" }
+    as: qtyBefore
+    # field defaults to value
+
+# Explicit field
+- read:
+    selector: { id: "row_1" }
+    field: label
+    as: rowLabel
+
+# Boolean state field
+- read:
+    selector: { id: "terms_checkbox" }
+    field: checked
+    as: agreed
+    # binds a real boolean, not the string "true"
+```
+
+Attribute fields (`id`, `text`, `label`, `hint`, `value`, `role`,
+`class`, `package`, `bounds`) bind as strings. State fields
+(`clickable`, `enabled`, `focused`, `selected`, `checked`, `visible`)
+bind as booleans. `field` defaults to `value`. The command waits for
+the element up to a fixed default timeout of 5000 ms, then fails the
+step if the element has not appeared by then. An absent attribute or
+an unreported state field fails the step. A present empty string
+binds an empty string.
+
+### assertExpr
+
+Assert a boolean expression over variables read earlier.
+
+```yaml
+- read:
+    selector: { id: "qty_field" }
+    as: qtyBefore
+- tap: "Plus 5"
+- read:
+    selector: { id: "qty_field" }
+    as: qtyAfter
+- assertExpr:
+    expr: "number(qtyAfter) == number(qtyBefore) + 5"
+    # asserts a runtime relation without hardcoding an absolute value
+```
+
+The expression references variables by their bare name, not the
+`${...}` form. It must evaluate to a boolean, and a false result
+fails the step. See the Expression Syntax section for the full
+operator and casting rules.
+
 ### screenshot
 
 Capture a screenshot. Saved in test artifacts.
@@ -255,6 +434,10 @@ Press a device key.
 - pressKey: enter
 ```
 
+Which keys the current platform recognizes, and how each one behaves,
+differs by platform. See the `press_key` platform support table in
+[`mcp-tools.md`](./mcp-tools.md#press_key).
+
 ### back
 
 Shorthand for `pressKey: back`.
@@ -276,11 +459,11 @@ Wait for a fixed duration (milliseconds).
 General-purpose pointer gesture. Expresses every W3C Actions
 sequence: tap, long-press, drag, press-and-drag, flick. Use the
 narrower commands (`tap`, `swipe`, `pressKey`) for the common
-cases; reach for `pointer` when you need timing control that
+cases. Reach for `pointer` when you need timing control that
 those don't expose (drag from A to B, press-and-hold before a
 drag, etc.).
 
-Four action types, executed in order:
+Five action types, executed in order:
 
 | Action | Payload | Semantics |
 |---|---|---|
@@ -288,63 +471,86 @@ Four action types, executed in order:
 | `move` | `"selector"` or `{ x, y }` | Drag to the resolved point |
 | `wait` | integer ms | Hold the current position |
 | `up` | (no payload) | Release the pointer |
+| `capture` | optional `label` | Take a screenshot while the pointer is held down, mid-gesture |
 
-A sequence must open with `down` and close with `up`. Exactly
+`capture` is valid only strictly between a sequence's opening `down`
+and its closing `up`. Its optional label names the artifact the
+capture produces in the run report.
+
+```yaml
+- pointer:
+    touches:
+      - actions:
+          - down: "Item A"
+          - wait: 300
+          - capture: mid-drag
+          - move: "Drop zone"
+          - up
+```
+
+A pointer step carries a `touches` list, one entry per pointer.
+Each entry holds an `actions` sequence and, for a multi-pointer
+gesture, a unique `id`. A single entry is a single-pointer gesture.
+Each sequence must open with `down` and close with `up`, with exactly
 one `down` before each `up`.
 
-**Tap** — `down` then `up` at the same point:
+**Tap**: `down` then `up` at the same point:
 
 ```yaml
 - pointer:
-    actions:
-      - down: "Submit"
-      - up
+    touches:
+      - actions:
+          - down: "Submit"
+          - up
 ```
 
-**Long-press** — `down`, `wait`, `up`:
+**Long-press**: `down`, `wait`, `up`:
 
 ```yaml
 - pointer:
-    actions:
-      - down: "Item A"
-      - wait: 800
-      - up
+    touches:
+      - actions:
+          - down: "Item A"
+          - wait: 800
+          - up
 ```
 
-**Drag** — `down`, `move`, `up`:
+**Drag**: `down`, `move`, `up`:
 
 ```yaml
 - pointer:
-    actions:
-      - down: { x: 100, y: 500 }
-      - move: { x: 300, y: 500 }
-      - up
+    touches:
+      - actions:
+          - down: { x: 100, y: 500 }
+          - move: { x: 300, y: 500 }
+          - up
 ```
 
-**Long-press then drag** — `down`, `wait`, `move`, `up`:
+**Long-press then drag**: `down`, `wait`, `move`, `up`:
 
 ```yaml
 - pointer:
-    actions:
-      - down: "Item A"
-      - wait: 800
-      - move: "Drop zone"
-      - up
+    touches:
+      - actions:
+          - down: "Item A"
+          - wait: 800
+          - move: "Drop zone"
+          - up
 ```
 
 Selector targets in `down` resolve once when the pointer touches
-down; selector targets in `move` re-resolve at their own step so
+down. Selector targets in `move` re-resolve at their own step, so
 the drag can target an element that animated into view during
 the gesture. Coordinate targets (`{ x, y }`) are always absolute.
 
-**Multi-pointer gestures** — pinch, rotate, multi-finger
-custom — use the `pointers:` form instead of `actions:`. Each
-entry is one pointer with its own sequence; the runner aligns
-them on a shared wall clock anchored at the first `down`.
+**Multi-pointer gestures**: pinch, rotate, multi-finger
+custom. Give `touches` more than one entry, each with a unique
+`id` and its own sequence, and the runner aligns them on a shared wall
+clock anchored at the first `down`.
 
 ```yaml
 - pointer:
-    pointers:
+    touches:
       - id: finger1
         actions:
           - down: { x: 100, y: 300 }
@@ -362,27 +568,91 @@ Multi-pointer requires driver support:
 
 | Platform | Requirement |
 |---|---|
-| iOS | runtime probe — supported on Xcode 16+ sim and recent physical devices |
-| Android | multi-stroke APK route — not yet shipped |
+| iOS | runtime probe that is supported on Xcode 16+ sim and recent physical devices |
+| Android | supported through simultaneous multi-pointer dispatch |
 
-Scripts that use the `pointers:` form on a driver without
-multi-pointer capability fail at the validator with
-`POINTER_MULTI_NOT_SUPPORTED`.
+Scripts whose `touches` list has more than one entry, run on a
+driver without multi-pointer capability, fail at the validator
+with `POINTER_MULTI_NOT_SUPPORTED`.
 
-**Pressure-sensitive gestures** (3D Touch / Force Touch) — add
+**Pressure-sensitive gestures** (3D Touch / Force Touch): add
 `pressure: 0.0..1.0` to `down` or `move`:
 
 ```yaml
 - pointer:
-    actions:
-      - down: { x: 200, y: 400, pressure: 0.3 }
-      - move: { x: 200, y: 400, pressure: 0.9 }
-      - up
+    touches:
+      - actions:
+          - down: { x: 200, y: 400, pressure: 0.3 }
+          - move: { x: 200, y: 400, pressure: 0.9 }
+          - up
 ```
 
 Pressure requires `canPressure=true` on the active driver;
 scripts setting pressure on a driver without the capability
 fail with `POINTER_PRESSURE_NOT_SUPPORTED`.
+
+See [`pointer.md`](./pointer.md) for further gesture patterns,
+capability gates, and platform notes.
+
+### longPress
+
+Press and hold at a target, then release. When `thenSwipeTo` is
+set, drag to it before releasing (a hold-then-drag). `at` and
+`thenSwipeTo` accept the same target as a pointer action: an
+absolute `{ x, y }` coordinate or a selector, resolved by the
+driver at dispatch time. `holdMs` defaults to 500.
+
+```yaml
+- longPress:
+    at: "Item A"
+    holdMs: 600
+    thenSwipeTo: "Drop zone"
+```
+
+`longPress` compiles to the pointer gesture path: a hold-only
+press dispatches as a long-press primitive, and a hold-then-drag
+holds correctly on every platform.
+
+### pinch
+
+Two-finger pinch centered on `center`, moving the two contact
+points from `startGap` apart to `endGap` apart. An `endGap`
+greater than `startGap` spreads the fingers (a zoom-in). `center`
+accepts a coordinate or a selector. A selector is resolved to the
+element's center at dispatch time. `axis` is `vertical` (default)
+or `horizontal`. `durationMs` defaults to 200.
+
+```yaml
+- pinch:
+    center: { id: photo }
+    startGap: 80
+    endGap: 320
+    axis: vertical
+```
+
+### rotate
+
+Two-finger rotation of `degrees` around `center`, with the two
+contact points placed `radius` apart on opposite sides and each
+tracing an arc. `center` accepts a coordinate or a selector, like
+`pinch`. `radius` defaults to 100 points, and `durationMs` defaults
+to 200.
+
+```yaml
+- rotate:
+    center: { id: dial }
+    degrees: 90
+    radius: 120
+```
+
+`pinch` and `rotate` are multi-pointer gestures, so they require
+`canMultiPointer` on the active driver and fail with
+`POINTER_MULTI_NOT_SUPPORTED` otherwise. The existing `tap` and
+`swipe` commands are unaffected by these three steps.
+
+See [`pointer.md`](./pointer.md) §"Gesture sugar" for `longPress`,
+`pinch`, and `rotate` alongside the raw `pointer` primitives they
+compile to.
 
 ---
 
@@ -423,9 +693,9 @@ Validate a captured API response.
       $.user.active: true
 ```
 
-**`status`** — HTTP status code (number).
+**`status`**: HTTP status code (number).
 
-**`body`** — Dot-path assertions against the response body.
+**`body`**: Dot-path assertions against the response body.
 Paths start with `$.` and support nested objects and arrays:
 
 ```yaml
@@ -447,16 +717,16 @@ body:
   $.count: 42
   $.active: true
 
-  # $not_empty — not null, not "", not []
+  # $not_empty, that is, not null, not "", not []
   $.token: $not_empty
 
-  # $exists — field is present (even if null)
+  # $exists, that is, field is present (even if null)
   $.data: $exists
 
-  # $not_exists — field is absent
+  # $not_exists, that is, field is absent
   $.error: $not_exists
 
-  # $contains — string includes substring
+  # $contains, that is, string includes substring
   $.message: "$contains:success"
 
   # Numeric comparisons
@@ -495,7 +765,7 @@ Extract values from a captured response into variables for later use.
 
 ### handle
 
-UI-based branching — detect which screen the app is showing and act accordingly.
+UI-based branching: detect which screen the app is showing and act accordingly.
 
 ```yaml
 - tap: "Submit"
@@ -549,7 +819,7 @@ UI-based branching — detect which screen the app is showing and act accordingl
 
 ### branch
 
-API-based branching — route based on a captured API response.
+API-based branching: route based on a captured API response.
 
 ```yaml
 - capture: "POST /api/payment as: payment"
@@ -614,10 +884,10 @@ either full scripts (with config) or flow fragments (steps only).
 
 ## Flow Fragments
 
-A flow fragment is a steps-only YML file — no config, no `---`:
+A flow fragment is a steps-only YML file, with no config, no `---`:
 
 ```yaml
-# flows/login.yml — reusable login flow
+# flows/login.yml, that is, a reusable login flow
 - tap: "Email"
 - type: ${email}
 - tap: "Password"
@@ -634,7 +904,7 @@ Used by:
 - `runFlow: flows/login.yml`
 - `do: flows/login.yml` (in handle/branch)
 
-Flow fragments execute in the parent's context — they inherit
+Flow fragments execute in the parent's context. They inherit
 variables, captures, and share state.
 
 ---
@@ -653,16 +923,29 @@ requires:
 
 Behavior:
 - Required flows run in order, before the main steps
-- If a required flow fails → main script is **skipped** (fail fast)
+- If a required flow fails, the main script is **skipped** (fail fast)
 - **Dedup**: same flow runs once even if required by multiple scripts
-- **Circular detection**: A requires B requires A → error
+- **Circular detection**: A requires B requires A results in an error
 - **Shared state**: variables and captures persist through the chain
 
 ---
 
 ## Proxy Setup
 
-Required for `capture` / `assertApi` / `extract` / `branch` commands.
+Required for `capture` / `assertApi` / `extract` / `branch` commands,
+and for any script declaring `proxy: required` in its config fields.
+
+### Without a proxy configured
+
+A `proxy: required` script run with no network capture adapter
+configured is refused before its first step: zero steps run, and the
+result carries a top level abort naming the code `PROXY_REQUIRED`, a
+message explaining that the script needs network capture, and a
+remedy pointing at `--proxy` on the CLI or the `proxy` argument on the
+MCP server's `run_script` tool. Nothing runs partway and no route,
+host, or port detail leaks into the message. Configure a capture
+adapter with the platform steps below, or drop `proxy: required` from
+the script's config fields when the run genuinely needs no capture.
 
 ### Prerequisites
 
@@ -679,19 +962,41 @@ make ready-ios-capture
 The `ready-ios-capture` target wraps mitmdump with a local
 capture add-on that streams captured flows into
 `.atomyx/capture/*.jsonl`. The add-on ships per-contributor
-(under `scripts/`, gitignored); run `make ready-ios-capture`
+(under `scripts/`, gitignored). Run `make ready-ios-capture`
 to start the proxy.
 
 ### Configure device
 
-Settings → Wi-Fi → HTTP Proxy → Manual:
-- Server: your Mac's IP
-- Port: 8889
+Platform notes (the proxy and capture file format are the same on
+both; only the device-side configuration differs):
 
-Trust mitmproxy CA cert (one-time):
-1. Download: `http://<mac-ip>:9999/mitmproxy-ca-cert.pem`
-2. Install: Settings → General → VPN & Device Management
-3. Trust: Settings → General → About → Certificate Trust Settings
+- **iOS**: Settings, then Wi-Fi, then HTTP Proxy, then Manual:
+  - Server: your Mac's IP
+  - Port: 8889
+
+  Trust mitmproxy CA cert (one-time):
+  1. Download: `http://<mac-ip>:9999/mitmproxy-ca-cert.pem`
+  2. Install: Settings, then General, then VPN & Device Management
+  3. Trust: Settings, then General, then About, then Certificate Trust Settings
+
+- **Android**: point the device at the host over `adb`, then start
+  mitmdump directly (no Makefile target ships for Android yet):
+
+  ```bash
+  HOST_IP=$(ipconfig getifaddr en0 || ipconfig getifaddr en1)
+  adb shell settings put global http_proxy ${HOST_IP}:8889
+  adb shell settings put global global_http_proxy_host ${HOST_IP}
+  adb shell settings put global global_http_proxy_port 8889
+
+  mitmdump --listen-port 8889 --listen-host 0.0.0.0 -w /tmp/atomyx-capture.jsonl
+  ```
+
+  Trust mitmproxy CA cert (one-time): serve
+  `~/.mitmproxy/mitmproxy-ca-cert.pem` from the host and install it on
+  the device through Settings, then Security, then Install
+  certificate, then CA certificate. A user-installed cert covers apps
+  that respect the user trust store; an app pinning to the system
+  trust store needs a rooted device or a debug build instead.
 
 ### Run with capture
 
@@ -699,6 +1004,11 @@ Trust mitmproxy CA cert (one-time):
 atomyx run \
   --file script.yml \
   --platform ios --device <UDID> \
+  --proxy mitmproxy:/tmp/atomyx-capture.jsonl
+
+atomyx run \
+  --file script.yml \
+  --platform android --device <serial> \
   --proxy mitmproxy:/tmp/atomyx-capture.jsonl
 ```
 
@@ -730,4 +1040,4 @@ See `examples/` directory:
 
 | File | Description |
 |---|---|
-| `test-login-flow.yml` | login + OTP branching + handle + assertVisible — exercised end-to-end against `examples/atomyx-demo` |
+| `test-login-flow.yml` | login + OTP branching + handle + assertVisible, which is exercised end-to-end against `examples/atomyx-demo` |

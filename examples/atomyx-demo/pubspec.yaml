@@ -1,5 +1,5 @@
 name: atomyx_demo
-description: Atomyx Demo — reference Flutter app exercising every YML script command.
+description: Atomyx Demo, a reference Flutter app exercising every YML script command.
 publish_to: "none"
 version: 1.0.0
 

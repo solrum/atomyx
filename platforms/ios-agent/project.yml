@@ -24,6 +24,7 @@ targets:
         UILaunchScreen: {}
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
+        CFBundleDisplayName: Atomyx Driver Agent
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: ${BUNDLE_ID}
       PRODUCT_NAME: AtomyxHostApp
@@ -39,12 +40,12 @@ targets:
     sources:
       - path: Tests
     dependencies:
-      # Link host app as build dependency only — NOT as test host.
+      # Link host app as build dependency only, NOT as test host.
       # This prevents XcodeGen from injecting BUNDLE_LOADER and
       # TEST_TARGET_NAME, which would make the runner load into
       # the host app process. We want a standalone runner so it
       # can be installed + launched without re-verifying host app
-      # signing every time — critical for proxy-on scenarios.
+      # signing every time, which is critical for proxy-on scenarios.
       - target: AtomyxHostApp
         embed: false
     settings:
@@ -58,8 +59,8 @@ targets:
       DEVELOPMENT_TEAM: ${DEV_TEAM}
       CODE_SIGN_IDENTITY: "Apple Development"
       # Explicitly clear to prevent injection into the host app
-      # process. XcodeGen auto-infers these from the dependency —
-      # override with empty values so the runner stays standalone.
+      # process. XcodeGen auto-infers these from the dependency, so we
+      # override with empty values, keeping the runner standalone.
       TEST_HOST: ""
       BUNDLE_LOADER: ""
       TEST_TARGET_NAME: ""

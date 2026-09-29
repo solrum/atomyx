@@ -1,0 +1,5 @@
+{
+  "name": "cast-number-invalid-hexadecimal-string",
+  "description": "number() rejects a hexadecimal string.",
+  "expr": "number(\"0x10\")"
+}

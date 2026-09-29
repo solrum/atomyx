@@ -1,0 +1,5 @@
+{
+  "name": "var-undefined-on-right-surfaces-over-left-type-mismatch",
+  "description": "an undefined variable on the right operand of + is evaluated, and its error surfaces, even though the left operand has the wrong type.",
+  "expr": "true + missing"
+}

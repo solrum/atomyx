@@ -1,6 +1,6 @@
 format: atomyx/v1
 appId: dev.atomyx.demo
-name: Login flow — with OTP branching
+name: Login flow, with OTP branching
 description: Test login with handle for OTP vs direct dashboard
 tags:
   - login
@@ -9,13 +9,27 @@ env:
   email: otp@example.com
   password: secret123
   otp_code: "123456"
+
+# The demo app keeps its navigation state across a plain relaunch, so
+# a prior run that ended on the Dashboard leaves the Dashboard on
+# screen instead of the Sign in screen this script expects. Sign out
+# first when that is the case, so the script always starts from the
+# same known screen.
+preconditions:
+  - check:
+      notVisible: "Dashboard"
+    setup:
+      - tap: "Sign out"
+      - waitFor: "Confirm"
+      - tap: "Confirm"
+      - waitFor: "Sign in"
 ---
 - launchApp
 - sleep: 1000
 - waitFor: "Sign in"
 
-# Use type with into selector — ACTION_SET_TEXT targets the correct
-# field via selector resolution instead of relying on focus state.
+# The into selector taps the field to focus it first, because the
+# text is entered into whichever field currently holds focus.
 - type:
     into:
       role: text-field
@@ -29,7 +43,7 @@ env:
 - tap: "Login"
 
 # Handle: OTP screen or Dashboard. `when: visible` polls the tree so
-# there's no need for an explicit sleep after tapping Login — the
+# there's no need for an explicit sleep after tapping Login, since the
 # branch that lights up fires as soon as the transition renders.
 - handle:
     - when:

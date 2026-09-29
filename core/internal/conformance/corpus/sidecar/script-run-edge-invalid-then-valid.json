@@ -1,0 +1,20 @@
+{
+  "name": "script-run-edge-invalid-then-valid",
+  "description": "runScript with unparseable YAML fails before any run state is created (the fold-in parse-before-lock fix): isRunning immediately after reports false on both engines, and a following valid runScript is accepted rather than rejected as already-in-progress.",
+  "deviceSnapshots": [
+    [
+      { "id": "mock-1", "platform": "android", "name": "Mock Device", "kind": "emulator", "state": "online" }
+    ]
+  ],
+  "driver": {
+    "apps": ["com.example.app"],
+    "hierarchies": [{ "attributes": {}, "children": [] }]
+  },
+  "steps": [
+    { "method": "selectDevice", "params": { "id": "mock-1" } },
+    { "method": "runScript", "params": { "yaml": "format: v1\nappId: com.example.app\nname: Smoke\nenv: {}\n---\n- launchApp\n" } },
+    { "method": "isRunning" },
+    { "method": "runScript", "params": { "yaml": "appId: com.example.app\nname: valid after invalid\nenv: {}\n---\n- launchApp\n" } },
+    { "method": "isRunning" }
+  ]
+}

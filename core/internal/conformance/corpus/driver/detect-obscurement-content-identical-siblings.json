@@ -1,0 +1,26 @@
+{
+  "name": "detect-obscurement-content-identical-siblings",
+  "description": "two overlapping siblings share identical role, id, and bounds; only the one that is a true ancestor by tree position is exempt, while the content-identical non-ancestor sibling is still correctly flagged as the obscurer",
+  "function": "detectObscurement",
+  "selector": { "id": "target" },
+  "tree": {
+    "attributes": { "role": "container" },
+    "children": [
+      {
+        "attributes": { "role": "container", "id": "shared-card", "bounds": "0,0,300,300" },
+        "children": [
+          {
+            "attributes": { "role": "button", "id": "target", "text": "Confirm", "bounds": "50,50,150,150" },
+            "children": [],
+            "enabled": true,
+            "clickable": true
+          }
+        ]
+      },
+      {
+        "attributes": { "role": "container", "id": "shared-card", "bounds": "0,0,300,300" },
+        "children": []
+      }
+    ]
+  }
+}

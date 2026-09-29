@@ -1,0 +1,5 @@
+{
+  "name": "prec-stacked-unary-minus-with-multiplication",
+  "description": "two stacked unary minus operators combined with multiplication.",
+  "expr": "- -2 * 3"
+}

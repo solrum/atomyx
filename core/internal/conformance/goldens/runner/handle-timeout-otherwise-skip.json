@@ -1,0 +1,338 @@
+{
+  "calls": [
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    }
+  ],
+  "durationMs": 5000,
+  "events": [
+    {
+      "command": "handle",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "handle: \"1 branch\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "handle"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"1 branch\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "handle",
+      "depth": 0,
+      "detail": "handle: no branch matched, skipped",
+      "durationMs": 5000,
+      "line": 5,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "handle: \"1 branch\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "handle"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"1 branch\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "screenshot",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 11,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "screenshot: \"after\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "screenshot"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"after\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "screenshot",
+      "depth": 0,
+      "detail": "Screenshot saved as \"after\"",
+      "durationMs": 0,
+      "line": 11,
+      "ok": true,
+      "stepIndex": 1,
+      "summary": "screenshot: \"after\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "screenshot"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"after\""
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 2,
+  "screenshots": [
+    {
+      "dataLength": 0,
+      "label": "after"
+    }
+  ],
+  "scriptName": "handle timeout skip",
+  "steps": [
+    {
+      "command": "handle",
+      "detail": "handle: no branch matched, skipped",
+      "durationMs": 5000,
+      "ok": true,
+      "stepIndex": 0
+    },
+    {
+      "command": "screenshot",
+      "detail": "Screenshot saved as \"after\"",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 1
+    }
+  ],
+  "totalSteps": 2
+}

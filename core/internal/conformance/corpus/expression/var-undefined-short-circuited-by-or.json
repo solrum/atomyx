@@ -1,0 +1,5 @@
+{
+  "name": "var-undefined-short-circuited-by-or",
+  "description": "or short-circuits before ever evaluating an undefined variable on its right.",
+  "expr": "true or missing"
+}

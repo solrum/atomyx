@@ -1,0 +1,195 @@
+{
+  "parsed": {
+    "_stepLines": [
+      18,
+      19,
+      21,
+      25,
+      31,
+      32,
+      37,
+      84
+    ],
+    "appId": "dev.atomyx.demo",
+    "description": "Routes the UI based on the captured login response — different\nbody shapes drive different post-login flows. Demonstrates\n`branch` (deterministic routing on a captured request) versus\n`handle` (visibility-polling on the live UI).\n",
+    "env": {
+      "email": "qa+branch@atomyx.test",
+      "password": "super-secret"
+    },
+    "format": "atomyx/v1",
+    "name": "API-driven branching",
+    "proxy": "required",
+    "steps": [
+      {
+        "command": "launchApp"
+      },
+      {
+        "command": "waitFor",
+        "selector": {
+          "label": "Sign in",
+          "text": "Sign in"
+        }
+      },
+      {
+        "command": "type",
+        "into": {
+          "id": "email"
+        },
+        "text": "qa+branch@atomyx.test"
+      },
+      {
+        "command": "type",
+        "into": {
+          "id": "password"
+        },
+        "text": "super-secret"
+      },
+      {
+        "as": "loginRsp",
+        "command": "capture",
+        "pattern": "POST /api/v1/auth/login"
+      },
+      {
+        "command": "tap",
+        "selector": {
+          "label": "Login",
+          "text": "Login"
+        }
+      },
+      {
+        "command": "branch",
+        "default": [
+          {
+            "command": "assertVisible",
+            "selector": {
+              "label": "Something went wrong",
+              "text": "Something went wrong"
+            }
+          },
+          {
+            "command": "screenshot",
+            "label": "unexpected-login-response"
+          }
+        ],
+        "from": "loginRsp",
+        "on": [
+          {
+            "do": [
+              {
+                "command": "waitFor",
+                "selector": {
+                  "label": "Verify it's you",
+                  "text": "Verify it's you"
+                }
+              },
+              {
+                "command": "type",
+                "into": {
+                  "id": "otp"
+                },
+                "text": "123456"
+              },
+              {
+                "command": "tap",
+                "selector": {
+                  "label": "Verify",
+                  "role": "button",
+                  "text": "Verify"
+                }
+              },
+              {
+                "command": "waitFor",
+                "selector": {
+                  "label": "Dashboard",
+                  "text": "Dashboard"
+                }
+              }
+            ],
+            "match": {
+              "body": {
+                "$.requires_step_up": true
+              },
+              "status": 200
+            }
+          },
+          {
+            "do": [
+              {
+                "command": "waitFor",
+                "selector": {
+                  "label": "Welcome aboard",
+                  "text": "Welcome aboard"
+                }
+              },
+              {
+                "command": "tap",
+                "selector": {
+                  "label": "Get started",
+                  "text": "Get started"
+                }
+              },
+              {
+                "command": "waitFor",
+                "selector": {
+                  "label": "Dashboard",
+                  "text": "Dashboard"
+                }
+              }
+            ],
+            "match": {
+              "body": {
+                "$.user.is_new": true
+              },
+              "status": 200
+            }
+          },
+          {
+            "do": [
+              {
+                "command": "waitFor",
+                "selector": {
+                  "label": "Dashboard",
+                  "text": "Dashboard"
+                }
+              }
+            ],
+            "match": {
+              "body": {
+                "$.user.is_new": false
+              },
+              "status": 200
+            }
+          },
+          {
+            "do": [
+              {
+                "command": "assertVisible",
+                "selector": {
+                  "label": "Invalid email or password",
+                  "text": "Invalid email or password"
+                }
+              },
+              {
+                "command": "screenshot",
+                "label": "login-rejected"
+              }
+            ],
+            "match": {
+              "status": 401
+            }
+          }
+        ]
+      },
+      {
+        "command": "screenshot",
+        "label": "post-login"
+      }
+    ],
+    "tags": [
+      "api",
+      "branching",
+      "capture"
+    ]
+  },
+  "valid": true
+}

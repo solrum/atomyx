@@ -1,0 +1,5 @@
+{
+  "name": "nested-handle-inside-handle-valid",
+  "description": "a valid handle step nested two levels deep inside another handle's branch `do`, proving the schema's full-depth recursion does not reject a runtime-valid script.",
+  "yaml": "appId: com.example.app\nname: Nested handle\nenv: {}\n---\n- launchApp\n- handle:\n    - when: { visible: \"Outer\" }\n      do:\n        - handle:\n            - when: { visible: \"Inner\" }\n              do:\n                - tap: \"Confirm\"\n            - otherwise: skip\n    - otherwise: fail\n"
+}

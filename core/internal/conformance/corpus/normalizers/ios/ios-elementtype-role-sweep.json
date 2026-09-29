@@ -1,0 +1,192 @@
+{
+  "name": "ios-elementtype-role-sweep",
+  "description": "every iosElementTypeToRole arm and the interactive-role whitelist asymmetries",
+  "rawTree": {
+    "elementType": "window",
+    "identifier": "root-window",
+    "bounds": {
+      "left": 0,
+      "top": 0,
+      "right": 393,
+      "bottom": 852
+    },
+    "enabled": true,
+    "focused": false,
+    "selected": false,
+    "visible": true,
+    "children": [
+      {
+        "elementType": "button",
+        "identifier": "t-button"
+      },
+      {
+        "elementType": "popupButton",
+        "identifier": "t-popupButton"
+      },
+      {
+        "elementType": "link",
+        "identifier": "t-link"
+      },
+      {
+        "elementType": "textField",
+        "identifier": "t-textField"
+      },
+      {
+        "elementType": "secureTextField",
+        "identifier": "t-secureTextField"
+      },
+      {
+        "elementType": "searchField",
+        "identifier": "t-searchField"
+      },
+      {
+        "elementType": "staticText",
+        "identifier": "t-staticText",
+        "label": "Hi"
+      },
+      {
+        "elementType": "cell",
+        "identifier": "t-cell"
+      },
+      {
+        "elementType": "image",
+        "identifier": "t-image",
+        "label": "Logo"
+      },
+      {
+        "elementType": "icon",
+        "identifier": "t-icon"
+      },
+      {
+        "elementType": "switch",
+        "identifier": "t-switch"
+      },
+      {
+        "elementType": "toggle",
+        "identifier": "t-toggle"
+      },
+      {
+        "elementType": "slider",
+        "identifier": "t-slider"
+      },
+      {
+        "elementType": "checkBox",
+        "identifier": "t-checkBox"
+      },
+      {
+        "elementType": "radioButton",
+        "identifier": "t-radioButton"
+      },
+      {
+        "elementType": "navigationBar",
+        "identifier": "t-navigationBar"
+      },
+      {
+        "elementType": "tabBar",
+        "identifier": "t-tabBar"
+      },
+      {
+        "elementType": "tabGroup",
+        "identifier": "t-tabGroup"
+      },
+      {
+        "elementType": "toolbar",
+        "identifier": "t-toolbar"
+      },
+      {
+        "elementType": "menuBar",
+        "identifier": "t-menuBar"
+      },
+      {
+        "elementType": "menu",
+        "identifier": "t-menu"
+      },
+      {
+        "elementType": "alert",
+        "identifier": "t-alert"
+      },
+      {
+        "elementType": "dialog",
+        "identifier": "t-dialog"
+      },
+      {
+        "elementType": "sheet",
+        "identifier": "t-sheet"
+      },
+      {
+        "elementType": "keyboard",
+        "identifier": "t-keyboard"
+      },
+      {
+        "elementType": "key",
+        "identifier": "t-key",
+        "label": "a"
+      },
+      {
+        "elementType": "table",
+        "identifier": "t-table"
+      },
+      {
+        "elementType": "collectionView",
+        "identifier": "t-collectionView"
+      },
+      {
+        "elementType": "scrollView",
+        "identifier": "t-scrollView"
+      },
+      {
+        "elementType": "group",
+        "identifier": "t-group"
+      },
+      {
+        "elementType": "window",
+        "identifier": "t-window"
+      },
+      {
+        "elementType": "splitGroup",
+        "identifier": "t-splitGroup"
+      },
+      {
+        "elementType": "stackView",
+        "identifier": "t-stackView"
+      },
+      {
+        "elementType": "layoutArea",
+        "identifier": "t-layoutArea"
+      },
+      {
+        "elementType": "heading",
+        "identifier": "t-heading",
+        "label": "Section"
+      },
+      {
+        "elementType": "pickerWheel",
+        "identifier": "t-pickerWheel"
+      },
+      {
+        "elementType": "picker",
+        "identifier": "t-picker"
+      },
+      {
+        "elementType": "activityIndicator",
+        "identifier": "t-activityIndicator"
+      },
+      {
+        "elementType": "progressIndicator",
+        "identifier": "t-progressIndicator"
+      },
+      {
+        "elementType": "other",
+        "identifier": "t-other"
+      },
+      {
+        "elementType": "tab",
+        "identifier": "t-tab"
+      },
+      {
+        "elementType": "someFutureType",
+        "identifier": "t-unknown"
+      }
+    ]
+  }
+}

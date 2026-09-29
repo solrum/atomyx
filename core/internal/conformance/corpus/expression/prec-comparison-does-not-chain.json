@@ -1,0 +1,5 @@
+{
+  "name": "prec-comparison-does-not-chain",
+  "description": "comparison is left-associative but not chainable: the result of the first comparison is a boolean, which the second comparison then rejects.",
+  "expr": "1 < 2 < 3"
+}

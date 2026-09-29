@@ -1,0 +1,5 @@
+{
+  "name": "matrix-literal-div-boolean-string",
+  "description": "literal boolean \"/\" literal string",
+  "expr": "true / \"a\""
+}

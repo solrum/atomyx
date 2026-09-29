@@ -1,0 +1,31 @@
+{
+  "name": "find-in-tree-nested-with-ranking",
+  "description": "resolution over a nested tree picks the ranked-first match (clickable) and returns its bounds and center point",
+  "function": "find-in-tree",
+  "selector": { "text": "Verify" },
+  "tree": {
+    "attributes": { "role": "container", "id": "root" },
+    "children": [
+      {
+        "attributes": { "role": "container", "id": "header" },
+        "children": [
+          {
+            "attributes": { "role": "text", "text": "Verify", "bounds": "0,0,200,40" },
+            "children": []
+          }
+        ]
+      },
+      {
+        "attributes": { "role": "container", "id": "body" },
+        "children": [
+          {
+            "attributes": { "role": "button", "id": "verify_btn", "text": "Verify", "bounds": "0,100,200,140" },
+            "children": [],
+            "enabled": true,
+            "clickable": true
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "parsed": {
+    "_stepLines": [
+      7
+    ],
+    "appId": "com.example.app",
+    "env": {
+      "greeting": "from-external",
+      "onlyScript": "script-value"
+    },
+    "format": "atomyx/v1",
+    "name": "Env precedence",
+    "steps": [
+      {
+        "command": "type",
+        "text": "from-external script-value"
+      }
+    ]
+  },
+  "valid": true
+}

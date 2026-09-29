@@ -1,0 +1,10 @@
+{
+  "name": "ios-empty-element-type",
+  "description": "regression pin for D4: explicit empty elementType must be preserved as the class attribute, not defaulted to other",
+  "rawTree": {
+    "elementType": "",
+    "identifier": "no-type",
+    "label": "Mystery",
+    "children": []
+  }
+}

@@ -1,0 +1,161 @@
+{
+  "parsed": {
+    "_stepLines": [
+      19,
+      20,
+      23,
+      26,
+      29,
+      33,
+      39,
+      44,
+      45,
+      48,
+      49,
+      52,
+      72,
+      75,
+      76
+    ],
+    "appId": "dev.atomyx.demo",
+    "description": "Exercises every step variant the run dock renders so you can\nverify the new colored tokens + `line N · Xms` sub-line at a\nglance. Open this file in Studio, hit Play, and watch each row\nlight up with its keyword (orange), selector identifier\n(cyan), value (green), and source-line metadata.\n",
+    "env": {
+      "email": "qa+run42@atomyx.test",
+      "password": "super-secret-123",
+      "username": "hieu"
+    },
+    "format": "atomyx/v1",
+    "name": "Run timeline demo",
+    "steps": [
+      {
+        "command": "launchApp"
+      },
+      {
+        "command": "sleep",
+        "ms": 500
+      },
+      {
+        "command": "waitFor",
+        "selector": {
+          "label": "Sign in",
+          "text": "Sign in"
+        }
+      },
+      {
+        "command": "tap",
+        "selector": {
+          "label": "Sign in",
+          "text": "Sign in"
+        }
+      },
+      {
+        "command": "type",
+        "into": {
+          "id": "email"
+        },
+        "text": "qa+run42@atomyx.test"
+      },
+      {
+        "command": "type",
+        "into": {
+          "id": "password"
+        },
+        "text": "super-secret-123"
+      },
+      {
+        "command": "tap",
+        "selector": {
+          "label": "Continue",
+          "role": "button",
+          "text": "Continue"
+        }
+      },
+      {
+        "command": "assertVisible",
+        "selector": {
+          "label": "Welcome",
+          "text": "Welcome"
+        }
+      },
+      {
+        "command": "screenshot",
+        "label": "dashboard-loaded"
+      },
+      {
+        "command": "swipe",
+        "direction": "up"
+      },
+      {
+        "command": "pressKey",
+        "key": "enter"
+      },
+      {
+        "branches": [
+          {
+            "do": [
+              {
+                "command": "type",
+                "into": {
+                  "id": "otp"
+                },
+                "text": "123456"
+              },
+              {
+                "command": "tap",
+                "selector": {
+                  "label": "Verify",
+                  "role": "button",
+                  "text": "Verify"
+                }
+              }
+            ],
+            "when": {
+              "visible": "Enter OTP"
+            }
+          },
+          {
+            "do": [
+              {
+                "command": "tap",
+                "selector": {
+                  "label": "Allow",
+                  "text": "Allow"
+                }
+              },
+              {
+                "command": "waitFor",
+                "selector": {
+                  "label": "Dashboard",
+                  "text": "Dashboard"
+                }
+              }
+            ],
+            "when": {
+              "visible": "Notifications"
+            }
+          }
+        ],
+        "command": "handle"
+      },
+      {
+        "command": "back"
+      },
+      {
+        "command": "assertVisible",
+        "selector": {
+          "label": "Dashboard",
+          "text": "Dashboard"
+        }
+      },
+      {
+        "command": "screenshot",
+        "label": "end-of-flow"
+      }
+    ],
+    "tags": [
+      "demo",
+      "timeline"
+    ]
+  },
+  "valid": true
+}

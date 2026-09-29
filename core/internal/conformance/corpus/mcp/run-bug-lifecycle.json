@@ -1,0 +1,18 @@
+{
+  "name": "run-bug-lifecycle",
+  "description": "start_run, report_bug (no screenshot, so no device is needed), get_bug, list_bugs, finish_run, list_runs, get_run, update_run_summary, delete_run, a not-found get_run, delete_bug, and a not-found get_bug — the full run/bug CRUD surface backed by InMemoryStorage.",
+  "steps": [
+    { "tool": "start_run", "args": { "name": "login smoke", "source": "exploratory" } },
+    { "tool": "report_bug", "args": { "title": "button misaligned", "description": "the button sits 4px off from the mock", "captureScreenshot": false } },
+    { "tool": "get_bug", "args": { "id": "$lastBugId" } },
+    { "tool": "list_bugs", "args": {} },
+    { "tool": "finish_run", "args": { "status": "passed", "summary": "looks fine" } },
+    { "tool": "list_runs", "args": {} },
+    { "tool": "get_run", "args": { "id": "$lastRunId" } },
+    { "tool": "update_run_summary", "args": { "id": "$lastRunId", "summary": "updated after review" } },
+    { "tool": "delete_run", "args": { "id": "$lastRunId" } },
+    { "tool": "get_run", "args": { "id": "$lastRunId" } },
+    { "tool": "delete_bug", "args": { "id": "$lastBugId" } },
+    { "tool": "get_bug", "args": { "id": "$lastBugId" } }
+  ]
+}

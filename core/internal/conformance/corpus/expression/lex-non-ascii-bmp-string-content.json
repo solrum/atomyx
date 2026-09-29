@@ -1,0 +1,5 @@
+{
+  "name": "lex-non-ascii-bmp-string-content",
+  "description": "a string literal containing non-ASCII Basic Multilingual Plane characters.",
+  "expr": "\"café\""
+}

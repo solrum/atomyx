@@ -1,0 +1,10 @@
+{
+  "name": "pointer-capture-single-success",
+  "description": "a down+capture+up pointer sequence dispatches through the gesture path and routes the mock driver's synthetic image into the run's screenshot artifacts",
+  "yaml": "appId: com.test\nname: pointer capture\nenv: {}\n---\n- launchApp\n- pointer:\n    touches:\n      - actions:\n          - down:\n              x: 10\n              y: 10\n          - capture: mid-drag\n          - up\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

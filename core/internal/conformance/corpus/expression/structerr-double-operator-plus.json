@@ -1,0 +1,5 @@
+{
+  "name": "structerr-double-operator-plus",
+  "description": "two consecutive plus signs, the second having no valid unary meaning.",
+  "expr": "1 + + 2"
+}

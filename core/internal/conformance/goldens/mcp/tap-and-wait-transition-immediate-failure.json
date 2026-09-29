@@ -1,0 +1,42 @@
+[
+  {
+    "result": {
+      "content": [
+        {
+          "active": {
+            "connectedAt": "\u003cnormalized\u003e",
+            "id": "mock-device",
+            "kind": "simulator",
+            "platform": "android"
+          },
+          "ok": true
+        }
+      ],
+      "isError": false
+    },
+    "tool": "select_device"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "classification": "tap_failed",
+          "hint": "The tap itself did not succeed. Fix the selector / obscurement issue before retrying.",
+          "ok": false,
+          "reason": "tap failed: element is visually obscured by [role=dialog id=\"confirm-sheet\" label=\"Confirm\"]. Dismiss the obscuring element, or call tap on the obscurer directly.",
+          "tapResult": {
+            "obscurer": {
+              "id": "confirm-sheet",
+              "label": "Confirm",
+              "role": "dialog"
+            },
+            "ok": false,
+            "reason": "element is visually obscured by [role=dialog id=\"confirm-sheet\" label=\"Confirm\"]. Dismiss the obscuring element, or call tap on the obscurer directly."
+          }
+        }
+      ],
+      "isError": false
+    },
+    "tool": "tap_and_wait_transition"
+  }
+]

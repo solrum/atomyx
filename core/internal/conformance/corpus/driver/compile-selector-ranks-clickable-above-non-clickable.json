@@ -1,0 +1,21 @@
+{
+  "name": "compile-selector-ranks-clickable-above-non-clickable",
+  "description": "when a non-clickable title and a clickable button share the same text, ranking puts the clickable candidate first even though it appears later in document order",
+  "function": "compileSelector",
+  "selector": { "text": "Verify" },
+  "tree": {
+    "attributes": { "role": "container" },
+    "children": [
+      {
+        "attributes": { "role": "text", "text": "Verify" },
+        "children": []
+      },
+      {
+        "attributes": { "role": "button", "id": "verify_btn", "text": "Verify" },
+        "children": [],
+        "enabled": true,
+        "clickable": true
+      }
+    ]
+  }
+}

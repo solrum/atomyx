@@ -1,0 +1,14 @@
+{
+  "name": "requires-chain-two-flows",
+  "description": "a chain of two required flows runs in declared order before the main script's own steps, sharing one artifacts collector",
+  "yaml": "appId: com.test\nname: requires chain\nenv: {}\nrequires:\n  - \"{{DIR}}/flowA.yml\"\n  - \"{{DIR}}/flowB.yml\"\n---\n- screenshot: main\n",
+  "flowFiles": {
+    "flowA.yml": "- screenshot: from-a\n",
+    "flowB.yml": "- screenshot: from-b\n"
+  },
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

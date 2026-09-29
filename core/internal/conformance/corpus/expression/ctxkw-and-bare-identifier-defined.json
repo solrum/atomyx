@@ -1,0 +1,11 @@
+{
+  "name": "ctxkw-and-bare-identifier-defined",
+  "description": "the keyword and, appearing where no left operand precedes it, resolves as a variable when one is bound to that name.",
+  "expr": "and",
+  "variables": {
+    "and": {
+      "type": "boolean",
+      "boolean": true
+    }
+  }
+}

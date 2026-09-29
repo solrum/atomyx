@@ -1,0 +1,15 @@
+{
+  "name": "pointer-anchor-tap",
+  "description": "a down+up pointer sequence targeting a selector's topLeft anchor classifies as a tap and dispatches at the anchored point",
+  "yaml": "appId: com.test\nname: pointer anchor\nenv: {}\n---\n- launchApp\n- pointer:\n    touches:\n      - actions:\n          - down:\n              selector:\n                id: target\n              anchor: topLeft\n          - up\n",
+  "driver": {
+    "hierarchies": [
+      {
+        "attributes": {},
+        "children": [
+          { "attributes": { "id": "target", "bounds": "40,300,340,400" }, "children": [], "clickable": true }
+        ]
+      }
+    ]
+  }
+}

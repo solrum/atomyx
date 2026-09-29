@@ -1,0 +1,51 @@
+{
+  "parsed": {
+    "_stepLines": [
+      5,
+      6
+    ],
+    "appId": "com.example.app",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Smoke",
+    "steps": [
+      {
+        "command": "launchApp"
+      },
+      {
+        "branches": [
+          {
+            "do": [
+              {
+                "branches": [
+                  {
+                    "do": [
+                      {
+                        "command": "tap",
+                        "selector": {
+                          "label": "Confirm",
+                          "text": "Confirm"
+                        }
+                      }
+                    ],
+                    "when": {
+                      "visible": "Inner"
+                    }
+                  }
+                ],
+                "command": "handle",
+                "otherwise": "skip"
+              }
+            ],
+            "when": {
+              "visible": "Outer"
+            }
+          }
+        ],
+        "command": "handle",
+        "otherwise": "fail"
+      }
+    ]
+  },
+  "valid": true
+}

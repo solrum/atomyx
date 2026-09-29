@@ -1,0 +1,53 @@
+{
+  "parsed": {
+    "_stepLines": [
+      1,
+      2
+    ],
+    "appId": "",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Untitled script",
+    "steps": [
+      {
+        "command": "launchApp"
+      },
+      {
+        "command": "pointer",
+        "moveDurationMs": 300,
+        "touches": [
+          {
+            "actions": [
+              {
+                "target": {
+                  "selector": {
+                    "label": "Item A",
+                    "text": "Item A"
+                  }
+                },
+                "type": "down"
+              },
+              {
+                "ms": 800,
+                "type": "wait"
+              },
+              {
+                "target": {
+                  "point": {
+                    "x": 300,
+                    "y": 600
+                  }
+                },
+                "type": "move"
+              },
+              {
+                "type": "up"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "valid": true
+}

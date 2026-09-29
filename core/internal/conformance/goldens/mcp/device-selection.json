@@ -1,0 +1,51 @@
+[
+  {
+    "result": {
+      "content": [
+        {
+          "active": {
+            "connectedAt": "\u003cnormalized\u003e",
+            "id": "mock-device",
+            "kind": "simulator",
+            "platform": "android"
+          },
+          "ok": true
+        }
+      ],
+      "isError": false
+    },
+    "tool": "select_device"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "ok": true,
+          "wasActive": {
+            "id": "mock-device",
+            "platform": "android"
+          }
+        }
+      ],
+      "isError": false
+    },
+    "tool": "disconnect_device"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "active": {
+            "connectedAt": "\u003cnormalized\u003e",
+            "id": "mock-device-2",
+            "kind": "simulator",
+            "platform": "ios"
+          },
+          "ok": true
+        }
+      ],
+      "isError": false
+    },
+    "tool": "select_device"
+  }
+]

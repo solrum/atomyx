@@ -1,0 +1,5 @@
+{
+  "name": "numeric-modulo-sign-negative-positive",
+  "description": "modulo with a negative dividend and positive divisor.",
+  "expr": "-5 % 3"
+}

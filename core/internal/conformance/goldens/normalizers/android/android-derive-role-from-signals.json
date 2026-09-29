@@ -1,0 +1,128 @@
+{
+  "attributes": {
+    "class": "android.widget.FrameLayout",
+    "role": "container"
+  },
+  "children": [
+    {
+      "attributes": {
+        "class": "android.view.View",
+        "role": "button",
+        "text": "Tap me"
+      },
+      "children": [],
+      "clickable": true,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.view.View",
+        "label": "Tap me too",
+        "role": "button"
+      },
+      "children": [],
+      "clickable": true,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.view.View",
+        "role": "other"
+      },
+      "children": [],
+      "clickable": true,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.view.View",
+        "role": "text",
+        "text": "Just a label"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.view.View",
+        "label": "Decorative",
+        "role": "other"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.view.View",
+        "role": "other"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.view.View",
+        "label": "Icon only",
+        "role": "button"
+      },
+      "children": [],
+      "clickable": true,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.webkit.WebView",
+        "role": "text",
+        "text": "Rendered page text"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.widget.FrameLayout",
+        "role": "container",
+        "text": "Card body"
+      },
+      "children": [],
+      "clickable": true,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    }
+  ],
+  "clickable": false,
+  "enabled": true,
+  "focused": false,
+  "selected": false,
+  "visible": true
+}

@@ -1,0 +1,23 @@
+{
+  "name": "compile-selector-matches-by-id",
+  "description": "id is the highest-priority content field and resolves alone",
+  "function": "compileSelector",
+  "selector": { "id": "login_btn" },
+  "tree": {
+    "attributes": { "role": "container" },
+    "children": [
+      {
+        "attributes": { "role": "button", "id": "login_btn", "text": "Sign in", "label": "Login button" },
+        "children": [],
+        "enabled": true,
+        "clickable": true
+      },
+      {
+        "attributes": { "role": "button", "id": "cancel_btn", "text": "Cancel" },
+        "children": [],
+        "enabled": true,
+        "clickable": true
+      }
+    ]
+  }
+}

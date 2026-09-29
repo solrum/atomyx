@@ -1,0 +1,9 @@
+{
+  "config": null,
+  "envRefError": "/atomyx.config.yaml references environment variable \"ATOMYX_CORPUS_TOKEN_UNSET\" in environments.staging.vars.token, but it is not set.",
+  "found": true,
+  "issuePaths": [],
+  "resolved": null,
+  "schemaValid": true,
+  "selectError": null
+}

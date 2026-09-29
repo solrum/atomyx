@@ -1,0 +1,11 @@
+{
+  "name": "requires-missing-file-aborts-run",
+  "description": "a required flow file that does not exist aborts the whole run with an error instead of a graceful failed ScriptResult, matching the TypeScript runner's requires loop having no try/catch around its file read",
+  "yaml": "appId: com.test\nname: requires missing file\nrequires:\n  - \"{{DIR}}/missing-required.yml\"\n---\n- launchApp\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  },
+  "expectRunError": true
+}

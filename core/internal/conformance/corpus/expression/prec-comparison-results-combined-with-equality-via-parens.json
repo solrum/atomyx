@@ -1,0 +1,5 @@
+{
+  "name": "prec-comparison-results-combined-with-equality-via-parens",
+  "description": "parenthesized comparisons combine through equality.",
+  "expr": "(1 < 2) == (3 > 2)"
+}

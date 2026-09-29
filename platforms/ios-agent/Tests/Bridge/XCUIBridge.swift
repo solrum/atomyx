@@ -12,7 +12,7 @@ import XCTest
 ///      command handlers run under `node:test`-style assertions without
 ///      touching a simulator.
 ///
-/// Press-key dispatch is NOT on this protocol — it lives in
+/// Press-key dispatch is NOT on this protocol. It lives in
 /// `PressKeyStrategy` under `Tests/PressKey/`. The bridge is a thin
 /// adapter over XCUI primitives; anything with its own strategy chain
 /// belongs in a dedicated registry.
@@ -26,7 +26,7 @@ struct KeyDescriptor {
 
 /// Result of `getKeyboard`. `visible=false` means no system keyboard
 /// is on screen; the other fields are zero-initialized. `layout` is a
-/// heuristic classification from the key labels — see
+/// heuristic classification from the key labels. See
 /// `DefaultXCUIBridge.detectKeyboardLayout`.
 struct KeyboardInfoResult {
     let visible: Bool
@@ -51,12 +51,12 @@ struct HideKeyboardResult {
 
 protocol XCUIBridge {
     /// Launch an app by bundle id and return its `XCUIApplication`
-    /// reference. Idempotent — if the app is already running, this
+    /// reference. Idempotent: if the app is already running, this
     /// activates it.
     func launchApp(bundleId: String) -> XCUIApplication
 
     /// Terminate an app by bundle id. Creates a fresh reference
-    /// internally — the caller does not need to hold one. Safe to call
+    /// internally, so the caller does not need to hold one. Safe to call
     /// on an app that isn't running.
     func terminateApp(bundleId: String)
 
@@ -71,8 +71,8 @@ protocol XCUIBridge {
     /// Drag from one point to another. `durationSeconds` is the
     /// press-and-hold time before the drag starts (passed to
     /// `press(forDuration:thenDragTo:)`). The drag motion itself runs
-    /// at XCUITest's internal speed — not parameterizable through this
-    /// API.
+    /// at XCUITest's internal speed and is not parameterizable through
+    /// this API.
     func swipe(
         app: XCUIApplication,
         fromX: CGFloat,
@@ -90,7 +90,7 @@ protocol XCUIBridge {
     func screenshot() -> String
 
     /// Type raw text into the currently-focused input field. iOS
-    /// handles this natively via `XCUIApplication.typeText(_:)` — the
+    /// handles this natively via `XCUIApplication.typeText(_:)`. The
     /// system keyboard accepts the string in one call and dispatches
     /// per-character events internally. No per-key delay simulation
     /// needed; XCUITest handles IME layout switching transparently for
@@ -102,12 +102,12 @@ protocol XCUIBridge {
     /// IME can't represent (⌘A select-all, ⌘C/V copy-paste, etc.).
     /// Requires the simulator to have Connect Hardware Keyboard on
     /// (`xcrun simctl keyboard <udid> enable hardware` or the
-    /// I/O → Keyboard menu); without it, the modifier flags are
+    /// I/O menu's Keyboard submenu); without it, the modifier flags are
     /// silently dropped by the software keyboard and the key is
     /// typed as a plain character.
     ///
     /// Returns true when the dispatch is accepted, false when the
-    /// XCUITest API throws — most commonly because no element has
+    /// XCUITest API throws, most commonly because no element has
     /// keyboard focus or the simulator keyboard configuration
     /// rejects the modifier combo.
     func typeKey(app: XCUIApplication, key: String, modifiers: XCUIElement.KeyModifierFlags) -> Bool
@@ -115,7 +115,7 @@ protocol XCUIBridge {
     /// Query the system keyboard state. Returns `visible=false` when
     /// no `.keyboard` elementType is present in the snapshot tree.
     /// Custom in-app keyboards (Flutter `GestureDetector` grids, React
-    /// Native `TouchableOpacity` keys) are NOT detected — they're
+    /// Native `TouchableOpacity` keys) are NOT detected, because they're
     /// regular app views, not system keyboards. The host tool layer
     /// handles the "visible=false but field is focused" case via
     /// hierarchy inspection.
@@ -126,7 +126,7 @@ protocol XCUIBridge {
     ///
     ///   1. Tap a keyboard dismiss affordance ("Hide keyboard" or
     ///      "done"/"return" button within the keyboard frame).
-    ///   2. Tap just above the keyboard frame — resigns first
+    ///   2. Tap just above the keyboard frame, which resigns first
     ///      responder on most apps.
     ///
     /// Dispatches the gesture and returns immediately; does NOT
@@ -134,11 +134,11 @@ protocol XCUIBridge {
     /// confirms the keyboard is gone by polling `hierarchy()`.
     ///
     /// Returns `ok: false` with `strategy: "not-visible"` when no
-    /// keyboard was visible to begin with — idempotent no-op.
+    /// keyboard was visible to begin with. This is an idempotent no-op.
     func hideKeyboard(app: XCUIApplication) -> HideKeyboardResult
 
     /// Dump the accessibility tree as a nested dictionary. This is the
-    /// canonical tree source — the host adapter (`@atomyx/core-driver-ios`)
+    /// canonical tree source. The host adapter (`@atomyx/core-driver-ios`)
     /// reshapes it into the framework's `TreeNode` and runs selector
     /// resolution, obscurement detection, and element filtering on the
     /// host side. The driver just returns raw `app.snapshot()` bytes.
@@ -153,11 +153,18 @@ protocol XCUIBridge {
     /// accessibility tree but coordinate taps to off-screen points
     /// fail silently).
     func getScreenSize(app: XCUIApplication) -> CGSize
+
+    /// Value of the element that currently has keyboard focus, read
+    /// from a single `app.snapshot()` call. Returns nil when no
+    /// element in the snapshot reports focus, which the caller must
+    /// treat differently from a focused element whose value happens
+    /// to be the empty string.
+    func focusedFieldValue(app: XCUIApplication) -> String?
 }
 
 /// Production implementation using the stable XCUITest API subset.
 /// Works on iOS 15+ / Xcode 14+. Bleeding-edge APIs belong in a
-/// separate bridge class when they appear — do not leak them here.
+/// separate bridge class when they appear. Do not leak them here.
 final class DefaultXCUIBridge: XCUIBridge {
     func launchApp(bundleId: String) -> XCUIApplication {
         let app = XCUIApplication(bundleIdentifier: bundleId)
@@ -239,6 +246,14 @@ final class DefaultXCUIBridge: XCUIBridge {
         return Self.buildRawTree(root: root, screen: app.frame)
     }
 
+    func focusedFieldValue(app: XCUIApplication) -> String? {
+        guard let snapshot = try? app.snapshot(),
+              let focused = findFocused(in: snapshot) else {
+            return nil
+        }
+        return focused.value as? String ?? ""
+    }
+
     /// Iterative pre-order walk producing a nested `[String: Any]`
     /// mirror of the XCUIElementSnapshot tree. Iterative (not recursive)
     /// for consistency with `getKeyboard`'s walk and to avoid Swift's
@@ -248,17 +263,17 @@ final class DefaultXCUIBridge: XCUIBridge {
     ///
     /// Two-pass approach:
     ///
-    ///   Pass 1 — DFS walk pushing nodes onto a flat `entries` array in
+    ///   Pass 1: DFS walk pushing nodes onto a flat `entries` array in
     ///   document order, recording each node's parent index in
     ///   `childrenOf`. Depth-bounded at 100 levels.
     ///
-    ///   Pass 2 — iterate `entries` from last to first (bottom-up). At
+    ///   Pass 2: iterate `entries` from last to first (bottom-up). At
     ///   that point every descendant has already been materialized, so
     ///   assembling a parent's `children` array is just mapping child
     ///   indices to the finalized child dicts.
     ///
     /// Entry 0 is always the root. `maxDepth` of 100 is a generous
-    /// ceiling — real iOS/Flutter apps rarely exceed 20 levels.
+    /// ceiling, since real iOS/Flutter apps rarely exceed 20 levels.
     private static func buildRawTree(root: XCUIElementSnapshot, screen: CGRect) -> [String: Any] {
         let maxDepth = 100
         struct WorkItem {
@@ -281,8 +296,8 @@ final class DefaultXCUIBridge: XCUIBridge {
 
             if item.depth < maxDepth {
                 // Push children in reverse so pop order preserves
-                // document order (parent → child[0] subtree → child[1]
-                // subtree → ...). Stable order matters for diff-based
+                // document order (parent, then child[0] subtree, then
+                // child[1] subtree, then ...). Stable order matters for diff-based
                 // walkers on the host side.
                 for child in item.node.children.reversed() {
                     stack.append(WorkItem(
@@ -294,7 +309,7 @@ final class DefaultXCUIBridge: XCUIBridge {
             }
         }
 
-        // Bottom-up assembly: walk entries last → first so every
+        // Bottom-up assembly: walk entries from last to first so every
         // child dict is already final before its parent consumes it.
         for i in (0 ..< entries.count).reversed() {
             if let childIndices = childrenOf[i], !childIndices.isEmpty {
@@ -318,7 +333,7 @@ final class DefaultXCUIBridge: XCUIBridge {
             "enabled": node.isEnabled,
             // XCUIElementSnapshot exposes `hasFocus` (not
             // `hasKeyboardFocus`, which lives only on XCUIElement).
-            // For text inputs on iOS 13+ these are equivalent — the
+            // For text inputs on iOS 13+ these are equivalent, because the
             // snapshot carries whichever affordance receives
             // keystrokes.
             "focused": node.hasFocus,
@@ -336,12 +351,12 @@ final class DefaultXCUIBridge: XCUIBridge {
             // Placeholder text on an empty field. Cross-platform
             // selector key: `hint`. Lets host code pick an input
             // whose only identifier is its placeholder ("Email",
-            // "Search products") — typical when developers forget
+            // "Search products"), which is typical when developers forget
             // to set `accessibilityIdentifier`.
             dict["placeholderValue"] = placeholder
         }
-        // `isSelected` carries Apple's accessibility "selected" bit
-        // — used by tabs, segmented controls, and any custom
+        // `isSelected` carries Apple's accessibility "selected" bit,
+        // used by tabs, segmented controls, and any custom
         // surface that calls `accessibilityTraits.insert(.selected)`.
         // Cross-platform consumers read `node.selected`.
         dict["selected"] = node.isSelected
@@ -371,7 +386,7 @@ final class DefaultXCUIBridge: XCUIBridge {
         // most surfaces this matches `frame`; when it differs, it's
         // the element's hit area as opposed to its layout area.
         // `accessibilityFrame` is exposed on `XCUIElement` but not
-        // declared on the `XCUIElementSnapshot` protocol — reach via
+        // declared on the `XCUIElementSnapshot` protocol. Reach via
         // KVC so older Xcode SDKs and protocol-typed values keep
         // compiling. Snapshots returned by `app.snapshot()` typically
         // carry CGRect.zero for this key (the property is element-
@@ -391,8 +406,8 @@ final class DefaultXCUIBridge: XCUIBridge {
         // accessibility daemon. Reads the snapshot's
         // `additionalAttributes` using integer keys resolved at
         // process load via `AccessibilityAttrSymbols`. This is the
-        // same path WDA takes for `wdVisible` / `wdAccessible` —
-        // when the dictionary is populated, it is the only signal
+        // same path WDA takes for `wdVisible` / `wdAccessible`. When
+        // the dictionary is populated, it is the only signal
         // that accounts for occlusion (modal sheets, covering
         // siblings) which a pure frame-intersect cannot catch.
         //
@@ -425,7 +440,7 @@ final class DefaultXCUIBridge: XCUIBridge {
     /// Decode a `UIAccessibilityTraits` bitmask into an array of
     /// canonical trait names. Mirrors the public trait constants;
     /// callers that consume the wire JSON match against these
-    /// strings. Unknown bits are dropped silently — the host can
+    /// strings. Unknown bits are dropped silently, but the host can
     /// still observe them by reading the raw bitmask if it cares.
     private static func decodeTraits(_ bits: UInt64) -> [String] {
         var out: [String] = []
@@ -574,7 +589,7 @@ final class DefaultXCUIBridge: XCUIBridge {
     // MARK: - Helpers
 
     /// Heuristic layout classifier from key labels. iOS does not expose
-    /// keyboard type directly — we infer from the keys present. Not
+    /// keyboard type directly, so we infer from the keys present. Not
     /// exact for locale-specific layouts, but accurate for English
     /// system keyboards which is the common case.
     ///

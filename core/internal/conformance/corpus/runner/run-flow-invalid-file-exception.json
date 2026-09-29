@@ -1,0 +1,13 @@
+{
+  "name": "run-flow-invalid-file-exception",
+  "description": "runFlow's target file exists but fails to parse, reporting the parse failure as an \"Exception: \" detail rather than \"Sub-flow file not found\", since only the file read is caught on both sides",
+  "yaml": "appId: com.test\nname: runFlow invalid file\n---\n- launchApp\n- runFlow:\n    file: \"{{DIR}}/invalid-sub-flow.yml\"\n",
+  "flowFiles": {
+    "invalid-sub-flow.yml": "appId: com.bad\n"
+  },
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

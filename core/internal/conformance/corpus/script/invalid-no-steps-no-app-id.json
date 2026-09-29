@@ -1,0 +1,5 @@
+{
+  "name": "invalid-no-steps-no-app-id",
+  "description": "a script with neither steps nor an appId must be REJECTED.",
+  "yaml": "appId: \"\"\nname: Empty\nenv: {}\nsteps: []\n"
+}

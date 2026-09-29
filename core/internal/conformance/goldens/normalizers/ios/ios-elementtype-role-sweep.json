@@ -1,0 +1,397 @@
+{
+  "attributes": {
+    "bounds": "0,0,393,852",
+    "class": "window",
+    "id": "root-window",
+    "role": "container"
+  },
+  "children": [
+    {
+      "attributes": {
+        "class": "button",
+        "id": "t-button",
+        "role": "button"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "popupButton",
+        "id": "t-popupButton",
+        "role": "button"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "link",
+        "id": "t-link",
+        "role": "link"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "textField",
+        "id": "t-textField",
+        "role": "text-field"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "secureTextField",
+        "id": "t-secureTextField",
+        "role": "secure-text-field"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "searchField",
+        "id": "t-searchField",
+        "role": "search-field"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "staticText",
+        "id": "t-staticText",
+        "role": "text",
+        "text": "Hi"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "cell",
+        "id": "t-cell",
+        "role": "cell"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "image",
+        "id": "t-image",
+        "label": "Logo",
+        "role": "image"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "icon",
+        "id": "t-icon",
+        "role": "image"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "switch",
+        "id": "t-switch",
+        "role": "switch"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "toggle",
+        "id": "t-toggle",
+        "role": "switch"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "slider",
+        "id": "t-slider",
+        "role": "slider"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "checkBox",
+        "id": "t-checkBox",
+        "role": "checkbox"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "radioButton",
+        "id": "t-radioButton",
+        "role": "radio-button"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "navigationBar",
+        "id": "t-navigationBar",
+        "role": "menu"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "tabBar",
+        "id": "t-tabBar",
+        "role": "menu"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "tabGroup",
+        "id": "t-tabGroup",
+        "role": "menu"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "toolbar",
+        "id": "t-toolbar",
+        "role": "menu"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "menuBar",
+        "id": "t-menuBar",
+        "role": "menu"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "menu",
+        "id": "t-menu",
+        "role": "menu"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "alert",
+        "id": "t-alert",
+        "role": "alert"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "dialog",
+        "id": "t-dialog",
+        "role": "dialog"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "sheet",
+        "id": "t-sheet",
+        "role": "dialog"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "keyboard",
+        "id": "t-keyboard",
+        "role": "keyboard"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "key",
+        "id": "t-key",
+        "label": "a",
+        "role": "key"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "table",
+        "id": "t-table",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "collectionView",
+        "id": "t-collectionView",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "scrollView",
+        "id": "t-scrollView",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "group",
+        "id": "t-group",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "window",
+        "id": "t-window",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "splitGroup",
+        "id": "t-splitGroup",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "stackView",
+        "id": "t-stackView",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "layoutArea",
+        "id": "t-layoutArea",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "heading",
+        "id": "t-heading",
+        "role": "heading",
+        "text": "Section"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "pickerWheel",
+        "id": "t-pickerWheel",
+        "role": "slider"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "picker",
+        "id": "t-picker",
+        "role": "slider"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "activityIndicator",
+        "id": "t-activityIndicator",
+        "role": "activityindicator"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "progressIndicator",
+        "id": "t-progressIndicator",
+        "role": "progressindicator"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "other",
+        "id": "t-other",
+        "role": "other"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "tab",
+        "id": "t-tab",
+        "role": "other"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "someFutureType",
+        "id": "t-unknown",
+        "role": "other"
+      },
+      "children": [],
+      "clickable": false
+    }
+  ],
+  "clickable": false,
+  "enabled": true,
+  "focused": false,
+  "selected": false,
+  "visible": true
+}

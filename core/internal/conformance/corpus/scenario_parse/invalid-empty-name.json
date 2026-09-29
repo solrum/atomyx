@@ -1,0 +1,6 @@
+{
+  "name": "invalid-empty-name",
+  "description": "an empty name string must be REJECTED with zod's exact string-min-length issue message.",
+  "yaml": "name: \"\"\nscripts:\n  - flows/login.yml\n",
+  "expectErrorText": true
+}

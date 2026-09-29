@@ -1,0 +1,5 @@
+{
+  "name": "numeric-integer-precision-loss-at-2-pow-53",
+  "description": "adding 1 to 2^53 loses precision in a float64, so the result equals the original value.",
+  "expr": "9007199254740992 + 1"
+}

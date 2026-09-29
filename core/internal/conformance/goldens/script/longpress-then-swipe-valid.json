@@ -1,0 +1,34 @@
+{
+  "parsed": {
+    "_stepLines": [
+      1,
+      2
+    ],
+    "appId": "",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Untitled script",
+    "steps": [
+      {
+        "command": "launchApp"
+      },
+      {
+        "at": {
+          "selector": {
+            "label": "Item A",
+            "text": "Item A"
+          }
+        },
+        "command": "longPress",
+        "holdMs": 600,
+        "thenSwipeTo": {
+          "selector": {
+            "label": "Drop zone",
+            "text": "Drop zone"
+          }
+        }
+      }
+    ]
+  },
+  "valid": true
+}

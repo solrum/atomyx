@@ -1,0 +1,5 @@
+{
+  "name": "structerr-unknown-callable",
+  "description": "a call to a name outside the number, string, bool whitelist.",
+  "expr": "bar(1)"
+}

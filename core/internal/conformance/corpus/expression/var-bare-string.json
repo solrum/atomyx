@@ -1,0 +1,11 @@
+{
+  "name": "var-bare-string",
+  "description": "a bare string variable reference.",
+  "expr": "s",
+  "variables": {
+    "s": {
+      "type": "string",
+      "string": "hello"
+    }
+  }
+}

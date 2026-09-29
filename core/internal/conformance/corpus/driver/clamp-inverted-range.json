@@ -1,0 +1,8 @@
+{
+  "name": "clamp-inverted-range",
+  "description": "an inverted range (max below min) returns min rather than throwing",
+  "function": "clamp",
+  "value": 10,
+  "min": 100,
+  "max": 50
+}

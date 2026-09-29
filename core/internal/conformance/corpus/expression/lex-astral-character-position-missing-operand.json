@@ -1,0 +1,5 @@
+{
+  "name": "lex-astral-character-position-missing-operand",
+  "description": "a trailing binary plus with no right operand reports the correct position after a string literal containing an astral character.",
+  "expr": "\"😀\" +"
+}

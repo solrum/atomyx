@@ -1,0 +1,10 @@
+{
+  "name": "assert-exists-failure",
+  "description": "assertExists with no timeout does a single instant check and fails when the selector is absent",
+  "yaml": "appId: com.test\nname: assert exists failure\nenv: {}\n---\n- launchApp\n- assertExists: Nonexistent\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

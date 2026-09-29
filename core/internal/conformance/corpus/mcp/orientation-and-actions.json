@@ -1,0 +1,50 @@
+{
+  "name": "orientation-and-actions",
+  "description": "Core orientation and action tools (get_ui_tree, find_element, tap, input_text, swipe, press_key, wait_for_element, list_apps, screenshot) against a static login screen.",
+  "driver": {
+    "hierarchy": {
+      "attributes": { "role": "container", "bounds": "0,0,430,932" },
+      "children": [
+        {
+          "attributes": {
+            "role": "button",
+            "id": "login_btn",
+            "text": "Sign in",
+            "label": "Login button",
+            "bounds": "100,400,330,460"
+          },
+          "children": [],
+          "enabled": true,
+          "clickable": true
+        },
+        {
+          "attributes": {
+            "role": "textfield",
+            "id": "email",
+            "hint": "Email address",
+            "bounds": "40,300,390,340"
+          },
+          "children": [],
+          "enabled": true,
+          "focused": true
+        }
+      ]
+    }
+  },
+  "steps": [
+    { "tool": "select_device", "args": { "platform": "android", "id": "mock-device" } },
+    { "tool": "get_ui_tree", "args": {} },
+    { "tool": "get_ui_tree", "args": { "limit": 1 } },
+    { "tool": "find_element", "args": { "id": "login_btn" } },
+    { "tool": "find_element", "args": { "id": "nope" } },
+    { "tool": "tap", "args": { "selector": { "id": "login_btn" } } },
+    { "tool": "tap", "args": { "x": 100, "y": 200 } },
+    { "tool": "input_text", "args": { "selector": { "id": "email" }, "text": "hi" } },
+    { "tool": "swipe", "args": { "direction": "up" } },
+    { "tool": "swipe", "args": { "fromX": 10, "fromY": 20, "toX": 30, "toY": 40 } },
+    { "tool": "press_key", "args": { "key": "back" } },
+    { "tool": "wait_for_element", "args": { "selector": { "id": "login_btn" }, "timeoutMs": 1000 } },
+    { "tool": "list_apps", "args": {} },
+    { "tool": "screenshot", "args": {} }
+  ]
+}

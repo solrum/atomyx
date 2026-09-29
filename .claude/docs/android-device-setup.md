@@ -1,4 +1,4 @@
-# Android device setup — how-to
+# Android device setup: how-to
 
 ## Purpose
 
@@ -21,7 +21,7 @@ or the Atomyx Android agent (port 8765 via adb forward).
 Capture is written to `/tmp/atomyx-capture.jsonl` when started
 via the CLI (`--proxy mitmproxy:/tmp/atomyx-capture.jsonl`).
 
-### Step 1 — Verify current state (always run first)
+### Step 1: Verify current state (always run first)
 
 ```bash
 # 1. Host IP (proxy must point here)
@@ -45,7 +45,7 @@ Expected healthy state:
 - mitmproxy LISTEN on `*:8889`
 - Cert hash `c8750f0d.0` present in `/data/misc/user/0/cacerts-added/`
 
-### Step 2 — Fix proxy IP / port
+### Step 2: Fix proxy IP / port
 
 Run whenever the host IP changes or the port is wrong:
 
@@ -56,7 +56,7 @@ adb shell settings put global global_http_proxy_host ${HOST_IP}
 adb shell settings put global global_http_proxy_port 8889
 ```
 
-### Step 3 — Start mitmproxy
+### Step 3: Start mitmproxy
 
 ```bash
 mitmdump --listen-port 8889 --listen-host 0.0.0.0 -w /tmp/atomyx-capture.jsonl
@@ -68,12 +68,12 @@ Run in background when needed during a session:
 mitmdump --listen-port 8889 --listen-host 0.0.0.0 -w /tmp/atomyx-capture.jsonl &
 ```
 
-### Step 4 — Install CA cert (if missing)
+### Step 4: Install CA cert (if missing)
 
 Serve the cert from the host, then install on device via browser.
 
 ```bash
-# On host — serve the cert directory
+# On host, then serve the cert directory
 python3 -m http.server 9999 --directory ~/.mitmproxy &
 
 # Get host IP to share with device
@@ -81,16 +81,16 @@ ipconfig getifaddr en0 || ipconfig getifaddr en1
 ```
 
 On the device:
-1. Open browser → `http://<host-ip>:9999/mitmproxy-ca-cert.pem`
+1. Open browser and navigate to `http://<host-ip>:9999/mitmproxy-ca-cert.pem`
 2. Download the file.
-3. Settings → Security → Install certificate → CA certificate → select the downloaded file.
-4. Verify: re-run the check in Step 1 — hash `c8750f0d` must appear.
+3. Settings, then Security, then Install certificate, then CA certificate, then select the downloaded file.
+4. Verify: re-run the check in Step 1. The hash `c8750f0d` must appear.
 
 > User-installed certs cover browsers and apps that respect the
 > user trust store. System-level trust (for apps pinning to the
 > system store) requires a rooted device or a debug build.
 
-### Troubleshooting — "No internet" after clearing proxy
+### Troubleshooting: "No internet" after clearing proxy
 
 **Symptom:** proxy cleared, ping works, but device shows "No internet"
 and apps report no connectivity.
@@ -106,7 +106,7 @@ even after the proxy is removed because Android caches the result.
 # Confirm internet actually works despite the warning
 adb shell curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
   http://connectivitycheck.gstatic.com/generate_204
-# → 204 means internet is fine; the problem is the cached flag only
+# So 204 means internet is fine; the problem is the cached flag only
 
 # Check the active WiFi network capability flags
 adb shell dumpsys connectivity 2>/dev/null \
@@ -114,7 +114,7 @@ adb shell dumpsys connectivity 2>/dev/null \
   | grep -oE "PARTIAL_CONNECTIVITY|VALIDATED"
 ```
 
-**Fix** (testing device — captive portal detection not needed):
+**Fix** (testing device, captive portal detection not needed):
 
 ```bash
 # Disable captive portal check, reconnect WiFi to clear the flag
@@ -124,7 +124,7 @@ adb shell svc wifi disable && sleep 2 && adb shell svc wifi enable
 
 After reconnecting, the network reports `VALIDATED` and the "No
 internet" warning disappears. `captive_portal_mode 0` is kept
-permanently on testing devices — use `ap reset` to apply in one step.
+permanently on testing devices, so use `ap reset` to apply in one step.
 
 ### Quick-reference: proxy healthy state
 

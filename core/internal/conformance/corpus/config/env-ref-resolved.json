@@ -1,0 +1,6 @@
+{
+  "name": "env-ref-resolved",
+  "description": "A ${ENV:NAME} placeholder in vars substitutes the process environment variable's value.",
+  "yaml": "project: Demo\napps:\n  - id: main\n    platform: android\n    appId: com.example.app\nenvironments:\n  staging:\n    app: main\n    vars:\n      token: ${ENV:ATOMYX_CORPUS_TOKEN}\n",
+  "envVars": { "ATOMYX_CORPUS_TOKEN": "secret-value" }
+}

@@ -1,0 +1,242 @@
+[
+  {
+    "result": {
+      "content": [
+        {
+          "active": {
+            "connectedAt": "\u003cnormalized\u003e",
+            "id": "mock-device",
+            "kind": "simulator",
+            "platform": "android"
+          },
+          "ok": true
+        }
+      ],
+      "isError": false
+    },
+    "tool": "select_device"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "nodes": [
+            {
+              "bounds": "0,0,430,932",
+              "depth": 0,
+              "role": "container"
+            },
+            {
+              "bounds": "100,400,330,460",
+              "clickable": true,
+              "depth": 1,
+              "enabled": true,
+              "id": "login_btn",
+              "label": "Login button",
+              "role": "button",
+              "text": "Sign in"
+            },
+            {
+              "bounds": "40,300,390,340",
+              "depth": 1,
+              "enabled": true,
+              "focused": true,
+              "hint": "Email address",
+              "id": "email",
+              "role": "textfield"
+            }
+          ],
+          "returned": 3,
+          "total": 3,
+          "truncated": false
+        }
+      ],
+      "isError": false
+    },
+    "tool": "get_ui_tree"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "nodes": [
+            {
+              "bounds": "0,0,430,932",
+              "depth": 0,
+              "role": "container"
+            }
+          ],
+          "returned": 1,
+          "total": 3,
+          "truncated": true
+        }
+      ],
+      "isError": false
+    },
+    "tool": "get_ui_tree"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "bounds": {
+            "bottom": 460,
+            "left": 100,
+            "right": 330,
+            "top": 400
+          },
+          "center": {
+            "x": 215,
+            "y": 430
+          },
+          "clickable": true,
+          "enabled": true,
+          "found": true,
+          "id": "login_btn",
+          "label": "Login button",
+          "role": "button",
+          "text": "Sign in"
+        }
+      ],
+      "isError": false
+    },
+    "tool": "find_element"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "found": false
+        }
+      ],
+      "isError": false
+    },
+    "tool": "find_element"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "detail": "tapped at (215,430)",
+          "ok": true,
+          "resolvedBy": "id"
+        }
+      ],
+      "isError": false
+    },
+    "tool": "tap"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "detail": "tapped at (100,200)",
+          "ok": true
+        }
+      ],
+      "isError": false
+    },
+    "tool": "tap"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "detail": "typed 2 char(s) into field at (215,320)",
+          "ok": true,
+          "resolvedBy": "id"
+        }
+      ],
+      "isError": false
+    },
+    "tool": "input_text"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "direction": "up",
+          "ok": true
+        }
+      ],
+      "isError": false
+    },
+    "tool": "swipe"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "detail": "swiped from (10,20) to (30,40)",
+          "ok": true
+        }
+      ],
+      "isError": false
+    },
+    "tool": "swipe"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "ok": true
+        }
+      ],
+      "isError": false
+    },
+    "tool": "press_key"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "bounds": {
+            "bottom": 460,
+            "left": 100,
+            "right": 330,
+            "top": 400
+          },
+          "center": {
+            "x": 215,
+            "y": 430
+          },
+          "clickable": true,
+          "enabled": true,
+          "found": true,
+          "id": "login_btn",
+          "label": "Login button",
+          "role": "button",
+          "text": "Sign in"
+        }
+      ],
+      "isError": false
+    },
+    "tool": "wait_for_element"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "apps": [],
+          "count": 0,
+          "note": "No apps returned. Device may have no installed apps, or the host enumeration toolchain is not available."
+        }
+      ],
+      "isError": false
+    },
+    "tool": "list_apps"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "format": "png",
+          "path": "\u003cnormalized\u003e",
+          "sizeBytes": 0
+        }
+      ],
+      "isError": false
+    },
+    "tool": "screenshot"
+  }
+]

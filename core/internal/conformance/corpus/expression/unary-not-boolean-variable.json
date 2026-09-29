@@ -1,0 +1,11 @@
+{
+  "name": "unary-not-boolean-variable",
+  "description": "logical not on a boolean variable.",
+  "expr": "not b",
+  "variables": {
+    "b": {
+      "type": "boolean",
+      "boolean": true
+    }
+  }
+}

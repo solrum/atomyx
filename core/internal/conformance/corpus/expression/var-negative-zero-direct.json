@@ -1,0 +1,11 @@
+{
+  "name": "var-negative-zero-direct",
+  "description": "a variable holding negative zero, returned bare.",
+  "expr": "negZero",
+  "variables": {
+    "negZero": {
+      "type": "number",
+      "number": "-0"
+    }
+  }
+}

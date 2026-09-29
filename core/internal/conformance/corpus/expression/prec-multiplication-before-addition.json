@@ -1,0 +1,5 @@
+{
+  "name": "prec-multiplication-before-addition",
+  "description": "multiplication binds tighter than addition.",
+  "expr": "2 + 3 * 4"
+}

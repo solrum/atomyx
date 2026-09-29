@@ -5,7 +5,7 @@ import XCTest
 /// `PressKeyRegistry`. The command is pure orchestration:
 ///
 ///   1. Validate the `key` argument.
-///   2. Resolve the strategy (registered name → fallback).
+///   2. Resolve the strategy (registered name, then fallback).
 ///   3. Guard `state.currentApp` iff `strategy.requiresApp`.
 ///   4. Dispatch `strategy.execute(key:app:)` and forward the result
 ///      onto the wire.
@@ -38,7 +38,7 @@ final class PressKeyCommand: CommandHandler {
         let app: XCUIApplication?
         if strategy.requiresApp {
             guard let tracked = state.currentApp else {
-                return .error(id: request.id, message: "no app launched — call launchApp first")
+                return .error(id: request.id, message: "no app launched, call launchApp first")
             }
             app = tracked
         } else {

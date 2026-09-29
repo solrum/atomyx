@@ -1,0 +1,150 @@
+{
+  "calls": [
+    {
+      "args": [
+        "com.test",
+        {}
+      ],
+      "method": "launchApp"
+    },
+    {
+      "args": [
+        {
+          "pointers": [
+            {
+              "id": "single",
+              "waypoints": [
+                {
+                  "atOffsetSeconds": 0,
+                  "phase": "down",
+                  "point": {
+                    "x": 10,
+                    "y": 20
+                  }
+                },
+                {
+                  "atOffsetSeconds": 0.6,
+                  "phase": "move",
+                  "point": {
+                    "x": 10,
+                    "y": 20
+                  }
+                },
+                {
+                  "atOffsetSeconds": 0.8,
+                  "phase": "move",
+                  "point": {
+                    "x": 100,
+                    "y": 200
+                  }
+                },
+                {
+                  "atOffsetSeconds": 0.8,
+                  "phase": "up",
+                  "point": {
+                    "x": 100,
+                    "y": 200
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "method": "dispatchGesture"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "line": 5,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "longPress",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 6,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "longPress",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "longPress"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "longPress",
+      "depth": 0,
+      "detail": "longPress (hold 600ms, then drag)",
+      "durationMs": 0,
+      "line": 6,
+      "ok": true,
+      "stepIndex": 1,
+      "summary": "longPress",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "longPress"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 2,
+  "screenshots": [],
+  "scriptName": "longpress then drag",
+  "steps": [
+    {
+      "command": "launchApp",
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    },
+    {
+      "command": "longPress",
+      "detail": "longPress (hold 600ms, then drag)",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 1
+    }
+  ],
+  "totalSteps": 2
+}

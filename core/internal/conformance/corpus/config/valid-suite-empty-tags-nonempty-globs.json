@@ -1,0 +1,5 @@
+{
+  "name": "valid-suite-empty-tags-nonempty-globs",
+  "description": "A suite with an explicit empty tags array but a non-empty globs array is valid, and the empty array must round-trip as present, not be dropped.",
+  "yaml": "project: Demo\napps:\n  - id: main\n    platform: android\n    appId: com.example.app\nenvironments:\n  staging:\n    app: main\nsuites:\n  smoke:\n    tags: []\n    globs: [\"tests/**\"]\n"
+}

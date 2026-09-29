@@ -1,0 +1,8 @@
+{
+  "name": "swipe-direction-left",
+  "description": "a left swipe drags from a higher X to a lower X, centered vertically",
+  "function": "swipeDirection",
+  "screen": { "width": 400, "height": 800 },
+  "direction": "left",
+  "fraction": 0.6
+}

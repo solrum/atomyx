@@ -1,0 +1,13 @@
+{
+  "name": "detect-obscurement-covered-by-later-sibling",
+  "description": "a later sibling whose bounds cover the target's midpoint is reported as the obscurer",
+  "function": "detectObscurement",
+  "selector": { "id": "target" },
+  "tree": {
+    "attributes": { "id": "root" },
+    "children": [
+      { "attributes": { "id": "target", "bounds": "100,100,200,150" }, "children": [] },
+      { "attributes": { "id": "dialog-panel", "role": "dialog", "label": "Confirm", "bounds": "0,0,430,932" }, "children": [] }
+    ]
+  }
+}

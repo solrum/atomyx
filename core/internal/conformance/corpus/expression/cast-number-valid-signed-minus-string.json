@@ -1,0 +1,5 @@
+{
+  "name": "cast-number-valid-signed-minus-string",
+  "description": "number() accepts a negative-signed string.",
+  "expr": "number(\"-5\")"
+}

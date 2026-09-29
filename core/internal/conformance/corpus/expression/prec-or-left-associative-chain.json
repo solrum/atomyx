@@ -1,0 +1,5 @@
+{
+  "name": "prec-or-left-associative-chain",
+  "description": "or is left-associative across a three-term chain.",
+  "expr": "false or false or true"
+}

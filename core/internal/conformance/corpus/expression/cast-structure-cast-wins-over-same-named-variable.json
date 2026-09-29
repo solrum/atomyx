@@ -1,0 +1,11 @@
+{
+  "name": "cast-structure-cast-wins-over-same-named-variable",
+  "description": "a cast function name followed by a call parses as the cast even when a variable of the same name exists.",
+  "expr": "number(5)",
+  "variables": {
+    "number": {
+      "type": "number",
+      "number": "999"
+    }
+  }
+}

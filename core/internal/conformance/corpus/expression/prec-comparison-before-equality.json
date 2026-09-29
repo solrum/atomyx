@@ -1,0 +1,5 @@
+{
+  "name": "prec-comparison-before-equality",
+  "description": "comparison binds tighter than equality.",
+  "expr": "1 < 2 == true"
+}

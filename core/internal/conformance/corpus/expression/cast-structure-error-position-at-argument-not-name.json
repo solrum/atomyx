@@ -1,0 +1,5 @@
+{
+  "name": "cast-structure-error-position-at-argument-not-name",
+  "description": "a cast conversion error is positioned at the argument, not at the cast function name.",
+  "expr": "number(   \"abc\")"
+}

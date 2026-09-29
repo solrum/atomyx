@@ -1,0 +1,5 @@
+{
+  "name": "lexerr-unexpected-character-colon",
+  "description": "an unrecognized character (:) in the source.",
+  "expr": "1 : 2"
+}

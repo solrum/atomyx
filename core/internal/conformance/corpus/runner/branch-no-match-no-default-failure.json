@@ -1,0 +1,15 @@
+{
+  "name": "branch-no-match-no-default-failure",
+  "description": "branch fails the step when no case matches and no default block is given",
+  "yaml": "appId: com.test\nname: branch no match\nproxy: optional\nenv: {}\n---\n- launchApp\n- capture: \"POST /login as: r\"\n- branch:\n    from: r\n    on:\n      - match:\n          status: 200\n        do:\n          - back\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  },
+  "network": {
+    "requests": [
+      { "method": "POST", "url": "/login", "status": 500, "headers": {}, "body": {}, "timestampMs": 0 }
+    ]
+  }
+}

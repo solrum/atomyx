@@ -1,0 +1,5 @@
+{
+  "name": "unary-minus-number-literal",
+  "description": "unary minus on a number literal.",
+  "expr": "-5"
+}

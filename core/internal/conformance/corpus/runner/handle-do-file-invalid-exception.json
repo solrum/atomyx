@@ -1,0 +1,18 @@
+{
+  "name": "handle-do-file-invalid-exception",
+  "description": "handle's matching branch names a do file that exists but fails to parse, reporting the parse failure as an \"Exception: \" detail",
+  "yaml": "appId: com.test\nname: handle invalid do file\n---\n- launchApp\n- handle:\n    - when:\n        visible: X\n      do: \"{{DIR}}/invalid-handle-do.yml\"\n",
+  "flowFiles": {
+    "invalid-handle-do.yml": "appId: com.bad\n"
+  },
+  "driver": {
+    "hierarchies": [
+      {
+        "attributes": {},
+        "children": [
+          { "attributes": { "text": "X", "label": "X", "bounds": "0,0,10,10" }, "children": [], "clickable": true }
+        ]
+      }
+    ]
+  }
+}

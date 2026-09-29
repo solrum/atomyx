@@ -1,0 +1,5 @@
+{
+  "name": "invalid-format-regex",
+  "description": "a format string not matching 'atomyx/v<n>' must be REJECTED.",
+  "yaml": "format: v1\nappId: com.example.app\nname: Smoke\nenv: {}\n---\n- launchApp\n"
+}

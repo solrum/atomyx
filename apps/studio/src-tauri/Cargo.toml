@@ -3,7 +3,7 @@ name = "atomyx-studio"
 version = "0.1.0"
 description = "Atomyx Studio — desktop IDE for authoring and running Atomyx YAML test scripts."
 authors = ["Solrum"]
-license = "Apache-2.0"
+license = "MIT"
 edition = "2021"
 rust-version = "1.77"
 

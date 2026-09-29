@@ -1,0 +1,11 @@
+{
+  "name": "lex-identifier-mixed-case",
+  "description": "an identifier variable name with mixed case.",
+  "expr": "FooBar",
+  "variables": {
+    "FooBar": {
+      "type": "number",
+      "number": "1"
+    }
+  }
+}

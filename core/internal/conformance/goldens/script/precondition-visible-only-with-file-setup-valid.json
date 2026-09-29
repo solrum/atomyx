@@ -1,0 +1,25 @@
+{
+  "parsed": {
+    "_stepLines": [
+      8
+    ],
+    "appId": "com.example.app",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Smoke with precondition",
+    "preconditions": [
+      {
+        "check": {
+          "visible": "Home"
+        },
+        "setup": "flows/dismiss-onboarding.yml"
+      }
+    ],
+    "steps": [
+      {
+        "command": "launchApp"
+      }
+    ]
+  },
+  "valid": true
+}

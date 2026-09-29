@@ -1,0 +1,5 @@
+{
+  "name": "step-assert-not-visible",
+  "description": "assertNotVisible with a string shorthand selector and an explicit timeout.",
+  "yaml": "- launchApp\n- assertNotVisible: \"Loading spinner\"\n- assertNotVisible:\n    text: \"Onboarding\"\n    timeout: 3000\n"
+}

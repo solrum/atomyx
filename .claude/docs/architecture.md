@@ -1,277 +1,297 @@
-# ATOMYX ARCHITECTURE — OPT-IN MODULAR ECOSYSTEM
+# Atomyx: Architecture reference
 
-## 1. CORE PHILOSOPHY: DECOUPLED ECOSYSTEM
-Atomyx is NOT a single application. It is a suite of independent, opt-in
-modules.
+## Purpose
 
-- **The User is King:** Users install only what they need.
-- **Example:** A pure developer who only wants device interaction installs
-  `@atomyx/cli` alone — no test-management, no studio, no cloud.
-- **Persona-driven:** Every module exists because a real user persona needs
-  it standalone (see §6).
+Who reads this: a contributor or AI agent about to design or evaluate
+a change to the driver, orchestra, script, MCP, or CLI layers.
 
-## 2. MODULE INDEPENDENCE — DISTRIBUTION-LEVEL, NOT RUNTIME-LEVEL
+When to read it: before adding a Driver method, a script step, an
+MCP tool, or a new platform adapter, and before judging whether a
+change respects the module's dependency direction.
 
-Atomyx separates **two kinds of modularity** that are easy to confuse:
+What this does not cover: concrete file locations (see
+[`repo-map.md`](./repo-map.md)), build and test commands (see
+[`development.md`](./development.md)), and the MCP tool-by-tool
+contract (see [`tools.md`](./tools.md)).
 
-| | Distribution modularity | Runtime modularity |
-|---|---|---|
-| **What** | "Install only what you need" | "Modules talk over network at runtime" |
-| **Mechanism** | Separate npm packages, opt-in install | HTTP / IPC between processes |
-| **Cost** | Near zero | Latency, process orchestration, type-safety loss |
-| **Atomyx uses** | ✅ Yes | ❌ No |
+## TL;DR
 
-**Atomyx targets distribution modularity, NOT runtime modularity.**
+Atomyx's runtime is a single Go module (`dev.atomyx`) under `core/`.
+One platform-neutral `Driver` port abstracts device control. Four
+implementers satisfy it (mock, Android, iOS device, iOS simulator).
+An `Orchestra` layer composes `Driver` calls into selector
+resolution, scroll-into-view, obscurement handling, and wait
+primitives, so every higher layer inherits that behavior for free.
+The script engine and the MCP server are both built on `Orchestra`,
+never on a `Driver` directly. Dependency direction between all of
+this is enforced by `go-arch-lint` reading `core/.go-arch-lint.yml`,
+run locally through `make check`.
 
-Each module ships as one or more independently-installable npm packages.
-Power users install all of them; pure developers install one. **At runtime,
-modules link in-process via standard ES imports** — no HTTP between them,
-no separate processes to orchestrate, no serialization overhead, full
-TypeScript type safety preserved end-to-end.
+## Layers
 
-The tradeoff we make: in-process composition trades inter-module HTTP
-overhead + per-module deployment autonomy for operational simplicity and
-type safety end-to-end. The sharp edge is that a process crash takes
-every module down together; the benefit is that a single install yields
-a working setup without orchestrating multiple services.
+```mermaid
+flowchart TB
+    subgraph leaves["Leaf packages"]
+        wire["wire (shared types)"]
+        diag["diag (error codes)"]
+        clock["clock"]
+        logging["logging"]
+        transport["transport (HTTP + TCP clients)"]
+        process["process (adb/xcrun execution)"]
+    end
 
-When the day comes that a module needs to scale to a separate team, a
-separate language, or a separate deployment tier, the boundaries are
-already clean (enforced by `dependency-cruiser` — see §4) and the
-migration to runtime modularity is incremental, not a rewrite.
+    driver["driver (Driver port + Capabilities)"]
+    drivermock["driver/mock, driver/drivertest"]
+    androiddriver["androiddriver"]
+    iosdriver["iosdriver"]
+    iossimdriver["iossimdriver"]
+    orchestra["orchestra (selector resolution, scroll, obscurement, waits)"]
+    script["script (parser + expression engine)"]
+    runner["runner (step handlers)"]
+    scenario["scenario (script and suite sequencing)"]
+    device["device (probe + factory)"]
 
-## 3. INTERFACE LAYERING
+    mcp["mcp (MCP server)"]
+    cli["cli (atomyx binary)"]
+    sidecar["sidecar (JSON-RPC bridge)"]
 
-Every module follows the same internal layering:
+    wire --> driver
+    transport --> driver
+    driver --> androiddriver
+    driver --> iosdriver
+    driver --> iossimdriver
+    process --> androiddriver
+    process --> iosdriver
+    process --> iossimdriver
+    driver --> drivermock
+    driver --> orchestra
+    drivermock --> orchestra
+    orchestra --> script
+    script --> runner
+    runner --> scenario
+    driver --> device
+    androiddriver --> device
+    iosdriver --> device
+    iossimdriver --> device
+    orchestra --> device
 
-```
-┌─────────────────────────────────────────────┐
-│  CORE LOGIC (TypeScript library)            │
-│  — pure functions, no I/O assumptions       │
-│  — the primary execution engine             │
-└──────────────┬───────────────┬──────────────┘
-               │               │
-       ┌───────┴────┐     ┌────┴──────┐
-       ▼            ▼     ▼           ▼
-┌──────────┐  ┌───────────┐  ┌──────────────┐
-│  CLI     │  │  Studio   │  │ MCP server   │
-│  binary  │  │  (Tauri,  │  │ (stdio)      │
-│          │  │  Node     │  │ — optional   │
-│          │  │  sidecar) │  │   AI adapter │
-└──────────┘  └───────────┘  └──────────────┘
-                                     │
-                          (optional) ▼
-                            ┌──────────────┐
-                            │ HTTP server  │
-                            │ (browser /   │
-                            │  non-TS /    │
-                            │  remote use) │
-                            └──────────────┘
-```
-
-Studio consumes the core runtime via a `StudioRuntime` port —
-default adapter spawns a Node sidecar that links the core as a
-library. MCP is a SECONDARY adapter that wraps the same core for
-AI-agent consumers; Studio can opt into it via settings but does
-not depend on it. See ADR-005 for the rationale and contract.
-
-Rules:
-
-1. **Core logic is the canonical implementation.** It is a pure TypeScript
-   library — exports types, classes, and functions. No transport, no I/O
-   beyond what the Driver port abstracts.
-
-2. **CLI, Studio, MCP, and HTTP are PARALLEL consumers** of the core
-   logic. They are siblings, not stacked layers. MCP does NOT wrap
-   HTTP; both call the core directly. Studio in Tauri talks to the
-   core through a Node sidecar it owns — no MCP required for humans.
-
-3. **HTTP is OPTIONAL** within a module. Ship it when there's a real
-   external consumer that cannot link the core as a library (browser,
-   non-TS language, remote Studio scenario). Until that consumer exists,
-   don't ship HTTP — it's surface area to maintain for nothing.
-
-4. **MCP wraps the core, not HTTP.** AI agents talking to a local MCP
-   server hit the core in the same process — zero network hops, full
-   speed, full type safety up to the MCP boundary.
-
-5. **MCP is optional**, not a middleware the human tools depend on.
-   CLI and Studio call the core runtime directly; MCP is a separate
-   adapter that AI-agent sessions opt into. Building Studio features
-   that require MCP when the user has not opted in is a regression.
-
-## 4. CROSS-MODULE BOUNDARIES — ENFORCED BY LINT
-
-Modules are independent at the **package** level: each module ships as
-its own npm package(s) with its own `package.json`, version, changelog,
-and publish pipeline. They can be split into separate repositories at
-any point with `git subtree split` if the team scales beyond one.
-
-**Imports across packages go through public entry points only:**
-
-```ts
-// ✅ ALLOWED — studio imports driver's PUBLIC API
-import { Orchestra, IosDriver } from "@atomyx/driver";
-
-// ❌ FORBIDDEN — reaching into driver internals
-import { ScrollController } from "@atomyx/driver/src/scroll/...";
-import { internalThing } from "@atomyx/driver/dist/internals/...";
+    orchestra --> mcp
+    runner --> mcp
+    device --> mcp
+    runner --> cli
+    device --> cli
+    scenario --> cli
+    device --> sidecar
+    runner --> sidecar
 ```
 
-This is enforced by `dependency-cruiser` configured in the repo root:
+Reading the diagram: an arrow means "the arrow's tail may depend on
+its head." `mcp`, `cli`, and `sidecar` are parallel consumers of the
+same `orchestra` and `runner` contracts, and none of them wraps another.
 
-```js
-// .dependency-cruiser.cjs
-forbidden: [
-  {
-    name: "no-cross-package-deep-imports",
-    from: { path: "^packages/" },
-    to: {
-      path: "^packages/[^/]+/src/",
-      pathNot: "/index\\.ts$",
-    },
-  },
-];
+## The Driver port
+
+`core/internal/driver/driver.go` defines `Driver`, the platform-neutral
+device control surface every concrete adapter implements. Port names
+are platform-neutral by design: `Platform()` returns `"ios"` or
+`"android"`, not a package name. `AppID` replaces a platform-specific
+concept like a bundle identifier or a package name at the port
+boundary.
+
+A `Driver` implementation reports static feature support through
+`Capabilities()` (`core/internal/driver/types.go`), which callers
+above the port must check before invoking a conditionally supported
+method:
+
+- `CanEraseText`: native backward erase from the focused field.
+- `CanHideKeyboard`: native keyboard dismissal.
+- `CanWaitForIdle`: a native idle-detection primitive. `orchestra`
+  falls back to tree-diff polling when absent.
+- `CanMultiPointer`: multi-pointer gesture dispatch (pinch, rotate,
+  multi-finger custom paths).
+- `CanPressure`: per-waypoint pressure values inside a gesture.
+
+Rule of thumb stated directly in the port's doc comment: if a method
+can be implemented by composing other `Driver` methods, it does not
+belong on the interface. Selector resolution, scroll-into-view,
+obscurement detection, and retry all live one layer up, in
+`orchestra`.
+
+## The Orchestra layer
+
+`core/internal/orchestra` composes `Driver` calls into the operations
+every consumer (script engine, MCP tools, CLI) actually wants:
+selector resolution and priority broadening, scroll-into-view via the
+scroll controller (`core/internal/orchestra/scroll_controller.go`),
+obscurement detection, and the wait primitives in
+`core/internal/orchestra/wait.go`. The tree-query helpers live in
+`core/internal/orchestra/finder.go`. `Find` and `FindOne` run a
+compiled selector filter against a hierarchy and return matching
+cursors.
+
+### Selector priority broadening
+
+`core/internal/orchestra/priority_broadening.go` defines
+`CompileSelector`, which turns a `Selector` (the fields an agent or a
+script step supplies) into an `ElementFilter`. Content fields are
+tried in a fixed priority order, most specific to most fuzzy:
+
+```
+ID > Label > Text > Value > Hint
 ```
 
-The rule operates on the package directory level (`packages/<name>/`).
-Module ownership is encoded in the package name convention, not in
-directory hierarchy. The
-filesystem layout stays flat for ergonomics; the conceptual modules are
-inferred from naming.
+The first field that produces a non-empty match wins, so broadening
+stops there. When the caller supplies `Text` but not `Label`, a
+`Label` match against the same pattern is tried right after `Text`,
+because a cross-platform text query against an element that only
+carries an accessibility label still needs to resolve. `Role`,
+`Enabled`, `Clickable`, and `Focused` are not part of the priority
+chain: every candidate filter AND-s them in as constraints. `Nth`
+skips ranking entirely and selects positionally from the winning
+filter's result list.
 
-CI fails on violations. This gives the same loose-coupling guarantee as
-HTTP boundaries (no module can secretly depend on another's internals)
-**without** the runtime cost.
+This is the mechanism that lets an agent write `{text: "Login"}`
+without knowing whether Android exposes that string through
+`contentDesc` or iOS through `label`: both adapters normalize onto
+the same canonical attribute keys at the `Driver` boundary, and
+`CompileSelector` tries whichever fields the caller supplied in
+priority order.
 
-## 5. FEATURE DISCOVERY — GRACEFUL DEGRADATION
+## Driver implementers
 
-Modules detect siblings at install time via npm dependency resolution,
-NOT at runtime via network probes:
+Four packages implement `Driver`, all verified against the same
+contract suite in `core/internal/driver/drivertest`:
 
-```ts
-// inside any consumer that wants test-management as an optional sibling
-let testRepo: TestCaseRepo | null = null;
-try {
-  const mod = await import("@atomyx/test-mgmt");
-  testRepo = new mod.TestCaseRepo();
-} catch {
-  // @atomyx/test-mgmt not installed — disable test-mgmt UI section
-}
-```
+- **Mock** (`core/internal/driver/mock`): an in-memory implementation
+  for tests. Production code must never import it. Only test files
+  and the contract suite depend on it.
+- **Android** (`core/internal/androiddriver`): talks to the Android
+  agent's HTTP control server over `127.0.0.1:8765`, reached through
+  an `adb forward` tunnel the driver manages.
+- **iOS device and simulator via XCUITest**
+  (`core/internal/iosdriver`): talks to the Swift XCUITest runner
+  over a line-delimited JSON TCP protocol on `127.0.0.1:22087`.
+  Connecting to a physical device additionally runs an `iproxy` USB
+  tunnel to map that port.
+- **iOS simulator via direct HID** (`core/internal/iossimdriver`):
+  dispatches touch gestures through a WebSocket connection to a
+  helper process wrapping Apple's private simulator HID client,
+  bypassing XCUITest for the simulator-only fast path.
 
-If a user installs only `@atomyx/cli`, the optional
-`@atomyx/test-mgmt` import fails at runtime and the consumer
-gracefully reports "I have driver, no test repository" — exactly the
-behavior the previous ARCHITECTURE.md draft required, achieved via npm rather than HTTP
-probing.
+Each implementer's own package doc comment describes its transport in
+more detail. The contract suite in `drivertest` is what keeps all
+four honest against the same `Driver` invariants as the port
+evolves.
 
-## 6. USER PERSONAS
+## Script engine and step handlers
 
-Each persona maps to a specific install:
+`core/internal/script` owns the test-script schema, the YAML parser,
+and the expression engine (`core/internal/script/expression`) that
+evaluates the boolean and arithmetic expressions used by
+`assertExpr`, branch and handle conditions, and extract and capture
+patterns. `core/internal/runner` defines the command execution
+contract (`CommandContext`, `CommandResult`, `CommandDefinition`) and
+the `ScriptRunner` that dispatches a parsed script's steps against
+that contract, one step at a time, against an `Orchestra` instance,
+failing fast on the first step that does not succeed.
 
-| Persona | Installs | Gets |
-|---|---|---|
-| **Pure Developer** | `@atomyx/cli` | Device interaction via CLI + MCP. ~5-10 MB. |
-| **QC Manager** | `@atomyx/test-mgmt` | Standalone test-case + report manager. No driver. |
-| **Power User** | `@atomyx/studio` | GUI bundling everything. Auto-detects which siblings are installed. |
-| **CI Pipeline** | `@atomyx/cli` + `@atomyx/test-mgmt` | Headless run-and-report. |
-| **Cloud / Scale Operator** | `@atomyx/cloud` (future) | Remote device farm orchestration. |
+`core/internal/scenario` sequences groups of scripts (a scenario) and
+ordered sets of scripts or scenarios (a suite), giving each entry its
+own fresh `ScriptRunner` so precondition, guard, and per-run data
+isolation stay entirely inside `runner`.
 
-Each module has its own `bin` and its own MCP server entry point. The
-power user case is composed at install time (npm pulls everything) and
-linked at runtime (Studio imports the others as libraries).
+## The MCP surface
 
-## 7. ECOSYSTEM DIAGRAM
+`core/internal/mcp` builds the Atomyx MCP server: the stdio-based
+process an AI agent connects to for tool-driven mobile test
+orchestration. Every tool handler is a thin wrapper that validates
+its arguments against a JSON Schema, calls one or more `Orchestra` (or,
+for run and script tools, `RunStore` or `ScriptRunner`) methods, and
+returns a JSON result. See [`tools.md`](./tools.md) for the full
+tool-by-tool contract. MCP is an adapter over the same core the CLI
+uses, and it never sits between the CLI and `Orchestra`.
 
-```text
-                                ┌──────────────┐
-                                │  HUMAN USER  │
-                                └──────┬───────┘
-                                       │
-                ┌──────────────────────┴──────────────────────┐
-                ▼                                             ▼
-       ┌─────────────────┐                           ┌─────────────────┐
-       │  ATOMYX STUDIO  │                           │   ATOMYX CLI    │
-       │      (GUI)      │                           │  (per module)   │
-       └────────┬────────┘                           └────────┬────────┘
-                │                                             │
-                │  in-process imports                         │  in-process
-                │  (NOT HTTP)                                 │  imports
-                │                                             │
-                ▼                                             ▼
- ╔═════════════════════════════════════════════════════════════════════╗
- ║         INDEPENDENT NPM PACKAGES (the Ecosystem)                    ║
- ║                                                                     ║
- ║  ┌─────────────────────┐  ┌──────────────────────┐                  ║
- ║  │ @atomyx/core +      │  │ @atomyx/test-mgmt    │                  ║
- ║  │ @atomyx/driver      │  │ - Case manager       │                  ║
- ║  │ - Driver port       │  │ - Report storage     │                  ║
- ║  │ - Orchestra         │  │ - YML parser         │                  ║
- ║  │ - Filters / scroll  │  │ - Persona: QC Mgr    │                  ║
- ║  │ - iOS / Android     │  │                      │                  ║
- ║  │   driver impls      │  │                      │                  ║
- ║  └─────────────────────┘  └──────────────────────┘                  ║
- ║                                                                     ║
- ║  ┌─────────────────────┐                                            ║
- ║  │ @atomyx/cloud       │  (future)                                  ║
- ║  │ - Remote devices    │                                            ║
- ║  │ - Worker pool       │                                            ║
- ║  └─────────────────────┘                                            ║
- ╚═════════════════════════════════════════════════════════════════════╝
+## The CLI
 
-       AGENT (MCP) ─────► each module's MCP server (in-process)
-       SCRIPT  ─────────► each module's CLI binary
-       BROWSER ─────────► each module's HTTP server (optional, only when needed)
+`core/internal/cli` implements the `atomyx` binary: argument parsing,
+command routing, and the driver module's commands (`run`, `suite`,
+`list-devices`, `doctor`, `version`, `help`) plus the skills module's
+commands (`init`, `update-skills`) that install the bundled skill and
+agent markdown files from `core/internal/skills` into a consumer
+project.
 
-   Cross-module imports allowed AT PUBLIC ENTRY POINTS ONLY.
-   Deep imports into another module's internals → CI fail (dep-cruiser).
-```
+## Dependency direction and its enforcement
 
-## 8. Wire protocols
+Dependency direction across every package under `core/internal/` is
+declared in `core/.go-arch-lint.yml` and enforced locally by
+`go-arch-lint check --project-path .`, part of `make -C core check`
+(see [`development.md`](./development.md) for the full gate list). The
+config lists every package as a named component and an explicit
+`mayDependOn` edge list, and an import that is not on that list fails
+the check.
 
-Atomyx has two distinct wire protocols — one per platform. There is no
-shared cross-platform wire schema. The `Driver` port in `@atomyx/driver`
-abstracts both; adapter authors implement that port, not a wire schema.
+The shape the config encodes:
 
-### Android HTTP
+- **Leaf components** (`clock`, `logging`, `version`, `diag`, `wire`)
+  carry no business knowledge and may be depended on by nearly
+  everything, directly mirroring the "leaf package" language in their
+  own doc comments.
+- **`transport`** may depend only on `wire` and `diag`.
+- **`driver`** may depend only on `wire` and `transport`. The three
+  concrete implementers (`androiddriver`, `iosdriver`,
+  `iossimdriver`) may depend on `driver`, `transport`, `process`, and
+  the `drivertest` contract suite, but not on each other.
+- **`orchestra`** may depend on `driver` and `drivermock` (for its own
+  tests), never on a concrete implementer. This is what keeps
+  `Orchestra` platform-neutral: it is compiled against the port, not
+  against Android or iOS code.
+- **`script`** depends on `driver` and `orchestra`.
+- **`runner`** additionally depends on `script` and `expression`.
+- **`scenario`** additionally depends on `runner`.
+- **`device`** (discovery and construction) is the one package
+  allowed to depend on `driver` and all three concrete implementers
+  at once, because assembling a live `Driver` for whichever platform
+  a caller selects is exactly its job.
+- **`mcp`**, **`cli`**, and **`sidecar`** sit at the top: each may
+  depend on `orchestra`, `script`, `runner`, `device`, and their own
+  supporting leaves, but none of them may depend on each other. This
+  is the enforcement mechanism behind "MCP, CLI, and the sidecar are
+  parallel consumers, not stacked layers."
+- **`conformance`** and **`cmd`** are declared `anyProjectDeps: true`:
+  the differential test corpus and the binary entry points are
+  allowed to import anything, because their job is exercising or
+  wiring the rest of the module, not being depended upon.
 
-- **Transport**: HTTP over `127.0.0.1:8765` via `adb forward`.
-- **Path namespace**: `/actions/*` for mutations, `/tree` for the UI
-  hierarchy, `/current-activity`, `/health`, `/ping` for meta.
-- **Response envelope**: write actions return
-  `DispatchResult { ok: boolean, reason?: string, code?: string }`.
-- **Runner spec**: `platforms/android-agent/…/router/CommonRoutes.kt`.
-- **Host adapter**: `packages/android-driver/src/android.driver.ts`.
+A change that needs an edge the config does not grant is a signal to
+reconsider the change's layer, not to add a blanket allowance.
 
-### iOS TCP+JSON
+## Design principles
 
-- **Transport**: TCP JSON stream on `127.0.0.1:22087`; `iproxy` tunnels
-  physical devices. Bundle id: `dev.atomyx.driver.host`.
-- **Message envelope**: `{ id: string, type: string, args: object }` for
-  requests; per-command response shapes vary by command type.
-- **Runner spec**: `platforms/ios-agent/Sources/…/*Command.swift` files.
-- **Host adapter**: `packages/ios-driver/src/ios.driver.ts`.
+These hold regardless of which layer a change touches:
 
-### Shared types only
+- **Cross-platform by design.** Every capability an agent or a script
+  step can invoke goes through the `Driver` port. Port and
+  `Capabilities` field names are platform-neutral.
+- **One tool per intent.** The MCP surface stays small on purpose;
+  before adding a tool, confirm no existing tool can absorb the
+  intent through a parameter.
+- **No platform branching above the driver adapter.** `orchestra`,
+  `script`, `runner`, and `mcp` never switch on `Platform()`. A
+  behavior that genuinely differs per platform belongs inside the
+  concrete `Driver` implementer, not in a conditional above it.
+- **Selector-first, coordinates first-class.** Actions accept a
+  `Selector` or raw `{x, y}` coordinates as an equally valid,
+  non-hacky alternative, because not every element carries a stable
+  selector.
+- **Agent ergonomics over engine purity.** A tool name, error message,
+  or default that makes the calling agent's life easier wins even
+  when it pushes complexity into the tool layer that would otherwise
+  "belong" lower in the stack.
 
-`@atomyx/driver-wire` provides `TreeNodeWire` and primitive types
-(`PointWire`, `BoundsWire`, etc.) that normalizers in each adapter
-produce. These are TS type declarations — not a wire schema, not a
-validation layer, and not a constraint on what bytes cross the wire.
+## References
 
----
-
-## 9. WHAT THIS DOCUMENT IS NOT
-
-- It is **not** a microservices manifesto. Microservices solve cross-team
-  / cross-language deployment problems Atomyx does not have.
-- It is **not** a license to import everywhere. Public entry points are
-  the contract; deep imports break it.
-- It is **not** anti-HTTP. HTTP is one of three transports a module can
-  ship (CLI, MCP, HTTP) — added when a real consumer needs it.
-
-The goal is the same as v1 of this document: **install only what you
-need, modules independently developable, gracefully degrade**. The
-mechanism is different: **npm-level distribution + in-process composition
-+ lint-enforced boundaries**, not HTTP-between-processes.
+- [`repo-map.md`](./repo-map.md): where each package and binary lives
+  on disk.
+- [`development.md`](./development.md): build, test, and extension
+  workflow, including running `go-arch-lint` locally.
+- [`tools.md`](./tools.md): the full MCP tool contract.

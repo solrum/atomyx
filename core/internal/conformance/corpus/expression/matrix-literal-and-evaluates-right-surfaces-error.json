@@ -1,0 +1,5 @@
+{
+  "name": "matrix-literal-and-evaluates-right-surfaces-error",
+  "description": "and evaluates its right side when the left side is true, so a division by zero on the right surfaces.",
+  "expr": "true and (1 / 0 == 0)"
+}

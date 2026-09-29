@@ -1,0 +1,6 @@
+{
+  "name": "invalid-unknown-key",
+  "description": "a root key ScenarioDefinitionSchema does not declare must be REJECTED by .strict() with zod's exact unrecognized-keys issue message.",
+  "yaml": "name: Checkout regression\nscripts:\n  - flows/login.yml\nretries: 3\n",
+  "expectErrorText": true
+}

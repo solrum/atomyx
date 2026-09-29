@@ -1,0 +1,56 @@
+{
+  "kind": "script",
+  "metadata": {
+    "command": "run",
+    "device": "emulator-5554",
+    "durationMs": 2500,
+    "env": "staging",
+    "finishedAt": "2026-01-01T00:00:02.500Z",
+    "label": "Login flow",
+    "platform": "android",
+    "runId": "11111111-1111-4111-8111-111111111111",
+    "startedAt": "2026-01-01T00:00:00.000Z"
+  },
+  "reportVersion": 1,
+  "result": {
+    "durationMs": 2500,
+    "ok": true,
+    "passedSteps": 4,
+    "screenshots": [
+      {
+        "file": "01-after-login.png",
+        "label": "after login"
+      }
+    ],
+    "scriptName": "Login flow",
+    "steps": [
+      {
+        "command": "launchApp",
+        "durationMs": 800,
+        "ok": true,
+        "stepIndex": 0
+      },
+      {
+        "command": "tap",
+        "detail": "tapped #username",
+        "durationMs": 120,
+        "ok": true,
+        "stepIndex": 1
+      },
+      {
+        "command": "type",
+        "durationMs": 300,
+        "ok": true,
+        "stepIndex": 2
+      },
+      {
+        "command": "tap",
+        "detail": "tapped #submit",
+        "durationMs": 1280,
+        "ok": true,
+        "stepIndex": 3
+      }
+    ],
+    "totalSteps": 4
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "cast-string-nan",
+  "description": "string() renders NaN as \"NaN\".",
+  "expr": "string(nanVar)",
+  "variables": {
+    "nanVar": {
+      "type": "number",
+      "number": "NaN"
+    }
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "name": "lex-decimal-literal",
+  "description": "a decimal literal with several fraction digits.",
+  "expr": "3.14159"
+}

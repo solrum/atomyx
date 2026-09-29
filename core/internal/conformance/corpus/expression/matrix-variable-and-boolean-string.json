@@ -1,0 +1,15 @@
+{
+  "name": "matrix-variable-and-boolean-string",
+  "description": "variable boolean \"and\" variable string, proving lookup-typed values take the same path as literals.",
+  "expr": "lb and rs",
+  "variables": {
+    "lb": {
+      "type": "boolean",
+      "boolean": true
+    },
+    "rs": {
+      "type": "string",
+      "string": "a"
+    }
+  }
+}

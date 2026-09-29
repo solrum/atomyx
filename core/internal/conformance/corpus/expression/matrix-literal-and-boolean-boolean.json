@@ -1,0 +1,5 @@
+{
+  "name": "matrix-literal-and-boolean-boolean",
+  "description": "literal boolean \"and\" literal boolean",
+  "expr": "true and true"
+}

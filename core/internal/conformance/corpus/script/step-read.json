@@ -1,0 +1,5 @@
+{
+  "name": "step-read",
+  "description": "read fetches an attribute field and a boolean state field into named variables.",
+  "yaml": "- launchApp\n- read:\n    selector: { id: \"quantity_field\" }\n    field: value\n    as: quantity\n- read:\n    selector: { id: \"terms_checkbox\" }\n    field: checked\n    as: accepted\n- read:\n    selector: { id: \"quantity_field\" }\n    as: defaultedField\n"
+}

@@ -1,0 +1,11 @@
+{
+  "booleanValue": false,
+  "errorKind": "parse",
+  "kind": "error",
+  "message": "unexpected character \"^\" in expression at position 2",
+  "numberBits": "",
+  "numberText": "",
+  "position": 2,
+  "stringValue": "",
+  "valueType": ""
+}

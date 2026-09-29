@@ -1,0 +1,28 @@
+{
+  "name": "launch-installed-app",
+  "description": "launch_app succeeds for an app id the installed-app precheck finds present, and the app comes to the foreground with no list_apps call in this case to keep the empty TypeScript oracle mock in agreement.",
+  "driver": {
+    "apps": ["com.example.app"],
+    "hierarchy": {
+      "attributes": { "role": "container", "bounds": "0,0,430,932" },
+      "children": [
+        {
+          "attributes": {
+            "role": "button",
+            "id": "home_btn",
+            "text": "Home",
+            "bounds": "100,400,330,460"
+          },
+          "children": [],
+          "enabled": true,
+          "clickable": true
+        }
+      ]
+    }
+  },
+  "steps": [
+    { "tool": "select_device", "args": { "platform": "android", "id": "mock-device" } },
+    { "tool": "launch_app", "args": { "appId": "com.example.app" } },
+    { "tool": "get_ui_tree", "args": {} }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "name": "matrix-literal-and-number-number",
+  "description": "literal number \"and\" literal number",
+  "expr": "3 and 3"
+}

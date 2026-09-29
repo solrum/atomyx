@@ -1,0 +1,5 @@
+{
+  "name": "cast-number-valid-integer-string",
+  "description": "number() accepts a plain integer string.",
+  "expr": "number(\"42\")"
+}

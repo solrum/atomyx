@@ -1,0 +1,30 @@
+{
+  "parsed": {
+    "_stepLines": [
+      1,
+      2
+    ],
+    "appId": "",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Untitled script",
+    "steps": [
+      {
+        "command": "launchApp"
+      },
+      {
+        "axis": "horizontal",
+        "center": {
+          "selector": {
+            "id": "canvas"
+          }
+        },
+        "command": "pinch",
+        "durationMs": 300,
+        "endGap": 200,
+        "startGap": 60
+      }
+    ]
+  },
+  "valid": true
+}

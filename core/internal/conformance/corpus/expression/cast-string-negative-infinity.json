@@ -1,0 +1,11 @@
+{
+  "name": "cast-string-negative-infinity",
+  "description": "string() renders negative infinity.",
+  "expr": "string(negInf)",
+  "variables": {
+    "negInf": {
+      "type": "number",
+      "number": "-Infinity"
+    }
+  }
+}

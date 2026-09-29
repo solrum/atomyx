@@ -1,0 +1,10 @@
+{
+  "name": "android-optional-booleans-omitted",
+  "description": "regression pin for D1: fields absent from input must be absent from output, not defaulted to false",
+  "rawTree": {
+    "elementId": "sparse",
+    "className": "android.widget.TextView",
+    "text": "hello",
+    "children": []
+  }
+}

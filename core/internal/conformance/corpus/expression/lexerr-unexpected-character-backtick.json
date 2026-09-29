@@ -1,0 +1,5 @@
+{
+  "name": "lexerr-unexpected-character-backtick",
+  "description": "an unrecognized character (`) in the source.",
+  "expr": "`1`"
+}

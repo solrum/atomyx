@@ -1,0 +1,11 @@
+{
+  "name": "cast-string-exponential-notation-boundary-large",
+  "description": "string() switches to exponential notation just above the large-magnitude boundary (1e21).",
+  "expr": "string(large)",
+  "variables": {
+    "large": {
+      "type": "number",
+      "number": "1000000000000000000000"
+    }
+  }
+}

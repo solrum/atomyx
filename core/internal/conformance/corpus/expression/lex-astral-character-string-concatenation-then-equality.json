@@ -1,0 +1,5 @@
+{
+  "name": "lex-astral-character-string-concatenation-then-equality",
+  "description": "concatenating an astral character onto a string and comparing the result exercises token positions after the astral character across two subsequent operators.",
+  "expr": "\"😀\" + \"x\" == \"😀x\""
+}

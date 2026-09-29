@@ -1,0 +1,11 @@
+{
+  "name": "var-name-collides-with-cast-function-name",
+  "description": "a variable named after a cast function resolves as that variable when not followed by a call.",
+  "expr": "number + 1",
+  "variables": {
+    "number": {
+      "type": "number",
+      "number": "4"
+    }
+  }
+}

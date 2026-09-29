@@ -21,10 +21,17 @@ class _GesturesScreenState extends State<GesturesScreen> {
   Offset _dragOffset = Offset.zero;
   String _dragStatus = 'idle';
   final List<String> _reorderItems = ['Alpha', 'Beta', 'Gamma'];
+  final TransformationController _pinchController = TransformationController();
   double _pinchScale = 1.0;
   int _pinchEvents = 0;
   double _pressurePeak = 0.0;
   int _pressureEvents = 0;
+
+  @override
+  void dispose() {
+    _pinchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -351,6 +358,15 @@ class _GesturesScreenState extends State<GesturesScreen> {
   // by the Pinch card.
 
   // ── Pinch (multi-pointer) ──────────────────────────────────────
+  //
+  // A bare GestureDetector's scale callbacks lose the gesture arena to
+  // the page's own ListView: a vertical drag recognizer and a scale
+  // recognizer both contest the same pointer stream, and the ancestor
+  // Scrollable wins often enough that a real two-finger pinch never
+  // reaches the card. InteractiveViewer registers its own scale
+  // recognizer that reliably claims a genuine two-finger gesture
+  // regardless of ancestor scrollables, which is exactly the contract
+  // a pinch-to-zoom target needs.
   Widget _pinchCard() {
     const accent = Color(0xFF00838F); // teal
     return Card(
@@ -362,42 +378,70 @@ class _GesturesScreenState extends State<GesturesScreen> {
             Semantics(
               identifier: 'gesture-pinch-state',
               label:
-                  'Pinch scale: ${_pinchScale.toStringAsFixed(2)}, events: $_pinchEvents',
+                  'scale=${_pinchScale.toStringAsFixed(2)}, events=$_pinchEvents',
               child: _sectionHeader(
                 icon: Icons.zoom_out_map,
                 color: accent,
                 title: 'Pinch (multi-pointer)',
                 state:
-                    'scale=${_pinchScale.toStringAsFixed(2)}  •  events=$_pinchEvents',
+                    'scale=${_pinchScale.toStringAsFixed(2)}  •  events=$_pinchEvents  •  double-tap resets',
               ),
             ),
             const SizedBox(height: 12),
             Semantics(
               identifier: 'gesture-pinch-target',
               child: GestureDetector(
-                onScaleStart: (_) => setState(() => _pinchEvents += 1),
-                onScaleUpdate: (d) =>
-                    setState(() => _pinchScale = d.scale.clamp(0.5, 4.0)),
-                child: Container(
-                  height: 160,
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: accent.withValues(alpha: 0.3), width: 2),
-                  ),
-                  alignment: Alignment.center,
-                  child: Transform.scale(
-                    scale: _pinchScale,
+                onDoubleTap: _resetPinch,
+                child: SizedBox(
+                  height: 220,
+                  child: InteractiveViewer(
+                    transformationController: _pinchController,
+                    // Panning is disabled so a one-finger touch inside
+                    // this box never contests the page scroll's drag
+                    // recognizer; only a genuine two-finger scale is
+                    // claimed here, which the page scroll never
+                    // recognizes anyway.
+                    panEnabled: false,
+                    scaleEnabled: true,
+                    minScale: 0.5,
+                    maxScale: 4.0,
+                    onInteractionStart: (_) =>
+                        setState(() => _pinchEvents += 1),
+                    onInteractionUpdate: (_) => setState(() {
+                      _pinchScale = _pinchController.value.getMaxScaleOnAxis();
+                    }),
                     child: Container(
-                      width: 80,
-                      height: 80,
                       decoration: BoxDecoration(
-                        color: accent,
-                        shape: BoxShape.circle,
+                        color: accent.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: accent.withValues(alpha: 0.3), width: 2),
                       ),
-                      child: const Icon(Icons.fingerprint,
-                          color: Colors.white, size: 40),
+                      alignment: Alignment.center,
+                      child: CustomPaint(
+                        painter: _PinchGridPainter(accent),
+                        child: SizedBox(
+                          width: 200,
+                          height: 200,
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.zoom_in, color: accent, size: 40),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '${_pinchScale.toStringAsFixed(2)}x',
+                                  style: TextStyle(
+                                    color: accent,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 22,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -407,6 +451,11 @@ class _GesturesScreenState extends State<GesturesScreen> {
         ),
       ),
     );
+  }
+
+  void _resetPinch() {
+    _pinchController.value = Matrix4.identity();
+    setState(() => _pinchScale = 1.0);
   }
 
   // ── Pressure (3D Touch / Force Touch) ─────────────────────────
@@ -510,4 +559,51 @@ class _CrosshairPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _CrosshairPainter old) => old.color != color;
+}
+
+/// Graph-paper grid behind the pinch target's scale readout. Grid
+/// division count stays fixed while InteractiveViewer scales this
+/// whole painter, so square size in a screenshot is a direct visual
+/// gauge of the live zoom level.
+class _PinchGridPainter extends CustomPainter {
+  _PinchGridPainter(this.color);
+
+  final Color color;
+  static const int _divisions = 4;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final linePaint = Paint()
+      ..color = color.withValues(alpha: 0.35)
+      ..strokeWidth = 1;
+    final stepX = size.width / _divisions;
+    final stepY = size.height / _divisions;
+    for (var i = 1; i < _divisions; i++) {
+      canvas.drawLine(
+        Offset(stepX * i, 0),
+        Offset(stepX * i, size.height),
+        linePaint,
+      );
+      canvas.drawLine(
+        Offset(0, stepY * i),
+        Offset(size.width, stepY * i),
+        linePaint,
+      );
+    }
+    final textPainter = TextPainter(
+      textDirection: TextDirection.ltr,
+      text: TextSpan(
+        text: '${_divisions}x${_divisions}',
+        style: TextStyle(
+          color: color.withValues(alpha: 0.5),
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    )..layout();
+    textPainter.paint(canvas, const Offset(4, 4));
+  }
+
+  @override
+  bool shouldRepaint(covariant _PinchGridPainter old) => old.color != color;
 }

@@ -1,0 +1,5 @@
+{
+  "name": "cast-bool-empty-string-rejected",
+  "description": "bool() rejects an empty string.",
+  "expr": "bool(\"\")"
+}

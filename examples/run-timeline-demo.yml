@@ -14,39 +14,54 @@ env:
   email: qa+run42@atomyx.test
   password: super-secret-123
   username: hieu
+
+# The demo app keeps its navigation state across a plain relaunch, so
+# a prior run that ended on the Dashboard leaves the Dashboard on
+# screen instead of the Sign in screen this script expects. Sign out
+# first when that is the case, so the script always starts from the
+# same known screen.
+preconditions:
+  - check:
+      notVisible: "Dashboard"
+    setup:
+      - tap: "Sign out"
+      - waitFor: "Confirm"
+      - tap: "Confirm"
+      - waitFor: "Sign in"
 ---
 # Top-of-flow boot
 - launchApp
 - sleep: 500
 
-# Selector-driven query — text selector on a labeled element
+# Selector-driven query, using a text selector on a labeled element
 - waitFor: "Sign in"
 
 # Tap with a string-shorthand text selector
 - tap: "Sign in"
 
-# Type-into with explicit selector — id-based field, secret masked
+# Type-into with explicit selector, a role-and-position field with secret masked
 - type:
     into:
-      id: email
+      role: text-field
+      nth: 0
     text: ${email}
 - type:
     into:
-      id: password
+      role: text-field
+      nth: 1
     text: ${password}
 
 # Tap with a structured selector + role narrow
 - tap:
-    text: "Continue"
+    text: "Login"
     role: button
 
 # Assertion + screenshot for evidence
 - assertVisible: "Welcome"
 - screenshot: dashboard-loaded
 
-# Gesture + key
+# Gesture
 - swipe: up
-- pressKey: enter
 
 # Branching: handle two possible follow-up screens
 - handle:
@@ -55,7 +70,8 @@ env:
       do:
         - type:
             into:
-              id: otp
+              role: text-field
+              nth: 0
             text: "123456"
         - tap:
             text: "Verify"
@@ -65,12 +81,20 @@ env:
       do:
         - tap: "Allow"
         - waitFor: "Dashboard"
-  otherwise: skip
-  timeout: 8000
+    - otherwise: skip
 
-# Navigation back
-- back
+# Navigate forward one screen, then back with an explicit key press.
+# The Dashboard route replaced Sign in on the navigation stack, so
+# pressing back from Dashboard itself would exit the app instead of
+# just popping a route. Push Settings first, so back has somewhere
+# in-app to return to.
+- tap: "Settings"
+- waitFor: "Settings"
+- pressKey: back
 
-# Final assert + closing screenshot
-- assertVisible: "Dashboard"
+# Final assert + closing screenshot. Polls, because the back
+# transition's animation is still settling when this step starts.
+- assertVisible:
+    text: "Dashboard"
+    timeout: 5000
 - screenshot: end-of-flow

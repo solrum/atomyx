@@ -1,0 +1,22 @@
+{
+  "name": "branch-nested-object-body-match",
+  "description": "branch's body condition matches when the expected value is a nested object that deep-equals the captured value, running the matching case's steps instead of falling to default",
+  "yaml": "appId: com.test\nname: branch nested object match\nproxy: optional\nenv: {}\n---\n- launchApp\n- capture: \"POST /login as: loginRsp\"\n- branch:\n    from: loginRsp\n    on:\n      - match:\n          body:\n            \"$.user\":\n              id: 1\n              role: admin\n        do:\n          - screenshot: matched\n    default:\n      - screenshot: fallback\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  },
+  "network": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/login",
+        "status": 200,
+        "headers": {},
+        "body": { "user": { "id": 1, "role": "admin" } },
+        "timestampMs": 0
+      }
+    ]
+  }
+}

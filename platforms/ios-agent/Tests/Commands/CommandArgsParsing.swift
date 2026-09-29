@@ -5,7 +5,7 @@ import Foundation
 /// boxed `Double`, a boxed `Int` (host serializers that drop the
 /// fractional part for whole numbers), or a `String` (literal
 /// numeric text passed without quoting on the host). Returns
-/// `nil` for any other shape — callers raise the appropriate
+/// `nil` for any other shape, so callers raise the appropriate
 /// "missing field" error so the host validator gets a precise
 /// diagnostic.
 enum CommandArgs {

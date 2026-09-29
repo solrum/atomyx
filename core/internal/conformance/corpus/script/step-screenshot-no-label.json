@@ -1,0 +1,5 @@
+{
+  "name": "step-screenshot-no-label",
+  "description": "screenshot bare-string form with no label auto-names the artifact by step index.",
+  "yaml": "- launchApp\n- screenshot\n"
+}

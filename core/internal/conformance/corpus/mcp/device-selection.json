@@ -1,0 +1,9 @@
+{
+  "name": "device-selection",
+  "description": "select_device binds a driver, disconnect_device tears it down, and a second select_device on a different platform rebinds cleanly.",
+  "steps": [
+    { "tool": "select_device", "args": { "platform": "android", "id": "mock-device" } },
+    { "tool": "disconnect_device", "args": {} },
+    { "tool": "select_device", "args": { "platform": "ios", "id": "mock-device-2", "kind": "simulator" } }
+  ]
+}

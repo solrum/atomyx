@@ -1,0 +1,13 @@
+[
+  {
+    "attributes": {
+      "id": "login_btn",
+      "label": "Login button",
+      "role": "button",
+      "text": "Sign in"
+    },
+    "children": [],
+    "clickable": true,
+    "enabled": true
+  }
+]

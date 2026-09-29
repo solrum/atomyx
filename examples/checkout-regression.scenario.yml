@@ -1,13 +1,13 @@
 name: Checkout regression
 description: |
   Smoke test that walks the happy path through login, browse, and
-  checkout. Each script runs in its own clean execution context —
+  checkout. Each script runs in its own clean execution context, so
   variables and captures do not leak between scripts.
 scripts:
-  - flows/setup-fresh-user.yml
+  - flows/sign-in.yml
   - test-login-flow.yml
   - api-capture-assert.yml
-  - flows/cleanup-account.yml
+  - flows/sign-out.yml
 onFailure: stop
 env:
   BASE_URL: https://staging.example.com

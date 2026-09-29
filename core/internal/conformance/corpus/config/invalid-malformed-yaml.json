@@ -1,0 +1,5 @@
+{
+  "name": "invalid-malformed-yaml",
+  "description": "YAML that fails to parse at all is reported as a single root-level schema failure.",
+  "yaml": "project: [unterminated\n"
+}

@@ -2,7 +2,7 @@ import Foundation
 import XCTest
 
 /// Mutable driver state shared across commands. Holds the currently
-/// launched app reference — XCUITest has no system-wide foreground
+/// launched app reference, because XCUITest has no system-wide foreground
 /// query, so the driver tracks this itself. Without it, every
 /// subsequent command would need its own `XCUIApplication` lookup
 /// and most of them cannot even perform one.
@@ -10,7 +10,7 @@ import XCTest
 /// **Thread safety:** `DriverState` is NOT internally synchronized. It
 /// relies on `CommandServer` serializing all handler dispatches on the
 /// main thread via `DispatchQueue.main.sync` (see
-/// `CommandServer.serveClient`) — XCUITest API calls also require the
+/// `CommandServer.serveClient`), and XCUITest API calls also require the
 /// main thread, so the two constraints happen to coincide. If
 /// `CommandServer` is ever changed to fan out work to multiple queues,
 /// this class must gain a lock or be refactored into an actor.
@@ -24,10 +24,10 @@ protocol CommandHandler {
     /// Wire protocol `type` field that this handler responds to.
     var type: String { get }
 
-    /// Threading contract. `true` (default) — CommandServer wraps
+    /// Threading contract. When `true` (the default), CommandServer wraps
     /// the handler in `DispatchQueue.main.sync` so it runs on the
     /// main thread (required by most XCUITest APIs, including
-    /// `XCUIApplication.launch()`). `false` — the handler runs
+    /// `XCUIApplication.launch()`). When `false`, the handler runs
     /// on the server's background accept queue; suitable for
     /// commands that MUST have the main queue free (e.g.
     /// `DispatchPointerCommand`, whose `synthesizeEvent:completion:`
@@ -36,7 +36,7 @@ protocol CommandHandler {
     var requiresMainThread: Bool { get }
 
     /// Dispatch entry point. Must return a `Response` matching the
-    /// request id. May throw only `XCTSkip` — other errors should
+    /// request id. May throw only `XCTSkip`. Other errors should
     /// become `.error` responses for the wire.
     func handle(_ request: Request, bridge: XCUIBridge, state: DriverState) -> Response
 }
@@ -67,7 +67,7 @@ final class CommandRegistry {
     }
 
     /// Threading hint for `CommandServer`. Unknown commands
-    /// default to `true` — they'll be routed onto main and hit
+    /// default to `true`, so they'll be routed onto main and hit
     /// the "unknown command" error branch there, which is
     /// harmless.
     func requiresMainThread(for type: String) -> Bool {

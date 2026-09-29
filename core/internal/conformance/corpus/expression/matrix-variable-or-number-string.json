@@ -1,0 +1,15 @@
+{
+  "name": "matrix-variable-or-number-string",
+  "description": "variable number \"or\" variable string, proving lookup-typed values take the same path as literals.",
+  "expr": "ln or rs",
+  "variables": {
+    "ln": {
+      "type": "number",
+      "number": "3"
+    },
+    "rs": {
+      "type": "string",
+      "string": "a"
+    }
+  }
+}

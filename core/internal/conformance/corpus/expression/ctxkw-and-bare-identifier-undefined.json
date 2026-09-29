@@ -1,0 +1,5 @@
+{
+  "name": "ctxkw-and-bare-identifier-undefined",
+  "description": "the keyword and, appearing where no left operand precedes it, parses as a bare identifier and fails at evaluation as an undefined variable.",
+  "expr": "and"
+}

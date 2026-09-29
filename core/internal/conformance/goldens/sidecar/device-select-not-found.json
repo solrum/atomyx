@@ -1,0 +1,24 @@
+{
+  "events": [
+    {
+      "event": "deviceConnected",
+      "payload": {
+        "id": "mock-2",
+        "kind": "simulator",
+        "name": "Mock Simulator",
+        "platform": "ios",
+        "state": "online"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "errorCode": "InternalError",
+      "method": "selectDevice"
+    },
+    {
+      "errorCode": "InvalidParams",
+      "method": "selectDevice"
+    }
+  ]
+}

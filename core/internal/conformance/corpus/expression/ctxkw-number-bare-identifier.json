@@ -1,0 +1,11 @@
+{
+  "name": "ctxkw-number-bare-identifier",
+  "description": "the cast name number resolves as a variable when not followed by a call.",
+  "expr": "number",
+  "variables": {
+    "number": {
+      "type": "number",
+      "number": "11"
+    }
+  }
+}

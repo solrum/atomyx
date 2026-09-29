@@ -1,0 +1,16 @@
+{
+  "name": "case-studies",
+  "description": "add_case_study derives a case-studies/YYYY-MM/<slug> key from the current wall-clock month and the title, then get_case_studies reads it back — the key is deliberately NOT normalized, so this case catches a slug-format regression.",
+  "steps": [
+    {
+      "tool": "add_case_study",
+      "args": {
+        "title": "Obscured dialog dismissal",
+        "trigger": "tap kept failing on a settings row hidden behind a confirm sheet",
+        "solution": "dismiss the confirm sheet before retrying the tap",
+        "example": "tap({selector: {id: 'confirm-dismiss'}})"
+      }
+    },
+    { "tool": "get_case_studies", "args": {} }
+  ]
+}

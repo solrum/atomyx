@@ -1,56 +1,42 @@
 format: atomyx/v1
 appId: dev.atomyx.demo
-name: Composed flow — requires + runFlow
+name: Composed flow, combining requires and runFlow
 description: |
-  Demonstrates flow composition. `requires` runs setup-fresh-user
-  before the script's own steps so the test starts on a known
-  account. `runFlow` invokes a teardown sub-flow inline at the end
-  so cleanup happens regardless of which UI path the test took.
-  Both sub-flows share this script's variables and captures.
+  Demonstrates flow composition. `requires` runs the sign-in flow
+  before the script's own steps so the test starts on a known,
+  logged-in account. `runFlow` invokes a sign-out sub-flow inline at
+  the end so the app returns to a known state regardless of which UI
+  path the test took. Both sub-flows share this script's variables.
 tags:
   - composition
   - sub-flow
-  - api
-proxy: required
 requires:
-  - flows/setup-fresh-user.yml
+  - examples/flows/sign-in.yml
 env:
   email: qa+composed@atomyx.test
   password: super-secret
 ---
-# At this point setup-fresh-user has already run: a fresh account
-# exists, ${newUserId} is populated, and the app is sitting on the
-# Welcome screen.
+# At this point sign-in has already run: the account is signed in
+# and the app is sitting on the Dashboard.
 
-- waitFor: "Welcome"
-- tap: "Continue"
-- waitFor: "Dashboard"
+- assertVisible: "Welcome"
 
-# Drive a quick edit while the proxy captures the save call.
-- tap: "Edit profile"
-- waitFor:
-    text: "Display name"
+# Navigate into Settings and back, so the composed flow does more
+# than the sub-flows alone would.
+- tap: "Settings"
+- waitFor: "Settings"
+- tap: "Dark Mode"
+- pressKey: back
+
+# Polls, because the back transition's animation is still settling
+# when this step starts.
+- assertVisible:
+    text: "Dashboard"
     timeout: 5000
-- type:
-    into:
-      id: display_name
-    text: "QA Bot ${newUserId}"
+- screenshot: composed-flow-done
 
-- capture: "PUT /api/v1/me as: updateRsp"
-- tap: "Save"
-
-- assertApi:
-    from: updateRsp
-    status: 200
-    body:
-      "$.user.id": ${newUserId}
-      "$.user.display_name": "QA Bot ${newUserId}"
-
-- waitFor: "Profile updated"
-- screenshot: profile-updated
-
-# Inline composition. The cleanup file's steps execute as if they
-# were inlined here — including any nested handle / branch /
+# Inline composition. The sign-out file's steps execute as if they
+# were inlined here, including any nested handle, branch, or
 # capture they declare.
 - runFlow:
-    file: flows/cleanup-account.yml
+    file: examples/flows/sign-out.yml

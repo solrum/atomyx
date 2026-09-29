@@ -1,0 +1,5 @@
+{
+  "name": "valid-minimal",
+  "description": "A minimal valid config with one app and one environment resolves that environment automatically.",
+  "yaml": "project: Demo\napps:\n  - id: main\n    platform: android\n    appId: com.example.app\nenvironments:\n  staging:\n    app: main\n"
+}

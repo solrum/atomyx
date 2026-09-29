@@ -1,0 +1,5 @@
+{
+  "name": "cast-number-boolean-false-rejected",
+  "description": "number() rejects the boolean false.",
+  "expr": "number(false)"
+}

@@ -1,0 +1,5 @@
+{
+  "name": "unary-not-binds-tighter-than-or",
+  "description": "not binds tighter than or, so \"not false or false\" groups as \"(not false) or false\".",
+  "expr": "not false or false"
+}

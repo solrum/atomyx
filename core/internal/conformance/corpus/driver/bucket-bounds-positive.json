@@ -1,0 +1,6 @@
+{
+  "name": "bucket-bounds-positive",
+  "description": "positive bounds coordinates quantize into their bucket index by simple division",
+  "function": "bucketBounds",
+  "bounds": "100,200,300,400"
+}

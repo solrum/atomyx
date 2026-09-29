@@ -1,0 +1,26 @@
+{
+  "name": "happy-path-core-actions",
+  "description": "One flowing script exercises launchApp, tap, type (into and focused), waitFor, assertVisible, assertNotVisible, swipe, pressKey, back, sleep, and two screenshots, all succeeding",
+  "yaml": "appId: com.test\nname: happy path\nenv: {}\n---\n- launchApp\n- tap: Login\n- type:\n    into: Email\n    text: \"user@test.com\"\n- type: \"hi\"\n- waitFor:\n    text: Login\n    timeout: 0\n- assertVisible: Login\n- assertNotVisible: Missing\n- swipe: up\n- pressKey: enter\n- back\n- sleep: 10\n- screenshot: first\n- screenshot: second\n",
+  "driver": {
+    "hierarchies": [
+      {
+        "attributes": {},
+        "children": [
+          {
+            "attributes": { "text": "Login", "label": "Login", "bounds": "40,300,390,350" },
+            "children": [],
+            "clickable": true
+          },
+          {
+            "attributes": { "hint": "Email address", "label": "Email", "bounds": "40,400,390,450", "value": "" },
+            "children": [],
+            "clickable": true,
+            "enabled": true,
+            "focused": true
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "name": "pointer-multi-touch-valid",
+  "description": "pointer with a multi-entry `touches` list is valid (a multi-pointer gesture); each touch carries a unique id.",
+  "yaml": "- launchApp\n- pointer:\n    touches:\n      - id: \"p1\"\n        actions:\n          - down: \"Item A\"\n          - up\n      - id: \"p2\"\n        actions:\n          - down: \"Item B\"\n          - up\n"
+}

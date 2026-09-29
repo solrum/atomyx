@@ -1,0 +1,11 @@
+# Grandfathered hits for scripts/check-comments.sh.
+# Format: one entry per line, path:substring
+#   path      - the offending file, relative to the go/ module root
+#   substring - text from the comment line that uniquely identifies it
+#
+# Every entry here is a comment that still names the TypeScript
+# implementation and needs to be reworded to describe the current Go
+# behavior on its own terms. This list may only shrink: an entry is
+# removed when the comment it names is fixed. Do not add an entry for
+# a comment written after this gate existed; fix the comment instead.
+# Blank lines and lines starting with # are ignored.

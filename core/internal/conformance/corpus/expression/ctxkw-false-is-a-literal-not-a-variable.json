@@ -1,0 +1,5 @@
+{
+  "name": "ctxkw-false-is-a-literal-not-a-variable",
+  "description": "false is always the boolean literal, never a variable lookup, even with no variables bound at all.",
+  "expr": "false"
+}

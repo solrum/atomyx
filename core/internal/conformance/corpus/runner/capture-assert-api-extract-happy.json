@@ -1,0 +1,22 @@
+{
+  "name": "capture-assert-api-extract-happy",
+  "description": "capture binds a matching request, assertApi checks its status and body, extract pulls a value into a variable, and assertExpr consumes that variable",
+  "yaml": "appId: com.test\nname: api happy path\nproxy: optional\nenv: {}\n---\n- launchApp\n- capture: \"POST /api/v1/auth/login as: loginRsp\"\n- assertApi:\n    from: loginRsp\n    status: 200\n    body:\n      \"$.status\": ok\n- extract:\n    from: loginRsp\n    values:\n      userId: \"$.body.user.id\"\n- assertExpr:\n    expr: \"userId == \\\"42\\\"\"\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  },
+  "network": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/api/v1/auth/login",
+        "status": 200,
+        "headers": {},
+        "body": { "status": "ok", "user": { "id": 42, "email": "qa@atomyx.test" } },
+        "timestampMs": 0
+      }
+    ]
+  }
+}

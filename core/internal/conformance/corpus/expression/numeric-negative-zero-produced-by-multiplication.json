@@ -1,0 +1,5 @@
+{
+  "name": "numeric-negative-zero-produced-by-multiplication",
+  "description": "multiplying a negative number by zero produces negative zero.",
+  "expr": "-1 * 0"
+}

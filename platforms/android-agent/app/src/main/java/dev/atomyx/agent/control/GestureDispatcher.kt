@@ -3,8 +3,8 @@ package dev.atomyx.agent.control
 /**
  * Dispatches coordinate-level pointer gestures through the
  * `GestureRunner` pipeline. Every primitive builds a single-pointer
- * `PointerPath` and delegates — no bespoke `dispatchGesture` paths
- * remain, so validation, completion waits, and the
+ * `PointerPath` and delegates, leaving no bespoke `dispatchGesture` paths
+ * behind, so validation, completion waits, and the
  * `DispatchResult` shape are identical across tap / swipe /
  * long-press / raw `dispatchGesture`.
  *
@@ -25,7 +25,7 @@ class GestureDispatcher(
      * Tap at the given screen coordinates. Blocks until the
      * accessibility service fires `GestureResultCallback` so a
      * caller that immediately dumps the tree sees post-tap state
-     * instead of racing the gesture — no fire-and-forget path
+     * instead of racing the gesture. No fire-and-forget path
      * survives the dispatch pipeline.
      */
     fun tapAt(x: Float, y: Float): GestureRunner.DispatchResult {
@@ -38,7 +38,7 @@ class GestureDispatcher(
                 ),
             ),
         )
-        return runner.dispatch(pointers)
+        return runner.dispatch(pointers).result
     }
 
     /**
@@ -65,14 +65,14 @@ class GestureDispatcher(
                 ),
             ),
         )
-        return runner.dispatch(pointers)
+        return runner.dispatch(pointers).result
     }
 
     /**
      * Press-and-hold at the given coordinates for `durationMs`.
      * Duration is coerced to [300, 5000]ms to stay in the "long
      * press" gesture recogniser window on every known Android
-     * version — below 300ms the OS reads a tap, above 5s the
+     * version. Below 300ms the OS reads a tap, and above 5s the
      * context menu animation can interfere with subsequent taps.
      */
     fun longPressAt(
@@ -90,6 +90,6 @@ class GestureDispatcher(
                 ),
             ),
         )
-        return runner.dispatch(pointers)
+        return runner.dispatch(pointers).result
     }
 }

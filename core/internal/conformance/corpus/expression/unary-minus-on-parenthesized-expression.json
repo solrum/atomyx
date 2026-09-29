@@ -1,0 +1,5 @@
+{
+  "name": "unary-minus-on-parenthesized-expression",
+  "description": "unary minus applied to a parenthesized sum.",
+  "expr": "-(1 + 2)"
+}

@@ -1,0 +1,10 @@
+{
+  "name": "step-delay-inter-step-pad",
+  "description": "a nonzero stepDelay pads every top-level step after the first except sleep itself, so total durationMs accumulates the pad plus the sleep's own duration",
+  "yaml": "appId: com.test\nname: step delay\nenv: {}\nstepDelay: 300\n---\n- back\n- sleep: 150\n- back\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

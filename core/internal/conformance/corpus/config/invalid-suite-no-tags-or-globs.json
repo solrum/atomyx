@@ -1,0 +1,5 @@
+{
+  "name": "invalid-suite-no-tags-or-globs",
+  "description": "A suite entry with neither tags nor globs fails SuiteEntrySchema's refine rule.",
+  "yaml": "project: Demo\napps:\n  - id: main\n    platform: android\n    appId: com.example.app\nenvironments:\n  staging:\n    app: main\nsuites:\n  smoke: {}\n"
+}

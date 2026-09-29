@@ -1,9 +1,8 @@
-# Atomyx Studio — testing rules
+# Atomyx Studio: testing rules
 
 **Scope**: this file applies to source files under `apps/studio/`
-ONLY. The rest of the workspace (`packages/`, `platforms/`) tests
-under its own per-package conventions and is unaffected by anything
-below.
+ONLY. The rest of the workspace (`core/`, `platforms/`) tests
+under its own conventions and is unaffected by anything below.
 
 **Purpose**: answers "how is Studio tested, and what must I cover
 before merging?". Read it before adding a test, adding a feature
@@ -12,22 +11,22 @@ cover the layer-import rules (`studio-architecture.md`) or the
 feature folder shape (`feature-structure.md`).
 
 If a rule here conflicts with what a task requires, stop and
-surface the conflict — do not quietly bend it.
+surface the conflict. Do not quietly bend it.
 
 ---
 
-## 1. Layer → test-type matrix
+## 1. Layer-to-test-type matrix
 
-Studio is four layers (`ui → state → domain ← platform`). Each
+Studio is four layers (`ui` leads to `state` leads to `domain` ← `platform`). Each
 layer is tested differently because each has a different amount of
 pure logic and a different cost to exercise.
 
 | Layer | What to test | Runner | Required? |
 |---|---|---|---|
-| `domain/` | Pure functions, validators, ports' pure logic | `node:test` (no DOM) | Yes — any file with branching logic |
-| `state/` | Store factories (`*.zustand.ts` / `*.impl.ts`): state transitions, derived snapshots | `node:test` (no DOM) | Yes — any store with non-trivial transitions |
+| `domain/` | Pure functions, validators, ports' pure logic | `node:test` (no DOM) | Yes: any file with branching logic |
+| `state/` | Store factories (`*.zustand.ts` / `*.impl.ts`): state transitions, derived snapshots | `node:test` (no DOM) | Yes: any store with non-trivial transitions |
 | `platform/` | Adapters, by mocking `@tauri-apps/api` `invoke` | `node:test` (no DOM) | Encouraged, not gated |
-| `ui/` | React components, rendering, interaction | jsdom suite (future — see §6) | Deferred |
+| `ui/` | React components, rendering, interaction | jsdom suite (future, see §6) | Deferred |
 
 Tests are colocated with the code under test (`foo.test.ts` next
 to `foo.ts`), never in a parallel `tests/` tree.
@@ -39,7 +38,7 @@ to `foo.ts`), never in a parallel `tests/` tree.
 The `domain/` and `state/` suites MUST run under `node:test` with
 no bundler, no `jsdom`, and no React. A test that imports `react`,
 `react-dom`, `monaco-editor`, or touches `document` / `window`
-blows up at load time — and that is the point. If a test needs the
+blows up at load time, and that is the point. If a test needs the
 DOM, the code under test belongs in `ui/`, not `domain/` or
 `state/`.
 
@@ -59,7 +58,7 @@ A change is not done without a test when it:
   validator;
 - adds or edits a `state/` store transition, async action, or
   derived snapshot;
-- fixes a bug in `domain/` or `state/` — add the regression test
+- fixes a bug in `domain/` or `state/`: add the regression test
   that fails before the fix.
 
 A change does NOT need a test when it is:
@@ -68,14 +67,14 @@ A change does NOT need a test when it is:
 - a thin `platform/` `invoke` passthrough with no branching;
 - type-only edits, comments, or docs.
 
-When unsure, write the test — the floor only ratchets up.
+When unsure, write the test, since the floor only ratchets up.
 
 ---
 
 ## 4. Coverage policy
 
 Coverage is measured by `c8` over `src/domain` and `src/state`
-only — the two pure-logic layers. `ui/` has no runner yet and
+only, the two pure-logic layers. `ui/` has no runner yet and
 `platform/` is mostly untestable invoke glue, so gating them would
 reward writing thin wrappers, not real tests. They are excluded
 from the metric, not from the codebase.
@@ -83,28 +82,29 @@ from the metric, not from the codebase.
 - The threshold lives in `apps/studio/.c8rc.json`.
 - The threshold only ever **ratchets up**. When a batch of tests
   lands and raises measured coverage, raise the floor to match in
-  the same change. Never lower it to make a red build green —
-  fix the test or the code.
-- A drop below the floor fails `npm run test:coverage`, which is a
-  blocking CI step (§5).
+  the same change. Never lower it to make a red build green.
+  Fix the test or the code.
+- A drop below the floor fails `npm run test:coverage`, one of the
+  blocking local checks (§5).
 
 ---
 
 ## 5. Enforcement
 
-Two gates, both blocking:
+There is no hosted CI. All of Studio's checks run locally from
+`apps/studio`, blocking on the same terms a CI gate would:
 
-- **Local**: `npm run test:coverage` runs the full `node:test`
-  suite under `c8 --check-coverage` against the
-  `.c8rc.json` thresholds. `npm run test` runs the suite without
-  the coverage check for fast iteration.
-- **CI**: `.github/workflows/studio-ci.yml` runs on push / PR
-  touching `apps/studio/` and its workspace dependencies. It runs
-  `typecheck`, `lint`, `depcruise`, `lint:feature-api`, and
-  `test:coverage`. A failure on any blocks merge.
+- `npm run typecheck`
+- `npm run lint`
+- `npm run depcruise`
+- `npm run lint:feature-api`
+- `npm run test:coverage`: the full `node:test` suite under
+  `c8 --check-coverage` against the `.c8rc.json` thresholds. `npm run
+  test` runs the suite without the coverage check for fast iteration.
 
-When you raise the coverage floor, confirm CI is green at the new
-floor before merging.
+Run all five before opening a pull request that touches
+`apps/studio/`. When you raise the coverage floor, confirm all five
+pass at the new floor in the same change.
 
 ---
 
@@ -122,7 +122,7 @@ yet. When one is introduced:
 
 Until that suite exists, `ui/` correctness is verified by running
 the app, not by automated tests. Say so explicitly when reporting
-a UI change as done — type-checking and the logic suite do not
+a UI change as done, because type-checking and the logic suite do not
 prove a component renders.
 
 ---

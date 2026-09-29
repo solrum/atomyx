@@ -1,0 +1,5 @@
+{
+  "name": "top-level-unknown-key-ignored-by-parser",
+  "description": "a misspelled or extraneous top-level config key is silently ignored during YAML parsing in both languages, since each language's parser copies only known fields into the canonical object before it ever reaches the strict schema.",
+  "yaml": "appId: com.example.app\nname: Smoke\nenv: {}\nbogusTopLevelField: unexpected\n---\n- launchApp\n"
+}

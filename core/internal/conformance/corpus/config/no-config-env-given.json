@@ -1,0 +1,6 @@
+{
+  "name": "no-config-env-given",
+  "description": "No config file found but --env given errors, naming the expected config file names.",
+  "noConfig": true,
+  "envName": "staging"
+}

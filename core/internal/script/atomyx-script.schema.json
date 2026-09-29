@@ -1,0 +1,1198 @@
+{
+  "$id": "https://schemas.atomyx.dev/script.schema.json",
+  "$ref": "#/definitions/ScriptDefinition",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "AssertApiStep": {
+      "additionalProperties": false,
+      "description": "Assert that a captured request's response matches the given status and/or body shape.",
+      "properties": {
+        "body": {
+          "additionalProperties": {},
+          "description": "Body assertions keyed by dot-path.",
+          "type": "object"
+        },
+        "command": {
+          "const": "assertApi",
+          "type": "string"
+        },
+        "from": {
+          "description": "Variable name of a previously captured request.",
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "status": {
+          "description": "Expected HTTP status code.",
+          "maximum": 599,
+          "minimum": 100,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "command",
+        "from"
+      ],
+      "type": "object"
+    },
+    "AssertExistsStep": {
+      "additionalProperties": false,
+      "description": "Assert a node matching `selector` is present in the UI hierarchy.",
+      "properties": {
+        "command": {
+          "const": "assertExists",
+          "type": "string"
+        },
+        "selector": {
+          "$ref": "#/definitions/ScriptSelector"
+        },
+        "timeoutMs": {
+          "description": "Polling timeout in milliseconds.",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "command",
+        "selector"
+      ],
+      "type": "object"
+    },
+    "AssertExprStep": {
+      "additionalProperties": false,
+      "description": "Assert a boolean expression over runtime variables.",
+      "properties": {
+        "command": {
+          "const": "assertExpr",
+          "type": "string"
+        },
+        "expr": {
+          "description": "Boolean expression evaluated against the script's runtime variables.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "command",
+        "expr"
+      ],
+      "type": "object"
+    },
+    "AssertNotVisibleStep": {
+      "additionalProperties": false,
+      "description": "Assert `selector` is NOT visible.",
+      "properties": {
+        "command": {
+          "const": "assertNotVisible",
+          "type": "string"
+        },
+        "selector": {
+          "$ref": "#/definitions/ScriptSelector"
+        },
+        "timeoutMs": {
+          "description": "How long to wait for the element to disappear, in milliseconds.",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "command",
+        "selector"
+      ],
+      "type": "object"
+    },
+    "AssertVisibleStep": {
+      "additionalProperties": false,
+      "description": "Assert `selector` is currently visible.",
+      "properties": {
+        "command": {
+          "const": "assertVisible",
+          "type": "string"
+        },
+        "selector": {
+          "$ref": "#/definitions/ScriptSelector"
+        },
+        "timeoutMs": {
+          "description": "Polling timeout in milliseconds.",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "command",
+        "selector"
+      ],
+      "type": "object"
+    },
+    "BackStep": {
+      "additionalProperties": false,
+      "description": "Navigate back one step.",
+      "properties": {
+        "command": {
+          "const": "back",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command"
+      ],
+      "type": "object"
+    },
+    "BranchCase": {
+      "additionalProperties": false,
+      "description": "One case of a branch step: a match condition plus the steps to run when it matches.",
+      "properties": {
+        "do": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/definitions/ScriptStep"
+              },
+              "type": "array"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "Steps to run: an inline list, or a string path to a flow fragment file."
+        },
+        "match": {
+          "$ref": "#/definitions/BranchMatchCondition"
+        }
+      },
+      "required": [
+        "match",
+        "do"
+      ],
+      "type": "object"
+    },
+    "BranchMatchCondition": {
+      "additionalProperties": false,
+      "description": "Case condition for an API-based branch. Status and body are ANDed together when both are set.",
+      "properties": {
+        "body": {
+          "additionalProperties": {},
+          "description": "Match when every dot-path in this map equals its expected value in the response body.",
+          "type": "object"
+        },
+        "status": {
+          "description": "Match when response status equals this code.",
+          "maximum": 599,
+          "minimum": 100,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "BranchStep": {
+      "additionalProperties": false,
+      "description": "Route on the request captured as `from`.",
+      "properties": {
+        "command": {
+          "const": "branch",
+          "type": "string"
+        },
+        "default": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/definitions/ScriptStep"
+              },
+              "type": "array"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "Steps to run: an inline list, or a string path to a flow fragment file."
+        },
+        "from": {
+          "description": "Variable name of a previously captured request to route on.",
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "on": {
+          "description": "Ordered list of cases. First matching `match` wins.",
+          "items": {
+            "$ref": "#/definitions/BranchCase"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "command",
+        "from",
+        "on"
+      ],
+      "type": "object"
+    },
+    "CaptureStep": {
+      "additionalProperties": false,
+      "description": "Capture the next request matching `pattern` via the network proxy.",
+      "properties": {
+        "as": {
+          "description": "Variable name to bind the captured request to.",
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "command": {
+          "const": "capture",
+          "type": "string"
+        },
+        "pattern": {
+          "description": "Method plus path pattern to match against captured traffic, for example 'POST /api/login'.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "command",
+        "pattern",
+        "as"
+      ],
+      "type": "object"
+    },
+    "ExtractStep": {
+      "additionalProperties": false,
+      "description": "Extract fields from a captured API response into runtime variables.",
+      "properties": {
+        "command": {
+          "const": "extract",
+          "type": "string"
+        },
+        "from": {
+          "description": "Variable name of a previously captured request.",
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "values": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Map of target variable name to dot-path extracted from the captured response.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "command",
+        "from",
+        "values"
+      ],
+      "type": "object"
+    },
+    "HandleBranch": {
+      "additionalProperties": false,
+      "description": "One branch of a handle step: a condition plus the steps to run when it matches.",
+      "properties": {
+        "do": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/definitions/ScriptStep"
+              },
+              "type": "array"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "Steps to run: an inline list, or a string path to a flow fragment file."
+        },
+        "when": {
+          "$ref": "#/definitions/HandleCondition"
+        }
+      },
+      "required": [
+        "when",
+        "do"
+      ],
+      "type": "object"
+    },
+    "HandleCondition": {
+      "additionalProperties": false,
+      "description": "Condition a handle branch matches on. Exactly one of `visible` or `notVisible` should be set.",
+      "properties": {
+        "notVisible": {
+          "$ref": "#/definitions/StringOrSelector"
+        },
+        "visible": {
+          "$ref": "#/definitions/StringOrSelector"
+        }
+      },
+      "type": "object"
+    },
+    "HandleStep": {
+      "additionalProperties": false,
+      "description": "Probe the current screen state and run the first matching branch.",
+      "properties": {
+        "branches": {
+          "description": "Ordered list of branches. First matching `when` wins.",
+          "items": {
+            "$ref": "#/definitions/HandleBranch"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "command": {
+          "const": "handle",
+          "type": "string"
+        },
+        "otherwise": {
+          "description": "Action when no branch matches within `timeout`. Defaults to 'fail'.",
+          "enum": [
+            "fail",
+            "skip"
+          ],
+          "type": "string"
+        },
+        "timeout": {
+          "description": "Max time in milliseconds the runner waits for any branch's `when` condition to hold.",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "command",
+        "branches"
+      ],
+      "type": "object"
+    },
+    "LaunchAppStep": {
+      "additionalProperties": false,
+      "description": "Launch (or relaunch) the app declared at the top of the script via `appId`.",
+      "properties": {
+        "command": {
+          "const": "launchApp",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command"
+      ],
+      "type": "object"
+    },
+    "LongPressStep": {
+      "additionalProperties": false,
+      "description": "Press and hold at `at` for `holdMs`, then release. When `thenSwipeTo` is set, drag to it before releasing (a hold-then-drag).",
+      "properties": {
+        "at": {
+          "$ref": "#/definitions/PointerTarget"
+        },
+        "command": {
+          "const": "longPress",
+          "type": "string"
+        },
+        "holdMs": {
+          "description": "Hold duration in milliseconds before release. Defaults to 500 ms.",
+          "minimum": 0,
+          "type": "number"
+        },
+        "thenSwipeTo": {
+          "$ref": "#/definitions/PointerTarget"
+        }
+      },
+      "required": [
+        "command",
+        "at"
+      ],
+      "type": "object"
+    },
+    "PinchStep": {
+      "additionalProperties": false,
+      "description": "Two-finger pinch centered on `center`, moving the contact points from `startGap` apart to `endGap` apart. A selector `center` is resolved to a coordinate at dispatch time.",
+      "properties": {
+        "axis": {
+          "description": "Axis the two contact points spread along. Defaults to 'vertical'.",
+          "enum": [
+            "vertical",
+            "horizontal"
+          ],
+          "type": "string"
+        },
+        "center": {
+          "$ref": "#/definitions/PointerTarget"
+        },
+        "command": {
+          "const": "pinch",
+          "type": "string"
+        },
+        "durationMs": {
+          "description": "Duration in milliseconds of the pinch motion. Defaults to 200 ms.",
+          "minimum": 0,
+          "type": "number"
+        },
+        "endGap": {
+          "description": "Distance in points between the two contact points at the end of the pinch. Greater than `startGap` spreads the fingers (a zoom-in).",
+          "minimum": 0,
+          "type": "number"
+        },
+        "startGap": {
+          "description": "Distance in points between the two contact points at the start of the pinch.",
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "command",
+        "center",
+        "startGap",
+        "endGap"
+      ],
+      "type": "object"
+    },
+    "PointerAction": {
+      "description": "One primitive in a pointer sequence, following W3C Actions semantics.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Touch down at the resolved target. A pointer sequence must open with `down`.",
+          "properties": {
+            "pressure": {
+              "description": "Pressure applied at this action, in the range [0.0, 1.0].",
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            "target": {
+              "$ref": "#/definitions/PointerTarget"
+            },
+            "type": {
+              "const": "down",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "target"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Drag the active pointer to a new target.",
+          "properties": {
+            "pressure": {
+              "description": "Pressure applied at this action, in the range [0.0, 1.0].",
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            "target": {
+              "$ref": "#/definitions/PointerTarget"
+            },
+            "type": {
+              "const": "move",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "target"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Hold the current pointer position.",
+          "properties": {
+            "ms": {
+              "description": "Hold duration in milliseconds.",
+              "minimum": 0,
+              "type": "number"
+            },
+            "type": {
+              "const": "wait",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "ms"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Release the pointer. A pointer sequence must close with `up`.",
+          "properties": {
+            "type": {
+              "const": "up",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Capture a screenshot while the pointer is held down, mid-gesture. Valid only strictly between the sequence's opening `down` and its closing `up`.",
+          "properties": {
+            "label": {
+              "description": "Filename-safe label attached to the captured image in the run artifacts.",
+              "type": "string"
+            },
+            "type": {
+              "const": "capture",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PointerAnchor": {
+      "description": "Which point on the matched element's rect the target resolves to before `offset` is applied. Defaults to `center`.",
+      "enum": [
+        "center",
+        "topLeft",
+        "topRight",
+        "bottomLeft",
+        "bottomRight",
+        "top",
+        "bottom",
+        "left",
+        "right"
+      ],
+      "type": "string"
+    },
+    "PointerStep": {
+      "additionalProperties": false,
+      "description": "General-purpose pointer gesture expressing W3C Actions sequences: tap, long-press, drag, flick, pinch, rotate, multi-finger. Its `touches` list holds one path per pointer.",
+      "properties": {
+        "command": {
+          "const": "pointer",
+          "type": "string"
+        },
+        "moveDurationMs": {
+          "description": "Duration in milliseconds of each `move` action in this gesture. Defaults to 200 ms.",
+          "minimum": 0,
+          "type": "number"
+        },
+        "touches": {
+          "description": "One or more pointer paths. A single entry is a single-pointer gesture; more than one entry is a multi-pointer gesture whose paths run in parallel on a shared clock.",
+          "items": {
+            "$ref": "#/definitions/PointerTouch"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "command",
+        "touches"
+      ],
+      "type": "object"
+    },
+    "PointerTarget": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "description": "Resolve to a point on the matched element's rect.",
+          "properties": {
+            "anchor": {
+              "$ref": "#/definitions/PointerAnchor"
+            },
+            "offset": {
+              "additionalProperties": false,
+              "description": "Point offset applied after resolving `anchor`.",
+              "properties": {
+                "dx": {
+                  "description": "Horizontal offset in points from the anchor, positive rightward.",
+                  "type": "number"
+                },
+                "dy": {
+                  "description": "Vertical offset in points from the anchor, positive downward.",
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            },
+            "selector": {
+              "$ref": "#/definitions/ScriptSelector"
+            }
+          },
+          "required": [
+            "selector"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Absolute screen coordinates in points.",
+          "properties": {
+            "point": {
+              "additionalProperties": false,
+              "properties": {
+                "x": {
+                  "description": "Screen x in points.",
+                  "type": "number"
+                },
+                "y": {
+                  "description": "Screen y in points.",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "x",
+                "y"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "point"
+          ],
+          "type": "object"
+        }
+      ],
+      "description": "Target of a pointer down or move action: a selector-relative point, or an absolute coordinate."
+    },
+    "PointerTouch": {
+      "additionalProperties": false,
+      "description": "One pointer's path in a pointer step: an optional id and a required time-ordered action list.",
+      "properties": {
+        "actions": {
+          "description": "This pointer's time-ordered action list.",
+          "items": {
+            "$ref": "#/definitions/PointerAction"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "id": {
+          "description": "Author-chosen pointer id. Required and unique across touches when the step carries more than one touch (a multi-pointer gesture); optional and unused for a single-touch gesture.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "actions"
+      ],
+      "type": "object"
+    },
+    "Precondition": {
+      "additionalProperties": false,
+      "description": "A run-once setup gate a flow's steps require before they run.",
+      "properties": {
+        "check": {
+          "$ref": "#/definitions/PreconditionCheck"
+        },
+        "policy": {
+          "description": "How the runner enforces this precondition. Defaults to 'ensure'.",
+          "enum": [
+            "ensure",
+            "always",
+            "skip"
+          ],
+          "type": "string"
+        },
+        "setup": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/definitions/ScriptStep"
+              },
+              "type": "array"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "Steps to run: an inline list, or a string path to a flow fragment file."
+        }
+      },
+      "required": [
+        "check",
+        "setup"
+      ],
+      "type": "object"
+    },
+    "PreconditionCheck": {
+      "additionalProperties": false,
+      "description": "Condition a precondition checks before its flow runs. Exactly one of `visible` or `notVisible` must be set.",
+      "properties": {
+        "notVisible": {
+          "$ref": "#/definitions/StringOrSelector"
+        },
+        "visible": {
+          "$ref": "#/definitions/StringOrSelector"
+        }
+      },
+      "type": "object"
+    },
+    "PressKeyStep": {
+      "additionalProperties": false,
+      "description": "Press a hardware or system key.",
+      "properties": {
+        "command": {
+          "const": "pressKey",
+          "type": "string"
+        },
+        "key": {
+          "description": "Key identifier, for example 'enter', 'back', or 'home'.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "command",
+        "key"
+      ],
+      "type": "object"
+    },
+    "ReadStep": {
+      "additionalProperties": false,
+      "description": "Resolve an element and read one field into a runtime variable.",
+      "properties": {
+        "as": {
+          "description": "Variable name to bind the read value to.",
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "command": {
+          "const": "read",
+          "type": "string"
+        },
+        "field": {
+          "description": "Which field to read from the resolved element. Defaults to 'value'.",
+          "enum": [
+            "id",
+            "text",
+            "label",
+            "hint",
+            "value",
+            "role",
+            "class",
+            "package",
+            "bounds",
+            "clickable",
+            "enabled",
+            "focused",
+            "selected",
+            "checked",
+            "visible"
+          ],
+          "type": "string"
+        },
+        "selector": {
+          "$ref": "#/definitions/ScriptSelector"
+        }
+      },
+      "required": [
+        "command",
+        "selector",
+        "as"
+      ],
+      "type": "object"
+    },
+    "RotateStep": {
+      "additionalProperties": false,
+      "description": "Two-finger rotation of `degrees` around `center`, with the contact points placed `radius` apart on opposite sides. A selector `center` is resolved to a coordinate at dispatch time.",
+      "properties": {
+        "center": {
+          "$ref": "#/definitions/PointerTarget"
+        },
+        "command": {
+          "const": "rotate",
+          "type": "string"
+        },
+        "degrees": {
+          "description": "Signed rotation in degrees each contact point sweeps around the center.",
+          "type": "number"
+        },
+        "durationMs": {
+          "description": "Duration in milliseconds of the rotation motion. Defaults to 200 ms.",
+          "minimum": 0,
+          "type": "number"
+        },
+        "radius": {
+          "description": "Distance in points from the center to each contact point. Defaults to 100 points.",
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "command",
+        "center",
+        "degrees"
+      ],
+      "type": "object"
+    },
+    "RunFlowStep": {
+      "additionalProperties": false,
+      "description": "Execute another YAML script as a sub-flow.",
+      "properties": {
+        "command": {
+          "const": "runFlow",
+          "type": "string"
+        },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Extra variables to pass to the sub-flow, merged over the parent env.",
+          "type": "object"
+        },
+        "file": {
+          "description": "Path to the sub-flow YAML file, relative to the current working directory.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "command",
+        "file"
+      ],
+      "type": "object"
+    },
+    "ScreenshotStep": {
+      "additionalProperties": false,
+      "description": "Capture a screenshot and attach it to the run artifacts.",
+      "properties": {
+        "command": {
+          "const": "screenshot",
+          "type": "string"
+        },
+        "label": {
+          "description": "Filename-safe label attached to the screenshot in the run artifacts.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command"
+      ],
+      "type": "object"
+    },
+    "ScriptDefinition": {
+      "additionalProperties": false,
+      "description": "An Atomyx YAML test script: an entry script (full config plus steps) or a flow fragment (steps only).",
+      "properties": {
+        "_stepLines": {
+          "description": "Parser metadata: 1-indexed source line for each entry in `steps`.",
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "appId": {
+          "description": "Bundle id (iOS) or package name (Android) of the app under test. An empty string is reserved for flow fragments that run in a parent script's context.",
+          "type": "string"
+        },
+        "description": {
+          "description": "Longer description of what this script verifies.",
+          "type": "string"
+        },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Variables available via `${varName}` in every step value.",
+          "type": "object"
+        },
+        "format": {
+          "description": "Script format version. Format: 'atomyx/v\u003cn\u003e'. Defaults to 'atomyx/v1' when omitted.",
+          "pattern": "^atomyx/v\\d+$",
+          "type": "string"
+        },
+        "name": {
+          "description": "Human-readable script name.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "precondition": {
+          "description": "Human-readable precondition text. Informational only, not enforced by the runner.",
+          "type": "string"
+        },
+        "preconditions": {
+          "description": "Preconditions checked, and established via `setup` when unmet, before this script's steps run.",
+          "items": {
+            "$ref": "#/definitions/Precondition"
+          },
+          "type": "array"
+        },
+        "proxy": {
+          "description": "Network-capture proxy policy. Defaults to 'optional'.",
+          "enum": [
+            "required",
+            "optional"
+          ],
+          "type": "string"
+        },
+        "requires": {
+          "description": "Flow files to run before this script, relative to the current working directory.",
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "stepDelay": {
+          "description": "Delay in ms inserted between each step. Defaults to 500 ms.",
+          "minimum": 0,
+          "type": "number"
+        },
+        "steps": {
+          "description": "Ordered list of steps to execute.",
+          "items": {
+            "$ref": "#/definitions/ScriptStep"
+          },
+          "type": "array"
+        },
+        "tags": {
+          "description": "Tags for filtering and organizing runs.",
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "appId",
+        "name",
+        "env",
+        "steps"
+      ],
+      "type": "object"
+    },
+    "ScriptSelector": {
+      "additionalProperties": false,
+      "description": "Element selector. Every field is optional, but at least one should be set for the selector to be useful.",
+      "properties": {
+        "hint": {
+          "description": "Match element by its input hint or placeholder.",
+          "type": "string"
+        },
+        "id": {
+          "description": "Match element by its stable resource id or accessibility id.",
+          "type": "string"
+        },
+        "label": {
+          "description": "Match element by its accessibility label.",
+          "type": "string"
+        },
+        "nth": {
+          "description": "When multiple elements match, pick the nth one (0-indexed).",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "role": {
+          "description": "Constrain the match to a semantic role, for example 'button'.",
+          "type": "string"
+        },
+        "text": {
+          "description": "Match element by its visible text.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ScriptStep": {
+      "description": "One canonical step the runner accepts, discriminated by `command`.",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/LaunchAppStep"
+        },
+        {
+          "$ref": "#/definitions/TapStep"
+        },
+        {
+          "$ref": "#/definitions/TypeStep"
+        },
+        {
+          "$ref": "#/definitions/WaitForStep"
+        },
+        {
+          "$ref": "#/definitions/AssertVisibleStep"
+        },
+        {
+          "$ref": "#/definitions/AssertNotVisibleStep"
+        },
+        {
+          "$ref": "#/definitions/AssertExistsStep"
+        },
+        {
+          "$ref": "#/definitions/ScreenshotStep"
+        },
+        {
+          "$ref": "#/definitions/SwipeStep"
+        },
+        {
+          "$ref": "#/definitions/PressKeyStep"
+        },
+        {
+          "$ref": "#/definitions/BackStep"
+        },
+        {
+          "$ref": "#/definitions/SleepStep"
+        },
+        {
+          "$ref": "#/definitions/CaptureStep"
+        },
+        {
+          "$ref": "#/definitions/AssertApiStep"
+        },
+        {
+          "$ref": "#/definitions/ExtractStep"
+        },
+        {
+          "$ref": "#/definitions/ReadStep"
+        },
+        {
+          "$ref": "#/definitions/AssertExprStep"
+        },
+        {
+          "$ref": "#/definitions/HandleStep"
+        },
+        {
+          "$ref": "#/definitions/BranchStep"
+        },
+        {
+          "$ref": "#/definitions/RunFlowStep"
+        },
+        {
+          "$ref": "#/definitions/PointerStep"
+        },
+        {
+          "$ref": "#/definitions/LongPressStep"
+        },
+        {
+          "$ref": "#/definitions/PinchStep"
+        },
+        {
+          "$ref": "#/definitions/RotateStep"
+        }
+      ]
+    },
+    "SleepStep": {
+      "additionalProperties": false,
+      "description": "Unconditionally wait `ms` milliseconds.",
+      "properties": {
+        "command": {
+          "const": "sleep",
+          "type": "string"
+        },
+        "ms": {
+          "description": "Sleep duration in milliseconds.",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "command",
+        "ms"
+      ],
+      "type": "object"
+    },
+    "StringOrSelector": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "$ref": "#/definitions/ScriptSelector"
+        }
+      ],
+      "description": "Either a bare visible-text string or a full element selector."
+    },
+    "SwipeStep": {
+      "additionalProperties": false,
+      "description": "Swipe the centre of the visible viewport in a cardinal direction.",
+      "properties": {
+        "command": {
+          "const": "swipe",
+          "type": "string"
+        },
+        "direction": {
+          "description": "Swipe direction.",
+          "enum": [
+            "up",
+            "down",
+            "left",
+            "right"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "command",
+        "direction"
+      ],
+      "type": "object"
+    },
+    "TapStep": {
+      "additionalProperties": false,
+      "description": "Tap the element resolved by `selector`.",
+      "properties": {
+        "command": {
+          "const": "tap",
+          "type": "string"
+        },
+        "selector": {
+          "$ref": "#/definitions/ScriptSelector"
+        }
+      },
+      "required": [
+        "command",
+        "selector"
+      ],
+      "type": "object"
+    },
+    "TypeStep": {
+      "additionalProperties": false,
+      "description": "Type `text` into the field resolved by `into`, or the currently focused field when `into` is omitted.",
+      "properties": {
+        "command": {
+          "const": "type",
+          "type": "string"
+        },
+        "into": {
+          "$ref": "#/definitions/ScriptSelector"
+        },
+        "text": {
+          "description": "Text to type. `${var}` placeholders are resolved against the script env.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command",
+        "text"
+      ],
+      "type": "object"
+    },
+    "WaitForStep": {
+      "additionalProperties": false,
+      "description": "Wait for `selector` to become visible within `timeoutMs`.",
+      "properties": {
+        "command": {
+          "const": "waitFor",
+          "type": "string"
+        },
+        "selector": {
+          "$ref": "#/definitions/ScriptSelector"
+        },
+        "timeoutMs": {
+          "description": "Polling timeout in milliseconds.",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "command",
+        "selector"
+      ],
+      "type": "object"
+    }
+  }
+}

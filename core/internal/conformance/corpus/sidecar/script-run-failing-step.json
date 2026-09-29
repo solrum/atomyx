@@ -1,0 +1,18 @@
+{
+  "name": "script-run-failing-step",
+  "description": "runScript on a script whose second step's assertVisible has no match fails gracefully: the step is reported ok:false, the run stops there, and runCompleted (not runErrored) still fires with ok:false. This is the graceful-failure counterpart to script-run-stopped's runErrored path.",
+  "deviceSnapshots": [
+    [
+      { "id": "mock-1", "platform": "android", "name": "Mock Device", "kind": "emulator", "state": "online" }
+    ]
+  ],
+  "driver": {
+    "apps": ["com.example.app"],
+    "hierarchies": [{ "attributes": {}, "children": [] }]
+  },
+  "steps": [
+    { "method": "selectDevice", "params": { "id": "mock-1" } },
+    { "method": "runScript", "params": { "yaml": "appId: com.example.app\nname: missing element\nenv: {}\n---\n- launchApp\n- assertVisible: Nonexistent\n" } },
+    { "method": "isRunning" }
+  ]
+}

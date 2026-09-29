@@ -1,0 +1,11 @@
+{
+  "booleanValue": false,
+  "errorKind": "parse",
+  "kind": "error",
+  "message": "expected an expression but found \"*\" at position 4",
+  "numberBits": "",
+  "numberText": "",
+  "position": 4,
+  "stringValue": "",
+  "valueType": ""
+}

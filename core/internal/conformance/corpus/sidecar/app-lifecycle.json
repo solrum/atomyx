@@ -1,0 +1,16 @@
+{
+  "name": "app-lifecycle",
+  "description": "listApps, launchApp, and currentForeground against a selected mock device: launchApp records the bundle id as foreground and currentForeground reports it back.",
+  "deviceSnapshots": [
+    [
+      { "id": "mock-1", "platform": "android", "name": "Mock Device", "kind": "emulator", "state": "online" }
+    ]
+  ],
+  "driver": { "hierarchies": [{ "attributes": {}, "children": [] }] },
+  "steps": [
+    { "method": "selectDevice", "params": { "id": "mock-1" } },
+    { "method": "listApps" },
+    { "method": "launchApp", "params": { "bundleId": "com.example.app" } },
+    { "method": "currentForeground" }
+  ]
+}

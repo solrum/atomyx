@@ -1,0 +1,53 @@
+{
+  "name": "ios-extension-attributes-and-tri-state",
+  "description": "ext:ios-* attributes and tri-state boolean parity",
+  "rawTree": {
+    "elementType": "cell",
+    "identifier": "ext-root",
+    "label": "Row",
+    "title": "Row title",
+    "traits": [
+      "button",
+      "selected"
+    ],
+    "bounds": {
+      "left": 0,
+      "top": 0,
+      "right": 393,
+      "bottom": 64
+    },
+    "accessibilityFrame": {
+      "left": 0,
+      "top": 2,
+      "right": 393,
+      "bottom": 62
+    },
+    "enabled": true,
+    "focused": false,
+    "selected": true,
+    "visible": true,
+    "accessible": true,
+    "children": [
+      {
+        "elementType": "staticText",
+        "identifier": "e01",
+        "label": "Sub",
+        "accessible": false
+      },
+      {
+        "elementType": "staticText",
+        "identifier": "e02",
+        "label": "Sub2"
+      },
+      {
+        "elementType": "image",
+        "identifier": "e03",
+        "label": "Chevron",
+        "title": "",
+        "traits": [],
+        "enabled": false,
+        "visible": false
+      }
+    ]
+  }
+}

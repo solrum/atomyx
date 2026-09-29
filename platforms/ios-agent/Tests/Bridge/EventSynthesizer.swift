@@ -5,10 +5,10 @@ import XCTest
 /// Canonical gesture-dispatch abstraction for the iOS driver. Two
 /// concrete backends:
 ///
-///   - `EventRecordSynthesizer` — XCSynthesizedEventRecord +
+///   - `EventRecordSynthesizer`: XCSynthesizedEventRecord +
 ///     XCPointerEventPath. Full multi-pointer + pressure
 ///     surface. Probed at startup; selected when present.
-///   - `CoordinateSynthesizer` — XCUICoordinate primitives.
+///   - `CoordinateSynthesizer`: XCUICoordinate primitives.
 ///     Single-pointer fallback, used only when the event-record
 ///     probe fails (older Xcode, SDK drift, etc.).
 ///
@@ -42,11 +42,15 @@ enum SynthesizerError: Error, Equatable {
 }
 
 /// Waypoint phase. `wait` is represented by the `atOffsetSeconds`
-/// delta between adjacent waypoints, not as its own phase.
+/// delta between adjacent waypoints, not as its own phase. `capture`
+/// marks a point strictly between a pointer's opening `down` and
+/// closing `up` where a screenshot is taken while the touch is still
+/// held; it carries no motion of its own.
 enum Phase: String, Equatable {
     case down
     case move
     case up
+    case capture
 }
 
 /// One waypoint in a pointer's time-ordered action list.
@@ -73,7 +77,7 @@ struct PointerPath: Equatable {
 ///
 /// Gestures are device-global: coordinates address the active
 /// scene, not an owning app. Callers do NOT have to launch or
-/// attach to an app before dispatching — the XCUITest daemon
+/// attach to an app before dispatching. The XCUITest daemon
 /// routes the synthesized events to whichever app is currently
 /// frontmost. The event-record backend bypasses XCUIApplication
 /// entirely; the coordinate backend constructs a Springboard
@@ -83,7 +87,7 @@ protocol EventSynthesizer {
     var capabilities: EventCapabilities { get }
 
     /// Short identifier for telemetry / log correlation. Stable
-    /// across releases — host-side code MUST NOT branch on it.
+    /// across releases. Host-side code MUST NOT branch on it.
     var mechanismName: String { get }
 
     /// Optional probe log. Backends that probe runtime symbols
@@ -92,8 +96,14 @@ protocol EventSynthesizer {
     /// Returns `nil` when the backend does not probe.
     var probeLog: String? { get }
 
-    /// Dispatch the gesture synchronously — returns when the
+    /// Dispatch the gesture synchronously. Returns when the
     /// underlying XCUITest call completes. Throws
     /// `SynthesizerError` on refusal or dispatch failure.
-    func dispatch(pointers: [PointerPath]) throws
+    ///
+    /// The return value holds one PNG screenshot per `capture`
+    /// waypoint in the dispatched pointers, in the same order the
+    /// waypoints were encountered (each pointer in order, each
+    /// waypoint within it in order). Empty when no pointer carries a
+    /// `capture` waypoint.
+    func dispatch(pointers: [PointerPath]) throws -> [Data]
 }

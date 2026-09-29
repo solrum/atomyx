@@ -1,0 +1,5 @@
+{
+  "name": "cast-bool-zero-string-rejected",
+  "description": "bool() rejects the string \"0\".",
+  "expr": "bool(\"0\")"
+}

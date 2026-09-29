@@ -1,0 +1,5 @@
+{
+  "name": "prec-unary-minus-tighter-than-multiplication-right",
+  "description": "unary minus on the right operand binds before multiplication.",
+  "expr": "2 * -3"
+}

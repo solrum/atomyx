@@ -1,0 +1,144 @@
+{
+  "kind": "suite",
+  "metadata": {
+    "command": "suite",
+    "durationMs": 5000,
+    "finishedAt": "2026-01-04T08:00:05.000Z",
+    "label": "Regression suite",
+    "platform": "ios",
+    "runId": "44444444-4444-4444-8444-444444444444",
+    "startedAt": "2026-01-04T08:00:00.000Z"
+  },
+  "reportVersion": 1,
+  "result": {
+    "durationMs": 5000,
+    "entries": [
+      {
+        "durationMs": 1000,
+        "kind": "script",
+        "path": "scripts/smoke.yml",
+        "result": {
+          "durationMs": 1000,
+          "ok": true,
+          "passedSteps": 1,
+          "screenshots": [
+            {
+              "file": "01-0-scripts-smoke-yml-smoke-first-run.png",
+              "label": "smoke first run"
+            }
+          ],
+          "scriptName": "Smoke test",
+          "steps": [
+            {
+              "command": "launchApp",
+              "durationMs": 1000,
+              "ok": true,
+              "stepIndex": 0
+            }
+          ],
+          "totalSteps": 1
+        },
+        "status": "passed"
+      },
+      {
+        "durationMs": 2500,
+        "kind": "scenario",
+        "path": "scenarios/checkout.yml",
+        "result": {
+          "durationMs": 2500,
+          "ok": false,
+          "passedScripts": 1,
+          "scenarioName": "Checkout scenario",
+          "scripts": [
+            {
+              "durationMs": 1200,
+              "result": {
+                "durationMs": 1200,
+                "ok": true,
+                "passedSteps": 1,
+                "screenshots": [
+                  {
+                    "file": "02-1-scenarios-checkout-yml-0-scripts-add-to-cart-yml-cart-populated.png",
+                    "label": "cart populated"
+                  }
+                ],
+                "scriptName": "Add to cart",
+                "steps": [
+                  {
+                    "command": "tap",
+                    "detail": "tapped #add-to-cart",
+                    "durationMs": 1200,
+                    "ok": true,
+                    "stepIndex": 0
+                  }
+                ],
+                "totalSteps": 1
+              },
+              "scriptIndex": 0,
+              "scriptPath": "scripts/add-to-cart.yml",
+              "status": "passed"
+            },
+            {
+              "durationMs": 1300,
+              "result": {
+                "durationMs": 1300,
+                "failedAtStep": 0,
+                "ok": false,
+                "passedSteps": 0,
+                "screenshots": [],
+                "scriptName": "Pay",
+                "steps": [
+                  {
+                    "command": "tap",
+                    "detail": "element not found: #pay-button",
+                    "durationMs": 1300,
+                    "ok": false,
+                    "stepIndex": 0
+                  }
+                ],
+                "totalSteps": 1
+              },
+              "scriptIndex": 1,
+              "scriptPath": "scripts/pay.yml",
+              "status": "failed"
+            }
+          ],
+          "totalScripts": 2
+        },
+        "status": "failed"
+      },
+      {
+        "durationMs": 1500,
+        "kind": "script",
+        "path": "scripts/smoke.yml",
+        "result": {
+          "durationMs": 1500,
+          "ok": true,
+          "passedSteps": 1,
+          "screenshots": [
+            {
+              "file": "03-2-scripts-smoke-yml-smoke-second-run.png",
+              "label": "smoke second run"
+            }
+          ],
+          "scriptName": "Smoke test",
+          "steps": [
+            {
+              "command": "launchApp",
+              "durationMs": 1500,
+              "ok": true,
+              "stepIndex": 0
+            }
+          ],
+          "totalSteps": 1
+        },
+        "status": "passed"
+      }
+    ],
+    "failed": 1,
+    "ok": false,
+    "passed": 2,
+    "suiteName": "Regression suite",
+    "total": 3
+  }
+}

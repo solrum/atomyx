@@ -1,14 +1,10 @@
-import { ScriptDefinitionSchema } from "@atomyx/shared/script";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import atomyxScriptSchema from "./generated/atomyx-script.schema.json";
 
 /**
- * JSON Schema derived from the authoritative zod
- * `ScriptDefinitionSchema` in `@atomyx/shared`. Feeds
- * monaco-yaml for completion / hover / validation on
- * `*.atomyx.yml` files. Regenerated at module load — cheap
- * enough for a once-per-window call.
+ * JSON Schema for `*.atomyx.yml` scripts, staged from the Go core
+ * (`go/internal/script`) by `npm run generate:schema`. Feeds
+ * monaco-yaml for completion, hover, and validation. The Go core is
+ * the single source of truth for this schema; Studio only consumes
+ * the emitted artifact.
  */
-export const scriptJsonSchema = zodToJsonSchema(ScriptDefinitionSchema, {
-  name: "AtomyxScript",
-  $refStrategy: "none",
-});
+export const scriptJsonSchema = atomyxScriptSchema;

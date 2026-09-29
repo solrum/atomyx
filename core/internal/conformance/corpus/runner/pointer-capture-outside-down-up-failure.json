@@ -1,0 +1,10 @@
+{
+  "name": "pointer-capture-outside-down-up-failure",
+  "description": "a `capture` action after the sequence's pointer has already lifted fails with a fixed detail, the same way an out-of-bracket `wait` or `move` would",
+  "yaml": "appId: com.test\nname: pointer capture outside bracket\nenv: {}\n---\n- launchApp\n- pointer:\n    touches:\n      - actions:\n          - down:\n              x: 10\n              y: 10\n          - up\n          - capture\n          - up\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

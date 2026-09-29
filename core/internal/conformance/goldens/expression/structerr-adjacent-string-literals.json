@@ -1,0 +1,11 @@
+{
+  "booleanValue": false,
+  "errorKind": "parse",
+  "kind": "error",
+  "message": "unexpected trailing input \"b\" at position 4",
+  "numberBits": "",
+  "numberText": "",
+  "position": 4,
+  "stringValue": "",
+  "valueType": ""
+}

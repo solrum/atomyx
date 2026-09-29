@@ -10,7 +10,7 @@ import XCTest
 /// is inside the visible viewport before dispatching a coordinate
 /// tap. iOS accessibility snapshot trees contain off-screen elements
 /// (e.g. rows scrolled below the fold in a UITableView), and a raw
-/// coordinate tap to an off-screen point fails silently — the tap
+/// coordinate tap to an off-screen point fails silently, because the tap
 /// lands on empty space or outside the device bounds.
 ///
 /// The adapter caches this result per session. Screen size is

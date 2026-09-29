@@ -1,0 +1,5 @@
+{
+  "name": "step-pointer-up-object-form",
+  "description": "pointer action object form `{ up: ... }` is accepted with its payload discarded, matching the bare string \"up\".",
+  "yaml": "- launchApp\n- pointer:\n    touches:\n      - actions:\n          - down: \"Item A\"\n          - up: null\n"
+}

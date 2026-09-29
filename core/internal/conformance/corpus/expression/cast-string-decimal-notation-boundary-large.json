@@ -1,0 +1,11 @@
+{
+  "name": "cast-string-decimal-notation-boundary-large",
+  "description": "string() uses decimal notation at the largest magnitude boundary (1e20).",
+  "expr": "string(large)",
+  "variables": {
+    "large": {
+      "type": "number",
+      "number": "100000000000000000000"
+    }
+  }
+}

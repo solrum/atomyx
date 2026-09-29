@@ -6,7 +6,7 @@ import Darwin
 /// to the provided handler closure, write line-delimited JSON responses.
 ///
 /// Runs accept loop on a background queue. Each incoming client is
-/// served sequentially — one connection at a time, no parallel
+/// served sequentially: one connection at a time, no parallel
 /// dispatch. Agents drive the session through a single TCP connection.
 ///
 /// Threading policy:
@@ -16,13 +16,13 @@ import Darwin
 ///   - The private-path `dispatchPointer` must NOT run on the main
 ///     thread: it calls `synthesizeEvent:completion:` whose
 ///     completion block is posted to the main queue, and we wait
-///     on a semaphore for it — if the handler itself were on main,
+///     on a semaphore for it. If the handler itself were on main,
 ///     main would be blocked and the completion could never fire
 ///     (classic main-queue deadlock).
 ///
 /// Per-command threading: each `CommandHandler` declares
 /// `requiresMainThread`. Handlers that need main (XCUI tree
-/// queries, `XCUIApplication.launch`, etc.) set it to `true` —
+/// queries, `XCUIApplication.launch`, etc.) set it to `true`.
 /// the server wraps their handler call in
 /// `DispatchQueue.main.sync`. Handlers that need main to stay
 /// FREE (gesture dispatch waiting on a main-queue completion)
@@ -34,7 +34,7 @@ final class CommandServer {
     private var listenFd: Int32 = -1
     private let acceptQueue = DispatchQueue(label: "atomyx.driver.accept", qos: .userInitiated)
 
-    /// `requiresMainThread` defaults to `{ _ in true }` — the
+    /// `requiresMainThread` defaults to `{ _ in true }`, the
     /// conservative safe default for any handler whose threading
     /// preference is unknown. The serve entry point in
     /// `AtomyxDriverAgent` overrides it with a closure that
@@ -135,7 +135,7 @@ final class CommandServer {
                 // Per-request routing: most commands need the
                 // main thread (XCUIApplication.launch, XCUIElement
                 // queries, etc.). `DispatchPointerCommand` does
-                // NOT — it needs main to stay free for its
+                // NOT, because it needs main to stay free for its
                 // synthesized-event completion block.
                 let response: Response
                 if requiresMainThread(request) {

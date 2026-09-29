@@ -1,0 +1,5 @@
+{
+  "name": "cast-number-invalid-trailing-dot-string",
+  "description": "number() rejects a string with a trailing decimal point and no digit after it.",
+  "expr": "number(\"5.\")"
+}

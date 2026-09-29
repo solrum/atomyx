@@ -1,0 +1,11 @@
+{
+  "name": "unary-minus-boolean-variable-rejected",
+  "description": "unary minus rejects a boolean variable.",
+  "expr": "-b",
+  "variables": {
+    "b": {
+      "type": "boolean",
+      "boolean": true
+    }
+  }
+}

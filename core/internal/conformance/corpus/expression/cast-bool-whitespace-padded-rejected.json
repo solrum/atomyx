@@ -1,0 +1,5 @@
+{
+  "name": "cast-bool-whitespace-padded-rejected",
+  "description": "bool() rejects a whitespace-padded \"true\".",
+  "expr": "bool(\" true \")"
+}

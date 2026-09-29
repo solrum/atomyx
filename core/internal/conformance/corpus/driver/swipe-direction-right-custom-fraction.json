@@ -1,0 +1,8 @@
+{
+  "name": "swipe-direction-right-custom-fraction",
+  "description": "a right swipe with a non-default fraction scales the endpoints proportionally",
+  "function": "swipeDirection",
+  "screen": { "width": 430, "height": 932 },
+  "direction": "right",
+  "fraction": 0.25
+}

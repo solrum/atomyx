@@ -1,0 +1,5 @@
+{
+  "name": "invalid-suite-tags-item-too-short-no-globs",
+  "description": "A suite whose only tags item is empty and has no globs fails just the item's own min-length check: the refine reads the raw tags array (still length 1) so it does not also fire the missing-selector rule.",
+  "yaml": "project: Demo\napps:\n  - id: main\n    platform: android\n    appId: com.example.app\nenvironments:\n  staging:\n    app: main\nsuites:\n  smoke:\n    tags: [\"\"]\n"
+}

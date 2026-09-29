@@ -1,0 +1,5 @@
+{
+  "name": "lex-single-quoted-string",
+  "description": "a single-quoted string literal.",
+  "expr": "'hello'"
+}

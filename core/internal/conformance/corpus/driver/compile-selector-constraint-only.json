@@ -1,0 +1,27 @@
+{
+  "name": "compile-selector-constraint-only",
+  "description": "a selector with no content field is constraint-only and matches every element satisfying the constraints",
+  "function": "compileSelector",
+  "selector": { "role": "button" },
+  "tree": {
+    "attributes": { "role": "container" },
+    "children": [
+      {
+        "attributes": { "role": "button", "id": "login_btn", "text": "Sign in" },
+        "children": [],
+        "enabled": true,
+        "clickable": true
+      },
+      {
+        "attributes": { "role": "button", "id": "cancel_btn", "text": "Cancel" },
+        "children": [],
+        "enabled": true,
+        "clickable": true
+      },
+      {
+        "attributes": { "role": "cell", "text": "Sign in" },
+        "children": []
+      }
+    ]
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "name": "meta-handshake",
+  "description": "Calls the sidecar protocol handshake, then lists its registered methods, and asserts each response against the value recorded from the TypeScript sidecar.",
+  "steps": [
+    {
+      "method": "protocolVersion",
+      "expect": { "version": 1 }
+    },
+    {
+      "method": "listMethods",
+      "expect": {
+        "methods": [
+          "androidAgentStatus",
+          "currentForeground",
+          "deselectDevice",
+          "ensureAndroidAgent",
+          "ensureIosAgent",
+          "getUiTree",
+          "invalidateUiCache",
+          "iosAgentStatus",
+          "iosSimHidStatus",
+          "isRunning",
+          "launchApp",
+          "listApps",
+          "listDevices",
+          "listMethods",
+          "mirrorEraseText",
+          "mirrorInputText",
+          "mirrorLongPressRatio",
+          "mirrorPinch",
+          "mirrorPressKey",
+          "mirrorStreamingTouchDown",
+          "mirrorStreamingTouchMove",
+          "mirrorStreamingTouchUp",
+          "mirrorSwipeRatio",
+          "mirrorTapRatio",
+          "ping",
+          "protocolVersion",
+          "runScript",
+          "screenshot",
+          "selectDevice",
+          "stopScript",
+          "tapRatio"
+        ]
+      }
+    }
+  ]
+}

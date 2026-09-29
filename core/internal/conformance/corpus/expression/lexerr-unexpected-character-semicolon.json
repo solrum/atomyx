@@ -1,0 +1,5 @@
+{
+  "name": "lexerr-unexpected-character-semicolon",
+  "description": "an unrecognized character (;) in the source.",
+  "expr": "1; 2"
+}

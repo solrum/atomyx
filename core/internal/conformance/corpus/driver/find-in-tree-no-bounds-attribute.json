@@ -1,0 +1,17 @@
+{
+  "name": "find-in-tree-no-bounds-attribute",
+  "description": "a matched element with no bounds attribute resolves to found:true with null bounds and null point",
+  "function": "find-in-tree",
+  "selector": { "id": "login_btn" },
+  "tree": {
+    "attributes": { "role": "container" },
+    "children": [
+      {
+        "attributes": { "role": "button", "id": "login_btn", "text": "Sign in" },
+        "children": [],
+        "enabled": true,
+        "clickable": true
+      }
+    ]
+  }
+}

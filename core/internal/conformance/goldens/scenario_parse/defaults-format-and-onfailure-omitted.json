@@ -1,0 +1,10 @@
+{
+  "parsed": {
+    "description": "Fast pre-merge check",
+    "name": "Smoke pass",
+    "scripts": [
+      "flows/smoke.yml"
+    ]
+  },
+  "valid": true
+}

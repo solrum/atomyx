@@ -9,7 +9,7 @@ import android.view.accessibility.AccessibilityWindowInfo
  * Stateful UI tree service for AI-driven exploratory testing (Atomyx).
  *
  * Design: METADATA-ONLY registry. We do NOT retain AccessibilityNodeInfo
- * references — those become stale when the underlying view tree changes
+ * references, because those become stale when the underlying view tree changes
  * (keyboard appears, focus shift, RecyclerView recycle, animations).
  *
  * Instead, at dump time, we capture EVERYTHING we need to act on the element:
@@ -26,7 +26,7 @@ import android.view.accessibility.AccessibilityWindowInfo
  *   - Skip elements with invalid/zero bounds (off-screen)
  *   - Single getBoundsInScreen call per node, single read of each property
  *   - Event-driven cache invalidation (AccessibilityEvent marks the tree
- *     dirty) with a 5s TTL safety net — see `maxCacheAgeMs` below.
+ *     dirty) with a 5s TTL safety net, see `maxCacheAgeMs` below.
  */
 class UiTreeService(
     private val service: AccessibilityService,
@@ -53,7 +53,7 @@ class UiTreeService(
     // changed) instead of pure TTL. While UI is static, cache is reused
     // indefinitely. This eliminates redundant tree walks.
     @Volatile private var dirty: Boolean = true
-    private val maxCacheAgeMs = 5000L  // safety net — force re-dump every 5s anyway
+    private val maxCacheAgeMs = 5000L  // safety net, forces re-dump every 5s anyway
 
     /** Called by AtomyxAccessibilityService when relevant events fire. */
     fun markDirty() {
@@ -79,7 +79,7 @@ class UiTreeService(
         )
 
         val windows = try { service.windows ?: emptyList() } catch (_: Exception) { emptyList() }
-        // Sort by layer descending — top-most window first
+        // Sort by layer descending, so the top-most window comes first
         val sortedWindows = windows.sortedByDescending { it.layer }
 
         var counter = 0
@@ -93,7 +93,7 @@ class UiTreeService(
             val isImeWindow = win.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD
             val isSystemUi = isSystemUiPackage(root.packageName?.toString())
 
-            // Skip status bar / navigation bar — never useful for testing
+            // Skip status bar / navigation bar, since they are never useful for testing
             if (isSystemUi && !isImeWindow) {
                 root.recycle()
                 continue
@@ -155,7 +155,7 @@ class UiTreeService(
     }
 
     /**
-     * Compact tree representation — flat list of actionable elements only.
+     * Compact tree representation: a flat list of actionable elements only.
      * Drops layout wrappers, includes stable selectors for direct lookup.
      * Used by Claude exploration for token-efficient screen reading.
      */
@@ -195,7 +195,7 @@ class UiTreeService(
             !e.resourceId.isNullOrBlank() -> mapOf("resourceId" to e.resourceId)
             !e.contentDesc.isNullOrBlank() -> mapOf("contentDesc" to e.contentDesc)
             !e.text.isNullOrBlank() -> mapOf("text" to e.text)
-            else -> emptyMap()  // no stable selector — caller must use bounds
+            else -> emptyMap()  // no stable selector, so caller must use bounds
         }
     }
 
@@ -239,21 +239,21 @@ class UiTreeService(
         val cls = node.className?.toString()
         val clickable = node.isClickable
         val enabled = node.isEnabled
-        // Input focus — the element accepting keystrokes right now.
+        // Input focus: the element accepting keystrokes right now.
         // Distinct from accessibility focus (isAccessibilityFocused).
         val focused = node.isFocused
-        // Selection state — surfaces tab selection and segmented-
+        // Selection state: surfaces tab selection and segmented-
         // control current item.
         val selected = node.isSelected
         // Toggle / checkbox state for any node that exposes it.
         val checkable = node.isCheckable
         val checked = node.isChecked
-        // Accessibility-runtime visibility — true when the
+        // Accessibility-runtime visibility: true when the
         // accessibility framework considers the node viewable on
         // screen (accounts for offscreen scroll position even when
         // bounds are non-zero).
         val visible = node.isVisibleToUser
-        // Placeholder text on an empty field — API 26+. Lets host
+        // Placeholder text on an empty field, API 26+. Lets host
         // code pick an input whose only identifier is its placeholder
         // (e.g. "Email", "Search products"). Cross-platform selector
         // key: `hint`.
@@ -273,7 +273,7 @@ class UiTreeService(
         }
 
         // `focused` is counted as interesting so a focused empty input
-        // survives pruning — host-side focus observers need to see the
+        // survives pruning, because host-side focus observers need to see the
         // node even when it has no resourceId/text/desc yet. `hint` is
         // interesting too: placeholder-only inputs (empty EditText
         // whose only identifier is its placeholder) must reach the
@@ -374,7 +374,7 @@ data class RawElementDto(
     // state" (true for CheckBox, Switch, ToggleButton) from
     // "this node is checked right now". A non-checkable node has
     // `checked = false` because the AccessibilityNodeInfo default
-    // is false even when the property is meaningless — host code
+    // is false even when the property is meaningless, so host code
     // reads `checked` only when `checkable` is true.
     val checkable: Boolean = false,
     val checked: Boolean = false,
@@ -382,7 +382,7 @@ data class RawElementDto(
     // Set on the TOP-LEVEL DTO of an IME window subtree by dumpTree().
     // Lets host-side `findKeyboardNode(tree)` locate the keyboard
     // without a separate RPC. Descendants of the IME root inherit
-    // semantically — they're in the same subtree.
+    // this semantically, because they're in the same subtree.
     var isIme: Boolean = false,
     val children: MutableList<RawElementDto> = mutableListOf(),
 )

@@ -1,0 +1,377 @@
+{
+  "attributes": {
+    "bounds": "0,0,1080,1920",
+    "class": "android.widget.FrameLayout",
+    "role": "container"
+  },
+  "children": [
+    {
+      "attributes": {
+        "class": "android.widget.RadioButton",
+        "id": "r/radio",
+        "role": "radio-button"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.widget.CheckBox",
+        "id": "r/check",
+        "role": "checkbox"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.widget.EditText",
+        "id": "r/edit",
+        "role": "text-field"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "androidx.compose.ui.text.TextInputLayout",
+        "id": "r/textinput",
+        "role": "text-field"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "androidx.appcompat.widget.SearchView",
+        "id": "r/search",
+        "role": "search-field"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.widget.ImageButton",
+        "id": "r/imgbtn",
+        "role": "button"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.widget.Button",
+        "id": "r/btn",
+        "role": "button"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.widget.ToggleButton",
+        "id": "r/toggle",
+        "role": "button"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "com.example.ArrowButton",
+        "id": "r/arrow",
+        "role": "button"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.widget.ImageView",
+        "id": "r/img",
+        "role": "image"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.widget.TextView",
+        "id": "r/tv",
+        "role": "text"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "androidx.appcompat.widget.SwitchCompat",
+        "id": "r/switch",
+        "role": "switch"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.widget.SeekBar",
+        "id": "r/seek",
+        "role": "slider"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "com.example.SliderBox",
+        "id": "r/sliderbox",
+        "role": "slider"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "androidx.recyclerview.widget.RecyclerView",
+        "id": "r/rv",
+        "role": "list"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.widget.ListView",
+        "id": "r/lv",
+        "role": "list"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.webkit.WebView",
+        "id": "r/web",
+        "role": "other"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.widget.FrameLayout",
+        "id": "r/frame",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.widget.LinearLayout",
+        "id": "r/linear",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.widget.RelativeLayout",
+        "id": "r/relative",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "androidx.constraintlayout.widget.ConstraintLayout",
+        "id": "r/constraint",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.view.ViewGroup",
+        "id": "r/vg",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "androidx.compose.foundation.layout.Box",
+        "id": "r/box",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "androidx.compose.foundation.layout.Column",
+        "id": "r/column",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "androidx.compose.foundation.layout.Row",
+        "id": "r/row",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.widget.ScrollView",
+        "id": "r/scroll",
+        "role": "other"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.widget.GridLayout",
+        "id": "r/grid",
+        "role": "other"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "id": "r/noclass",
+        "role": "other"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    }
+  ],
+  "clickable": false,
+  "enabled": true,
+  "focused": false,
+  "selected": false,
+  "visible": true
+}

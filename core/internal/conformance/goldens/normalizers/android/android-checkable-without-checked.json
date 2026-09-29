@@ -1,0 +1,13 @@
+{
+  "attributes": {
+    "class": "android.widget.Switch",
+    "label": "Airplane mode",
+    "role": "switch"
+  },
+  "children": [],
+  "clickable": true,
+  "enabled": true,
+  "focused": false,
+  "selected": false,
+  "visible": true
+}

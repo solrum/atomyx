@@ -1,0 +1,8 @@
+{
+  "name": "clamp-above-max",
+  "description": "a value above max clamps down to max",
+  "function": "clamp",
+  "value": 500,
+  "min": 40,
+  "max": 100
+}

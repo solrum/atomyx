@@ -1,0 +1,5 @@
+{
+  "name": "cast-structure-nested-number-of-string",
+  "description": "number() applied to the result of string() round-trips a number through text.",
+  "expr": "number(string(5))"
+}

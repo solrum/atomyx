@@ -1,0 +1,93 @@
+{
+  "parsed": {
+    "_stepLines": [
+      5,
+      6,
+      7,
+      9,
+      13,
+      18,
+      19,
+      21,
+      27,
+      32,
+      33
+    ],
+    "appId": "",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Untitled script",
+    "steps": [
+      {
+        "command": "launchApp"
+      },
+      {
+        "command": "waitFor",
+        "selector": {
+          "label": "Sign up",
+          "text": "Sign up"
+        }
+      },
+      {
+        "command": "tap",
+        "selector": {
+          "label": "Sign up",
+          "text": "Sign up"
+        }
+      },
+      {
+        "command": "type",
+        "into": {
+          "id": "signup_email"
+        },
+        "text": "${email}"
+      },
+      {
+        "command": "type",
+        "into": {
+          "id": "signup_password"
+        },
+        "text": "${password}"
+      },
+      {
+        "as": "signupRsp",
+        "command": "capture",
+        "pattern": "POST /api/v1/auth/signup"
+      },
+      {
+        "command": "tap",
+        "selector": {
+          "label": "Create account",
+          "text": "Create account"
+        }
+      },
+      {
+        "body": {
+          "$.user.email": "${email}"
+        },
+        "command": "assertApi",
+        "from": "signupRsp",
+        "status": 201
+      },
+      {
+        "command": "extract",
+        "from": "signupRsp",
+        "values": {
+          "newUserId": "$.user.id"
+        }
+      },
+      {
+        "command": "waitFor",
+        "selector": {
+          "label": "Welcome",
+          "text": "Welcome"
+        }
+      },
+      {
+        "command": "screenshot",
+        "label": "account-created"
+      }
+    ]
+  },
+  "valid": true
+}

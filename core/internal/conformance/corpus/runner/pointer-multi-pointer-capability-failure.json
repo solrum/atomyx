@@ -1,0 +1,10 @@
+{
+  "name": "pointer-multi-pointer-capability-failure",
+  "description": "a multi-pointer gesture fails with a fixed detail when the driver does not report canMultiPointer",
+  "yaml": "appId: com.test\nname: pointer multi unsupported\nenv: {}\n---\n- launchApp\n- pointer:\n    touches:\n      - id: p1\n        actions:\n          - down:\n              x: 10\n              y: 10\n          - up\n      - id: p2\n        actions:\n          - down:\n              x: 20\n              y: 20\n          - up\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

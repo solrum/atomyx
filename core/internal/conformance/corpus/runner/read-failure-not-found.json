@@ -1,0 +1,10 @@
+{
+  "name": "read-failure-not-found",
+  "description": "read fails when the selector never resolves within its own wait budget",
+  "yaml": "appId: com.test\nname: read failure\nenv: {}\n---\n- read:\n    selector:\n      id: nope\n    as: v\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

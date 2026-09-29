@@ -1,0 +1,17 @@
+{
+  "name": "find-in-tree-no-match",
+  "description": "an unresolved selector reports found:false with no node, bounds, or point fields",
+  "function": "find-in-tree",
+  "selector": { "id": "does_not_exist" },
+  "tree": {
+    "attributes": { "role": "container" },
+    "children": [
+      {
+        "attributes": { "role": "button", "id": "login_btn", "text": "Sign in", "bounds": "10,20,110,60" },
+        "children": [],
+        "enabled": true,
+        "clickable": true
+      }
+    ]
+  }
+}

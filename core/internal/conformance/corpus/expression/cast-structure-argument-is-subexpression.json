@@ -1,0 +1,5 @@
+{
+  "name": "cast-structure-argument-is-subexpression",
+  "description": "a cast's argument may be a full comparison subexpression.",
+  "expr": "bool(1 == 1)"
+}

@@ -1,0 +1,5 @@
+{
+  "name": "precondition-inline-setup-with-policy-valid",
+  "description": "precondition with an inline setup step list and an explicit policy.",
+  "yaml": "appId: com.example.app\nname: Smoke with inline precondition\nenv: {}\npreconditions:\n  - check: { visible: \"Home\" }\n    setup:\n      - tap: \"Skip\"\n    policy: always\n---\n- launchApp\n"
+}

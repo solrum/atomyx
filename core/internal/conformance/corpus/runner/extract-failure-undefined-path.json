@@ -1,0 +1,15 @@
+{
+  "name": "extract-failure-undefined-path",
+  "description": "extract fails the step when its dot-path resolves to undefined in the captured request",
+  "yaml": "appId: com.test\nname: extract failure\nproxy: optional\nenv: {}\n---\n- launchApp\n- capture: \"GET /x as: r\"\n- extract:\n    from: r\n    values:\n      missing: \"$.nope\"\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  },
+  "network": {
+    "requests": [
+      { "method": "GET", "url": "/x", "status": 200, "headers": {}, "body": {}, "timestampMs": 0 }
+    ]
+  }
+}

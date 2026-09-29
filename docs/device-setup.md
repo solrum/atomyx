@@ -8,13 +8,13 @@ One-time setup to get Atomyx ready for testing on Android or iOS.
 # Build everything
 make build
 
-# Android — plug device + run
+# Android, then plug device + run
 make ready-android
 
-# iOS simulator — boot sim + run
+# iOS simulator, then boot sim + run
 make ready-ios-sim
 
-# iOS physical device — setup once, then run
+# iOS physical device, setup once, then run
 make ready-ios
 
 # With API capture (mitmproxy)
@@ -75,7 +75,7 @@ atomyx run \
 2. **Edit `device.env`:**
    ```bash
    DEVICE_UDID=<your-device-udid>    # idevice_id -l
-   DEV_TEAM=<your-team-id>           # developer.apple.com → Membership
+   DEV_TEAM=<your-team-id>           # developer.apple.com, then Membership
    BUNDLE_ID=com.example.atomyx      # any bundle id under your team
    ```
 
@@ -87,7 +87,7 @@ atomyx run \
    ```
 
 4. **Trust developer cert on device:**
-   Settings → General → VPN & Device Management → Trust
+   Settings, then General, then VPN & Device Management, then Trust
 
 ### Run
 ```bash
@@ -120,25 +120,25 @@ API responses in your test scripts.
    ```
 
    On device (proxy OFF):
-   - Safari → `http://<your-mac-ip>:9999/mitmproxy-ca-cert.pem`
-   - Settings → General → VPN & Device Management → Install profile
-   - Settings → General → About → Certificate Trust Settings → Enable "mitmproxy"
+   - Safari, then `http://<your-mac-ip>:9999/mitmproxy-ca-cert.pem`
+   - Settings, then General, then VPN & Device Management, then Install profile
+   - Settings, then General, then About, then Certificate Trust Settings, then Enable "mitmproxy"
 
 3. **Configure proxy on device:**
-   Settings → Wi-Fi → [network] → HTTP Proxy → Manual
+   Settings, then Wi-Fi, then [network], then HTTP Proxy, then Manual
    - Server: `<your-mac-ip>` (find via `ifconfig en0`)
    - Port: `8889`
 
-4. **For iOS physical device — Manual signing:**
+4. **For iOS physical device, manual signing:**
 
-   Edit `platforms/ios-agent/device.env`:
+   Edit `device.env`:
    ```bash
    CODE_SIGN_STYLE=Manual
    PROVISIONING_PROFILE_SPECIFIER=<your-wildcard-profile-name>
    ```
 
    Download a wildcard provisioning profile from
-   developer.apple.com → Profiles if you don't have one.
+   developer.apple.com, then Profiles, if you don't have one.
 
 ### Run with capture
 ```bash
@@ -155,10 +155,10 @@ atomyx run \
 ### How it works
 
 ```
-Device app → HTTP proxy (mitmproxy on Mac:8889)
-                ↓
-         JSON-lines file ← Atomyx FileCapture reads
-                ↓
+Device app -> HTTP proxy (mitmproxy on Mac:8889)
+                v
+         JSON-lines file <- Atomyx FileCapture reads
+                v
          capture + assertApi commands validate
 ```
 
@@ -197,11 +197,11 @@ make stop
 - iOS: check `idevice_id -l`, trust Mac on device
 
 ### "Developer cert not trusted"
-- Turn proxy OFF → Settings → VPN & Device Management → Trust → proxy ON
+- Turn proxy OFF, then Settings, then VPN & Device Management, then Trust, then proxy ON
 - Only needed once per device per signing identity
 
-### "capture timeout — 0 requests"
-- Check proxy configured on device (Wi-Fi → HTTP Proxy → Manual)
+### "capture timeout with 0 requests"
+- Check proxy configured on device (Wi-Fi, then HTTP Proxy, then Manual)
 - Check mitmproxy CA trusted on device
 - Check `mitmdump` is running (`make mitm` or `make ready-*-capture`)
 

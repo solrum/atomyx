@@ -1,0 +1,18 @@
+{
+  "name": "hash-visible-leaves-multi-leaf",
+  "description": "the tree-signature hash of a multi-leaf tree is order-independent and identical between Go and TypeScript",
+  "function": "hashVisibleLeaves",
+  "tree": {
+    "attributes": { "role": "container", "bounds": "0,0,430,932" },
+    "children": [
+      { "attributes": { "text": "Hello", "bounds": "0,100,430,140" }, "children": [] },
+      { "attributes": { "text": "World", "label": "greeting", "bounds": "0,200,430,240" }, "children": [] },
+      {
+        "attributes": { "role": "container", "bounds": "0,300,430,500" },
+        "children": [
+          { "attributes": { "text": "Nested", "bounds": "0,300,430,340" }, "children": [] }
+        ]
+      }
+    ]
+  }
+}

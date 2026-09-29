@@ -1,0 +1,5 @@
+{
+  "name": "structerr-trailing-and-keyword",
+  "description": "a trailing and keyword with no right operand.",
+  "expr": "1 and"
+}

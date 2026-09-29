@@ -1,0 +1,5 @@
+{
+  "name": "cast-number-invalid-whitespace-only-string",
+  "description": "number() rejects a string containing only whitespace.",
+  "expr": "number(\"  \")"
+}

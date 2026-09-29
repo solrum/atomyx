@@ -1,7 +1,7 @@
 # atomyx-sim-hid
 
 Persistent helper binary that dispatches touch events into the iOS Simulator
-via `SimDeviceLegacyHIDClient` — the same private SimulatorKit path
+via `SimDeviceLegacyHIDClient`, which is the same private SimulatorKit path
 Simulator.app uses internally.
 
 ## What it does
@@ -40,14 +40,14 @@ use distinct ids so iOS threads each touch through the HID stack correctly.
 
 Derived from baguette (Apache 2.0). Core path:
 
-1. `IOHIDEventCreateDigitizerEvent` — build a parent digitizer event.
-2. `IOHIDEventCreateDigitizerFingerEvent` — build a finger child, append via
+1. `IOHIDEventCreateDigitizerEvent` builds a parent digitizer event.
+2. `IOHIDEventCreateDigitizerFingerEvent` builds a finger child, appended via
    `IOHIDEventAppendEvent`.
-3. `IndigoHIDMessageForTrackpadEventFromHIDEventRef` — wrap the IOHIDEvent
+3. `IndigoHIDMessageForTrackpadEventFromHIDEventRef` wraps the IOHIDEvent
    pair into the Indigo message format SimulatorKit expects.
 4. Patch two byte slots the wrapper leaves uninitialised:
-   - offsets 0x6c and 0x10c → `UInt32(0x32)` (`IndigoHIDTouchTarget`)
-   - offsets 0x3a/0x3b and 0xda/0xdb → edge bitmask (0x00 for interior touches)
+   - offsets 0x6c and 0x10c become `UInt32(0x32)` (`IndigoHIDTouchTarget`)
+   - offsets 0x3a/0x3b and 0xda/0xdb become an edge bitmask (0x00 for interior touches)
 5. `SimDeviceLegacyHIDClient.sendWithMessage:freeWhenDone:completionQueue:completion:`
 
 ## Xcode / iOS version behaviour
@@ -87,5 +87,5 @@ pointing at the executable inside the bundle.
   SimulatorKit framework inside the Xcode bundle).
 - Gesture dispatch requires the target simulator to be booted.
 - Only interior touches are dispatched; edge-flagged gestures (home indicator
-  swipe, control centre pull) are not wired in this binary — those remain
+  swipe, control centre pull) are not wired in this binary. Instead, those remain
   on the XCUITest path for now.

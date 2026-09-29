@@ -1,0 +1,140 @@
+{
+  "name": "android-nested-recursion-order",
+  "description": "sibling order preserved and absent/null/empty children all normalize to an empty list",
+  "rawTree": {
+    "elementId": "root",
+    "className": "android.widget.FrameLayout",
+    "clickable": false,
+    "enabled": true,
+    "focused": false,
+    "selected": false,
+    "checkable": false,
+    "checked": false,
+    "visible": true,
+    "isIme": false,
+    "children": [
+      {
+        "elementId": "l1",
+        "className": "androidx.recyclerview.widget.RecyclerView",
+        "clickable": false,
+        "enabled": true,
+        "focused": false,
+        "selected": false,
+        "checkable": false,
+        "checked": false,
+        "visible": true,
+        "isIme": false,
+        "children": [
+          {
+            "elementId": "r1",
+            "className": "android.widget.LinearLayout",
+            "clickable": true,
+            "enabled": true,
+            "focused": false,
+            "selected": true,
+            "checkable": false,
+            "checked": false,
+            "visible": true,
+            "isIme": false,
+            "children": [
+              {
+                "elementId": "r1t",
+                "className": "android.widget.TextView",
+                "text": "first",
+                "clickable": false,
+                "enabled": true,
+                "focused": false,
+                "selected": false,
+                "checkable": false,
+                "checked": false,
+                "visible": true,
+                "isIme": false,
+                "children": []
+              },
+              {
+                "elementId": "r1i",
+                "className": "android.widget.ImageView",
+                "contentDesc": "avatar",
+                "clickable": false,
+                "enabled": true,
+                "focused": false,
+                "selected": false,
+                "checkable": false,
+                "checked": false,
+                "visible": true,
+                "isIme": false,
+                "children": []
+              }
+            ]
+          },
+          {
+            "elementId": "r2",
+            "className": "android.widget.LinearLayout",
+            "clickable": true,
+            "enabled": true,
+            "focused": false,
+            "selected": false,
+            "checkable": false,
+            "checked": false,
+            "visible": true,
+            "isIme": false,
+            "children": [
+              {
+                "elementId": "r2t",
+                "className": "android.widget.TextView",
+                "text": "second",
+                "clickable": false,
+                "enabled": true,
+                "focused": false,
+                "selected": false,
+                "checkable": false,
+                "checked": false,
+                "visible": true,
+                "isIme": false,
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "elementId": "empty",
+        "className": "android.widget.FrameLayout",
+        "clickable": false,
+        "enabled": true,
+        "focused": false,
+        "selected": false,
+        "checkable": false,
+        "checked": false,
+        "visible": true,
+        "isIme": false,
+        "children": []
+      },
+      {
+        "elementId": "nochildkey",
+        "className": "android.widget.FrameLayout",
+        "clickable": false,
+        "enabled": true,
+        "focused": false,
+        "selected": false,
+        "checkable": false,
+        "checked": false,
+        "visible": true,
+        "isIme": false
+      },
+      {
+        "elementId": "nullchild",
+        "className": "android.widget.FrameLayout",
+        "clickable": false,
+        "enabled": true,
+        "focused": false,
+        "selected": false,
+        "checkable": false,
+        "checked": false,
+        "visible": true,
+        "isIme": false,
+        "children": null
+      }
+    ]
+  }
+}

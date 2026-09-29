@@ -874,10 +874,10 @@ pub async fn projects_remove(
 /// the raw JSON string exactly as authored under
 /// `apps/studio/src/domain/features/theme/built-ins/*.json`.
 const BUILT_IN_THEMES: &[&str] = &[
-    include_str!("../../src/domain/features/theme/built-ins/intellij-darcula.json"),
-    include_str!("../../src/domain/features/theme/built-ins/intellij-light.json"),
-    include_str!("../../src/domain/features/theme/built-ins/atomyx-dark-teal.json"),
-    include_str!("../../src/domain/features/theme/built-ins/atomyx-dark-violet.json"),
+    include_str!("../../src/domain/features/theme/built-ins/theme-intellij-darcula.json"),
+    include_str!("../../src/domain/features/theme/built-ins/theme-intellij-light.json"),
+    include_str!("../../src/domain/features/theme/built-ins/theme-atomyx-dark-teal.json"),
+    include_str!("../../src/domain/features/theme/built-ins/theme-atomyx-dark-violet.json"),
 ];
 
 fn user_themes_dir(app: &tauri::AppHandle) -> StudioResult<std::path::PathBuf> {

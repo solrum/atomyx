@@ -1,0 +1,176 @@
+{
+  "name": "ios-merged-leaf-geometry",
+  "description": "isMergedSemanticLeaf height gate (inclusive 70px) and its restriction to staticText/image",
+  "rawTree": {
+    "elementType": "scrollView",
+    "identifier": "geo-root",
+    "children": [
+      {
+        "elementType": "staticText",
+        "identifier": "g01",
+        "label": "Card title",
+        "bounds": {
+          "left": 0,
+          "top": 0,
+          "right": 200,
+          "bottom": 70
+        }
+      },
+      {
+        "elementType": "staticText",
+        "identifier": "g02",
+        "label": "Card title",
+        "bounds": {
+          "left": 0,
+          "top": 0,
+          "right": 200,
+          "bottom": 69
+        }
+      },
+      {
+        "elementType": "staticText",
+        "identifier": "g03",
+        "label": "Card title",
+        "bounds": {
+          "left": 0,
+          "top": 100,
+          "right": 200,
+          "bottom": 169.5
+        }
+      },
+      {
+        "elementType": "staticText",
+        "identifier": "g04",
+        "label": "Card title",
+        "bounds": {
+          "left": 0,
+          "top": 100,
+          "right": 200,
+          "bottom": 170.5
+        }
+      },
+      {
+        "elementType": "image",
+        "identifier": "g05",
+        "bounds": {
+          "left": 0,
+          "top": 0,
+          "right": 200,
+          "bottom": 70
+        }
+      },
+      {
+        "elementType": "image",
+        "identifier": "g06",
+        "label": "Logo",
+        "bounds": {
+          "left": 0,
+          "top": 0,
+          "right": 40,
+          "bottom": 40
+        }
+      },
+      {
+        "elementType": "button",
+        "identifier": "g07",
+        "label": "Tall button",
+        "bounds": {
+          "left": 0,
+          "top": 0,
+          "right": 200,
+          "bottom": 300
+        }
+      },
+      {
+        "elementType": "cell",
+        "identifier": "g08",
+        "label": "Tall cell",
+        "bounds": {
+          "left": 0,
+          "top": 0,
+          "right": 393,
+          "bottom": 400
+        }
+      },
+      {
+        "elementType": "staticText",
+        "identifier": "g09",
+        "label": "Card title",
+        "bounds": {
+          "left": 0,
+          "top": 0,
+          "right": 200,
+          "bottom": 150
+        },
+        "children": [
+          {
+            "elementType": "image",
+            "identifier": "g09c",
+            "label": "Icon"
+          }
+        ]
+      },
+      {
+        "elementType": "staticText",
+        "identifier": "g10",
+        "label": "Card title"
+      },
+      {
+        "elementType": "staticText",
+        "identifier": "g11",
+        "traits": [
+          "staticText"
+        ],
+        "label": "Trait says text",
+        "bounds": {
+          "left": 0,
+          "top": 0,
+          "right": 200,
+          "bottom": 150
+        }
+      },
+      {
+        "elementType": "staticText",
+        "identifier": "g12",
+        "traits": [
+          "button"
+        ],
+        "label": "Trait says button",
+        "bounds": {
+          "left": 0,
+          "top": 0,
+          "right": 200,
+          "bottom": 150
+        }
+      },
+      {
+        "elementType": "staticText",
+        "identifier": "g13",
+        "traits": [
+          "header"
+        ],
+        "label": "Trait says header",
+        "bounds": {
+          "left": 0,
+          "top": 0,
+          "right": 200,
+          "bottom": 150
+        }
+      },
+      {
+        "elementType": "image",
+        "identifier": "g14",
+        "traits": [
+          "image"
+        ],
+        "label": "Trait says image",
+        "bounds": {
+          "left": 0,
+          "top": 0,
+          "right": 200,
+          "bottom": 150
+        }
+      }
+    ]
+  }
+}

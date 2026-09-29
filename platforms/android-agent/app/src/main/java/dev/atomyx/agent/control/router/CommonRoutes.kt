@@ -4,6 +4,7 @@ import com.google.gson.Gson
 import com.google.gson.JsonObject
 import dev.atomyx.agent.control.AtomyxServices
 import dev.atomyx.agent.control.GestureRunner
+import dev.atomyx.agent.control.SystemActionDispatcher
 import fi.iki.elonen.NanoHTTPD
 
 private val gson = Gson()
@@ -47,7 +48,7 @@ class PingRoute : Route {
             "ok" to true,
             "agent" to "atomyx-android",
             "sdkInt" to android.os.Build.VERSION.SDK_INT,
-            // `accessibility` names the one current mechanism — the
+            // `accessibility` names the one current mechanism: the
             // AccessibilityService gesture surface. Future backends
             // (e.g. a UiAutomation-based injector) would announce
             // themselves here without changing the wire shape.
@@ -67,7 +68,7 @@ class TreeRoute : Route {
         // Always returns the hierarchical RawElementDto tree.
         // `dumpCompact` stays on UiTreeService as an internal helper
         // for GestureDispatcher's on-screen-key fallback but is not
-        // exposed on the wire — the host consumes the hierarchical
+        // exposed on the wire. The host consumes the hierarchical
         // form exclusively.
         val payload = services.uiTree.dumpTree()
         return RouteResponse.ok(toJson(payload))
@@ -137,7 +138,7 @@ class AppsRoute : Route {
 // ────────────────────────────────────────────────────────────────────
 
 /**
- * Shared serialiser for `GestureRunner.DispatchResult` → route
+ * Shared serialiser that maps `GestureRunner.DispatchResult` to a route
  * response map. Tap / swipe / long-press / dispatch_gesture all
  * reach the same runner pipeline now; they all surface the same
  * `code` set (`gesture_rejected` / `gesture_cancelled` /
@@ -237,7 +238,10 @@ class HideKeyboardRoute : Route {
  * ```
  *
  * Response shape:
- *   - `{"ok":true,"pointers":N}` on successful completion.
+ *   - `{"ok":true,"pointers":N}` on successful completion, plus a
+ *     `capturedImages` array when the request carried at least one
+ *     `capture` waypoint: `[{"base64":"...","mimeType":"image/jpeg"}]`,
+ *     one entry per `capture` waypoint in dispatch order.
  *   - `{"ok":false,"reason":"...","code":"..."}` on rejection,
  *     cancellation, or timeout. `code` is one of
  *     `gesture_rejected` (validation or platform refusal),
@@ -258,8 +262,17 @@ class DispatchGestureRoute : Route {
                 "code" to "gesture_rejected",
             )))
 
-        val result = services.gestureRunner.dispatch(pointers)
-        return RouteResponse.ok(toJson(dispatchResultToMap(result, mapOf("pointers" to pointers.size))))
+        val outcome = services.gestureRunner.dispatch(pointers)
+        val extra = mutableMapOf<String, Any?>("pointers" to pointers.size)
+        if (outcome.capturedImages.isNotEmpty()) {
+            extra["capturedImages"] = outcome.capturedImages.map {
+                mapOf(
+                    "base64" to android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP),
+                    "mimeType" to "image/jpeg",
+                )
+            }
+        }
+        return RouteResponse.ok(toJson(dispatchResultToMap(outcome.result, extra)))
     }
 
     private fun parsePointers(body: JsonObject): List<GestureRunner.PointerPath>? {
@@ -326,8 +339,13 @@ class KeyRoute : Route {
     override val path = "/actions/key"
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
         val body = parseBody(request.body)
-        services.system.pressKey(body.get("key").asString)
-        return RouteResponse.ok(toJson(mapOf("ok" to true)))
+        val key = body.get("key").asString
+        return when (val outcome = services.system.pressKey(key)) {
+            is SystemActionDispatcher.KeyPressOutcome.Dispatched ->
+                RouteResponse.ok(toJson(mapOf("ok" to true)))
+            is SystemActionDispatcher.KeyPressOutcome.Unsupported ->
+                RouteResponse.badRequest(SystemActionDispatcher.unsupportedKeyMessage(outcome.key))
+        }
     }
 }
 
@@ -336,8 +354,13 @@ class LaunchRoute : Route {
     override val path = "/actions/launch"
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
         val body = parseBody(request.body)
-        services.system.launchApp(body.get("packageName").asString)
-        return RouteResponse.ok(toJson(mapOf("ok" to true)))
+        val packageName = body.get("packageName").asString
+        return when (val outcome = services.system.launchApp(packageName)) {
+            is SystemActionDispatcher.LaunchOutcome.Launched ->
+                RouteResponse.ok(toJson(mapOf("ok" to true)))
+            is SystemActionDispatcher.LaunchOutcome.NoLaunchableActivity ->
+                RouteResponse.badRequest(SystemActionDispatcher.noLaunchableActivityMessage(outcome.packageName))
+        }
     }
 }
 
@@ -346,7 +369,7 @@ class ForceStopRoute : Route {
     override val path = "/actions/force_stop"
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
         val body = parseBody(request.body)
-        services.system.forceStopApp(body.get("packageName").asString)
-        return RouteResponse.ok(toJson(mapOf("ok" to true)))
+        val result = services.system.forceStopApp(body.get("packageName").asString)
+        return RouteResponse.ok(toJson(mapOf("ok" to result.success, "reason" to result.reason)))
     }
 }

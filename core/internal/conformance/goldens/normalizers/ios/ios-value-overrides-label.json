@@ -1,0 +1,114 @@
+{
+  "attributes": {
+    "class": "scrollView",
+    "id": "value-root",
+    "role": "container"
+  },
+  "children": [
+    {
+      "attributes": {
+        "class": "textField",
+        "hint": "you@example.com",
+        "id": "v01",
+        "label": "Email",
+        "role": "text-field",
+        "text": "user@example.com",
+        "value": "user@example.com"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "textField",
+        "hint": "you@example.com",
+        "id": "v02",
+        "label": "Email",
+        "role": "text-field"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "staticText",
+        "id": "v03",
+        "role": "text",
+        "text": "Welcome back"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "staticText",
+        "id": "v04",
+        "role": "text",
+        "text": "42",
+        "value": "42"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "heading",
+        "id": "v05",
+        "role": "heading",
+        "text": "Overridden",
+        "value": "Overridden"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "button",
+        "id": "v06",
+        "label": "Play",
+        "role": "button",
+        "text": "Paused",
+        "value": "Paused"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "bounds": "0,0,200,150",
+        "class": "staticText",
+        "id": "v07",
+        "label": "Card title",
+        "role": "container",
+        "text": "Card value",
+        "value": "Card value"
+      },
+      "children": [],
+      "clickable": false
+    },
+    {
+      "attributes": {
+        "class": "switch",
+        "id": "v08",
+        "label": "Wi-Fi",
+        "role": "switch",
+        "text": "1",
+        "value": "1"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "image",
+        "id": "v09",
+        "role": "image",
+        "text": "only-a-value",
+        "value": "only-a-value"
+      },
+      "children": [],
+      "clickable": false
+    }
+  ],
+  "clickable": false
+}

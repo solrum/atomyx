@@ -1,0 +1,10 @@
+{
+  "name": "pointer-hold-then-drag-dispatches-gesture",
+  "description": "a `down, wait, move, up` sequence (a stationary hold followed by a drag) dispatches through the waypoint-based gesture path with an explicit same-coordinate hold segment, not through the coordinate-only Swipe primitive",
+  "yaml": "appId: com.test\nname: pointer hold then drag\nenv: {}\n---\n- launchApp\n- pointer:\n    touches:\n      - actions:\n          - down:\n              x: 10\n              y: 10\n          - wait: 800\n          - move:\n              x: 100\n              y: 200\n          - up\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "compile-selector-role-constraint-and",
+  "description": "role is AND-ed onto the content filter, not tried as a separate priority level, narrowing two text matches to one",
+  "function": "compileSelector",
+  "selector": { "text": "Sign in", "role": "button" },
+  "tree": {
+    "attributes": { "role": "container" },
+    "children": [
+      {
+        "attributes": { "role": "button", "id": "login_btn", "text": "Sign in" },
+        "children": [],
+        "enabled": true,
+        "clickable": true
+      },
+      {
+        "attributes": { "role": "cell", "text": "Sign in" },
+        "children": []
+      }
+    ]
+  }
+}

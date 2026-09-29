@@ -1,0 +1,5 @@
+{
+  "name": "invalid-empty-apps",
+  "description": "A config with zero app entries fails the apps.min(1) rule.",
+  "yaml": "project: Demo\napps: []\nenvironments: {}\n"
+}

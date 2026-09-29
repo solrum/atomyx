@@ -1,0 +1,31 @@
+{
+  "config": {
+    "apps": [
+      {
+        "appId": "com.example.app",
+        "id": "main",
+        "platform": "android"
+      },
+      {
+        "appId": "com.example.alt",
+        "id": "alt",
+        "platform": "ios"
+      }
+    ],
+    "environments": {
+      "prod": {
+        "app": "alt"
+      },
+      "staging": {
+        "app": "main"
+      }
+    },
+    "project": "Demo"
+  },
+  "envRefError": null,
+  "found": true,
+  "issuePaths": [],
+  "resolved": null,
+  "schemaValid": true,
+  "selectError": null
+}

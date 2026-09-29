@@ -1,0 +1,5 @@
+{
+  "name": "prec-additive-left-associative",
+  "description": "subtraction is left-associative.",
+  "expr": "10 - 3 - 2"
+}

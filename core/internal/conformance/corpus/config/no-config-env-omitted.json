@@ -1,0 +1,5 @@
+{
+  "name": "no-config-env-omitted",
+  "description": "No config file found and --env omitted applies no environment, without error.",
+  "noConfig": true
+}

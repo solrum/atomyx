@@ -1,0 +1,11 @@
+{
+  "name": "cast-string-max-float",
+  "description": "string() renders the largest finite double in exponential notation.",
+  "expr": "string(maxFloat)",
+  "variables": {
+    "maxFloat": {
+      "type": "number",
+      "number": "1.7976931348623157e+308"
+    }
+  }
+}

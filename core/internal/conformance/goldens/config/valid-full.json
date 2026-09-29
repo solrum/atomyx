@@ -1,0 +1,77 @@
+{
+  "config": {
+    "apps": [
+      {
+        "appId": "com.example.app",
+        "artifact": "/builds/app.apk",
+        "id": "main",
+        "platform": "android"
+      },
+      {
+        "appId": "com.example.alt",
+        "id": "alt",
+        "platform": "ios"
+      }
+    ],
+    "dataRoots": [
+      "fixtures"
+    ],
+    "environments": {
+      "prod": {
+        "app": "alt"
+      },
+      "staging": {
+        "app": "main",
+        "device": "emulator-5554",
+        "proxy": "staging-proxy",
+        "vars": {
+          "apiUrl": "https://staging.example.com"
+        }
+      }
+    },
+    "launch": {
+      "clearData": true,
+      "mode": "fresh"
+    },
+    "preconditions": "skip",
+    "project": "Demo",
+    "report": {
+      "formats": [
+        "html",
+        "json"
+      ],
+      "outDir": "reports"
+    },
+    "suites": {
+      "regression": {
+        "globs": [
+          "tests/regression/**"
+        ]
+      },
+      "smoke": {
+        "tags": [
+          "smoke"
+        ]
+      }
+    },
+    "testRoots": [
+      "tests"
+    ]
+  },
+  "envRefError": null,
+  "found": true,
+  "issuePaths": [],
+  "resolved": {
+    "appId": "com.example.app",
+    "artifact": "/builds/app.apk",
+    "deviceId": "emulator-5554",
+    "name": "staging",
+    "platform": "android",
+    "proxy": "staging-proxy",
+    "vars": {
+      "apiUrl": "https://staging.example.com"
+    }
+  },
+  "schemaValid": true,
+  "selectError": null
+}

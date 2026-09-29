@@ -1,0 +1,11 @@
+{
+  "name": "lex-identifier-with-underscore",
+  "description": "an identifier variable name containing an underscore.",
+  "expr": "_foo",
+  "variables": {
+    "_foo": {
+      "type": "number",
+      "number": "1"
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "events": [
+    {
+      "event": "deviceConnected",
+      "payload": {
+        "id": "mock-1",
+        "kind": "emulator",
+        "name": "Mock Device",
+        "platform": "android",
+        "state": "online"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "method": "listDevices",
+      "result": [
+        {
+          "id": "mock-1",
+          "kind": "emulator",
+          "name": "Mock Device",
+          "platform": "android",
+          "state": "online"
+        }
+      ]
+    },
+    {
+      "method": "selectDevice",
+      "result": {
+        "id": "mock-1",
+        "kind": "emulator",
+        "name": "Mock Device",
+        "platform": "android",
+        "state": "online"
+      }
+    },
+    {
+      "method": "deselectDevice",
+      "result": null
+    }
+  ]
+}

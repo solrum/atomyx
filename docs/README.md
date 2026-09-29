@@ -1,53 +1,48 @@
-# Atomyx — User Documentation
+# Atomyx: user documentation
 
-This directory holds **end-user documentation** for the Atomyx
-framework: getting started, installation, MCP setup, tool usage,
-configuration, and integration guides.
+## Purpose
 
-**Contributor / implementation documentation lives in
-[`.claude/docs/`](../.claude/docs/)** — that includes the
-internal architecture, contributor workflow, iOS implementation
-deep dive, known pitfalls, and tool implementation reference.
-The split exists so end users opening `docs/` see only the
-material relevant to USING Atomyx, while contributors and AI
-agents working ON Atomyx find the deeper context in `.claude/`.
+Index of the end-user documentation for Atomyx: installing the core
+runtime, driving a device through MCP, and writing YAML scripts.
+Read this file to find the right doc, not to learn the product
+itself.
+
+Contributor and implementation documentation (architecture, internal
+protocols, pitfalls) lives in [`.claude/docs/`](../.claude/docs/)
+instead. The split exists so an end user opening this directory sees
+only material about using Atomyx, while a contributor works from the
+deeper context under `.claude/`.
+
+## Start here
+
+[`getting-started.md`](./getting-started.md) walks from a fresh
+clone to an AI agent driving a device, or a YAML script running
+against one.
+
+## Reference
+
+| File | Answers |
+|---|---|
+| [`cli.md`](./cli.md) | What does the `atomyx` command and each of its flags do? |
+| [`yml-script-reference.md`](./yml-script-reference.md) | What does the YAML script format support? |
+| [`pointer.md`](./pointer.md) | How do I author a specific touch gesture? |
+| [`device-setup.md`](./device-setup.md) | How do I prepare an Android or iOS device to be driven? |
+| [`mcp-tools.md`](./mcp-tools.md) | What does each MCP tool do and how does it behave? |
+| [`known-limitations.md`](./known-limitations.md) | What does Atomyx currently not do, or do wrongly, that a user can hit, and how do I work around it? |
 
 ## Personas served by this directory
 
-- **Pure Developer** — installing `@atomyx/cli`, driving
-  devices via MCP, scripting test flows.
-- **QC Manager** — installing the test-management CLI,
-  organizing test cases (when the test-management module ships).
-- **Power User** — installing the Studio GUI for the visual
-  experience (when the studio module ships).
-- **CI Pipeline Engineer** — wiring Atomyx into headless test
-  runs and result reporting.
+- **Script author**: writing YAML tests against the `atomyx` CLI or
+  in CI.
+- **Agent operator**: wiring the `atomyx-mcp` server into an AI
+  client and driving a device conversationally.
+- **Device maintainer**: installing and troubleshooting the Android
+  and iOS agents.
 
-## Planned content
+A separate desktop IDE, Atomyx Studio, is under development and is
+not covered by this directory.
 
-When real user documentation lands, it slots in here:
-
-- `getting-started.md` — install, first run, hello-world MCP
-  session
-- `install/` — per-platform install guides (macOS, Linux,
-  Windows, Docker)
-- `mcp-setup.md` — wiring Atomyx into Claude Code, Cursor,
-  Continue, or other MCP clients
-- `tools/` — user-facing reference for each MCP tool (the
-  agent's view, not the implementer's)
-- `selectors.md` — selector patterns + priority broadening
-  from a user perspective
-- `device-setup/`
-  - `android.md` — installing the Atomyx Android APK,
-    granting accessibility, troubleshooting
-  - `ios.md` — Xcode setup, code signing, real device
-    provisioning
-- `recipes/` — common test patterns (login flow, payment,
-  scroll-to-element, etc.)
-- `troubleshooting.md` — common errors with fixes
-- `cli.md` — `atomyx driver` command reference
-
-Currently empty pending real content. See
-[architecture.md](../.claude/docs/architecture.md) for the high-level
-contract and [`.claude/docs/`](../.claude/docs/) for the
-contributor view.
+See [`../.claude/docs/architecture.md`](../.claude/docs/architecture.md)
+for the system's design contract, and
+[`../.claude/docs/`](../.claude/docs/) generally for the contributor
+view.

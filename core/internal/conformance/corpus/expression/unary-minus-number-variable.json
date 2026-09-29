@@ -1,0 +1,11 @@
+{
+  "name": "unary-minus-number-variable",
+  "description": "unary minus on a number variable.",
+  "expr": "-n",
+  "variables": {
+    "n": {
+      "type": "number",
+      "number": "5"
+    }
+  }
+}

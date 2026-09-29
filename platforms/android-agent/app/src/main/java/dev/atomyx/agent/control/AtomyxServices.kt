@@ -7,8 +7,8 @@ import dev.atomyx.agent.service.AtomyxAccessibilityService
  * lifecycle tied to the AccessibilityService instance. Routes receive an
  * AtomyxServices reference instead of constructing dependencies themselves.
  *
- * Resolved lazily per accessibility instance — when the user toggles
- * accessibility off/on, a new instance is created.
+ * Resolved lazily per accessibility instance, since a new instance is
+ * created each time the user toggles accessibility off/on.
  */
 class AtomyxServices(val accessibility: AtomyxAccessibilityService) {
 
@@ -21,8 +21,8 @@ class AtomyxServices(val accessibility: AtomyxAccessibilityService) {
     val system: SystemActionDispatcher = SystemActionDispatcher(accessibility)
 
     init {
-        // Cache invalidation hook — fires when the accessibility service sees
-        // a window state/content/visibility change, forces next dump to rebuild.
+        // Cache invalidation hook that fires when the accessibility service sees
+        // a window state/content/visibility change, forcing the next dump to rebuild.
         accessibility.onTreeMaybeChanged = { uiTree.markDirty() }
     }
 

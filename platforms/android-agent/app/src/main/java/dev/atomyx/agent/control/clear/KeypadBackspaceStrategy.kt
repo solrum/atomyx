@@ -14,7 +14,7 @@ class KeypadBackspaceStrategy : ClearTextStrategy {
         val summary = context.uiTree.dumpCompact()
         val backspace = findBackspaceKey(summary)
             ?: return ClearResult.Failed("no on-screen backspace key found")
-        // One extra tap as a safety margin — some inputs append a leading
+        // One extra tap as a safety margin, because some inputs append a leading
         // character during focus animation.
         val taps = context.initialText.length + 1
         val cx = backspace.bounds.left + (backspace.bounds.right - backspace.bounds.left) / 2f

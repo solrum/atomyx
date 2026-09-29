@@ -1,0 +1,11 @@
+{
+  "name": "lex-identifier-single-underscore",
+  "description": "an identifier variable name that is a single underscore.",
+  "expr": "_",
+  "variables": {
+    "_": {
+      "type": "number",
+      "number": "1"
+    }
+  }
+}

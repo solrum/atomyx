@@ -1,0 +1,5 @@
+{
+  "name": "lex-astral-character-position-valid-comparison",
+  "description": "an equality comparison whose left operand contains an astral character parses the second operand at the correct position.",
+  "expr": "\"a😀b\" == \"x\""
+}

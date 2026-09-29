@@ -1,0 +1,11 @@
+{
+  "name": "cast-string-smallest-denormal",
+  "description": "string() renders the smallest positive denormal double in exponential notation.",
+  "expr": "string(tiny)",
+  "variables": {
+    "tiny": {
+      "type": "number",
+      "number": "5e-324"
+    }
+  }
+}

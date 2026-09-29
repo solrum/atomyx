@@ -1,0 +1,5 @@
+{
+  "name": "matrix-literal-eq-string-string",
+  "description": "literal string \"==\" literal string",
+  "expr": "\"a\" == \"a\""
+}

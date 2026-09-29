@@ -1,0 +1,1046 @@
+{
+  "calls": [
+    {
+      "args": [
+        "com.test",
+        {}
+      ],
+      "method": "launchApp"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [
+        {
+          "x": 215,
+          "y": 325
+        }
+      ],
+      "method": "tap"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [
+        {
+          "x": 215,
+          "y": 425
+        }
+      ],
+      "method": "tap"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [
+        999
+      ],
+      "method": "eraseText"
+    },
+    {
+      "args": [
+        "user@test.com"
+      ],
+      "method": "inputText"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [
+        "hi"
+      ],
+      "method": "inputText"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [
+        {
+          "x": 215,
+          "y": 605.8
+        },
+        {
+          "x": 215,
+          "y": 326.20000000000005
+        },
+        200
+      ],
+      "method": "swipe"
+    },
+    {
+      "args": [
+        "enter"
+      ],
+      "method": "pressKey"
+    },
+    {
+      "args": [
+        "back"
+      ],
+      "method": "pressKey"
+    }
+  ],
+  "durationMs": 10,
+  "events": [
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "line": 5,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "tap",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 6,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "tap: element.text = \"Login\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "tap"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "element"
+        },
+        {
+          "kind": "punct",
+          "text": "."
+        },
+        {
+          "kind": "identifier",
+          "text": "text"
+        },
+        {
+          "kind": "punct",
+          "text": " = "
+        },
+        {
+          "kind": "string",
+          "text": "\"Login\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "tap",
+      "depth": 0,
+      "detail": "tapped at (215,325)",
+      "durationMs": 0,
+      "line": 6,
+      "ok": true,
+      "stepIndex": 1,
+      "summary": "tap: element.text = \"Login\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "tap"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "element"
+        },
+        {
+          "kind": "punct",
+          "text": "."
+        },
+        {
+          "kind": "identifier",
+          "text": "text"
+        },
+        {
+          "kind": "punct",
+          "text": " = "
+        },
+        {
+          "kind": "string",
+          "text": "\"Login\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "type",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 7,
+      "ok": null,
+      "stepIndex": 2,
+      "summary": "input: element.text = \"Email\" ← \"user@test.com\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "input"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "element"
+        },
+        {
+          "kind": "punct",
+          "text": "."
+        },
+        {
+          "kind": "identifier",
+          "text": "text"
+        },
+        {
+          "kind": "punct",
+          "text": " = "
+        },
+        {
+          "kind": "string",
+          "text": "\"Email\""
+        },
+        {
+          "kind": "punct",
+          "text": " ← "
+        },
+        {
+          "kind": "string",
+          "text": "\"user@test.com\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "type",
+      "depth": 0,
+      "detail": "Typed \"user@test.com\"",
+      "durationMs": 0,
+      "line": 7,
+      "ok": true,
+      "stepIndex": 2,
+      "summary": "input: element.text = \"Email\" ← \"user@test.com\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "input"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "element"
+        },
+        {
+          "kind": "punct",
+          "text": "."
+        },
+        {
+          "kind": "identifier",
+          "text": "text"
+        },
+        {
+          "kind": "punct",
+          "text": " = "
+        },
+        {
+          "kind": "string",
+          "text": "\"Email\""
+        },
+        {
+          "kind": "punct",
+          "text": " ← "
+        },
+        {
+          "kind": "string",
+          "text": "\"user@test.com\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "type",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 10,
+      "ok": null,
+      "stepIndex": 3,
+      "summary": "input: \"hi\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "input"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"hi\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "type",
+      "depth": 0,
+      "detail": "Typed \"hi\" into focused field",
+      "durationMs": 0,
+      "line": 10,
+      "ok": true,
+      "stepIndex": 3,
+      "summary": "input: \"hi\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "input"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"hi\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "waitFor",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 11,
+      "ok": null,
+      "stepIndex": 4,
+      "summary": "waitFor: element.text = \"Login\" (timeout=\"0ms\")",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "waitFor"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "element"
+        },
+        {
+          "kind": "punct",
+          "text": "."
+        },
+        {
+          "kind": "identifier",
+          "text": "text"
+        },
+        {
+          "kind": "punct",
+          "text": " = "
+        },
+        {
+          "kind": "string",
+          "text": "\"Login\""
+        },
+        {
+          "kind": "punct",
+          "text": " ("
+        },
+        {
+          "kind": "identifier",
+          "text": "timeout"
+        },
+        {
+          "kind": "punct",
+          "text": "="
+        },
+        {
+          "kind": "string",
+          "text": "\"0ms\""
+        },
+        {
+          "kind": "punct",
+          "text": ")"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "waitFor",
+      "depth": 0,
+      "detail": "Element appeared",
+      "durationMs": 0,
+      "line": 11,
+      "ok": true,
+      "stepIndex": 4,
+      "summary": "waitFor: element.text = \"Login\" (timeout=\"0ms\")",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "waitFor"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "element"
+        },
+        {
+          "kind": "punct",
+          "text": "."
+        },
+        {
+          "kind": "identifier",
+          "text": "text"
+        },
+        {
+          "kind": "punct",
+          "text": " = "
+        },
+        {
+          "kind": "string",
+          "text": "\"Login\""
+        },
+        {
+          "kind": "punct",
+          "text": " ("
+        },
+        {
+          "kind": "identifier",
+          "text": "timeout"
+        },
+        {
+          "kind": "punct",
+          "text": "="
+        },
+        {
+          "kind": "string",
+          "text": "\"0ms\""
+        },
+        {
+          "kind": "punct",
+          "text": ")"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "assertVisible",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 14,
+      "ok": null,
+      "stepIndex": 5,
+      "summary": "assertVisible: element.text = \"Login\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "assertVisible"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "element"
+        },
+        {
+          "kind": "punct",
+          "text": "."
+        },
+        {
+          "kind": "identifier",
+          "text": "text"
+        },
+        {
+          "kind": "punct",
+          "text": " = "
+        },
+        {
+          "kind": "string",
+          "text": "\"Login\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "assertVisible",
+      "depth": 0,
+      "detail": "Element is visible",
+      "durationMs": 0,
+      "line": 14,
+      "ok": true,
+      "stepIndex": 5,
+      "summary": "assertVisible: element.text = \"Login\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "assertVisible"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "element"
+        },
+        {
+          "kind": "punct",
+          "text": "."
+        },
+        {
+          "kind": "identifier",
+          "text": "text"
+        },
+        {
+          "kind": "punct",
+          "text": " = "
+        },
+        {
+          "kind": "string",
+          "text": "\"Login\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "assertNotVisible",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 15,
+      "ok": null,
+      "stepIndex": 6,
+      "summary": "assertNotVisible: element.text = \"Missing\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "assertNotVisible"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "element"
+        },
+        {
+          "kind": "punct",
+          "text": "."
+        },
+        {
+          "kind": "identifier",
+          "text": "text"
+        },
+        {
+          "kind": "punct",
+          "text": " = "
+        },
+        {
+          "kind": "string",
+          "text": "\"Missing\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "assertNotVisible",
+      "depth": 0,
+      "detail": "Element is not visible",
+      "durationMs": 0,
+      "line": 15,
+      "ok": true,
+      "stepIndex": 6,
+      "summary": "assertNotVisible: element.text = \"Missing\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "assertNotVisible"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "element"
+        },
+        {
+          "kind": "punct",
+          "text": "."
+        },
+        {
+          "kind": "identifier",
+          "text": "text"
+        },
+        {
+          "kind": "punct",
+          "text": " = "
+        },
+        {
+          "kind": "string",
+          "text": "\"Missing\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "swipe",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 16,
+      "ok": null,
+      "stepIndex": 7,
+      "summary": "swipe: \"up\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "swipe"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"up\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "swipe",
+      "depth": 0,
+      "detail": "Swiped up",
+      "durationMs": 0,
+      "line": 16,
+      "ok": true,
+      "stepIndex": 7,
+      "summary": "swipe: \"up\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "swipe"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"up\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "pressKey",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 17,
+      "ok": null,
+      "stepIndex": 8,
+      "summary": "pressKey: \"enter\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "pressKey"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"enter\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "pressKey",
+      "depth": 0,
+      "detail": "Pressed enter",
+      "durationMs": 0,
+      "line": 17,
+      "ok": true,
+      "stepIndex": 8,
+      "summary": "pressKey: \"enter\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "pressKey"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"enter\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "back",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 18,
+      "ok": null,
+      "stepIndex": 9,
+      "summary": "back",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "back"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "back",
+      "depth": 0,
+      "detail": "Pressed back",
+      "durationMs": 0,
+      "line": 18,
+      "ok": true,
+      "stepIndex": 9,
+      "summary": "back",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "back"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "sleep",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 19,
+      "ok": null,
+      "stepIndex": 10,
+      "summary": "sleep: \"10ms\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "sleep"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"10ms\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "sleep",
+      "depth": 0,
+      "detail": "Slept 10ms",
+      "durationMs": 10,
+      "line": 19,
+      "ok": true,
+      "stepIndex": 10,
+      "summary": "sleep: \"10ms\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "sleep"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"10ms\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "screenshot",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 20,
+      "ok": null,
+      "stepIndex": 11,
+      "summary": "screenshot: \"first\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "screenshot"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"first\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "screenshot",
+      "depth": 0,
+      "detail": "Screenshot saved as \"first\"",
+      "durationMs": 0,
+      "line": 20,
+      "ok": true,
+      "stepIndex": 11,
+      "summary": "screenshot: \"first\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "screenshot"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"first\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "screenshot",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 21,
+      "ok": null,
+      "stepIndex": 12,
+      "summary": "screenshot: \"second\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "screenshot"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"second\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "screenshot",
+      "depth": 0,
+      "detail": "Screenshot saved as \"second\"",
+      "durationMs": 0,
+      "line": 21,
+      "ok": true,
+      "stepIndex": 12,
+      "summary": "screenshot: \"second\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "screenshot"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"second\""
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 13,
+  "screenshots": [
+    {
+      "dataLength": 0,
+      "label": "first"
+    },
+    {
+      "dataLength": 0,
+      "label": "second"
+    }
+  ],
+  "scriptName": "happy path",
+  "steps": [
+    {
+      "command": "launchApp",
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    },
+    {
+      "command": "tap",
+      "detail": "tapped at (215,325)",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 1
+    },
+    {
+      "command": "type",
+      "detail": "Typed \"user@test.com\"",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 2
+    },
+    {
+      "command": "type",
+      "detail": "Typed \"hi\" into focused field",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 3
+    },
+    {
+      "command": "waitFor",
+      "detail": "Element appeared",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 4
+    },
+    {
+      "command": "assertVisible",
+      "detail": "Element is visible",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 5
+    },
+    {
+      "command": "assertNotVisible",
+      "detail": "Element is not visible",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 6
+    },
+    {
+      "command": "swipe",
+      "detail": "Swiped up",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 7
+    },
+    {
+      "command": "pressKey",
+      "detail": "Pressed enter",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 8
+    },
+    {
+      "command": "back",
+      "detail": "Pressed back",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 9
+    },
+    {
+      "command": "sleep",
+      "detail": "Slept 10ms",
+      "durationMs": 10,
+      "ok": true,
+      "stepIndex": 10
+    },
+    {
+      "command": "screenshot",
+      "detail": "Screenshot saved as \"first\"",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 11
+    },
+    {
+      "command": "screenshot",
+      "detail": "Screenshot saved as \"second\"",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 12
+    }
+  ],
+  "totalSteps": 13
+}

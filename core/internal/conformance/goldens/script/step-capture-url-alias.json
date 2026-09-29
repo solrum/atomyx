@@ -1,0 +1,23 @@
+{
+  "parsed": {
+    "_stepLines": [
+      1,
+      2
+    ],
+    "appId": "",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Untitled script",
+    "steps": [
+      {
+        "command": "launchApp"
+      },
+      {
+        "as": "loginRsp",
+        "command": "capture",
+        "pattern": "POST /api/v1/auth/login"
+      }
+    ]
+  },
+  "valid": true
+}

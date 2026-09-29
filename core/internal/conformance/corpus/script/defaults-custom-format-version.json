@@ -1,0 +1,5 @@
+{
+  "name": "defaults-custom-format-version",
+  "description": "an explicit higher format version (atomyx/v2) is still accepted by the regex.",
+  "yaml": "format: atomyx/v2\nappId: com.example.app\nname: Future format\nenv: {}\n---\n- launchApp\n"
+}

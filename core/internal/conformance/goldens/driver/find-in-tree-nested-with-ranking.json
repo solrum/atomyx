@@ -1,0 +1,24 @@
+{
+  "bounds": {
+    "bottom": 140,
+    "left": 0,
+    "right": 200,
+    "top": 100
+  },
+  "found": true,
+  "node": {
+    "attributes": {
+      "bounds": "0,100,200,140",
+      "id": "verify_btn",
+      "role": "button",
+      "text": "Verify"
+    },
+    "children": [],
+    "clickable": true,
+    "enabled": true
+  },
+  "point": {
+    "x": 100,
+    "y": 120
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "name": "pointer-missing-touches-invalid",
+  "description": "pointer with no `touches` list must be REJECTED.",
+  "yaml": "- launchApp\n- pointer:\n    moveDurationMs: 200\n"
+}

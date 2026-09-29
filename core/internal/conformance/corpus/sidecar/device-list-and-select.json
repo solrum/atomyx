@@ -1,0 +1,14 @@
+{
+  "name": "device-list-and-select",
+  "description": "listDevices reports the staged snapshot and publishes deviceConnected for a device seen for the first time; selectDevice then resolves it from the cached snapshot without rescanning, and deselectDevice clears the session with no error.",
+  "deviceSnapshots": [
+    [
+      { "id": "mock-1", "platform": "android", "name": "Mock Device", "kind": "emulator", "state": "online" }
+    ]
+  ],
+  "steps": [
+    { "method": "listDevices" },
+    { "method": "selectDevice", "params": { "id": "mock-1" } },
+    { "method": "deselectDevice" }
+  ]
+}

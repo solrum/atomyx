@@ -1,0 +1,5 @@
+{
+  "name": "invalid-empty-script",
+  "description": "an empty document (no YAML content at all) must be REJECTED.",
+  "yaml": ""
+}

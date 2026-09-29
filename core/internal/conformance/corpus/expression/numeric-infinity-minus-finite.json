@@ -1,0 +1,11 @@
+{
+  "name": "numeric-infinity-minus-finite",
+  "description": "infinity minus a finite number remains infinity.",
+  "expr": "inf - 1",
+  "variables": {
+    "inf": {
+      "type": "number",
+      "number": "Infinity"
+    }
+  }
+}

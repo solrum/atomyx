@@ -1,0 +1,5 @@
+{
+  "name": "prec-paren-transparency-unwrapped",
+  "description": "an arithmetic type error without enclosing parentheses.",
+  "expr": "1 + \"a\""
+}

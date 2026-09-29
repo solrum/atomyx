@@ -1,0 +1,5 @@
+{
+  "name": "unary-not-binds-looser-than-equality",
+  "description": "not binds looser than equality, so \"not 1 == 2\" groups as \"not (1 == 2)\".",
+  "expr": "not 1 == 2"
+}

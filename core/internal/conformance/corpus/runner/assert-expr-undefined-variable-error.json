@@ -1,0 +1,10 @@
+{
+  "name": "assert-expr-undefined-variable-error",
+  "description": "assertExpr fails the step with an evaluation error when it references a variable that was never set",
+  "yaml": "appId: com.test\nname: assert expr eval error\nenv: {}\n---\n- assertExpr:\n    expr: \"neverSet == 1\"\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

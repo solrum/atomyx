@@ -1,10 +1,9 @@
-# Atomyx iOS driver — Makefile wrapper around xcodegen + xcodebuild.
+# Atomyx iOS driver: Makefile wrapper around xcodegen + xcodebuild.
 #
 # Simulator usage (zero config):
 #   make setup                        # generate project + build
 #   make test                         # unit tests
 #   make serve                        # run driver (blocks)
-#   make smoke                        # host-side integration test
 #
 # Physical-device usage:
 #   cp device.env.example device.env  # one-time: copy + edit
@@ -18,25 +17,40 @@
 
 # Load per-contributor device config from `device.env` if it exists.
 # Template is committed as `device.env.example`; real file is gitignored.
-# The `-` prefix makes the include optional — simulator flow works
+# The `-` prefix makes the include optional, so the simulator flow works
 # without any device config.
+#
+# Restricted to device goals because device.env carries a contributor's
+# personal signing identity (BUNDLE_ID, DEV_TEAM); loading it unconditionally
+# would leak that identity into simulator builds, which need no signing.
+DEVICE_GOALS := build-device install-device test-device serve-device setup-device check-device
+ifneq ($(filter $(DEVICE_GOALS),$(MAKECMDGOALS)),)
 -include device.env
+endif
 
 PROJECT   := AtomyxDriver.xcodeproj
 SCHEME    := AtomyxDriver
 DERIVED   := ./build
 REPO_ROOT := $(abspath ../..)
 
-# ── Simulator defaults (auto-detected) ─────────────────────────────
+# Stamp files marking that build-for-testing has produced a runnable
+# test bundle for the simulator and device destinations respectively.
+# Kept apart because the two destinations build into the same derived
+# data path but are not interchangeable: a stamp only means its own
+# destination is ready to serve.
+BUILD_STAMP        := $(DERIVED)/.build-for-testing
+DEVICE_BUILD_STAMP := $(DERIVED)/.build-for-testing-device
+
+# --- Simulator defaults (auto-detected) -----------------------------
 # Auto-detect the first booted simulator's UDID. The 36-char anchor
 # in the grep pattern ensures we only match the UUID, not `(Booted)`.
 UDID ?= $(shell xcrun simctl list devices booted 2>/dev/null \
                 | grep -Eo '\(([A-F0-9-]{36})\)' | head -1 | tr -d '()')
 DESTINATION ?= platform=iOS Simulator,id=$(UDID)
 
-# ── Physical device config (loaded from device.env) ─────────────────
-# These defaults make `make help` readable when device.env is absent —
-# `check-device` target will still fail with an actionable message if
+# --- Physical device config (loaded from device.env) -----------------
+# These defaults make `make help` readable when device.env is absent.
+# The `check-device` target will still fail with an actionable message if
 # either DEVICE_UDID or DEV_TEAM is missing at target invocation time.
 #
 # BUNDLE_ID is overridable because some contributors may need a unique
@@ -54,7 +68,7 @@ DEVICE_DESTINATION ?= platform=iOS,id=$(DEVICE_UDID)
 #
 # Signing mode: Manual with wildcard provisioning profile by default.
 # Automatic signing requires network access to Apple servers on every
-# build — problematic when a MITM proxy is active (the proxy's CA
+# build, which is problematic when a MITM proxy is active (the proxy's CA
 # cert blocks Xcode's server trust). Manual signing with a wildcard
 # profile works offline after initial profile download.
 #
@@ -63,7 +77,7 @@ DEVICE_DESTINATION ?= platform=iOS,id=$(DEVICE_UDID)
 #
 # NOTE: PRODUCT_BUNDLE_IDENTIFIER is deliberately NOT overridden here
 # because xcodebuild applies command-line setting overrides to ALL
-# targets in the invocation — host app AND test bundle would get the
+# targets in the invocation, so the host app AND test bundle would get the
 # same bundle id, conflicting with the test target which needs a
 # distinct suffix. Instead, BUNDLE_ID is baked into the generated
 # .xcodeproj via XcodeGen's ${BUNDLE_ID} env var substitution in
@@ -77,27 +91,29 @@ SIGN_OVERRIDES := \
 	CODE_SIGNING_ALLOWED=YES \
 	DEVELOPMENT_TEAM=$(DEV_TEAM)
 
-# Only pass PROVISIONING_PROFILE_SPECIFIER when set — empty value
-# confuses xcodebuild with Automatic signing.
+# Only pass PROVISIONING_PROFILE_SPECIFIER when set, because an empty
+# value confuses xcodebuild with Automatic signing.
 ifneq ($(PROVISIONING_PROFILE_SPECIFIER),)
 SIGN_OVERRIDES += "PROVISIONING_PROFILE_SPECIFIER=$(PROVISIONING_PROFILE_SPECIFIER)"
 endif
 
-.PHONY: help generate build test serve smoke setup clean check-udid \
+.PHONY: help generate build test serve setup clean check-udid \
         build-device install-device test-device serve-device setup-device check-device
+# $(PROJECT), $(BUILD_STAMP), and $(DEVICE_BUILD_STAMP) are real file
+# targets, deliberately left out of .PHONY, so make only rebuilds them
+# when their prerequisites are newer (see the targets themselves below).
 
 .DEFAULT_GOAL := help
 
 help:
 	@echo "Atomyx iOS driver targets:"
 	@echo ""
-	@echo "Simulator (zero config — auto-detects booted sim):"
+	@echo "Simulator (zero config, auto-detects booted sim):"
 	@echo "  make setup       xcodegen + xcodebuild build-for-testing"
 	@echo "  make generate    xcodegen only"
 	@echo "  make build       xcodebuild build-for-testing"
 	@echo "  make test        run unit tests (serve test auto-skipped)"
 	@echo "  make serve       run in server mode (blocks terminal)"
-	@echo "  make smoke       run host-side smoke test (from repo root)"
 	@echo "  make pointer-smoke  run pointer-gesture smoke (7 W3C patterns)"
 	@echo "  make lint-isolation check private XCTest isolation (ADR-001)"
 	@echo "  make clean       remove build/ and AtomyxDriver.xcodeproj"
@@ -124,7 +140,7 @@ help:
 	@echo ""
 	@echo "Prerequisites for device targets:"
 	@echo "  brew install libimobiledevice  # iproxy tunneling"
-	@echo "  Xcode → Settings → Accounts → add Apple ID"
+	@echo "  Xcode, then Settings, then Accounts, then add Apple ID"
 	@echo ""
 	@echo "Resolved values (current run):"
 	@echo "  UDID        = $(UDID)"
@@ -141,24 +157,39 @@ check-udid:
 		exit 1; \
 	fi
 
-generate:
-	# Export env vars for XcodeGen ${...} substitution in project.yml.
-	# BUNDLE_ID and CODE_SIGN_STYLE are baked into the generated
-	# .xcodeproj. Re-run `make generate` after changing either.
+# The generated Xcode project is not checked into git (see
+# .gitignore) and is rebuilt from project.yml. Making it a real file
+# target keyed on project.yml means a fresh clone generates it once,
+# and an unchanged checkout skips xcodegen entirely, instead of
+# regenerating on every build or serve invocation.
+#
+# BUNDLE_ID and CODE_SIGN_STYLE are baked into the generated
+# .xcodeproj through this substitution. Changing either on the
+# command line without also touching project.yml will not trigger a
+# rebuild here, so run `make generate` to force one.
+$(PROJECT): project.yml
 	BUNDLE_ID=$(BUNDLE_ID) \
 	CODE_SIGN_STYLE=$(CODE_SIGN_STYLE) \
 	PROVISIONING_PROFILE_SPECIFIER="$(PROVISIONING_PROFILE_SPECIFIER)" \
 	DEV_TEAM=$(DEV_TEAM) \
 	xcodegen generate
+	@touch -c $(PROJECT)
 
-build: generate check-udid
+# Forces regeneration regardless of project.yml's timestamp, for
+# example after changing BUNDLE_ID or CODE_SIGN_STYLE on the command
+# line with project.yml itself unchanged.
+generate:
+	@rm -rf $(PROJECT)
+	@$(MAKE) $(PROJECT)
+
+build: check-udid $(PROJECT)
 	xcodebuild build-for-testing \
 		-project $(PROJECT) \
 		-scheme $(SCHEME) \
 		-destination '$(DESTINATION)' \
 		-derivedDataPath $(DERIVED)
 
-test: check-udid
+test: check-udid $(PROJECT)
 	xcodebuild test \
 		-project $(PROJECT) \
 		-scheme $(SCHEME) \
@@ -166,7 +197,20 @@ test: check-udid
 		-derivedDataPath $(DERIVED) \
 		-only-testing:AtomyxDriverAgent/CommandHandlerUnitTests
 
-serve: check-udid
+# build-for-testing output for the simulator destination. A fresh
+# clone has neither $(PROJECT) nor this stamp, so serve's prerequisite
+# chain below builds both automatically; an unchanged checkout skips
+# straight to serving.
+$(BUILD_STAMP): $(PROJECT)
+	xcodebuild build-for-testing \
+		-project $(PROJECT) \
+		-scheme $(SCHEME) \
+		-destination '$(DESTINATION)' \
+		-derivedDataPath $(DERIVED)
+	@mkdir -p $(DERIVED)
+	@touch $(BUILD_STAMP)
+
+serve: check-udid $(BUILD_STAMP)
 	xcodebuild test-without-building \
 		-project $(PROJECT) \
 		-scheme $(SCHEME) \
@@ -174,10 +218,7 @@ serve: check-udid
 		-derivedDataPath $(DERIVED) \
 		-only-testing:AtomyxDriverAgent/AtomyxDriverAgent/testServeCommands
 
-smoke:
-	cd $(REPO_ROOT) && npm run build && node scripts/ios-driver-smoke.mjs
-
-# Pointer-gesture smoke — runs 7 W3C patterns against a live
+# Pointer-gesture smoke: runs 7 W3C patterns against a live
 # driver. Expects `make serve` (or `make serve-device`) already
 # running in another terminal; optionally set POINTER_MODE to
 # tighten expectations for CI (private = all 7 pass; public =
@@ -185,34 +226,36 @@ smoke:
 pointer-smoke:
 	cd $(REPO_ROOT) && npm run build && node scripts/ios-pointer-smoke.mjs
 
-# Lint rule from ADR-001: private XCTest symbols may be
-# accessed from exactly ONE file (`PrivateEventSynthesizer.swift`).
-# Any other match is an isolation violation and a review
-# blocker. Runs as part of CI once the workflow lands.
+# Private XCTest symbols (XCSynthesizedEventRecord, XCPointerEventPath,
+# XCTRunnerDaemonSession, and related classes reached through
+# NSClassFromString) may be accessed from exactly one file,
+# Tests/Bridge/EventRecordSynthesizer.swift, so an Xcode update that
+# breaks the private surface has a single call site to fix. Any other
+# match is an isolation violation and a review blocker.
 lint-isolation:
-	@violations=$$(grep -rl 'NSClassFromString("XCSynth\|NSClassFromString("XCPointer\|NSClassFromString("XCTRunner' Tests/ | grep -v 'Bridge/PrivateEventSynthesizer.swift' || true); \
+	@violations=$$(grep -rl 'NSClassFromString("XCSynth\|NSClassFromString("XCPointer\|NSClassFromString("XCTRunner' Tests/ | grep -v 'Bridge/EventRecordSynthesizer.swift' || true); \
 	if [ -n "$$violations" ]; then \
-		echo "ERROR: private XCTest symbol access outside PrivateEventSynthesizer.swift:"; \
+		echo "ERROR: private XCTest symbol access outside Tests/Bridge/EventRecordSynthesizer.swift:"; \
 		echo "$$violations"; \
 		exit 1; \
 	fi; \
 	echo "isolation check: OK"
 
-setup: generate build
+setup: build
 
-# ── Physical device targets ──────────────────────────────────────────
+# --- Physical device targets -----------------------------------------
 #
 # Usage:
 #   make setup-device DEVICE_UDID=00008101-... DEV_TEAM=ABCD123456
 #   make serve-device DEVICE_UDID=00008101-... DEV_TEAM=ABCD123456
 #
 # Prerequisites (one-time, per host):
-#   1. `brew install libimobiledevice` — for iproxy tunneling
-#   2. Xcode → Settings → Accounts → add Apple ID
+#   1. `brew install libimobiledevice`, for iproxy tunneling
+#   2. Xcode, then Settings, then Accounts, then add Apple ID
 #   3. Trust the device on the Mac (pair via USB)
 #   4. Trust the Mac on the device (iOS prompt on first connect)
 #
-# Driver code is identical to simulator — the only difference is
+# Driver code is identical to simulator. The only difference is
 # (a) code signing passthrough to xcodebuild, and (b) the adapter
 # spawns iproxy on connect when targeting a physical device (see
 # `IosXctestController.startIproxy`).
@@ -231,12 +274,12 @@ check-device:
 		echo "Or override on the command line:"; \
 		echo "  make $(MAKECMDGOALS) DEVICE_UDID=<udid> DEV_TEAM=<team>"; \
 		echo ""; \
-		echo "Discover UDID:  idevice_id -l   OR   Xcode → Window → Devices"; \
-		echo "Team ID:        developer.apple.com/account → Membership"; \
+		echo "Discover UDID:  idevice_id -l   OR   Xcode, then Window, then Devices"; \
+		echo "Team ID:        developer.apple.com/account, then Membership"; \
 		exit 1; \
 	fi
 
-build-device: generate check-device
+build-device: check-device $(PROJECT)
 	xcodebuild build-for-testing \
 		-project $(PROJECT) \
 		-scheme $(SCHEME) \
@@ -244,7 +287,7 @@ build-device: generate check-device
 		-derivedDataPath $(DERIVED) \
 		$(SIGN_OVERRIDES)
 
-test-device: check-device
+test-device: check-device $(PROJECT)
 	xcodebuild test \
 		-project $(PROJECT) \
 		-scheme $(SCHEME) \
@@ -263,11 +306,27 @@ install-device: build-device
 		$(DERIVED)/Build/Products/Debug-iphoneos/AtomyxDriverAgent-Runner.app
 	@echo ""
 	@echo "Installed. If the device prompts to trust the developer certificate:"
-	@echo "  Settings → General → VPN & Device Management → Trust"
+	@echo "  Settings, then General, then VPN and Device Management, then Trust"
 	@echo ""
 	@echo "Next: make serve-device"
 
-serve-device: check-device
+# build-for-testing output for the device destination, kept apart
+# from $(BUILD_STAMP) because it carries signing overrides the
+# simulator build does not use. check-device is deliberately not a
+# prerequisite here (unlike serve-device below): a phony prerequisite
+# on a file target defeats staleness tracking, forcing a rebuild on
+# every invocation regardless of whether the stamp is current.
+$(DEVICE_BUILD_STAMP): $(PROJECT)
+	xcodebuild build-for-testing \
+		-project $(PROJECT) \
+		-scheme $(SCHEME) \
+		-destination '$(DEVICE_DESTINATION)' \
+		-derivedDataPath $(DERIVED) \
+		$(SIGN_OVERRIDES)
+	@mkdir -p $(DERIVED)
+	@touch $(DEVICE_BUILD_STAMP)
+
+serve-device: check-device $(DEVICE_BUILD_STAMP)
 	xcodebuild test-without-building \
 		-project $(PROJECT) \
 		-scheme $(SCHEME) \
@@ -276,7 +335,7 @@ serve-device: check-device
 		-only-testing:AtomyxDriverAgent/AtomyxDriverAgent/testServeCommands \
 		$(SIGN_OVERRIDES)
 
-setup-device: generate build-device
+setup-device: build-device
 
 clean:
 	rm -rf $(DERIVED) $(PROJECT)

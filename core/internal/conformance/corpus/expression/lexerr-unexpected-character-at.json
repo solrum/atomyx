@@ -1,0 +1,5 @@
+{
+  "name": "lexerr-unexpected-character-at",
+  "description": "an unrecognized character (@) in the source.",
+  "expr": "1 @ 2"
+}

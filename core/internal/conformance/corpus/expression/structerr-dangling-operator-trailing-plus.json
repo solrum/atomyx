@@ -1,0 +1,5 @@
+{
+  "name": "structerr-dangling-operator-trailing-plus",
+  "description": "a trailing binary plus with no right operand.",
+  "expr": "1 +"
+}

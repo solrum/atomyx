@@ -1,0 +1,5 @@
+{
+  "name": "cast-bool-false-string",
+  "description": "bool() accepts the exact string \"false\".",
+  "expr": "bool(\"false\")"
+}

@@ -1,0 +1,251 @@
+{
+  "calls": [
+    {
+      "args": [
+        "com.test",
+        {}
+      ],
+      "method": "launchApp"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [
+        {
+          "x": 215,
+          "y": 425
+        }
+      ],
+      "method": "tap"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [
+        999
+      ],
+      "method": "eraseText"
+    },
+    {
+      "args": [
+        "user@test.com"
+      ],
+      "method": "inputText"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 6,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "line": 6,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "handle",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 7,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "handle: \"1 branch\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "handle"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"1 branch\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "type",
+      "depth": 1,
+      "detail": null,
+      "durationMs": null,
+      "line": null,
+      "ok": null,
+      "stepIndex": 2,
+      "summary": "input: element.text = \"Email\" ← \"user@test.com\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "input"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "element"
+        },
+        {
+          "kind": "punct",
+          "text": "."
+        },
+        {
+          "kind": "identifier",
+          "text": "text"
+        },
+        {
+          "kind": "punct",
+          "text": " = "
+        },
+        {
+          "kind": "string",
+          "text": "\"Email\""
+        },
+        {
+          "kind": "punct",
+          "text": " ← "
+        },
+        {
+          "kind": "string",
+          "text": "\"user@test.com\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "type",
+      "depth": 1,
+      "detail": "Typed \"user@test.com\"",
+      "durationMs": 0,
+      "line": null,
+      "ok": true,
+      "stepIndex": 2,
+      "summary": "input: element.text = \"Email\" ← \"user@test.com\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "input"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "element"
+        },
+        {
+          "kind": "punct",
+          "text": "."
+        },
+        {
+          "kind": "identifier",
+          "text": "text"
+        },
+        {
+          "kind": "punct",
+          "text": " = "
+        },
+        {
+          "kind": "string",
+          "text": "\"Email\""
+        },
+        {
+          "kind": "punct",
+          "text": " ← "
+        },
+        {
+          "kind": "string",
+          "text": "\"user@test.com\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "handle",
+      "depth": 0,
+      "detail": "completed",
+      "durationMs": 0,
+      "line": 7,
+      "ok": true,
+      "stepIndex": 1,
+      "summary": "handle: \"1 branch\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "handle"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"1 branch\""
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 2,
+  "screenshots": [],
+  "scriptName": "handle parent variable",
+  "steps": [
+    {
+      "command": "launchApp",
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    },
+    {
+      "command": "handle",
+      "detail": "completed",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 1
+    }
+  ],
+  "totalSteps": 2
+}

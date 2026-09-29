@@ -1,0 +1,87 @@
+{
+  "durationMs": 0,
+  "entries": [
+    {
+      "durationMs": 0,
+      "kind": "script",
+      "path": "scripts/a.yml",
+      "result": {
+        "durationMs": 0,
+        "failedAtStep": null,
+        "ok": true,
+        "passedSteps": 2,
+        "screenshots": [],
+        "scriptName": "pass",
+        "steps": [
+          {
+            "command": "launchApp",
+            "detail": "Launched com.test",
+            "durationMs": 0,
+            "ok": true,
+            "stepIndex": 0
+          },
+          {
+            "command": "assertVisible",
+            "detail": "Element is visible",
+            "durationMs": 0,
+            "ok": true,
+            "stepIndex": 1
+          }
+        ],
+        "totalSteps": 2
+      },
+      "status": "passed"
+    },
+    {
+      "durationMs": 0,
+      "kind": "scenario",
+      "path": "scenarios/s1.yml",
+      "result": {
+        "durationMs": 0,
+        "ok": true,
+        "passedScripts": 1,
+        "scenarioName": "s1",
+        "scripts": [
+          {
+            "durationMs": 0,
+            "result": {
+              "durationMs": 0,
+              "failedAtStep": null,
+              "ok": true,
+              "passedSteps": 2,
+              "screenshots": [],
+              "scriptName": "pass",
+              "steps": [
+                {
+                  "command": "launchApp",
+                  "detail": "Launched com.test",
+                  "durationMs": 0,
+                  "ok": true,
+                  "stepIndex": 0
+                },
+                {
+                  "command": "assertVisible",
+                  "detail": "Element is visible",
+                  "durationMs": 0,
+                  "ok": true,
+                  "stepIndex": 1
+                }
+              ],
+              "totalSteps": 2
+            },
+            "scriptIndex": 0,
+            "scriptPath": "child-pass.yml",
+            "status": "passed"
+          }
+        ],
+        "totalScripts": 1
+      },
+      "status": "passed"
+    }
+  ],
+  "failed": 0,
+  "ok": true,
+  "passed": 2,
+  "suiteName": "mixed suite",
+  "total": 2
+}

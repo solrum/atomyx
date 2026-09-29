@@ -1,0 +1,64 @@
+{
+  "name": "android-ime-marker",
+  "description": "isIme attribute only appears when true, never propagates to children",
+  "rawTree": {
+    "elementId": "kb-root",
+    "className": "android.inputmethodservice.KeyboardView",
+    "bounds": {
+      "left": 0,
+      "top": 1200,
+      "right": 1080,
+      "bottom": 1920
+    },
+    "clickable": false,
+    "enabled": true,
+    "focused": false,
+    "selected": false,
+    "checkable": false,
+    "checked": false,
+    "visible": true,
+    "isIme": true,
+    "children": [
+      {
+        "elementId": "key-a",
+        "className": "android.view.View",
+        "contentDesc": "a",
+        "bounds": {
+          "left": 0,
+          "top": 1300,
+          "right": 100,
+          "bottom": 1400
+        },
+        "clickable": true,
+        "enabled": true,
+        "focused": false,
+        "selected": false,
+        "checkable": false,
+        "checked": false,
+        "visible": true,
+        "isIme": false,
+        "children": []
+      },
+      {
+        "elementId": "key-enter",
+        "className": "android.view.View",
+        "contentDesc": "enter",
+        "bounds": {
+          "left": 980,
+          "top": 1300,
+          "right": 1080,
+          "bottom": 1400
+        },
+        "clickable": true,
+        "enabled": true,
+        "focused": false,
+        "selected": false,
+        "checkable": false,
+        "checked": false,
+        "visible": true,
+        "isIme": false,
+        "children": []
+      }
+    ]
+  }
+}

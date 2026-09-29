@@ -1,0 +1,8 @@
+{
+  "name": "swipe-direction-up",
+  "description": "an up swipe drags from a lower Y to a higher Y, centered horizontally",
+  "function": "swipeDirection",
+  "screen": { "width": 400, "height": 800 },
+  "direction": "up",
+  "fraction": 0.6
+}

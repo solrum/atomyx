@@ -1,0 +1,65 @@
+package cli
+
+import (
+	"io"
+
+	"dev.atomyx/internal/device"
+	"dev.atomyx/internal/logging"
+	"dev.atomyx/internal/orchestra"
+)
+
+// Deps are the dependencies Run needs to execute a command. A caller
+// injects a real device.CompositeProbe and device.DriverFactory in
+// production, or a device.StaticProbe and device.MockDriverFactory in
+// a test.
+type Deps struct {
+	// Probe scans for connected devices, backing list-devices.
+	Probe device.Probe
+	// Factory builds a connected driver and orchestra for the
+	// platform and device a run targets.
+	Factory device.Factory
+	// Clock times a script run's steps. Defaults to
+	// orchestra.SystemClock{} when nil.
+	Clock orchestra.Clock
+	// Logger is the structured log sink a run or suite command writes
+	// its step trace through. Defaults to logging.NoopLogger{} when
+	// nil, which a caller only wants in a test that asserts on
+	// command output rather than on logged entries.
+	Logger logging.Logger
+	// Stdout and Stderr are the streams every command writes to.
+	// Both default to io.Discard when nil, which a caller only
+	// wants in a test that reads output some other way.
+	Stdout io.Writer
+	Stderr io.Writer
+	// Debug, when true, appends a stack trace to an unhandled error
+	// reported on Stderr, matching ATOMYX_DEBUG=1.
+	Debug bool
+}
+
+func (d Deps) stdout() io.Writer {
+	if d.Stdout == nil {
+		return io.Discard
+	}
+	return d.Stdout
+}
+
+func (d Deps) stderr() io.Writer {
+	if d.Stderr == nil {
+		return io.Discard
+	}
+	return d.Stderr
+}
+
+func (d Deps) clock() orchestra.Clock {
+	if d.Clock == nil {
+		return orchestra.SystemClock{}
+	}
+	return d.Clock
+}
+
+func (d Deps) logger() logging.Logger {
+	if d.Logger == nil {
+		return logging.NoopLogger{}
+	}
+	return d.Logger
+}

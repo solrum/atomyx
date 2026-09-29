@@ -1,0 +1,5 @@
+{
+  "name": "cast-string-decimal-number",
+  "description": "string() renders a decimal number.",
+  "expr": "string(3.14)"
+}

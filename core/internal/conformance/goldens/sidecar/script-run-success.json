@@ -1,0 +1,300 @@
+{
+  "events": [
+    {
+      "event": "deviceConnected",
+      "payload": {
+        "id": "mock-1",
+        "kind": "emulator",
+        "name": "Mock Device",
+        "platform": "android",
+        "state": "online"
+      }
+    },
+    {
+      "event": "runStarted",
+      "payload": {
+        "runId": "\u003cnormalized\u003e",
+        "scriptName": "login tap",
+        "startedAt": "\u003cnormalized\u003e"
+      }
+    },
+    {
+      "event": "stepStarted",
+      "payload": {
+        "command": "launchApp",
+        "depth": 0,
+        "line": 5,
+        "runId": "\u003cnormalized\u003e",
+        "stepIndex": 0,
+        "summary": "launchApp",
+        "tokens": [
+          {
+            "kind": "keyword",
+            "text": "launchApp"
+          }
+        ],
+        "type": "stepStarted"
+      }
+    },
+    {
+      "event": "stepCompleted",
+      "payload": {
+        "command": "launchApp",
+        "depth": 0,
+        "detail": "Launched com.example.app",
+        "durationMs": "\u003cnormalized\u003e",
+        "line": 5,
+        "ok": true,
+        "runId": "\u003cnormalized\u003e",
+        "stepIndex": 0,
+        "summary": "launchApp",
+        "tokens": [
+          {
+            "kind": "keyword",
+            "text": "launchApp"
+          }
+        ],
+        "type": "stepCompleted"
+      }
+    },
+    {
+      "event": "stepStarted",
+      "payload": {
+        "command": "tap",
+        "depth": 0,
+        "line": 6,
+        "runId": "\u003cnormalized\u003e",
+        "stepIndex": 1,
+        "summary": "tap: element.text = \"Login\"",
+        "tokens": [
+          {
+            "kind": "keyword",
+            "text": "tap"
+          },
+          {
+            "kind": "punct",
+            "text": ": "
+          },
+          {
+            "kind": "identifier",
+            "text": "element"
+          },
+          {
+            "kind": "punct",
+            "text": "."
+          },
+          {
+            "kind": "identifier",
+            "text": "text"
+          },
+          {
+            "kind": "punct",
+            "text": " = "
+          },
+          {
+            "kind": "string",
+            "text": "\"Login\""
+          }
+        ],
+        "type": "stepStarted"
+      }
+    },
+    {
+      "event": "stepCompleted",
+      "payload": {
+        "command": "tap",
+        "depth": 0,
+        "detail": "tapped at (215,325)",
+        "durationMs": "\u003cnormalized\u003e",
+        "line": 6,
+        "ok": true,
+        "runId": "\u003cnormalized\u003e",
+        "stepIndex": 1,
+        "summary": "tap: element.text = \"Login\"",
+        "tokens": [
+          {
+            "kind": "keyword",
+            "text": "tap"
+          },
+          {
+            "kind": "punct",
+            "text": ": "
+          },
+          {
+            "kind": "identifier",
+            "text": "element"
+          },
+          {
+            "kind": "punct",
+            "text": "."
+          },
+          {
+            "kind": "identifier",
+            "text": "text"
+          },
+          {
+            "kind": "punct",
+            "text": " = "
+          },
+          {
+            "kind": "string",
+            "text": "\"Login\""
+          }
+        ],
+        "type": "stepCompleted"
+      }
+    },
+    {
+      "event": "stepStarted",
+      "payload": {
+        "command": "assertVisible",
+        "depth": 0,
+        "line": 7,
+        "runId": "\u003cnormalized\u003e",
+        "stepIndex": 2,
+        "summary": "assertVisible: element.text = \"Login\"",
+        "tokens": [
+          {
+            "kind": "keyword",
+            "text": "assertVisible"
+          },
+          {
+            "kind": "punct",
+            "text": ": "
+          },
+          {
+            "kind": "identifier",
+            "text": "element"
+          },
+          {
+            "kind": "punct",
+            "text": "."
+          },
+          {
+            "kind": "identifier",
+            "text": "text"
+          },
+          {
+            "kind": "punct",
+            "text": " = "
+          },
+          {
+            "kind": "string",
+            "text": "\"Login\""
+          }
+        ],
+        "type": "stepStarted"
+      }
+    },
+    {
+      "event": "stepCompleted",
+      "payload": {
+        "command": "assertVisible",
+        "depth": 0,
+        "detail": "Element is visible",
+        "durationMs": "\u003cnormalized\u003e",
+        "line": 7,
+        "ok": true,
+        "runId": "\u003cnormalized\u003e",
+        "stepIndex": 2,
+        "summary": "assertVisible: element.text = \"Login\"",
+        "tokens": [
+          {
+            "kind": "keyword",
+            "text": "assertVisible"
+          },
+          {
+            "kind": "punct",
+            "text": ": "
+          },
+          {
+            "kind": "identifier",
+            "text": "element"
+          },
+          {
+            "kind": "punct",
+            "text": "."
+          },
+          {
+            "kind": "identifier",
+            "text": "text"
+          },
+          {
+            "kind": "punct",
+            "text": " = "
+          },
+          {
+            "kind": "string",
+            "text": "\"Login\""
+          }
+        ],
+        "type": "stepCompleted"
+      }
+    },
+    {
+      "event": "runCompleted",
+      "payload": {
+        "durationMs": "\u003cnormalized\u003e",
+        "ok": true,
+        "passed": 3,
+        "runId": "\u003cnormalized\u003e",
+        "total": 3
+      }
+    }
+  ],
+  "steps": [
+    {
+      "method": "selectDevice",
+      "result": {
+        "id": "mock-1",
+        "kind": "emulator",
+        "name": "Mock Device",
+        "platform": "android",
+        "state": "online"
+      }
+    },
+    {
+      "method": "runScript",
+      "result": {
+        "result": {
+          "artifacts": {},
+          "durationMs": "\u003cnormalized\u003e",
+          "ok": true,
+          "passedSteps": 3,
+          "scriptName": "login tap",
+          "steps": [
+            {
+              "command": "launchApp",
+              "detail": "Launched com.example.app",
+              "durationMs": "\u003cnormalized\u003e",
+              "ok": true,
+              "stepIndex": 0
+            },
+            {
+              "command": "tap",
+              "detail": "tapped at (215,325)",
+              "durationMs": "\u003cnormalized\u003e",
+              "ok": true,
+              "stepIndex": 1
+            },
+            {
+              "command": "assertVisible",
+              "detail": "Element is visible",
+              "durationMs": "\u003cnormalized\u003e",
+              "ok": true,
+              "stepIndex": 2
+            }
+          ],
+          "totalSteps": 3
+        },
+        "runId": "\u003cnormalized\u003e"
+      }
+    },
+    {
+      "method": "isRunning",
+      "result": {
+        "running": false
+      }
+    }
+  ]
+}

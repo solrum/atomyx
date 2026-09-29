@@ -1,0 +1,5 @@
+{
+  "name": "lex-string-containing-other-quote-unescaped-double",
+  "description": "a double-quoted string containing an unescaped single quote.",
+  "expr": "\"it's fine\""
+}

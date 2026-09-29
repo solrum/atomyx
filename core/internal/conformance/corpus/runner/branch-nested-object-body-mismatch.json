@@ -1,0 +1,22 @@
+{
+  "name": "branch-nested-object-body-mismatch",
+  "description": "branch's body condition does not match when the expected value is a nested object whose fields diverge from the captured value, falling to the default case instead of the first",
+  "yaml": "appId: com.test\nname: branch nested object mismatch\nproxy: optional\nenv: {}\n---\n- launchApp\n- capture: \"POST /login as: loginRsp\"\n- branch:\n    from: loginRsp\n    on:\n      - match:\n          body:\n            \"$.user\":\n              id: 1\n              role: admin\n        do:\n          - screenshot: matched\n    default:\n      - screenshot: fallback\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  },
+  "network": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/login",
+        "status": 200,
+        "headers": {},
+        "body": { "user": { "id": 1, "role": "user" } },
+        "timestampMs": 0
+      }
+    ]
+  }
+}

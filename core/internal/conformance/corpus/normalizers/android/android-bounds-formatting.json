@@ -1,0 +1,98 @@
+{
+  "name": "android-bounds-formatting",
+  "description": "bounds string formatting including absent bounds and extreme integers",
+  "rawTree": {
+    "elementId": "root",
+    "className": "android.widget.FrameLayout",
+    "bounds": {
+      "left": 0,
+      "top": 0,
+      "right": 1080,
+      "bottom": 1920
+    },
+    "clickable": false,
+    "enabled": true,
+    "focused": false,
+    "selected": false,
+    "checkable": false,
+    "checked": false,
+    "visible": true,
+    "isIme": false,
+    "children": [
+      {
+        "elementId": "b1",
+        "className": "android.widget.TextView",
+        "text": "offscreen above",
+        "bounds": {
+          "left": -50,
+          "top": -120,
+          "right": 0,
+          "bottom": -20
+        },
+        "clickable": false,
+        "enabled": true,
+        "focused": false,
+        "selected": false,
+        "checkable": false,
+        "checked": false,
+        "visible": false,
+        "isIme": false,
+        "children": []
+      },
+      {
+        "elementId": "b2",
+        "className": "android.widget.TextView",
+        "text": "degenerate",
+        "bounds": {
+          "left": 0,
+          "top": 0,
+          "right": 0,
+          "bottom": 0
+        },
+        "clickable": false,
+        "enabled": true,
+        "focused": false,
+        "selected": false,
+        "checkable": false,
+        "checked": false,
+        "visible": false,
+        "isIme": false,
+        "children": []
+      },
+      {
+        "elementId": "b3",
+        "className": "android.widget.TextView",
+        "text": "no bounds at all",
+        "clickable": false,
+        "enabled": true,
+        "focused": false,
+        "selected": false,
+        "checkable": false,
+        "checked": false,
+        "visible": true,
+        "isIme": false,
+        "children": []
+      },
+      {
+        "elementId": "b4",
+        "className": "android.widget.TextView",
+        "text": "large",
+        "bounds": {
+          "left": 2147483646,
+          "top": 0,
+          "right": 2147483647,
+          "bottom": 1
+        },
+        "clickable": false,
+        "enabled": true,
+        "focused": false,
+        "selected": false,
+        "checkable": false,
+        "checked": false,
+        "visible": true,
+        "isIme": false,
+        "children": []
+      }
+    ]
+  }
+}

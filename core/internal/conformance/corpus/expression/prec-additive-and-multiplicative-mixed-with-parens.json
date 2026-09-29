@@ -1,0 +1,5 @@
+{
+  "name": "prec-additive-and-multiplicative-mixed-with-parens",
+  "description": "addition, multiplication, and parentheses combined in one expression.",
+  "expr": "(1 + 2) * (3 + 4) - 5"
+}

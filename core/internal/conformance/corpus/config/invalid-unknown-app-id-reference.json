@@ -1,0 +1,5 @@
+{
+  "name": "invalid-unknown-app-id-reference",
+  "description": "An environment referencing an undeclared app id fails the top-level superRefine check.",
+  "yaml": "project: Demo\napps:\n  - id: main\n    platform: android\n    appId: com.example.app\nenvironments:\n  staging:\n    app: does-not-exist\n"
+}

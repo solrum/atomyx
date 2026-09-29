@@ -1,0 +1,117 @@
+{
+  "parsed": {
+    "_stepLines": [
+      25,
+      26,
+      27,
+      30,
+      31,
+      34,
+      39,
+      40,
+      42,
+      49,
+      50,
+      55
+    ],
+    "appId": "dev.atomyx.demo",
+    "description": "Demonstrates flow composition. `requires` runs setup-fresh-user\nbefore the script's own steps so the test starts on a known\naccount. `runFlow` invokes a teardown sub-flow inline at the end\nso cleanup happens regardless of which UI path the test took.\nBoth sub-flows share this script's variables and captures.\n",
+    "env": {
+      "email": "qa+composed@atomyx.test",
+      "password": "super-secret"
+    },
+    "format": "atomyx/v1",
+    "name": "Composed flow — requires + runFlow",
+    "proxy": "required",
+    "requires": [
+      "flows/setup-fresh-user.yml"
+    ],
+    "steps": [
+      {
+        "command": "waitFor",
+        "selector": {
+          "label": "Welcome",
+          "text": "Welcome"
+        }
+      },
+      {
+        "command": "tap",
+        "selector": {
+          "label": "Continue",
+          "text": "Continue"
+        }
+      },
+      {
+        "command": "waitFor",
+        "selector": {
+          "label": "Dashboard",
+          "text": "Dashboard"
+        }
+      },
+      {
+        "command": "tap",
+        "selector": {
+          "label": "Edit profile",
+          "text": "Edit profile"
+        }
+      },
+      {
+        "command": "waitFor",
+        "selector": {
+          "label": "Display name",
+          "text": "Display name"
+        },
+        "timeoutMs": 5000
+      },
+      {
+        "command": "type",
+        "into": {
+          "id": "display_name"
+        },
+        "text": "QA Bot ${newUserId}"
+      },
+      {
+        "as": "updateRsp",
+        "command": "capture",
+        "pattern": "PUT /api/v1/me"
+      },
+      {
+        "command": "tap",
+        "selector": {
+          "label": "Save",
+          "text": "Save"
+        }
+      },
+      {
+        "body": {
+          "$.user.display_name": "QA Bot ${newUserId}",
+          "$.user.id": "${newUserId}"
+        },
+        "command": "assertApi",
+        "from": "updateRsp",
+        "status": 200
+      },
+      {
+        "command": "waitFor",
+        "selector": {
+          "label": "Profile updated",
+          "text": "Profile updated"
+        }
+      },
+      {
+        "command": "screenshot",
+        "label": "profile-updated"
+      },
+      {
+        "command": "runFlow",
+        "file": "flows/cleanup-account.yml"
+      }
+    ],
+    "tags": [
+      "composition",
+      "sub-flow",
+      "api"
+    ]
+  },
+  "valid": true
+}

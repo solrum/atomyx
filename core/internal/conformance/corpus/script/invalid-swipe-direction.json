@@ -1,0 +1,5 @@
+{
+  "name": "invalid-swipe-direction",
+  "description": "a swipe direction other than up, down, left, or right must be REJECTED.",
+  "yaml": "- launchApp\n- swipe: diagonal\n"
+}

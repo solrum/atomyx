@@ -1,0 +1,10 @@
+{
+  "name": "launch-app-failure-no-app-id",
+  "description": "launchApp fails with a fixed detail when the root script's appId is empty",
+  "yaml": "appId: \"\"\nname: no app id\nenv: {}\n---\n- launchApp\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

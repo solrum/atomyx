@@ -1,0 +1,1388 @@
+{
+  "add_case_study": {
+    "description": "Append a learned lesson to the case-studies playbook. Use AFTER recovering from a non-obvious error (obscurement dismissal, scroll-search edge case, flaky transition) so future sessions can read it. Records are markdown under case-studies/YYYY-MM/\u003cslug\u003e.",
+    "inputSchema": {
+      "properties": {
+        "example": {
+          "type": "string"
+        },
+        "solution": {
+          "description": "What worked to recover.",
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "trigger": {
+          "description": "What situation caused the pain.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "trigger",
+        "solution"
+      ],
+      "type": "object"
+    }
+  },
+  "delete_bug": {
+    "description": "Delete a persisted bug report. Removes BOTH `bugs/\u003cid\u003e` and its sibling `bugs/\u003cid\u003e/screenshot` key when present, so no orphan screenshot payloads are left behind. Returns ok:false when the id is not found (before any delete happens, so partial-delete states are impossible).",
+    "inputSchema": {
+      "properties": {
+        "id": {
+          "description": "Bug id to delete.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    }
+  },
+  "delete_run": {
+    "description": "Delete a persisted run record. Removes `runs/\u003cid\u003e` from storage. Associated bug records (`bugs/\u003crunId\u003e-bug-\u003cn\u003e`) are NOT cascade-deleted, and they remain accessible via get_bug with their runId field pointing at the now-missing run. Use list_bugs with the runId filter then delete_bug to clean those up individually if desired. Returns ok:false when the id is not found.",
+    "inputSchema": {
+      "properties": {
+        "id": {
+          "description": "Run id to delete.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    }
+  },
+  "disconnect_device": {
+    "description": "Disconnect the currently-active device and leave the session idle. Subsequent tool calls that need a device will fail until select_device is called again. Returns ok:true even when no device was bound (idempotent).",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    }
+  },
+  "find_element": {
+    "description": "Find a single element matching a selector. Returns the element's id, text, label, role, bounds, and tap center point. Use this to verify an element exists or to get coordinates when a selector-based tap is failing for some reason. Selector priority: id \u003e label \u003e text \u003e value \u003e hint, with role/enabled/clickable/focused as constraints.",
+    "inputSchema": {
+      "properties": {
+        "clickable": {
+          "type": "boolean"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "focused": {
+          "type": "boolean"
+        },
+        "hint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "properties": {
+                "flags": {
+                  "type": "string"
+                },
+                "regex": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "regex"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "properties": {
+                "flags": {
+                  "type": "string"
+                },
+                "regex": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "regex"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "properties": {
+                "flags": {
+                  "type": "string"
+                },
+                "regex": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "regex"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "nth": {
+          "type": "number"
+        },
+        "role": {
+          "type": "string"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "properties": {
+                "flags": {
+                  "type": "string"
+                },
+                "regex": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "regex"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "properties": {
+                "flags": {
+                  "type": "string"
+                },
+                "regex": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "regex"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    }
+  },
+  "finish_run": {
+    "description": "Finish the currently-active test run with a verdict and optional summary. Persists the run record to storage (key: runs/\u003cid\u003e) so it can be read back or exported to a reporter. Returns { ok, id, status, actionCount, findingsCount, durationMs }.",
+    "inputSchema": {
+      "properties": {
+        "status": {
+          "anyOf": [
+            {
+              "const": "passed"
+            },
+            {
+              "const": "failed"
+            },
+            {
+              "const": "error"
+            }
+          ]
+        },
+        "summary": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "get_bug": {
+    "description": "Fetch a single persisted bug report by id. Returns the full record including description and screenshotPath. The screenshot bytes live under the returned screenshotPath key and can be loaded separately by consumers that need them. Returns ok:false when the id is not found.",
+    "inputSchema": {
+      "properties": {
+        "id": {
+          "description": "Bug id as returned by report_bug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    }
+  },
+  "get_case_studies": {
+    "description": "List + read case-studies from the playbook. Returns markdown bodies sorted descending by key (newest month first). Call at the start of a session to surface lessons from previous runs. Supports offset/limit pagination plus an optional `month` filter.",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "type": "number"
+        },
+        "month": {
+          "type": "string"
+        },
+        "offset": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "get_run": {
+    "description": "Fetch a single persisted run by id. Returns the full record including findings and summary. Use list_runs first to discover available ids. Returns ok:false when the id is not found.",
+    "inputSchema": {
+      "properties": {
+        "id": {
+          "description": "Run id as returned by start_run.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    }
+  },
+  "get_ui_tree": {
+    "description": "Capture the current UI hierarchy as a flat depth-annotated list of elements. Each entry includes role, id, text, label, bounds, and interactive state. THIS IS YOUR PRIMARY OBSERVATION TOOL, so call it FIRST after launch_app, after every navigation action (tap, back, swipe), and whenever you need to understand the current screen. Prefer this over screenshot because it is faster, cheaper, and gives you actionable selectors for tap/input_text directly.",
+    "inputSchema": {
+      "properties": {
+        "includeSystemOverlays": {
+          "type": "boolean"
+        },
+        "limit": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "input_text": {
+    "description": "Type text into an input field. Pass either {selector, text} for full pipeline (find + scroll-into-view + tap-to-focus + optional clear + type) or {x, y, text} for coordinate-based input. Set clearFirst=false to append instead of overwrite (default clears).",
+    "inputSchema": {
+      "properties": {
+        "clearFirst": {
+          "type": "boolean"
+        },
+        "selector": {
+          "properties": {
+            "clickable": {
+              "type": "boolean"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "focused": {
+              "type": "boolean"
+            },
+            "hint": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "label": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "nth": {
+              "type": "number"
+            },
+            "role": {
+              "type": "string"
+            },
+            "text": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "value": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "text": {
+          "type": "string"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "type": "object"
+    }
+  },
+  "launch_app": {
+    "description": "Launch an app on the connected device by its app identifier. The driver brings the app to the foreground; subsequent tool calls operate on its UI. Requires an active device, so call `select_device` first. Use `list_apps` to discover available identifiers.",
+    "inputSchema": {
+      "properties": {
+        "appId": {
+          "description": "Cross-platform app identifier (bundle id / package name). Use the string reported by `list_apps`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "appId"
+      ],
+      "type": "object"
+    }
+  },
+  "list_apps": {
+    "description": "List apps installed on the current device. Returns app identifiers plus display labels. Call before launch_app when you need to confirm the exact identifier.",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    }
+  },
+  "list_bugs": {
+    "description": "List persisted bug reports from storage, sorted by timestamp descending (newest first). Returns summaries only. Use get_bug for the full record. Supports runId filter and offset/limit pagination. Response includes `totalMatching` + `nextOffset` for easy paging.",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "type": "number"
+        },
+        "offset": {
+          "type": "number"
+        },
+        "runId": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "list_devices": {
+    "description": "Enumerate connected devices across all supported platforms. Returns a flat list with { platform, id, name, state, kind } entries. Use this BEFORE starting the MCP server to pick the target device. Platforms whose toolchain isn't installed on the host are silently skipped.",
+    "inputSchema": {
+      "properties": {
+        "platform": {
+          "anyOf": [
+            {
+              "const": "ios"
+            },
+            {
+              "const": "android"
+            },
+            {
+              "const": "all"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    }
+  },
+  "list_runs": {
+    "description": "List persisted runs from storage, sorted by startedAt descending (most recent first). Returns summaries only. Use get_run to fetch the full record including findings. Supports status filter and offset/limit pagination. The response includes `totalMatching` so callers can decide whether to request another page.",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "type": "number"
+        },
+        "offset": {
+          "type": "number"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "const": "passed"
+            },
+            {
+              "const": "failed"
+            },
+            {
+              "const": "error"
+            },
+            {
+              "const": "running"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    }
+  },
+  "press_key": {
+    "description": "Press a system or navigation key (back, home, enter, etc.). Some keys may return ok=false when the platform has no equivalent primitive; the response hint explains the recommended on-screen fallback (e.g. tap a Cancel / Close button).",
+    "inputSchema": {
+      "properties": {
+        "key": {
+          "description": "Key name: back, home, enter, tab, escape, delete, etc.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "type": "object"
+    }
+  },
+  "report_bug": {
+    "description": "Record a bug finding in the currently-active run. Optionally captures a screenshot. Use this AFTER confirming the bug by observing the device state. Returns the bug id for reference.",
+    "inputSchema": {
+      "properties": {
+        "captureScreenshot": {
+          "type": "boolean"
+        },
+        "description": {
+          "description": "Full description: expected vs actual, repro steps, any context the agent gathered (selectors tried, tool results, etc.).",
+          "type": "string"
+        },
+        "title": {
+          "description": "One-line bug title.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "description"
+      ],
+      "type": "object"
+    }
+  },
+  "run_script": {
+    "description": "Execute a YAML test script deterministically against the current device. Steps run in order, and execution stops on the first failure. Returns structured results with a pass or fail outcome per step. When a failure happened because the device or agent went unreachable rather than an ordinary assertion or command failure, the failed step and the top level result both carry deviceLost true. A script whose proxy field is \"required\" needs a proxy argument on this call; without one the result carries ok false, zero steps, and a top level abort object naming why. Use this for regression runs or replaying recorded flows, not for exploratory testing.",
+    "inputSchema": {
+      "properties": {
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "proxy": {
+          "description": "Network capture target for a script whose proxy field is \"required\", in \"type:path\" form, for example \"file:/tmp/capture.jsonl\". Omit when the script declares no proxy requirement.",
+          "type": "string"
+        },
+        "script": {
+          "description": "YAML test script content. Use the Atomyx YAML format with appId, name, env, and steps.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "script"
+      ],
+      "type": "object"
+    }
+  },
+  "screenshot": {
+    "description": "Use this only as a last resort, when get_ui_tree cannot answer your question (e.g. custom-rendered canvas, Flutter without semantics, visual layout validation, or when you suspect the UI tree is missing elements). Saves a compressed JPEG to .atomyx/screenshots/ and returns the file path. Read the file to view. Always try get_ui_tree or find_element FIRST because they are faster, cheaper, and give you actionable selectors directly.",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    }
+  },
+  "select_device": {
+    "description": "Bind the MCP session to a device so subsequent tools (launch_app, tap, get_ui_tree, etc.) operate on it. Enumerate candidates with list_devices first. Calling this again mid-session switches to a different device. The previous driver is disconnected cleanly.",
+    "inputSchema": {
+      "properties": {
+        "id": {
+          "description": "Device identifier as reported by list_devices.",
+          "type": "string"
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "const": "simulator"
+            },
+            {
+              "const": "device"
+            }
+          ]
+        },
+        "platform": {
+          "anyOf": [
+            {
+              "const": "ios"
+            },
+            {
+              "const": "android"
+            }
+          ]
+        },
+        "port": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "platform",
+        "id"
+      ],
+      "type": "object"
+    }
+  },
+  "start_run": {
+    "description": "Start a new test run. Call this BEFORE driving the device so bug reports and case studies can be attached to a named run. Any previously-active run is implicitly force-closed as 'error' and its record is persisted to runs/\u003cid\u003e so the lost run's trail isn't dropped. The returned `erroredPredecessor` field carries the old run id when this happens.",
+    "inputSchema": {
+      "properties": {
+        "name": {
+          "description": "Human description of the run.",
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    }
+  },
+  "swipe": {
+    "description": "Swipe the screen. Pass {direction: 'up'|'down'|'left'|'right'} for a centered directional scroll (default 60% of screen), or {fromX, fromY, toX, toY} for a precise two-point swipe. durationMs default 200.",
+    "inputSchema": {
+      "properties": {
+        "direction": {
+          "anyOf": [
+            {
+              "const": "up"
+            },
+            {
+              "const": "down"
+            },
+            {
+              "const": "left"
+            },
+            {
+              "const": "right"
+            }
+          ]
+        },
+        "durationMs": {
+          "type": "number"
+        },
+        "fraction": {
+          "type": "number"
+        },
+        "fromX": {
+          "type": "number"
+        },
+        "fromY": {
+          "type": "number"
+        },
+        "toX": {
+          "type": "number"
+        },
+        "toY": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "tap": {
+    "description": "Tap an element. Pass {selector: {...}} to find and tap the matching element with automatic scroll-into-view and obscurement detection, OR pass {x, y} to tap raw coordinates (use when you have a center point from get_ui_tree or find_element). Returns ok=true on success, or ok=false with a reason and optional obscurer info on failure.",
+    "inputSchema": {
+      "properties": {
+        "selector": {
+          "properties": {
+            "clickable": {
+              "type": "boolean"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "focused": {
+              "type": "boolean"
+            },
+            "hint": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "label": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "nth": {
+              "type": "number"
+            },
+            "role": {
+              "type": "string"
+            },
+            "text": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "value": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "tap_and_wait_transition": {
+    "description": "Tap + verify screen transition atomically. Use this INSTEAD of plain tap when the tap causes navigation / submit / login. Pass waitForAbsent (old anchor) and/or waitForAppear (new anchor). On timeout, returns a structured classification (still_loading, dialog_or_error_shown, partial_transition, no_change_detected) with an actionable hint. After this succeeds, call get_ui_tree to inspect the new screen. Do NOT use screenshot.",
+    "inputSchema": {
+      "properties": {
+        "intervalMs": {
+          "type": "number"
+        },
+        "loadingKeywords": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "maxTimeoutMs": {
+          "type": "number"
+        },
+        "selector": {
+          "properties": {
+            "clickable": {
+              "type": "boolean"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "focused": {
+              "type": "boolean"
+            },
+            "hint": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "label": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "nth": {
+              "type": "number"
+            },
+            "role": {
+              "type": "string"
+            },
+            "text": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "value": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "timeoutMs": {
+          "type": "number"
+        },
+        "waitForAbsent": {
+          "properties": {
+            "clickable": {
+              "type": "boolean"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "focused": {
+              "type": "boolean"
+            },
+            "hint": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "label": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "nth": {
+              "type": "number"
+            },
+            "role": {
+              "type": "string"
+            },
+            "text": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "value": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "waitForAppear": {
+          "properties": {
+            "clickable": {
+              "type": "boolean"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "focused": {
+              "type": "boolean"
+            },
+            "hint": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "label": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "nth": {
+              "type": "number"
+            },
+            "role": {
+              "type": "string"
+            },
+            "text": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "value": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            }
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "selector"
+      ],
+      "type": "object"
+    }
+  },
+  "update_run_summary": {
+    "description": "Set or replace the summary field on a persisted run. Useful when the summary wasn't known at finish_run time, or to append context discovered by a later investigation. Only the summary field is mutated, while all other fields (status, findings, durationMs, …) are preserved. Returns ok:false when the id is not found.",
+    "inputSchema": {
+      "properties": {
+        "id": {
+          "description": "Run id to update.",
+          "type": "string"
+        },
+        "summary": {
+          "description": "New summary text. Pass an empty string to clear.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "summary"
+      ],
+      "type": "object"
+    }
+  },
+  "wait_for_element": {
+    "description": "Poll the UI hierarchy until an element matching the selector appears, or the timeout expires. Use after a tap that triggers navigation: wait_for_element({selector: {text: 'Welcome'}, timeoutMs: 5000}). Returns the same shape as find_element on success (id, text, label, value, role, bounds, center, enabled, clickable) or {found: false, reason, elapsedMs, polls} on timeout.",
+    "inputSchema": {
+      "properties": {
+        "pollIntervalMs": {
+          "type": "number"
+        },
+        "selector": {
+          "properties": {
+            "clickable": {
+              "type": "boolean"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "focused": {
+              "type": "boolean"
+            },
+            "hint": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "label": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "nth": {
+              "type": "number"
+            },
+            "role": {
+              "type": "string"
+            },
+            "text": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "value": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "properties": {
+                    "flags": {
+                      "type": "string"
+                    },
+                    "regex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "regex"
+                  ],
+                  "type": "object"
+                }
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "timeoutMs": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "selector"
+      ],
+      "type": "object"
+    }
+  }
+}

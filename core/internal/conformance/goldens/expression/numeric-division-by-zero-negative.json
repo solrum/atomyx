@@ -1,0 +1,11 @@
+{
+  "booleanValue": false,
+  "errorKind": "eval",
+  "kind": "error",
+  "message": "division by zero at position 5",
+  "numberBits": "",
+  "numberText": "",
+  "position": 5,
+  "stringValue": "",
+  "valueType": ""
+}

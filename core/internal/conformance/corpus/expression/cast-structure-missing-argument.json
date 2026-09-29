@@ -1,0 +1,5 @@
+{
+  "name": "cast-structure-missing-argument",
+  "description": "a cast call with no argument at all.",
+  "expr": "string()"
+}

@@ -1,0 +1,11 @@
+{
+  "name": "cast-string-infinity",
+  "description": "string() renders positive infinity.",
+  "expr": "string(inf)",
+  "variables": {
+    "inf": {
+      "type": "number",
+      "number": "Infinity"
+    }
+  }
+}

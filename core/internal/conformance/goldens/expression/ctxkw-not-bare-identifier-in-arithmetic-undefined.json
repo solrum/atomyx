@@ -1,0 +1,11 @@
+{
+  "booleanValue": false,
+  "errorKind": "eval",
+  "kind": "error",
+  "message": "variable \"not\" is not defined at position 4",
+  "numberBits": "",
+  "numberText": "",
+  "position": 4,
+  "stringValue": "",
+  "valueType": ""
+}

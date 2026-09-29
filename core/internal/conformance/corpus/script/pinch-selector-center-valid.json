@@ -1,0 +1,5 @@
+{
+  "name": "pinch-selector-center-valid",
+  "description": "pinch with a selector center, gaps, and an explicit horizontal axis parses to a PinchStep.",
+  "yaml": "- launchApp\n- pinch:\n    center: { id: canvas }\n    startGap: 60\n    endGap: 200\n    axis: horizontal\n    durationMs: 300\n"
+}

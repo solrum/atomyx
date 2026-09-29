@@ -1,0 +1,25 @@
+{
+  "name": "script-run-success",
+  "description": "runScript on a two-step passing script emits the full runStarted/stepStarted/stepCompleted/stepStarted/stepCompleted/runCompleted event stream and returns an ok result; isRunning reports false once it returns.",
+  "deviceSnapshots": [
+    [
+      { "id": "mock-1", "platform": "android", "name": "Mock Device", "kind": "emulator", "state": "online" }
+    ]
+  ],
+  "driver": {
+    "apps": ["com.example.app"],
+    "hierarchies": [
+      {
+        "attributes": {},
+        "children": [
+          { "attributes": { "text": "Login", "label": "Login", "bounds": "40,300,390,350" }, "children": [], "clickable": true }
+        ]
+      }
+    ]
+  },
+  "steps": [
+    { "method": "selectDevice", "params": { "id": "mock-1" } },
+    { "method": "runScript", "params": { "yaml": "appId: com.example.app\nname: login tap\nenv: {}\n---\n- launchApp\n- tap: Login\n- assertVisible: Login\n" } },
+    { "method": "isRunning" }
+  ]
+}

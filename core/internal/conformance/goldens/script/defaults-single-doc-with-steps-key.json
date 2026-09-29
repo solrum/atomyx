@@ -1,0 +1,25 @@
+{
+  "parsed": {
+    "_stepLines": [
+      5,
+      6
+    ],
+    "appId": "com.example.app",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Single document form",
+    "steps": [
+      {
+        "command": "launchApp"
+      },
+      {
+        "command": "tap",
+        "selector": {
+          "label": "Login",
+          "text": "Login"
+        }
+      }
+    ]
+  },
+  "valid": true
+}

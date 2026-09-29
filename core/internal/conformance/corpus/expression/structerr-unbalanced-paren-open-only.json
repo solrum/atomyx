@@ -1,0 +1,5 @@
+{
+  "name": "structerr-unbalanced-paren-open-only",
+  "description": "a single stray opening parenthesis.",
+  "expr": "("
+}

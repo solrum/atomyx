@@ -1,0 +1,5 @@
+{
+  "name": "structerr-unbalanced-paren-open-with-expr",
+  "description": "an opening parenthesis with no matching close.",
+  "expr": "(1"
+}

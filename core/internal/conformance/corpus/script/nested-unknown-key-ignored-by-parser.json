@@ -1,0 +1,5 @@
+{
+  "name": "nested-unknown-key-ignored-by-parser",
+  "description": "a step's misspelled or extraneous sibling key, two levels deep inside a nested handle's `do`, is silently ignored during YAML parsing in both languages, the same as at the top level.",
+  "yaml": "appId: com.example.app\nname: Smoke\nenv: {}\n---\n- launchApp\n- handle:\n    - when: { visible: \"Outer\" }\n      do:\n        - handle:\n            - when: { visible: \"Inner\" }\n              do:\n                - tap: \"Confirm\"\n                  bogusStepField: unexpected\n            - otherwise: skip\n    - otherwise: fail\n"
+}

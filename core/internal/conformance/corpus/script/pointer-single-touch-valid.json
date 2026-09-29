@@ -1,0 +1,5 @@
+{
+  "name": "pointer-single-touch-valid",
+  "description": "pointer with a single-entry `touches` list is valid (a single-pointer gesture).",
+  "yaml": "- launchApp\n- pointer:\n    touches:\n      - actions:\n          - down: \"Item A\"\n          - up\n"
+}

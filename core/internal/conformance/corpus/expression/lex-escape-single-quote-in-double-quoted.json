@@ -1,0 +1,5 @@
+{
+  "name": "lex-escape-single-quote-in-double-quoted",
+  "description": "an escaped single quote inside a double-quoted string.",
+  "expr": "\"it\\'s\""
+}

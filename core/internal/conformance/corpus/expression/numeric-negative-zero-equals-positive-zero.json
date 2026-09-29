@@ -1,0 +1,5 @@
+{
+  "name": "numeric-negative-zero-equals-positive-zero",
+  "description": "negative zero compares equal to positive zero.",
+  "expr": "(-1 * 0) == 0"
+}

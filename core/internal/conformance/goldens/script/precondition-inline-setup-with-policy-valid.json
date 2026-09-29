@@ -1,0 +1,34 @@
+{
+  "parsed": {
+    "_stepLines": [
+      10
+    ],
+    "appId": "com.example.app",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Smoke with inline precondition",
+    "preconditions": [
+      {
+        "check": {
+          "visible": "Home"
+        },
+        "policy": "always",
+        "setup": [
+          {
+            "command": "tap",
+            "selector": {
+              "label": "Skip",
+              "text": "Skip"
+            }
+          }
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "command": "launchApp"
+      }
+    ]
+  },
+  "valid": true
+}

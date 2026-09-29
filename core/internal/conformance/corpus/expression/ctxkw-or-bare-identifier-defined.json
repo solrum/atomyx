@@ -1,0 +1,11 @@
+{
+  "name": "ctxkw-or-bare-identifier-defined",
+  "description": "the keyword or, appearing where no left operand precedes it, resolves as a variable when one is bound to that name.",
+  "expr": "or",
+  "variables": {
+    "or": {
+      "type": "boolean",
+      "boolean": false
+    }
+  }
+}

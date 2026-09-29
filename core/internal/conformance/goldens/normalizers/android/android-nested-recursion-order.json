@@ -1,0 +1,127 @@
+{
+  "attributes": {
+    "class": "android.widget.FrameLayout",
+    "role": "container"
+  },
+  "children": [
+    {
+      "attributes": {
+        "class": "androidx.recyclerview.widget.RecyclerView",
+        "role": "list"
+      },
+      "children": [
+        {
+          "attributes": {
+            "class": "android.widget.LinearLayout",
+            "role": "container"
+          },
+          "children": [
+            {
+              "attributes": {
+                "class": "android.widget.TextView",
+                "role": "text",
+                "text": "first"
+              },
+              "children": [],
+              "clickable": false,
+              "enabled": true,
+              "focused": false,
+              "selected": false,
+              "visible": true
+            },
+            {
+              "attributes": {
+                "class": "android.widget.ImageView",
+                "label": "avatar",
+                "role": "image"
+              },
+              "children": [],
+              "clickable": false,
+              "enabled": true,
+              "focused": false,
+              "selected": false,
+              "visible": true
+            }
+          ],
+          "clickable": true,
+          "enabled": true,
+          "focused": false,
+          "selected": true,
+          "visible": true
+        },
+        {
+          "attributes": {
+            "class": "android.widget.LinearLayout",
+            "role": "container"
+          },
+          "children": [
+            {
+              "attributes": {
+                "class": "android.widget.TextView",
+                "role": "text",
+                "text": "second"
+              },
+              "children": [],
+              "clickable": false,
+              "enabled": true,
+              "focused": false,
+              "selected": false,
+              "visible": true
+            }
+          ],
+          "clickable": true,
+          "enabled": true,
+          "focused": false,
+          "selected": false,
+          "visible": true
+        }
+      ],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.widget.FrameLayout",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.widget.FrameLayout",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    },
+    {
+      "attributes": {
+        "class": "android.widget.FrameLayout",
+        "role": "container"
+      },
+      "children": [],
+      "clickable": false,
+      "enabled": true,
+      "focused": false,
+      "selected": false,
+      "visible": true
+    }
+  ],
+  "clickable": false,
+  "enabled": true,
+  "focused": false,
+  "selected": false,
+  "visible": true
+}

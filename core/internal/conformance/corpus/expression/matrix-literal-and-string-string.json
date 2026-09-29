@@ -1,0 +1,5 @@
+{
+  "name": "matrix-literal-and-string-string",
+  "description": "literal string \"and\" literal string",
+  "expr": "\"a\" and \"a\""
+}

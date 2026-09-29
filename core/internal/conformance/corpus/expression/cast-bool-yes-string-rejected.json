@@ -1,0 +1,5 @@
+{
+  "name": "cast-bool-yes-string-rejected",
+  "description": "bool() rejects the string \"yes\".",
+  "expr": "bool(\"yes\")"
+}

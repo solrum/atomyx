@@ -1,0 +1,5 @@
+{
+  "name": "lex-escape-newline",
+  "description": "a newline escape sequence inside a string.",
+  "expr": "\"line1\\nline2\""
+}

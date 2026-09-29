@@ -1,0 +1,5 @@
+{
+  "name": "cast-number-invalid-leading-dot-string",
+  "description": "number() rejects a string with a leading decimal point and no digit before it.",
+  "expr": "number(\".5\")"
+}

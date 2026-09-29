@@ -1,0 +1,5 @@
+{
+  "name": "structerr-dangling-operator-leading-plus",
+  "description": "a leading plus sign, which is not a valid unary operator.",
+  "expr": "+ 1"
+}

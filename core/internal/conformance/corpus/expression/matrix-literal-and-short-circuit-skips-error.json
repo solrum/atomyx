@@ -1,0 +1,5 @@
+{
+  "name": "matrix-literal-and-short-circuit-skips-error",
+  "description": "and short-circuits on a false left side, so an error-producing right side never evaluates.",
+  "expr": "false and (1 / 0 == 0)"
+}

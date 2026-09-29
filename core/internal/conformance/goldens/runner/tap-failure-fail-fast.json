@@ -1,0 +1,196 @@
+{
+  "calls": [
+    {
+      "args": [
+        "com.test",
+        {}
+      ],
+      "method": "launchApp"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [
+        {
+          "x": 215,
+          "y": 186.40000000000003
+        },
+        {
+          "x": 215,
+          "y": 745.5999999999999
+        },
+        200
+      ],
+      "method": "swipe"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [
+        {
+          "x": 215,
+          "y": 745.5999999999999
+        },
+        {
+          "x": 215,
+          "y": 186.40000000000003
+        },
+        200
+      ],
+      "method": "swipe"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    }
+  ],
+  "durationMs": 1000,
+  "events": [
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "line": 5,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "tap",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 6,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "tap: element.text = \"Nonexistent\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "tap"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "element"
+        },
+        {
+          "kind": "punct",
+          "text": "."
+        },
+        {
+          "kind": "identifier",
+          "text": "text"
+        },
+        {
+          "kind": "punct",
+          "text": " = "
+        },
+        {
+          "kind": "string",
+          "text": "\"Nonexistent\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "tap",
+      "depth": 0,
+      "detail": "could not scroll element into view: element not found after scroll-search (UP + DOWN budgets exhausted)",
+      "durationMs": 1000,
+      "line": 6,
+      "ok": false,
+      "stepIndex": 1,
+      "summary": "tap: element.text = \"Nonexistent\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "tap"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "element"
+        },
+        {
+          "kind": "punct",
+          "text": "."
+        },
+        {
+          "kind": "identifier",
+          "text": "text"
+        },
+        {
+          "kind": "punct",
+          "text": " = "
+        },
+        {
+          "kind": "string",
+          "text": "\"Nonexistent\""
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": 1,
+  "ok": false,
+  "passedSteps": 1,
+  "screenshots": [],
+  "scriptName": "tap failure",
+  "steps": [
+    {
+      "command": "launchApp",
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    },
+    {
+      "command": "tap",
+      "detail": "could not scroll element into view: element not found after scroll-search (UP + DOWN budgets exhausted)",
+      "durationMs": 1000,
+      "ok": false,
+      "stepIndex": 1
+    }
+  ],
+  "totalSteps": 3
+}

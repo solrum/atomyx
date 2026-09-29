@@ -1,0 +1,217 @@
+{
+  "calls": [
+    {
+      "args": [
+        "com.test",
+        {}
+      ],
+      "method": "launchApp"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 6,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "line": 6,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "capture",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 7,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "capture: r ← \"POST /login\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "capture"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "r"
+        },
+        {
+          "kind": "punct",
+          "text": " ← "
+        },
+        {
+          "kind": "string",
+          "text": "\"POST /login\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "capture",
+      "depth": 0,
+      "detail": "Captured POST /login returning status 500 as \"r\"",
+      "durationMs": 0,
+      "line": 7,
+      "ok": true,
+      "stepIndex": 1,
+      "summary": "capture: r ← \"POST /login\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "capture"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "r"
+        },
+        {
+          "kind": "punct",
+          "text": " ← "
+        },
+        {
+          "kind": "string",
+          "text": "\"POST /login\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "branch",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 8,
+      "ok": null,
+      "stepIndex": 2,
+      "summary": "branch on $r (\"1 case\")",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "branch"
+        },
+        {
+          "kind": "punct",
+          "text": " on "
+        },
+        {
+          "kind": "identifier",
+          "text": "$r"
+        },
+        {
+          "kind": "punct",
+          "text": " ("
+        },
+        {
+          "kind": "string",
+          "text": "\"1 case\""
+        },
+        {
+          "kind": "punct",
+          "text": ")"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "branch",
+      "depth": 0,
+      "detail": "branch: no case matched for \"r\" (status=500)",
+      "durationMs": 0,
+      "line": 8,
+      "ok": false,
+      "stepIndex": 2,
+      "summary": "branch on $r (\"1 case\")",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "branch"
+        },
+        {
+          "kind": "punct",
+          "text": " on "
+        },
+        {
+          "kind": "identifier",
+          "text": "$r"
+        },
+        {
+          "kind": "punct",
+          "text": " ("
+        },
+        {
+          "kind": "string",
+          "text": "\"1 case\""
+        },
+        {
+          "kind": "punct",
+          "text": ")"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": 2,
+  "ok": false,
+  "passedSteps": 2,
+  "screenshots": [],
+  "scriptName": "branch no match",
+  "steps": [
+    {
+      "command": "launchApp",
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    },
+    {
+      "command": "capture",
+      "detail": "Captured POST /login returning status 500 as \"r\"",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 1
+    },
+    {
+      "command": "branch",
+      "detail": "branch: no case matched for \"r\" (status=500)",
+      "durationMs": 0,
+      "ok": false,
+      "stepIndex": 2
+    }
+  ],
+  "totalSteps": 3
+}

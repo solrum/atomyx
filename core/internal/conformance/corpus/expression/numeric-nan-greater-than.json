@@ -1,0 +1,11 @@
+{
+  "name": "numeric-nan-greater-than",
+  "description": "NaN compares false under >.",
+  "expr": "nanVar > 1",
+  "variables": {
+    "nanVar": {
+      "type": "number",
+      "number": "NaN"
+    }
+  }
+}

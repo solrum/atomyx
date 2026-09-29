@@ -1,0 +1,21 @@
+{
+  "name": "inspection-fresh-and-cached",
+  "description": "getUiTree captures a fresh tree, a second call within the cache TTL returns the same cached tree without re-capturing, invalidateUiCache drops it, and a following getUiTree captures fresh again.",
+  "deviceSnapshots": [
+    [
+      { "id": "mock-1", "platform": "android", "name": "Mock Device", "kind": "emulator", "state": "online" }
+    ]
+  ],
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [{ "attributes": { "text": "Login" }, "children": [] }] }
+    ]
+  },
+  "steps": [
+    { "method": "selectDevice", "params": { "id": "mock-1" } },
+    { "method": "getUiTree" },
+    { "method": "getUiTree" },
+    { "method": "invalidateUiCache" },
+    { "method": "getUiTree", "params": { "fresh": true } }
+  ]
+}

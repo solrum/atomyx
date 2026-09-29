@@ -1,0 +1,22 @@
+{
+  "name": "branch-multi-case-second-matches",
+  "description": "branch with multiple cases: the first case's status does not match, the second matches on status and body together, and its inline steps run",
+  "yaml": "appId: com.test\nname: branch multi case\nproxy: optional\nenv: {}\n---\n- launchApp\n- capture: \"POST /login as: loginRsp\"\n- branch:\n    from: loginRsp\n    on:\n      - match:\n          status: 200\n        do:\n          - screenshot: unexpected\n      - match:\n          status: 401\n          body:\n            \"$.requiresOtp\": true\n        do:\n          - screenshot: otp-required\n    default:\n      - screenshot: fallback\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  },
+  "network": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/login",
+        "status": 401,
+        "headers": {},
+        "body": { "requiresOtp": true },
+        "timestampMs": 0
+      }
+    ]
+  }
+}

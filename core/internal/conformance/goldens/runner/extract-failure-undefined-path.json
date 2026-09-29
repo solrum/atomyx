@@ -1,0 +1,209 @@
+{
+  "calls": [
+    {
+      "args": [
+        "com.test",
+        {}
+      ],
+      "method": "launchApp"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 6,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "line": 6,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "capture",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 7,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "capture: r ← \"GET /x\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "capture"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "r"
+        },
+        {
+          "kind": "punct",
+          "text": " ← "
+        },
+        {
+          "kind": "string",
+          "text": "\"GET /x\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "capture",
+      "depth": 0,
+      "detail": "Captured GET /x returning status 200 as \"r\"",
+      "durationMs": 0,
+      "line": 7,
+      "ok": true,
+      "stepIndex": 1,
+      "summary": "capture: r ← \"GET /x\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "capture"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "r"
+        },
+        {
+          "kind": "punct",
+          "text": " ← "
+        },
+        {
+          "kind": "string",
+          "text": "\"GET /x\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "extract",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 8,
+      "ok": null,
+      "stepIndex": 2,
+      "summary": "extract: $r into missing",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "extract"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "$r"
+        },
+        {
+          "kind": "punct",
+          "text": " into "
+        },
+        {
+          "kind": "string",
+          "text": "missing"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "extract",
+      "depth": 0,
+      "detail": "Path \"$.nope\" resolved to undefined in captured \"r\"",
+      "durationMs": 0,
+      "line": 8,
+      "ok": false,
+      "stepIndex": 2,
+      "summary": "extract: $r into missing",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "extract"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "$r"
+        },
+        {
+          "kind": "punct",
+          "text": " into "
+        },
+        {
+          "kind": "string",
+          "text": "missing"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": 2,
+  "ok": false,
+  "passedSteps": 2,
+  "screenshots": [],
+  "scriptName": "extract failure",
+  "steps": [
+    {
+      "command": "launchApp",
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    },
+    {
+      "command": "capture",
+      "detail": "Captured GET /x returning status 200 as \"r\"",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 1
+    },
+    {
+      "command": "extract",
+      "detail": "Path \"$.nope\" resolved to undefined in captured \"r\"",
+      "durationMs": 0,
+      "ok": false,
+      "stepIndex": 2
+    }
+  ],
+  "totalSteps": 3
+}

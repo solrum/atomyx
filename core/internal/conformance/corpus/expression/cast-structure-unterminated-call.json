@@ -1,0 +1,5 @@
+{
+  "name": "cast-structure-unterminated-call",
+  "description": "a cast call missing its closing parenthesis.",
+  "expr": "number(1"
+}

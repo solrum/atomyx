@@ -1,0 +1,272 @@
+{
+  "calls": [
+    {
+      "args": [
+        "com.test",
+        {}
+      ],
+      "method": "launchApp"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 6,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "line": 6,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "launchApp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "capture",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 7,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "capture: loginRsp ← \"POST /login\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "capture"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "loginRsp"
+        },
+        {
+          "kind": "punct",
+          "text": " ← "
+        },
+        {
+          "kind": "string",
+          "text": "\"POST /login\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "capture",
+      "depth": 0,
+      "detail": "Captured POST /login returning status 200 as \"loginRsp\"",
+      "durationMs": 0,
+      "line": 7,
+      "ok": true,
+      "stepIndex": 1,
+      "summary": "capture: loginRsp ← \"POST /login\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "capture"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "loginRsp"
+        },
+        {
+          "kind": "punct",
+          "text": " ← "
+        },
+        {
+          "kind": "string",
+          "text": "\"POST /login\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "branch",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 8,
+      "ok": null,
+      "stepIndex": 2,
+      "summary": "branch on $loginRsp (\"1 case\")",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "branch"
+        },
+        {
+          "kind": "punct",
+          "text": " on "
+        },
+        {
+          "kind": "identifier",
+          "text": "$loginRsp"
+        },
+        {
+          "kind": "punct",
+          "text": " ("
+        },
+        {
+          "kind": "string",
+          "text": "\"1 case\""
+        },
+        {
+          "kind": "punct",
+          "text": ")"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "screenshot",
+      "depth": 1,
+      "detail": null,
+      "durationMs": null,
+      "line": null,
+      "ok": null,
+      "stepIndex": 3,
+      "summary": "screenshot: \"fallback\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "screenshot"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"fallback\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "screenshot",
+      "depth": 1,
+      "detail": "Screenshot saved as \"fallback\"",
+      "durationMs": 0,
+      "line": null,
+      "ok": true,
+      "stepIndex": 3,
+      "summary": "screenshot: \"fallback\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "screenshot"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"fallback\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "branch",
+      "depth": 0,
+      "detail": "completed",
+      "durationMs": 0,
+      "line": 8,
+      "ok": true,
+      "stepIndex": 2,
+      "summary": "branch on $loginRsp (\"1 case\")",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "branch"
+        },
+        {
+          "kind": "punct",
+          "text": " on "
+        },
+        {
+          "kind": "identifier",
+          "text": "$loginRsp"
+        },
+        {
+          "kind": "punct",
+          "text": " ("
+        },
+        {
+          "kind": "string",
+          "text": "\"1 case\""
+        },
+        {
+          "kind": "punct",
+          "text": ")"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 3,
+  "screenshots": [
+    {
+      "dataLength": 0,
+      "label": "fallback"
+    }
+  ],
+  "scriptName": "branch nested object mismatch",
+  "steps": [
+    {
+      "command": "launchApp",
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    },
+    {
+      "command": "capture",
+      "detail": "Captured POST /login returning status 200 as \"loginRsp\"",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 1
+    },
+    {
+      "command": "branch",
+      "detail": "completed",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 2
+    }
+  ],
+  "totalSteps": 3
+}

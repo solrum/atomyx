@@ -1,0 +1,5 @@
+{
+  "name": "cast-string-boolean-true",
+  "description": "string() renders true as \"true\".",
+  "expr": "string(true)"
+}

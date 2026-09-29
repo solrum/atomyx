@@ -5,10 +5,10 @@ import XCTest
 /// string name the host adapter consumes over the wire.
 ///
 /// Kept as a free function (not a method on `DefaultXCUIBridge`)
-/// because it's data-driven with no XCUI state — anything in the
+/// because it's data-driven with no XCUI state. Anything in the
 /// driver that needs the string representation can call this without
 /// pulling in the whole bridge. The `@unknown default` branch lets
-/// future iOS SDKs add element types without breaking the build —
+/// future iOS SDKs add element types without breaking the build.
 /// they'll surface as `typeN` where N is the raw enum value, which
 /// the host adapter treats as `other`.
 func elementTypeName(_ t: XCUIElement.ElementType) -> String {

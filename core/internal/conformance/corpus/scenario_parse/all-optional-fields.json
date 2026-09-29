@@ -1,0 +1,5 @@
+{
+  "name": "all-optional-fields",
+  "description": "every optional field populated: format, description, onFailure, preconditions, env, and tags.",
+  "yaml": "format: atomyx-scenario/v1\nname: Checkout regression\ndescription: Login + browse + buy happy path\nscripts:\n  - flows/login.yml\n  - flows/browse-catalog.yml\n  - flows/checkout.yml\nonFailure: continue\npreconditions: force\nenv:\n  BASE_URL: https://staging.example.com\ntags:\n  - smoke\n  - regression\n"
+}

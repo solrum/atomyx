@@ -1,0 +1,122 @@
+{
+  "events": [
+    {
+      "event": "deviceConnected",
+      "payload": {
+        "id": "mock-1",
+        "kind": "emulator",
+        "name": "Mock Device",
+        "platform": "android",
+        "state": "online"
+      }
+    },
+    {
+      "event": "runStarted",
+      "payload": {
+        "runId": "\u003cnormalized\u003e",
+        "scriptName": "valid after invalid",
+        "startedAt": "\u003cnormalized\u003e"
+      }
+    },
+    {
+      "event": "stepStarted",
+      "payload": {
+        "command": "launchApp",
+        "depth": 0,
+        "line": 5,
+        "runId": "\u003cnormalized\u003e",
+        "stepIndex": 0,
+        "summary": "launchApp",
+        "tokens": [
+          {
+            "kind": "keyword",
+            "text": "launchApp"
+          }
+        ],
+        "type": "stepStarted"
+      }
+    },
+    {
+      "event": "stepCompleted",
+      "payload": {
+        "command": "launchApp",
+        "depth": 0,
+        "detail": "Launched com.example.app",
+        "durationMs": "\u003cnormalized\u003e",
+        "line": 5,
+        "ok": true,
+        "runId": "\u003cnormalized\u003e",
+        "stepIndex": 0,
+        "summary": "launchApp",
+        "tokens": [
+          {
+            "kind": "keyword",
+            "text": "launchApp"
+          }
+        ],
+        "type": "stepCompleted"
+      }
+    },
+    {
+      "event": "runCompleted",
+      "payload": {
+        "durationMs": "\u003cnormalized\u003e",
+        "ok": true,
+        "passed": 1,
+        "runId": "\u003cnormalized\u003e",
+        "total": 1
+      }
+    }
+  ],
+  "steps": [
+    {
+      "method": "selectDevice",
+      "result": {
+        "id": "mock-1",
+        "kind": "emulator",
+        "name": "Mock Device",
+        "platform": "android",
+        "state": "online"
+      }
+    },
+    {
+      "errorCode": "InternalError",
+      "method": "runScript"
+    },
+    {
+      "method": "isRunning",
+      "result": {
+        "running": false
+      }
+    },
+    {
+      "method": "runScript",
+      "result": {
+        "result": {
+          "artifacts": {},
+          "durationMs": "\u003cnormalized\u003e",
+          "ok": true,
+          "passedSteps": 1,
+          "scriptName": "valid after invalid",
+          "steps": [
+            {
+              "command": "launchApp",
+              "detail": "Launched com.example.app",
+              "durationMs": "\u003cnormalized\u003e",
+              "ok": true,
+              "stepIndex": 0
+            }
+          ],
+          "totalSteps": 1
+        },
+        "runId": "\u003cnormalized\u003e"
+      }
+    },
+    {
+      "method": "isRunning",
+      "result": {
+        "running": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "booleanValue": false,
+  "errorKind": "eval",
+  "kind": "error",
+  "message": "cannot use string value \"a\" in a logical operation, convert it with bool(...) at position 0",
+  "numberBits": "",
+  "numberText": "",
+  "position": 0,
+  "stringValue": "",
+  "valueType": ""
+}

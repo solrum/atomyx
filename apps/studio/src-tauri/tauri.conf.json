@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "dev.atomyx.studio",
   "build": {
-    "beforeDevCommand": "npm --workspace=@atomyx/sidecar run build:bundle && mkdir -p src-tauri/resources && cp ../../packages/sidecar/dist-bundle/sidecar.cjs src-tauri/resources/sidecar.cjs && cp ../../packages/sidecar/dist-bundle/sidecar.cjs src-tauri/target/debug/sidecar.cjs 2>/dev/null; npm run dev",
+    "beforeDevCommand": "make -C ../.. build-core && mkdir -p src-tauri/resources && cp ../../core/bin/atomyx-runtime src-tauri/resources/atomyx-runtime && cp ../../core/bin/atomyx-runtime src-tauri/target/debug/atomyx-runtime 2>/dev/null; npm run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run build && npm --workspace=@atomyx/sidecar run build:bundle && mkdir -p src-tauri/resources && cp ../../packages/sidecar/dist-bundle/sidecar.cjs src-tauri/resources/sidecar.cjs",
+    "beforeBuildCommand": "npm run build && make -C ../.. build-core && mkdir -p src-tauri/resources && cp ../../core/bin/atomyx-runtime src-tauri/resources/atomyx-runtime",
     "frontendDist": "../dist"
   },
   "app": {
@@ -32,7 +32,7 @@
     "active": true,
     "targets": ["dmg", "app"],
     "resources": {
-      "resources/sidecar.cjs": "sidecar.cjs"
+      "resources/atomyx-runtime": "atomyx-runtime"
     },
     "icon": [
       "icons/32x32.png",

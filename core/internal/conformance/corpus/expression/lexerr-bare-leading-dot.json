@@ -1,0 +1,5 @@
+{
+  "name": "lexerr-bare-leading-dot",
+  "description": "a bare leading decimal point with no digit before it.",
+  "expr": ".5"
+}

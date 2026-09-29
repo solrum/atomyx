@@ -1,0 +1,5 @@
+{
+  "name": "minimal-valid",
+  "description": "the smallest legal scenario: only the two required fields, name and scripts.",
+  "yaml": "name: Checkout regression\nscripts:\n  - flows/login.yml\n"
+}

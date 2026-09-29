@@ -1,0 +1,64 @@
+{
+  "durationMs": 0,
+  "ok": true,
+  "passedScripts": 2,
+  "scenarioName": "all pass",
+  "scripts": [
+    {
+      "durationMs": 0,
+      "result": {
+        "durationMs": 0,
+        "failedAtStep": null,
+        "ok": true,
+        "passedSteps": 2,
+        "screenshots": [],
+        "scriptName": "pass",
+        "steps": [
+          {
+            "command": "launchApp",
+            "detail": "Launched com.test",
+            "durationMs": 0,
+            "ok": true,
+            "stepIndex": 0
+          },
+          {
+            "command": "assertVisible",
+            "detail": "Element is visible",
+            "durationMs": 0,
+            "ok": true,
+            "stepIndex": 1
+          }
+        ],
+        "totalSteps": 2
+      },
+      "scriptIndex": 0,
+      "scriptPath": "pass1.yml",
+      "status": "passed"
+    },
+    {
+      "durationMs": 0,
+      "result": {
+        "durationMs": 0,
+        "failedAtStep": null,
+        "ok": true,
+        "passedSteps": 1,
+        "screenshots": [],
+        "scriptName": "pass",
+        "steps": [
+          {
+            "command": "assertVisible",
+            "detail": "Element is visible",
+            "durationMs": 0,
+            "ok": true,
+            "stepIndex": 1
+          }
+        ],
+        "totalSteps": 2
+      },
+      "scriptIndex": 1,
+      "scriptPath": "pass2.yml",
+      "status": "passed"
+    }
+  ],
+  "totalScripts": 2
+}

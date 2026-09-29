@@ -1,0 +1,5 @@
+{
+  "name": "lex-astral-character-trailing-token-position-after-string",
+  "description": "an extra trailing token after two string literals containing astral characters reports its position in UTF-16 code units, not runes.",
+  "expr": "\"😀\" == \"😀\" 1"
+}

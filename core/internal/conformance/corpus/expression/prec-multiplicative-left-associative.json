@@ -1,0 +1,5 @@
+{
+  "name": "prec-multiplicative-left-associative",
+  "description": "division is left-associative.",
+  "expr": "100 / 10 / 2"
+}

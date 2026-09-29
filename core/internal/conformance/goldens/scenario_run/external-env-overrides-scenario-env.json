@@ -1,0 +1,40 @@
+{
+  "durationMs": 0,
+  "ok": true,
+  "passedScripts": 1,
+  "scenarioName": "env override",
+  "scripts": [
+    {
+      "durationMs": 0,
+      "result": {
+        "durationMs": 0,
+        "failedAtStep": null,
+        "ok": true,
+        "passedSteps": 2,
+        "screenshots": [],
+        "scriptName": "env check",
+        "steps": [
+          {
+            "command": "launchApp",
+            "detail": "Launched com.test",
+            "durationMs": 0,
+            "ok": true,
+            "stepIndex": 0
+          },
+          {
+            "command": "assertVisible",
+            "detail": "Element is visible",
+            "durationMs": 0,
+            "ok": true,
+            "stepIndex": 1
+          }
+        ],
+        "totalSteps": 2
+      },
+      "scriptIndex": 0,
+      "scriptPath": "env-check.yml",
+      "status": "passed"
+    }
+  ],
+  "totalScripts": 1
+}

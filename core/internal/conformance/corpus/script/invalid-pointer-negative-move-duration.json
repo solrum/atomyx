@@ -1,0 +1,5 @@
+{
+  "name": "invalid-pointer-negative-move-duration",
+  "description": "a negative pointer `moveDurationMs` must be REJECTED.",
+  "yaml": "- launchApp\n- pointer:\n    touches:\n      - actions:\n          - down: \"Item A\"\n          - up\n    moveDurationMs: -50\n"
+}

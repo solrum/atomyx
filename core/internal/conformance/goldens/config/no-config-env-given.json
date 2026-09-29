@@ -1,0 +1,9 @@
+{
+  "config": null,
+  "envRefError": null,
+  "found": false,
+  "issuePaths": [],
+  "resolved": null,
+  "schemaValid": null,
+  "selectError": "--env \"staging\" was given, but no atomyx.config.yaml or atomyx.config.yml was found."
+}

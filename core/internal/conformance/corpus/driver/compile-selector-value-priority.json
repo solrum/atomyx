@@ -1,0 +1,15 @@
+{
+  "name": "compile-selector-value-priority",
+  "description": "value matches the current input value, below text in priority",
+  "function": "compileSelector",
+  "selector": { "value": "50%" },
+  "tree": {
+    "attributes": { "role": "container" },
+    "children": [
+      {
+        "attributes": { "role": "slider", "id": "volume", "value": "50%" },
+        "children": []
+      }
+    ]
+  }
+}

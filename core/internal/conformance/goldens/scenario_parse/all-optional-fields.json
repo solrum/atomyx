@@ -1,0 +1,22 @@
+{
+  "parsed": {
+    "description": "Login + browse + buy happy path",
+    "env": {
+      "BASE_URL": "https://staging.example.com"
+    },
+    "format": "atomyx-scenario/v1",
+    "name": "Checkout regression",
+    "onFailure": "continue",
+    "preconditions": "force",
+    "scripts": [
+      "flows/login.yml",
+      "flows/browse-catalog.yml",
+      "flows/checkout.yml"
+    ],
+    "tags": [
+      "smoke",
+      "regression"
+    ]
+  },
+  "valid": true
+}

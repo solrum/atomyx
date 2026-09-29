@@ -1,0 +1,88 @@
+{
+  "durationMs": 0,
+  "ok": false,
+  "passedScripts": 2,
+  "scenarioName": "continue on failure",
+  "scripts": [
+    {
+      "durationMs": 0,
+      "result": {
+        "durationMs": 0,
+        "failedAtStep": null,
+        "ok": true,
+        "passedSteps": 2,
+        "screenshots": [],
+        "scriptName": "pass",
+        "steps": [
+          {
+            "command": "launchApp",
+            "detail": "Launched com.test",
+            "durationMs": 0,
+            "ok": true,
+            "stepIndex": 0
+          },
+          {
+            "command": "assertVisible",
+            "detail": "Element is visible",
+            "durationMs": 0,
+            "ok": true,
+            "stepIndex": 1
+          }
+        ],
+        "totalSteps": 2
+      },
+      "scriptIndex": 0,
+      "scriptPath": "pass.yml",
+      "status": "passed"
+    },
+    {
+      "durationMs": 0,
+      "result": {
+        "durationMs": 0,
+        "failedAtStep": 1,
+        "ok": false,
+        "passedSteps": 0,
+        "screenshots": [],
+        "scriptName": "fail",
+        "steps": [
+          {
+            "command": "assertVisible",
+            "detail": "Element not visible on screen",
+            "durationMs": 0,
+            "ok": false,
+            "stepIndex": 1
+          }
+        ],
+        "totalSteps": 2
+      },
+      "scriptIndex": 1,
+      "scriptPath": "fail.yml",
+      "status": "failed"
+    },
+    {
+      "durationMs": 0,
+      "result": {
+        "durationMs": 0,
+        "failedAtStep": null,
+        "ok": true,
+        "passedSteps": 1,
+        "screenshots": [],
+        "scriptName": "pass",
+        "steps": [
+          {
+            "command": "assertVisible",
+            "detail": "Element is visible",
+            "durationMs": 0,
+            "ok": true,
+            "stepIndex": 1
+          }
+        ],
+        "totalSteps": 2
+      },
+      "scriptIndex": 2,
+      "scriptPath": "pass2.yml",
+      "status": "passed"
+    }
+  ],
+  "totalScripts": 3
+}

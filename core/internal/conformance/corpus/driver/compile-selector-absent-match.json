@@ -1,0 +1,17 @@
+{
+  "name": "compile-selector-absent-match",
+  "description": "a selector that matches nothing in the tree resolves to an empty match list, not an error",
+  "function": "compileSelector",
+  "selector": { "id": "does_not_exist" },
+  "tree": {
+    "attributes": { "role": "container" },
+    "children": [
+      {
+        "attributes": { "role": "button", "id": "login_btn", "text": "Sign in" },
+        "children": [],
+        "enabled": true,
+        "clickable": true
+      }
+    ]
+  }
+}

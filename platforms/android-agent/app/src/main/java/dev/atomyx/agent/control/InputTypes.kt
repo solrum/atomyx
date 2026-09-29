@@ -14,7 +14,7 @@ data class TypeResult(
 /**
  * Locate a backspace / clear / delete key on the current screen by
  * matching the label / contentDesc against a wide set of language- and
- * icon-independent patterns. Structural — works on any locale, any
+ * icon-independent patterns. Structural, so it works on any locale, any
  * keypad style.
  *
  * Shared between [KeyboardTyper] (pre-type clear) and

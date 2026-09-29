@@ -1,0 +1,5 @@
+{
+  "name": "lex-whitespace-tabs",
+  "description": "tab characters surrounding an operator.",
+  "expr": "1\t+\t2"
+}

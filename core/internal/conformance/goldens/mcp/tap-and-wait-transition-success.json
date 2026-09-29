@@ -1,0 +1,32 @@
+[
+  {
+    "result": {
+      "content": [
+        {
+          "active": {
+            "connectedAt": "\u003cnormalized\u003e",
+            "id": "mock-device",
+            "kind": "simulator",
+            "platform": "android"
+          },
+          "ok": true
+        }
+      ],
+      "isError": false
+    },
+    "tool": "select_device"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "ok": true,
+          "resolvedBy": "id",
+          "waitedMs": "\u003cnormalized\u003e"
+        }
+      ],
+      "isError": false
+    },
+    "tool": "tap_and_wait_transition"
+  }
+]

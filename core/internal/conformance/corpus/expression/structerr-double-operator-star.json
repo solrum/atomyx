@@ -1,0 +1,5 @@
+{
+  "name": "structerr-double-operator-star",
+  "description": "two consecutive multiplication operators.",
+  "expr": "1 * * 2"
+}

@@ -1,0 +1,5 @@
+{
+  "name": "matrix-literal-or-string-string",
+  "description": "literal string \"or\" literal string",
+  "expr": "\"a\" or \"a\""
+}

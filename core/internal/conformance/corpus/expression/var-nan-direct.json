@@ -1,0 +1,11 @@
+{
+  "name": "var-nan-direct",
+  "description": "a variable holding NaN, returned bare.",
+  "expr": "nanVar",
+  "variables": {
+    "nanVar": {
+      "type": "number",
+      "number": "NaN"
+    }
+  }
+}

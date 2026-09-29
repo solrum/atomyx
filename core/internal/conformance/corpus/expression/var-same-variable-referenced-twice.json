@@ -1,0 +1,11 @@
+{
+  "name": "var-same-variable-referenced-twice",
+  "description": "the same variable referenced on both sides of an operator.",
+  "expr": "n + n",
+  "variables": {
+    "n": {
+      "type": "number",
+      "number": "5"
+    }
+  }
+}

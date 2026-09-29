@@ -1,0 +1,23 @@
+{
+  "name": "compile-selector-falls-back-to-text",
+  "description": "priority falls through to text when no higher-priority field is provided",
+  "function": "compileSelector",
+  "selector": { "text": "Cancel" },
+  "tree": {
+    "attributes": { "role": "container" },
+    "children": [
+      {
+        "attributes": { "role": "button", "id": "login_btn", "text": "Sign in" },
+        "children": [],
+        "enabled": true,
+        "clickable": true
+      },
+      {
+        "attributes": { "role": "button", "id": "cancel_btn", "text": "Cancel" },
+        "children": [],
+        "enabled": true,
+        "clickable": true
+      }
+    ]
+  }
+}

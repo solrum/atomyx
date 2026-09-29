@@ -14,8 +14,8 @@ struct PressKeyResult {
 }
 
 /// One strategy per key intent. Strategies are the single place that
-/// knows HOW a particular key is dispatched on iOS — `home` is
-/// device-wide via `XCUIDevice`, `back` is a chain (nav bar →
+/// knows HOW a particular key is dispatched on iOS. `home` is
+/// device-wide via `XCUIDevice`, `back` is a chain (nav bar, then
 /// edge-swipe), `enter` types a newline into the focused field, and
 /// the registry's fallback handles unknown keys.
 ///
@@ -37,7 +37,7 @@ protocol PressKeyStrategy {
 
     /// `true` if `execute` needs a launched app reference. The command
     /// short-circuits with "no app launched" BEFORE calling execute
-    /// when this is true and no app is tracked — so strategies can
+    /// when this is true and no app is tracked, so strategies can
     /// force-unwrap `app` when `requiresApp` is true.
     var requiresApp: Bool { get }
 
@@ -63,8 +63,8 @@ final class PressKeyRegistry {
         strategies[strategy.key] = strategy
     }
 
-    /// Resolve a key to its strategy. Never returns nil — unknown keys
-    /// map to the fallback strategy passed at construction time.
+    /// Resolve a key to its strategy. Never returns nil, because unknown
+    /// keys map to the fallback strategy passed at construction time.
     func resolve(_ key: String) -> PressKeyStrategy {
         strategies[key] ?? fallback
     }

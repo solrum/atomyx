@@ -20,7 +20,7 @@ enum PublicPointerPattern: Equatable {
 let GESTURE_MIN_PRESS_SECONDS: Double = 0.05
 
 /// Pure classifier from a pointer path to a `PublicPointerPattern`.
-/// Has no XCUITest dependency — unit-tested directly.
+/// Has no XCUITest dependency. Unit-tested directly.
 struct PointerPatternClassifier {
 
     func classify(path: PointerPath) throws -> PublicPointerPattern {
@@ -85,7 +85,7 @@ struct PointerPatternClassifier {
             return .longPress(point: down.point, durationSeconds: holdSeconds)
         }
         throw SynthesizerError.patternNotExpressible(
-            reason: "pointer '\(pathId)' [down, up] has distinct endpoints — add an explicit `move` between them"
+            reason: "pointer '\(pathId)' [down, up] has distinct endpoints, add an explicit `move` between them"
         )
     }
 }
@@ -93,7 +93,7 @@ struct PointerPatternClassifier {
 /// XCUICoordinate-based gesture synthesizer. Uses
 /// `XCUICoordinate.tap`, `press(forDuration:)`, and
 /// `press(forDuration:thenDragTo:)` and works on any Xcode / iOS
-/// version that ships XCUITest. Single-pointer only — pinch,
+/// version that ships XCUITest. Single-pointer only. Pinch,
 /// rotate, and multi-finger custom gestures return
 /// `.patternNotExpressible`. Atomyx falls back to this backend
 /// when `EventRecordSynthesizer.isAvailable` is false.
@@ -104,7 +104,7 @@ struct PointerPatternClassifier {
 /// |-----------------------------------------|-------------|-------------------------------------------|
 /// | `[down(t=0), up(t=0)]`                  | yes         | `XCUICoordinate.tap()`                    |
 /// | `[down(t=0), up(t=T)]`  with T > 0      | yes         | `press(forDuration: T)`                   |
-/// | `[down(t=0), move(t=P), up(t=T)]`       | —           | `press(forDuration: P, thenDragTo: end)`  |
+/// | `[down(t=0), move(t=P), up(t=T)]`       | no          | `press(forDuration: P, thenDragTo: end)`  |
 final class CoordinateSynthesizer: EventSynthesizer {
     let capabilities = EventCapabilities(
         canMultiPointer: false,
@@ -116,7 +116,7 @@ final class CoordinateSynthesizer: EventSynthesizer {
 
     /// Springboard bundle id. `XCUIApplication(bundleIdentifier:)`
     /// returns a proxy whose `frame` matches the device's full
-    /// screen rect without requiring a `launch()` call — we need
+    /// screen rect without requiring a `launch()` call. We need
     /// only the `(0,0)` normalized origin to anchor device-global
     /// point coordinates via `coordinate(withNormalizedOffset:)
     /// .withOffset(...)`. Using Springboard as the anchor is a
@@ -126,7 +126,7 @@ final class CoordinateSynthesizer: EventSynthesizer {
 
     private let classifier = PointerPatternClassifier()
 
-    func dispatch(pointers: [PointerPath]) throws {
+    func dispatch(pointers: [PointerPath]) throws -> [Data] {
         guard pointers.count == 1 else {
             throw SynthesizerError.patternNotExpressible(
                 reason: "coordinate backend accepts exactly one pointer, got \(pointers.count)"
@@ -134,11 +134,16 @@ final class CoordinateSynthesizer: EventSynthesizer {
         }
         let pattern = try classifier.classify(path: pointers[0])
         try execute(pattern: pattern)
+        // The public 2-3 waypoint patterns this backend classifies
+        // (tap, long-press, drag) never include a `capture` waypoint;
+        // `classify` above already rejects any pattern that isn't one
+        // of those three shapes.
+        return []
     }
 
     private func execute(pattern: PublicPointerPattern) throws {
         // XCUICoordinate primitives must run on the main thread.
-        // Hop only when not already on main — nesting
+        // Hop only when not already on main, because nesting
         // `DispatchQueue.main.sync` aborts under libdispatch.
         if Thread.isMainThread {
             runOnMain(pattern: pattern)

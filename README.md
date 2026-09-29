@@ -1,19 +1,46 @@
 # Atomyx
 
-> AI agents driving real mobile apps — cross-platform, selector-first,
+> AI agents driving real mobile apps: cross-platform, selector-first,
 > open source.
 
-![License](https://img.shields.io/badge/license-Apache%202.0-blue)
-![Status](https://img.shields.io/badge/status-pre--release-orange)
-![Node](https://img.shields.io/badge/node-%E2%89%A5%2020-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-blue)
+![Status](https://img.shields.io/badge/status-in%20development-orange)
 
-Atomyx lets an AI agent drive iOS and Android apps the way a human QA
-would — discover screens, try flows, report bugs — through a small,
-stable set of high-intent tools. The same agent code drives both
-platforms; device selection, selector resolution, scroll-into-view,
-and z-order obscurement checking are handled for you.
+Atomyx lets an AI agent, or a plain YAML script, drive an iOS or
+Android app the way a human tester would: discovering screens, trying
+flows, and reporting bugs, through one small, stable core runtime.
+Device selection, selector resolution, scroll-into-view, and gesture
+dispatch are handled for you, so the same script or agent session
+works on both platforms.
 
-By [Solrum](https://atomyx.dev) · Apache 2.0.
+By [Solrum](https://atomyx.dev). MIT.
+
+## How it works
+
+```
+            +-----------+     +-----------+
+AI agent -> | atomyx-mcp|     | atomyx CLI| <- YAML script or CI job
+            +-----------+     +-----------+
+                    \             /
+                     v           v
+                  +---------------+
+                  |  core runtime  |
+                  |  (driver port, |
+                  |  script engine)|
+                  +---------------+
+                     /           \
+                    v             v
+          +----------------+  +----------------+
+          | Android agent  |  |   iOS agent    |
+          | (Kotlin APK)   |  | (XCUITest bundle)|
+          +----------------+  +----------------+
+```
+
+One core runtime, one `Driver` port. `atomyx-mcp` exposes it as an MCP
+tool surface for AI agents, and the `atomyx` CLI exposes it for scripts
+and CI. A native agent per platform does the actual on-device work
+(accessibility tree dump, tap, swipe, screenshot), speaking a small
+wire protocol back to the core.
 
 ## What it feels like
 
@@ -29,63 +56,47 @@ name: Settings smoke test
 - back
 ```
 
-One YAML, same script for iOS and Android. An agent can also call the
-same underlying primitives through the MCP tool surface — the two
-front-ends share one `Driver` port.
+One YAML script, same result on iOS and Android.
 
-## Status
+## Quick start
 
-Pre-1.0 (current: `v0.1.0`).
-
-### Platforms
-
-| OS | State |
-|---|---|
-| Android (device + emulator) | Preview |
-| iOS (simulator + physical device) | Preview |
-| Web (browser) | Planned |
-
-### App UI frameworks
-
-| Framework | State |
-|---|---|
-| Native Android (Views + Jetpack Compose) | Preview |
-| Native iOS — UIKit | Preview |
-| Native iOS — SwiftUI | Preview (verified against Apple system apps only; custom SwiftUI apps untested) |
-| Flutter | Preview — known edge cases (custom keypads, unreliable `clickable` flag) |
-| React Native | Untested — bug reports welcome |
-
-### Features
-
-| Feature | State |
-|---|---|
-| MCP tool surface (27 tools) | Preview |
-| YML script engine (17 commands) | Preview |
-| API capture (mitmproxy integration) | Preview |
-| Unified `atomyx mcp` binary | Planned for v1.0 (today: use `atomyx-mcp`) |
-| npm / GitHub Packages release | Planned for v1.0 |
-
-## Setup
+If more than one device is attached, run `export ANDROID_SERIAL=<serial>`
+first. `adb devices` lists the serials.
 
 ```bash
 git clone https://github.com/solrum/atomyx.git
 cd atomyx
-npm run setup   # installs dependencies and git hooks
+make build-core                    # builds core/bin/atomyx and atomyx-mcp
+cd platforms/android-agent && ./gradlew :app:assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb shell settings delete secure enabled_accessibility_services
+adb shell settings put secure enabled_accessibility_services dev.atomyx.agent/dev.atomyx.agent.service.AtomyxAccessibilityService
+adb shell am start-foreground-service -n dev.atomyx.agent/dev.atomyx.agent.control.AtomyxForegroundService
+cd ../..
+adb forward tcp:8765 tcp:8765
+make ready-android                 # confirms the driver can reach the device
+core/bin/atomyx devices            # confirm the device shows up
+core/bin/atomyx run --file examples/test-login-flow.yml --platform android --device <serial>
 ```
 
-Verify the install by running the fast quality gate:
+For the iOS path and every prerequisite in full, see
+[`docs/getting-started.md`](./docs/getting-started.md).
 
-```bash
-npm run check:fast   # lint + typecheck + prefix + phrases — should pass
+## Use with an AI agent (MCP)
+
+Build the core runtime with `make build-core`, which produces
+`core/bin/atomyx-mcp`, then point your MCP client at the binary:
+
+```json
+{
+  "mcpServers": {
+    "atomyx": { "type": "stdio", "command": "/absolute/path/to/atomyx/core/bin/atomyx-mcp" }
+  }
+}
 ```
 
-This sets up the TypeScript packages only. Native toolchains for
-Android and iOS require additional steps — see
-[`.claude/docs/android.md`](./.claude/docs/android.md) and
-[`.claude/docs/ios.md`](./.claude/docs/ios.md).
-
-For a full walkthrough — MCP client config, device prerequisites,
-first test — see [`docs/getting-started.md`](./docs/getting-started.md).
+Restart the client. See [`docs/mcp-tools.md`](./docs/mcp-tools.md) for
+what each tool does.
 
 ## Documentation
 
@@ -94,16 +105,21 @@ first test — see [`docs/getting-started.md`](./docs/getting-started.md).
 | End users (install, run, script) | [`docs/`](./docs/) |
 | Contributors (architecture, internals, pitfalls) | [`.claude/docs/`](./.claude/docs/) |
 | YAML script authors | [`docs/yml-script-reference.md`](./docs/yml-script-reference.md) |
-| Device setup (Android + iOS) | [`docs/device-setup.md`](./docs/device-setup.md) |
+| Device setup (Android and iOS) | [`docs/device-setup.md`](./docs/device-setup.md) |
+| MCP tool behavior | [`docs/mcp-tools.md`](./docs/mcp-tools.md) |
+| Known limitations and workarounds | [`docs/known-limitations.md`](./docs/known-limitations.md) |
+
+A separate desktop IDE, Atomyx Studio, is under development and is
+not covered by these docs.
 
 ## Contributing
 
-Issues and PRs welcome. Start with
+Issues and pull requests are welcome. Start with
 [`.claude/docs/development.md`](./.claude/docs/development.md) for
-build, test, and extension workflows; and
+build, test, and extension workflows, and
 [`.claude/docs/architecture.md`](./.claude/docs/architecture.md) for
 the design contract.
 
 ## License
 
-Apache 2.0. See [`LICENSE`](./LICENSE).
+MIT. See [`LICENSE`](./LICENSE).

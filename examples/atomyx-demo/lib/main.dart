@@ -5,6 +5,8 @@ import 'screens/otp_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/product_list_screen.dart';
 import 'screens/gestures_screen.dart';
+import 'screens/context_menu_screen.dart';
+import 'screens/media_viewer_screen.dart';
 
 void main() {
   runApp(const AtomyxDemoApp());
@@ -30,6 +32,8 @@ class AtomyxDemoApp extends StatelessWidget {
         '/settings': (_) => const SettingsScreen(),
         '/products': (_) => const ProductListScreen(),
         '/gestures': (_) => const GesturesScreen(),
+        '/context-menu': (_) => const ContextMenuScreen(),
+        '/media': (_) => const MediaViewerScreen(),
       },
     );
   }

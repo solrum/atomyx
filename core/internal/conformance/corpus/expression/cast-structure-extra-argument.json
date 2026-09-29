@@ -1,0 +1,5 @@
+{
+  "name": "cast-structure-extra-argument",
+  "description": "a cast call with more arguments than the grammar allows.",
+  "expr": "string(1,2,3)"
+}

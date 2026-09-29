@@ -1,0 +1,19 @@
+{
+  "name": "tap-failure-fail-fast",
+  "description": "tap on a selector absent from the tree fails the step, and the trailing screenshot step never runs (fail-fast)",
+  "yaml": "appId: com.test\nname: tap failure\nenv: {}\n---\n- launchApp\n- tap: Nonexistent\n- screenshot: never\n",
+  "driver": {
+    "hierarchies": [
+      {
+        "attributes": {},
+        "children": [
+          {
+            "attributes": { "text": "Login", "label": "Login", "bounds": "40,300,390,350" },
+            "children": [],
+            "clickable": true
+          }
+        ]
+      }
+    ]
+  }
+}

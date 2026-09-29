@@ -1,0 +1,16 @@
+{
+  "name": "read-then-assert-expr",
+  "description": "read fetches an attribute field and a state field into variables, and a later assertExpr step consumes both",
+  "yaml": "appId: com.test\nname: read then assert\nenv: {}\n---\n- launchApp\n- read:\n    selector:\n      id: qty_field\n    field: value\n    as: qty\n- read:\n    selector:\n      id: terms_checkbox\n    field: checked\n    as: accepted\n- assertExpr:\n    expr: \"qty == \\\"5\\\" and accepted == true\"\n",
+  "driver": {
+    "hierarchies": [
+      {
+        "attributes": {},
+        "children": [
+          { "attributes": { "id": "qty_field", "value": "5", "bounds": "40,300,390,350" }, "children": [], "enabled": true },
+          { "attributes": { "id": "terms_checkbox", "bounds": "40,400,390,450" }, "children": [], "checked": true }
+        ]
+      }
+    ]
+  }
+}

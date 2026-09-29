@@ -5,7 +5,7 @@ import dev.atomyx.agent.control.clear.ClearTextChain
 
 /**
  * Clears the currently focused input field. Works even when the field has
- * no stable selector — which is the common case for Flutter apps where text
+ * no stable selector, which is the common case for Flutter apps where text
  * fields are exposed as plain views without resourceId / contentDesc. Caller
  * must focus the target first with a tap.
  *

@@ -1,4 +1,4 @@
-/// Mock API service — simulates backend responses with configurable delays.
+/// Mock API service that simulates backend responses with configurable delays.
 /// Responses match the shapes expected by example YML scripts.
 class MockApi {
   static const _delay = Duration(milliseconds: 800);

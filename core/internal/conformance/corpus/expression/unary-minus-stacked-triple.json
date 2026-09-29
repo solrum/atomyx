@@ -1,0 +1,5 @@
+{
+  "name": "unary-minus-stacked-triple",
+  "description": "three stacked unary minus operators.",
+  "expr": "- - -5"
+}

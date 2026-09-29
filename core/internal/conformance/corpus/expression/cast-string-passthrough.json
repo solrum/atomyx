@@ -1,0 +1,5 @@
+{
+  "name": "cast-string-passthrough",
+  "description": "string() passes a string through unchanged.",
+  "expr": "string(\"a\")"
+}

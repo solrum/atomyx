@@ -1,0 +1,11 @@
+{
+  "name": "cast-number-passthrough-number-variable",
+  "description": "number() passes a number variable through unchanged.",
+  "expr": "number(n)",
+  "variables": {
+    "n": {
+      "type": "number",
+      "number": "5"
+    }
+  }
+}

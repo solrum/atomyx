@@ -1,0 +1,5 @@
+{
+  "name": "cast-string-negative-number",
+  "description": "string() renders a negated number.",
+  "expr": "string(-5)"
+}

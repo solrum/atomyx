@@ -1,0 +1,11 @@
+{
+  "name": "numeric-infinity-plus-infinity",
+  "description": "infinity plus infinity remains infinity.",
+  "expr": "inf + inf",
+  "variables": {
+    "inf": {
+      "type": "number",
+      "number": "Infinity"
+    }
+  }
+}

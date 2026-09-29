@@ -1,0 +1,5 @@
+{
+  "name": "longpress-coordinate-valid",
+  "description": "longPress with a coordinate `at` and an explicit holdMs parses to a LongPressStep.",
+  "yaml": "- launchApp\n- longPress:\n    at: { x: 120, y: 240 }\n    holdMs: 650\n"
+}

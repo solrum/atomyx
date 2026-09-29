@@ -1,0 +1,5 @@
+{
+  "name": "matrix-literal-gt-string-boolean",
+  "description": "literal string \">\" literal boolean",
+  "expr": "\"a\" > true"
+}

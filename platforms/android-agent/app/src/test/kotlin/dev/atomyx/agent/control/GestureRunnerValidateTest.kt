@@ -251,4 +251,58 @@ class GestureRunnerValidateTest {
         )
         assertNull(GestureRunner.validatePointers(pointers, singlePointerCaps))
     }
+
+    // ── capture waypoint ─────────────────────────────────────────
+
+    @Test
+    fun midGestureCaptureWaypointAccepted() {
+        // A `capture` waypoint carries no pressure and no capability
+        // flag of its own; it must pass validation on every driver
+        // build regardless of canMultiPointer/canPressure.
+        val pointers = listOf(
+            PointerPath(
+                "f1",
+                listOf(
+                    wp("down", offset = 0.0),
+                    wp("capture", offset = 0.1),
+                    wp("up", offset = 0.4),
+                ),
+            ),
+        )
+        assertNull(GestureRunner.validatePointers(pointers, singlePointerCaps))
+    }
+
+    @Test
+    fun captureOffsetsCollectedInDispatchOrder() {
+        // GestureRunner.captureOffsets is the pure seam scheduleCaptures
+        // relies on to fire one background capture per waypoint at the
+        // right delay; pinning its ordering here catches a regression
+        // without needing an AccessibilityService.
+        val pointers = listOf(
+            PointerPath(
+                "f1",
+                listOf(
+                    wp("down", offset = 0.0),
+                    wp("capture", offset = 0.1),
+                    wp("move", offset = 0.2),
+                    wp("capture", offset = 0.3),
+                    wp("up", offset = 0.4),
+                ),
+            ),
+            PointerPath(
+                "f2",
+                listOf(
+                    wp("down", offset = 0.0),
+                    wp("capture", offset = 0.15),
+                    wp("up", offset = 0.4),
+                ),
+            ),
+        )
+        assertEquals(listOf(0.1, 0.3, 0.15), GestureRunner.captureOffsets(pointers))
+    }
+
+    @Test
+    fun captureOffsetsEmptyWhenNoCaptureWaypoint() {
+        assertEquals(emptyList<Double>(), GestureRunner.captureOffsets(listOf(tapPath())))
+    }
 }

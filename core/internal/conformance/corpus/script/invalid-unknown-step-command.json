@@ -1,0 +1,5 @@
+{
+  "name": "invalid-unknown-step-command",
+  "description": "a step naming a command the schema does not recognize must be REJECTED.",
+  "yaml": "- launchApp\n- bogusCommand\n"
+}

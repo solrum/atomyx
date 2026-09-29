@@ -1,0 +1,15 @@
+{
+  "name": "matrix-variable-lt-number-boolean",
+  "description": "variable number \"<\" variable boolean, proving lookup-typed values take the same path as literals.",
+  "expr": "ln < rb",
+  "variables": {
+    "ln": {
+      "type": "number",
+      "number": "3"
+    },
+    "rb": {
+      "type": "boolean",
+      "boolean": true
+    }
+  }
+}

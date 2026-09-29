@@ -1,0 +1,5 @@
+{
+  "name": "cast-number-invalid-non-numeric-string",
+  "description": "number() rejects a non-numeric string.",
+  "expr": "number(\"abc\")"
+}

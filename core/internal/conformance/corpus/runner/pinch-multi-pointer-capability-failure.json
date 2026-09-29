@@ -1,0 +1,10 @@
+{
+  "name": "pinch-multi-pointer-capability-failure",
+  "description": "a pinch fails with the fixed multi-pointer detail when the driver does not report canMultiPointer.",
+  "yaml": "appId: com.test\nname: pinch unsupported\nenv: {}\n---\n- launchApp\n- pinch:\n    center: { x: 200, y: 200 }\n    startGap: 40\n    endGap: 120\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

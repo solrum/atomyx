@@ -1,0 +1,5 @@
+{
+  "name": "lex-whitespace-leading-and-trailing",
+  "description": "leading and trailing whitespace around a single literal.",
+  "expr": "   1   "
+}

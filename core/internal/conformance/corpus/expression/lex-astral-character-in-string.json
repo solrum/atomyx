@@ -1,0 +1,5 @@
+{
+  "name": "lex-astral-character-in-string",
+  "description": "a string literal containing a character outside the Basic Multilingual Plane.",
+  "expr": "\"😀\""
+}

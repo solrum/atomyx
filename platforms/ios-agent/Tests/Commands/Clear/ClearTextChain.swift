@@ -42,7 +42,7 @@ struct ClearTextChain {
         let pollInterval: TimeInterval = 0.05
         for _ in 0..<10 {
             guard let snapshot = try? context.app.snapshot() else {
-                // App navigated away — field gone counts as cleared.
+                // App navigated away, so field gone counts as cleared.
                 return true
             }
             if let focused = findFocused(in: snapshot) {

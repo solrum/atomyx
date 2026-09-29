@@ -1,0 +1,5 @@
+{
+  "name": "cast-number-invalid-exponential-string",
+  "description": "number() rejects exponential notation in a string.",
+  "expr": "number(\"1e5\")"
+}
