@@ -43,16 +43,6 @@ type StepSummary struct {
 	Tokens []StepToken
 }
 
-var secretFieldHints = []string{
-	"password",
-	"passwd",
-	"pwd",
-	"secret",
-	"token",
-	"pin",
-	"otp",
-}
-
 // SummarizeStep renders step into a colored token sequence plus
 // plain-text fallback, suitable for a progress timeline. The summary
 // text and the token sequence are a stable rendering contract: they
@@ -63,18 +53,13 @@ func SummarizeStep(step script.ScriptStep) StepSummary {
 	case *script.TapStep:
 		b.kw("tap").punct(": ").selector(&s.Selector)
 	case *script.TypeStep:
-		isSecret := s.Into != nil && selectorLooksSecret(s.Into)
 		b.kw("input")
 		if s.Into != nil {
 			b.punct(": ").selector(s.Into).punct(" ← ")
 		} else {
 			b.punct(": ")
 		}
-		if isSecret {
-			b.mask(maskOf(jsLength(s.Text)))
-		} else {
-			b.str(s.Text)
-		}
+		b.mask(maskOf(jsLength(s.Text)))
 	case *script.WaitForStep:
 		b.kw("waitFor").punct(": ").selector(&s.Selector)
 		if s.TimeoutMs != nil {
@@ -216,33 +201,6 @@ func selectorFieldNameAndValue(sel *script.ScriptSelector) (field string, value 
 	default:
 		return "", "", false
 	}
-}
-
-// looksSecret reports whether fieldValue contains one of the hints a
-// password-like field name carries, using a case-insensitive
-// substring check so a field named "Password" or "PWD" still counts
-// as a match.
-func looksSecret(fieldValue string) bool {
-	lower := strings.ToLower(fieldValue)
-	for _, hint := range secretFieldHints {
-		if strings.Contains(lower, hint) {
-			return true
-		}
-	}
-	return false
-}
-
-// selectorLooksSecret checks a type step's `into` selector for a
-// field name that hints at a secret value, checking the id, label,
-// hint, and text fields for a match.
-func selectorLooksSecret(sel *script.ScriptSelector) bool {
-	candidates := []*string{sel.ID, sel.Label, sel.Hint, sel.Text}
-	for _, c := range candidates {
-		if c != nil && looksSecret(*c) {
-			return true
-		}
-	}
-	return false
 }
 
 // maskOf renders a fixed-width mask for a secret value of the given

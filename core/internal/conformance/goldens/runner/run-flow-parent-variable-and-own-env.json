@@ -106,7 +106,7 @@
       "line": null,
       "ok": null,
       "stepIndex": 2,
-      "summary": "input: element.text = \"Email\" ← \"step-hi user@test.com\"",
+      "summary": "input: element.text = \"Email\" ← ••••••••••••",
       "tokens": [
         {
           "kind": "keyword",
@@ -141,8 +141,8 @@
           "text": " ← "
         },
         {
-          "kind": "string",
-          "text": "\"step-hi user@test.com\""
+          "kind": "mask",
+          "text": "••••••••••••"
         }
       ],
       "type": "stepStarted"
@@ -155,7 +155,7 @@
       "line": null,
       "ok": true,
       "stepIndex": 2,
-      "summary": "input: element.text = \"Email\" ← \"step-hi user@test.com\"",
+      "summary": "input: element.text = \"Email\" ← ••••••••••••",
       "tokens": [
         {
           "kind": "keyword",
@@ -190,8 +190,8 @@
           "text": " ← "
         },
         {
-          "kind": "string",
-          "text": "\"step-hi user@test.com\""
+          "kind": "mask",
+          "text": "••••••••••••"
         }
       ],
       "type": "stepCompleted"

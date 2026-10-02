@@ -224,7 +224,7 @@
       "line": 7,
       "ok": null,
       "stepIndex": 2,
-      "summary": "input: element.text = \"Email\" ← \"user@test.com\"",
+      "summary": "input: element.text = \"Email\" ← ••••••••••••",
       "tokens": [
         {
           "kind": "keyword",
@@ -259,8 +259,8 @@
           "text": " ← "
         },
         {
-          "kind": "string",
-          "text": "\"user@test.com\""
+          "kind": "mask",
+          "text": "••••••••••••"
         }
       ],
       "type": "stepStarted"
@@ -273,7 +273,7 @@
       "line": 7,
       "ok": true,
       "stepIndex": 2,
-      "summary": "input: element.text = \"Email\" ← \"user@test.com\"",
+      "summary": "input: element.text = \"Email\" ← ••••••••••••",
       "tokens": [
         {
           "kind": "keyword",
@@ -308,8 +308,8 @@
           "text": " ← "
         },
         {
-          "kind": "string",
-          "text": "\"user@test.com\""
+          "kind": "mask",
+          "text": "••••••••••••"
         }
       ],
       "type": "stepCompleted"
@@ -322,7 +322,7 @@
       "line": 10,
       "ok": null,
       "stepIndex": 3,
-      "summary": "input: \"hi\"",
+      "summary": "input: ••••",
       "tokens": [
         {
           "kind": "keyword",
@@ -333,8 +333,8 @@
           "text": ": "
         },
         {
-          "kind": "string",
-          "text": "\"hi\""
+          "kind": "mask",
+          "text": "••••"
         }
       ],
       "type": "stepStarted"
@@ -347,7 +347,7 @@
       "line": 10,
       "ok": true,
       "stepIndex": 3,
-      "summary": "input: \"hi\"",
+      "summary": "input: ••••",
       "tokens": [
         {
           "kind": "keyword",
@@ -358,8 +358,8 @@
           "text": ": "
         },
         {
-          "kind": "string",
-          "text": "\"hi\""
+          "kind": "mask",
+          "text": "••••"
         }
       ],
       "type": "stepCompleted"

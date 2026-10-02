@@ -568,3 +568,18 @@ func TestTypedDetail_CountsRunesAndNeverEchoesText(t *testing.T) {
 		t.Fatalf("detail %q echoes the typed text", got)
 	}
 }
+
+func TestSummarizeStep_TypeNeverShowsTheTypedText(t *testing.T) {
+	def := mustParse(t, "appId: com.test\n---\n- type:\n    into:\n      id: nickname\n    text: plain-sentinel\n")
+
+	summary := SummarizeStep(def.Steps[0])
+
+	if strings.Contains(summary.Text, "plain-sentinel") {
+		t.Fatalf("summary %q carries the typed text", summary.Text)
+	}
+	for _, token := range summary.Tokens {
+		if strings.Contains(token.Text, "plain-sentinel") {
+			t.Fatalf("token %+v carries the typed text", token)
+		}
+	}
+}
