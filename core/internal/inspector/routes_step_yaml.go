@@ -10,8 +10,6 @@ import (
 	"dev.atomyx/internal/session"
 )
 
-const codeNodeNotFound = "node_not_found"
-
 // Actions step/yaml renders. Each acts on one selector.
 const (
 	actionTap              = "tap"

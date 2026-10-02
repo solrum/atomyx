@@ -13,7 +13,6 @@ const (
 	routeSelectorTest    = "/api/v1/selector/test"
 	routeStepYAML        = "/api/v1/step/yaml"
 
-	codeTreeStale      = "tree_stale"
 	maxReportedMatches = 100
 )
 

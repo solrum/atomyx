@@ -521,13 +521,13 @@ build on the `.Built(` and `.Orchestra(` accessors, on
     screenshotRevision, scale, paired, highlightable}`. The tree is the
     raw masked tree, and `revision` identifies it. `scale`, `paired`
     and `highlightable` are decided by the session, and the page only
-    draws what they say. It answers `404` with code `no_tree` before the
+    draws what they say. It answers `404` with code `NO_TREE` before the
     first capture.
   - `GET /api/v1/screenshot` returns the image bytes with the content
     type read from the bytes and the headers `X-Atomyx-Epoch`,
     `X-Atomyx-Revision`, `X-Atomyx-Scale`, `X-Atomyx-Paired` and
     `X-Atomyx-Highlightable`. It answers `404` with code
-    `no_screenshot` before the first capture.
+    `NO_SCREENSHOT` before the first capture.
   - `GET /api/v1/events` streams newline-delimited JSON, flushed per
     line, for a page that reads it with `fetch`. Each line is
     `{kind, epoch, revision, stable}` with `kind` one of `tree`,
@@ -540,8 +540,13 @@ build on the `.Built(` and `.Orchestra(` accessors, on
     response. It answers `409` with code `HOLDER_BUSY` while a tool call
     or another fresh capture is running.
   - Every failing `/api/` response has the body
-    `{"error": {"code", "message", "remedy"}}`. A closed session is
-    `410` with code `session_closed`.
+    `{"error": {"code", "message", "remedy"}}`. Every code is upper
+    snake case, and a failure that carries a diag code keeps it, such
+    as `HOLDER_BUSY` and `INVALID_ARGUMENT`. The codes specific to the
+    inspector are `NO_TREE`, `NO_SCREENSHOT`, `SESSION_CLOSED`,
+    `TREE_STALE`, `NODE_NOT_FOUND`, `HOST_NOT_ALLOWED`,
+    `ORIGIN_NOT_ALLOWED`, `TOKEN_REQUIRED`, `CODE_REFUSED` and
+    `INTERNAL`. A closed session is `410` with code `SESSION_CLOSED`.
 - **Selector routes.** `SelectorRoutes` works from the stored tree and
   never calls the device. Every route is an operator action, and a
   request body with an unknown field, trailing data or a wrong type is
@@ -549,7 +554,7 @@ build on the `.Built(` and `.Orchestra(` accessors, on
   - `POST /api/v1/selector/suggest` takes `{treeRevision, path}`, where
     `path` is the child index chain of the node in the tree the page
     displays, empty for the root. A `treeRevision` other than the stored
-    one is refused with `409` and code `tree_stale`, so a path into a
+    one is refused with `409` and code `TREE_STALE`, so a path into a
     replaced tree never yields a suggestion for another node. Otherwise
     it returns `{epoch, treeRevision, candidates}`. Each candidate is
     `{selector, unique, matchCount, obscured}`. `unique` comes from the
@@ -572,8 +577,8 @@ build on the `.Built(` and `.Orchestra(` accessors, on
     tree, and when any match is secure the step holds `${password}` and
     the response sets `secure` and `placeholder`, never echoing the
     text. A `type` selector that matches no node is `404` with code
-    `node_not_found`, because the field cannot be shown to be non-secure.
-  - Suggest and test answer `404` with code `no_tree` before the first
+    `NODE_NOT_FOUND`, because the field cannot be shown to be non-secure.
+  - Suggest and test answer `404` with code `NO_TREE` before the first
     capture, and so does `type` in step/yaml.
 
 ## Run folder contract

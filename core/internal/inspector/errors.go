@@ -10,12 +10,20 @@ import (
 )
 
 // Codes the inspector reports for conditions that are specific to it.
-// A failure that already carries a diag code keeps that code.
+// Every code in an error body is upper snake case, the same convention
+// as the diag codes, and a failure that already carries a diag code
+// keeps that code.
 const (
-	codeNoTree        = "no_tree"
-	codeNoScreenshot  = "no_screenshot"
-	codeSessionClosed = "session_closed"
-	codeInternal      = "internal"
+	codeNoTree           = "NO_TREE"
+	codeNoScreenshot     = "NO_SCREENSHOT"
+	codeSessionClosed    = "SESSION_CLOSED"
+	codeTreeStale        = "TREE_STALE"
+	codeNodeNotFound     = "NODE_NOT_FOUND"
+	codeHostNotAllowed   = "HOST_NOT_ALLOWED"
+	codeOriginNotAllowed = "ORIGIN_NOT_ALLOWED"
+	codeTokenRequired    = "TOKEN_REQUIRED"
+	codeCodeRefused      = "CODE_REFUSED"
+	codeInternal         = "INTERNAL"
 )
 
 // writeCoded writes the error payload every failing /api/ response

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/session"
 )
@@ -184,7 +185,8 @@ func (s *Server) Close() error { return s.http.Close() }
 func (s *Server) secure(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !s.hostAllowed(r.Host) {
-			writeError(w, http.StatusForbidden, "host_not_allowed", "the request does not name this server")
+			writeCoded(w, http.StatusForbidden, codeHostNotAllowed, "the request does not name this server",
+				"Open the URL the atomyx inspect command printed, which names 127.0.0.1.")
 			return
 		}
 		h := w.Header()
@@ -193,11 +195,13 @@ func (s *Server) secure(next http.Handler) http.Handler {
 		h.Set("X-Content-Type-Options", "nosniff")
 		if strings.HasPrefix(r.URL.Path, apiPrefix) {
 			if r.Method != http.MethodGet && r.Header.Get("Origin") != "http://"+r.Host {
-				writeError(w, http.StatusForbidden, "origin_not_allowed", "the request does not come from the inspector page")
+				writeCoded(w, http.StatusForbidden, codeOriginNotAllowed, "the request does not come from the inspector page",
+					"Send the request from the inspector page, not from another site.")
 				return
 			}
 			if r.URL.Path != authPath && !s.auth.valid(r.Header.Get(tokenHeader)) {
-				writeError(w, http.StatusUnauthorized, "token_required", "send a valid "+tokenHeader+" header")
+				writeCoded(w, http.StatusUnauthorized, codeTokenRequired, "send a valid "+tokenHeader+" header",
+					"Open the URL the atomyx inspect command printed, or press Enter in its terminal for a fresh one.")
 				return
 			}
 		}
@@ -215,7 +219,8 @@ func (s *Server) handleAuth(w http.ResponseWriter, r *http.Request) {
 	}
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxAuthBodyBytes))
 	if err := dec.Decode(&body); err != nil {
-		writeError(w, http.StatusBadRequest, "bad_request", "send a JSON body with a code")
+		writeCoded(w, http.StatusBadRequest, diag.CodeInvalidArgument, "send a JSON body with a code",
+			"Open the URL the atomyx inspect command printed, which carries the code.")
 		return
 	}
 	token, ok, err := s.auth.exchange(body.Code)
@@ -223,18 +228,16 @@ func (s *Server) handleAuth(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case err != nil:
 		s.logger.Error("inspector.auth.failed", err, fields)
-		writeError(w, http.StatusInternalServerError, "internal", "the token could not be issued")
+		writeCoded(w, http.StatusInternalServerError, codeInternal, "the token could not be issued",
+			"Press Enter in the atomyx inspect terminal for a fresh URL, then try again.")
 	case !ok:
 		s.logger.Warn("inspector.auth.refused", fields)
-		writeError(w, http.StatusUnauthorized, "code_refused", "the bootstrap code is wrong or already used")
+		writeCoded(w, http.StatusUnauthorized, codeCodeRefused, "the bootstrap code is wrong or already used",
+			"Press Enter in the atomyx inspect terminal for a fresh URL.")
 	default:
 		s.logger.Info("inspector.auth.issued", fields)
 		writeJSON(w, http.StatusOK, map[string]string{"token": token})
 	}
-}
-
-func writeError(w http.ResponseWriter, status int, code, message string) {
-	writeCoded(w, status, code, message, "")
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

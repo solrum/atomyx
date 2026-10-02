@@ -200,8 +200,8 @@ func TestHost_AForeignHostIsRejectedOnEveryPath(t *testing.T) {
 	} {
 		for _, path := range []string{"/", "/api/v1/tree"} {
 			rec := srv.do(call{method: http.MethodGet, path: path, host: host, header: map[string]string{tokenHeader: token}})
-			if rec.Code != http.StatusForbidden || codeOf(t, rec) != "host_not_allowed" {
-				t.Errorf("host %q path %s: status %d %s, want 403 host_not_allowed", host, path, rec.Code, rec.Body)
+			if rec.Code != http.StatusForbidden || codeOf(t, rec) != codeHostNotAllowed {
+				t.Errorf("host %q path %s: status %d %s, want 403 HOST_NOT_ALLOWED", host, path, rec.Code, rec.Body)
 			}
 		}
 	}
@@ -232,8 +232,8 @@ func TestOrigin_ANonGetRequestNeedsTheServedOrigin(t *testing.T) {
 			header["Origin"] = origin
 		}
 		rec := srv.do(call{method: http.MethodPost, path: "/api/v1/act", header: header})
-		if rec.Code != http.StatusForbidden || codeOf(t, rec) != "origin_not_allowed" {
-			t.Errorf("%s origin: status %d %s, want 403 origin_not_allowed", name, rec.Code, rec.Body)
+		if rec.Code != http.StatusForbidden || codeOf(t, rec) != codeOriginNotAllowed {
+			t.Errorf("%s origin: status %d %s, want 403 ORIGIN_NOT_ALLOWED", name, rec.Code, rec.Body)
 		}
 	}
 	rec := srv.do(call{method: http.MethodPost, path: "/api/v1/act", header: map[string]string{tokenHeader: token, "Origin": served}})
@@ -270,7 +270,7 @@ func TestToken_EveryApiRouteNeedsItIncludingGetAndTheEventStream(t *testing.T) {
 			"empty":   {tokenHeader: "", "Origin": served["Origin"]},
 		} {
 			rec := srv.do(call{method: r.method, path: r.path, header: header})
-			if rec.Code != http.StatusUnauthorized || codeOf(t, rec) != "token_required" {
+			if rec.Code != http.StatusUnauthorized || codeOf(t, rec) != codeTokenRequired {
 				t.Errorf("%s %s with %s token: status %d, want 401", r.method, r.path, name, rec.Code)
 			}
 		}
@@ -314,8 +314,8 @@ func TestBootstrap_ACodeIsSingleUse(t *testing.T) {
 		t.Fatalf("the issued token was refused: %d", rec.Code)
 	}
 	rec := srv.do(call{method: http.MethodPost, path: authPath, body: `{"code":"` + code + `"}`, header: map[string]string{"Origin": "http://" + srv.hostPort()}})
-	if rec.Code != http.StatusUnauthorized || codeOf(t, rec) != "code_refused" {
-		t.Fatalf("second use: status %d %s, want 401 code_refused", rec.Code, rec.Body)
+	if rec.Code != http.StatusUnauthorized || codeOf(t, rec) != codeCodeRefused {
+		t.Fatalf("second use: status %d %s, want 401 CODE_REFUSED", rec.Code, rec.Body)
 	}
 }
 
