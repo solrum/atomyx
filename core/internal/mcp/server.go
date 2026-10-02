@@ -34,7 +34,7 @@ type ServerDeps struct {
 // NewServer constructs the Atomyx MCP server and registers its tool
 // surface. The returned server is not yet connected to a transport;
 // pass it to Serve to run it over stdio.
-func NewServer(info Info, deps ServerDeps) *mcp.Server {
+func NewServer(info Info, deps ServerDeps) *Server {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    info.Name,
 		Version: info.Version,
@@ -113,11 +113,28 @@ func NewServer(info Info, deps ServerDeps) *mcp.Server {
 
 	registerRunScriptTool(server, tc)
 
-	return server
+	return &Server{Server: server, session: session}
+}
+
+// Server is the Atomyx MCP server together with the device session its
+// tools share, so whoever runs the server can also release the device
+// when it stops.
+type Server struct {
+	*mcp.Server
+	session *DeviceSession
+}
+
+// Close releases the active device, stopping every child process its
+// driver started. It is idempotent, and a device selection that
+// completes after Close is released as well. Call it after Serve
+// returns, whatever the reason.
+func (s *Server) Close() {
+	s.session.Close()
 }
 
 // Serve runs server over stdio until ctx is done or the client
-// disconnects.
-func Serve(ctx context.Context, server *mcp.Server) error {
+// disconnects. It does not release the active device: the caller
+// calls Close afterwards.
+func Serve(ctx context.Context, server *Server) error {
 	return server.Run(ctx, &mcp.StdioTransport{})
 }

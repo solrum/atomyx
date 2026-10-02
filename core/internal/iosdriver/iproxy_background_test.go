@@ -74,3 +74,23 @@ func TestIosDriver_Disconnect_KillsIproxyThroughBackgroundHandle(t *testing.T) {
 		t.Fatalf("second Disconnect() error = %v, want idempotent", err)
 	}
 }
+
+func TestIosDriver_Connect_Device_CanceledDuringTunnelWait_KillsIproxyProcess(t *testing.T) {
+	port := freeTCPPort(t)
+	bg := process.NewFakeBackground()
+	proc := process.NewFakeBackgroundProcess()
+	bg.Stub(proc)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	d := iosdriver.New(newDefaultFakeConn(), process.NewFake(), iosdriver.Options{
+		UDID: "DEV-1", Kind: iosdriver.KindDevice, Port: port, Clock: &cancelOnSleepClock{cancel: cancel}, Background: bg,
+	})
+
+	err := d.Connect(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Connect() error = %v, want it to wrap context.Canceled", err)
+	}
+	if !proc.Killed() {
+		t.Fatal("iproxy process was still running after the connect was canceled")
+	}
+}

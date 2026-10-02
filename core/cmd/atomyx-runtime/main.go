@@ -17,6 +17,7 @@ import (
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/process"
+	"dev.atomyx/internal/shutdown"
 	"dev.atomyx/internal/sidecar"
 	"dev.atomyx/internal/version"
 )
@@ -117,11 +118,16 @@ func run() int {
 		// the pending read return, which lets Run observe ctx.Err()
 		// and drain every in-flight dispatch before done closes.
 		_ = os.Stdin.Close()
-		<-done
-		dispose(handles, session, simHid)
+		// A dispatch that never returns must not keep the children
+		// alive: the drain is bounded, and dispose runs regardless.
+		if !shutdown.Bounded(shutdown.GracePeriod, func() { <-done }) {
+			writeSidecarErrorLine("in-flight requests did not finish in time")
+		}
 	case <-done:
 		cancel()
-		dispose(handles, session, simHid)
+	}
+	if !shutdown.Bounded(shutdown.GracePeriod, func() { dispose(handles, session, simHid) }) {
+		writeSidecarErrorLine("device cleanup did not finish in time")
 	}
 	return 0
 }

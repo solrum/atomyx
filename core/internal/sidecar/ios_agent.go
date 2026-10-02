@@ -90,8 +90,17 @@ type IosAgentService struct {
 	events      *EventBus
 	onPanic     PanicHandler
 
-	mu      sync.Mutex
-	entries map[string]*iosAgentEntry
+	// ctx bounds every provisioning call, and Dispose cancels it so an
+	// agent still building or launching is stopped instead of orphaned.
+	ctx    context.Context
+	cancel context.CancelFunc
+	// inflight counts provisioning goroutines so Dispose can wait until
+	// each has stopped the process it was bringing up.
+	inflight sync.WaitGroup
+
+	mu       sync.Mutex
+	disposed bool
+	entries  map[string]*iosAgentEntry
 }
 
 // NewIosAgentService constructs an IosAgentService. The composition
@@ -102,10 +111,13 @@ type IosAgentService struct {
 // receives a background provisioning goroutine's recovered panic, and
 // passing nil discards it.
 func NewIosAgentService(provisioner device.AgentProvisioner, events *EventBus, onPanic PanicHandler) *IosAgentService {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &IosAgentService{
 		provisioner: provisioner,
 		events:      events,
 		onPanic:     onPanic,
+		ctx:         ctx,
+		cancel:      cancel,
 		entries:     make(map[string]*iosAgentEntry),
 	}
 }
@@ -135,19 +147,21 @@ func (s *IosAgentService) statusLocked(udid string) IosAgentStatus {
 // goroutine.
 func (s *IosAgentService) Ensure(udid string, kind device.IosAgentKind) IosAgentStatus {
 	s.mu.Lock()
-	if entry, ok := s.entries[udid]; ok && (entry.state == IosAgentStateReady || entry.state == IosAgentStateBuilding) {
+	if entry, ok := s.entries[udid]; s.disposed || (ok && (entry.state == IosAgentStateReady || entry.state == IosAgentStateBuilding)) {
 		status := s.statusLocked(udid)
 		s.mu.Unlock()
 		return status
 	}
 	s.entries[udid] = &iosAgentEntry{state: IosAgentStateBuilding}
 	status := s.statusLocked(udid)
+	s.inflight.Add(1)
 	s.mu.Unlock()
 	s.emit(udid)
 
 	go func() {
+		defer s.inflight.Done()
 		defer s.recoverEnsurePanic(udid)
-		kill, err := s.provisioner.EnsureIOSAgent(context.Background(), udid, kind)
+		kill, err := s.provisioner.EnsureIOSAgent(s.ctx, udid, kind)
 		if err != nil {
 			s.markFailed(udid, err.Error())
 			return
@@ -178,6 +192,11 @@ func (s *IosAgentService) recoverEnsurePanic(udid string) {
 
 func (s *IosAgentService) markReady(udid string, kill func() error) {
 	s.mu.Lock()
+	if s.disposed {
+		s.mu.Unlock()
+		_ = kill()
+		return
+	}
 	entry, ok := s.entries[udid]
 	if !ok {
 		s.mu.Unlock()
@@ -191,12 +210,19 @@ func (s *IosAgentService) markReady(udid string, kill func() error) {
 }
 
 // Dispose stops every XCUITest driver process this service brought
-// up, so none of them outlives the service. Each entry's kill is
-// invoked at most once and its error discarded, because one device's
-// teardown failure must not block releasing the rest. Safe to call
-// during process shutdown; RegisterIosAgentFeature wires it as the
-// feature's Handle.Dispose.
+// up, so none of them outlives the service. A provisioning call still
+// building or launching is canceled and awaited, and a later Ensure
+// is a no-op. Each entry's kill is invoked at most once and its error
+// discarded, because one device's teardown failure must not block
+// releasing the rest. Safe to call during process shutdown;
+// RegisterIosAgentFeature wires it as the feature's Handle.Dispose.
 func (s *IosAgentService) Dispose() error {
+	s.mu.Lock()
+	s.disposed = true
+	s.mu.Unlock()
+	s.cancel()
+	s.inflight.Wait()
+
 	s.mu.Lock()
 	kills := make([]func() error, 0, len(s.entries))
 	for _, entry := range s.entries {

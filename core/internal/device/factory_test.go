@@ -2,6 +2,8 @@ package device
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"os"
 	"runtime"
 	"testing"
@@ -163,5 +165,55 @@ func TestDriverFactory_CreateDriver_ExplicitHidPort_BuildsIosSimDriverWithoutSta
 	}
 	if len(starter.calls) != 0 {
 		t.Fatalf("StartSimHid calls = %v, want none when the descriptor already carries a HidPort", starter.calls)
+	}
+}
+
+// listeningBackground is a BackgroundRunner whose Start binds a
+// listener that drops every connection, modeling an iproxy tunnel
+// that comes up but forwards to an agent that never answers.
+type listeningBackground struct {
+	t    *testing.T
+	port int
+	proc *process.FakeBackgroundProcess
+}
+
+func (b *listeningBackground) Start(ctx context.Context, _ string, _ ...string) (process.BackgroundProcess, error) {
+	l, err := new(net.ListenConfig).Listen(ctx, "tcp", fmt.Sprintf("127.0.0.1:%d", b.port))
+	if err != nil {
+		return nil, err
+	}
+	b.t.Cleanup(func() { _ = l.Close() })
+	go func() {
+		for {
+			c, err := l.Accept()
+			if err != nil {
+				return
+			}
+			_ = c.Close()
+		}
+	}()
+	return b.proc, nil
+}
+
+func TestDriverFactory_Build_ConnectFailsAfterTunnelStarted_StopsTheTunnel(t *testing.T) {
+	probe, err := new(net.ListenConfig).Listen(context.Background(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("reserve port: %v", err)
+	}
+	port := probe.Addr().(*net.TCPAddr).Port
+	_ = probe.Close()
+
+	proc := process.NewFakeBackgroundProcess()
+	f := NewDriverFactory(DriverFactoryDeps{
+		Runner:     process.NewFake(),
+		Background: &listeningBackground{t: t, port: port, proc: proc},
+	})
+
+	_, err = f.Build(context.Background(), Descriptor{ID: "DEV-1", Platform: PlatformIOS, Kind: KindDevice, Port: port})
+	if err == nil {
+		t.Fatal("Build() succeeded against an agent that never answers the handshake")
+	}
+	if !proc.Killed() {
+		t.Fatal("the tunnel process was left running after Build failed")
 	}
 }

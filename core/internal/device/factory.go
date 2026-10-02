@@ -108,6 +108,11 @@ func (f *DriverFactory) Build(ctx context.Context, desc Descriptor) (Built, erro
 		return Built{}, err
 	}
 	if err := drv.Connect(ctx); err != nil {
+		// Connect can fail after it has already started a long-lived
+		// child, such as the USB tunnel, and the caller never receives
+		// the driver to disconnect. Disconnect is idempotent, so
+		// releasing here is always safe.
+		_ = drv.Disconnect()
 		return Built{}, err
 	}
 	return Built{

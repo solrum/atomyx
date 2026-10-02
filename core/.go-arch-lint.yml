@@ -31,6 +31,8 @@ components:
     in: internal/driver/drivertest
   process:
     in: internal/process
+  shutdown:
+    in: internal/shutdown
   androiddriver:
     in: internal/androiddriver
   iosdriver:
@@ -103,6 +105,9 @@ deps:
     anyVendorDeps: true
     mayDependOn:
       - diag
+  shutdown:
+    mayDependOn:
+      - shutdown
   androiddriver:
     mayDependOn:
       - wire

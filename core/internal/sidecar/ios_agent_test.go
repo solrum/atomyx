@@ -510,3 +510,49 @@ func TestIosAgent_SimHidStatus_MarshalsPortPresenceFaithfully(t *testing.T) {
 		})
 	}
 }
+
+// TestIosAgent_Dispose_WhileBuilding_CancelsTheProvisioningCall guards
+// the shutdown path against an agent still launching: Dispose must
+// cancel the in-flight provisioning call and wait for it, because the
+// launcher only stops its xcodebuild child when its context is
+// canceled.
+func TestIosAgent_Dispose_WhileBuilding_CancelsTheProvisioningCall(t *testing.T) {
+	ctx := newTestContext()
+	provisioner := device.NewFakeProvisioner()
+	provisioner.SetGate(make(chan struct{}))
+	service := NewIosAgentService(provisioner, ctx.Events, nil)
+	RegisterIosAgentFeature(ctx, service, device.NewFakeSimHidStatusProvider())
+
+	params, _ := json.Marshal(map[string]string{"udid": "udid-1", "kind": "simulator"})
+	if _, err := ctx.Dispatcher.Dispatch(context.Background(), "ensureIosAgent", params); err != nil {
+		t.Fatalf("Dispatch() error = %v", err)
+	}
+	waitForIOSCallCount(t, provisioner, 1)
+
+	returned := make(chan struct{})
+	go func() {
+		_ = service.Dispose()
+		close(returned)
+	}()
+	select {
+	case <-returned:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Dispose did not return: the provisioning call was never canceled")
+	}
+	if got := service.Status("udid-1").State; got == IosAgentStateReady {
+		t.Fatalf("state = %q after Dispose, want it not ready", got)
+	}
+}
+
+func TestIosAgent_EnsureAfterDispose_DoesNotProvision(t *testing.T) {
+	ctx := newTestContext()
+	provisioner := device.NewFakeProvisioner()
+	service := NewIosAgentService(provisioner, ctx.Events, nil)
+	_ = service.Dispose()
+
+	service.Ensure("udid-1", device.IosAgentKindSimulator)
+
+	if calls := provisioner.IOSCalls(); len(calls) != 0 {
+		t.Fatalf("IOSCalls() = %#v, want none after Dispose", calls)
+	}
+}

@@ -13,7 +13,12 @@ import (
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/process"
+	"dev.atomyx/internal/shutdown"
 )
+
+// exitForced is the exit code when cleanup outlasts the grace period
+// and the process is ended without finishing it.
+const exitForced = 1
 
 func main() {
 	procRunner := process.NewExec()
@@ -51,6 +56,15 @@ func main() {
 	// lets those defers run on the way out.
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	// A command whose deferred cleanup hangs, such as a driver
+	// Disconnect waiting on a stuck child, must not hold the exit open
+	// after the stop request: the watchdog ends the process once the
+	// grace period lapses.
+	go func() {
+		<-ctx.Done()
+		shutdown.ForceExitAfter(shutdown.GracePeriod, func() { os.Exit(exitForced) })
+	}()
 
 	// stop deliberately does not run before this os.Exit: the process
 	// is terminating either way, and stop only releases in-process

@@ -128,6 +128,9 @@ func (r *fakeXcodebuildRunner) runSpawn(ctx context.Context, proc *tunnelProcess
 	}
 	if !r.spawnReady {
 		<-ctx.Done()
+		if r.spawnReturned != nil {
+			close(r.spawnReturned)
+		}
 		return ctx.Err()
 	}
 
@@ -754,5 +757,47 @@ func TestXctestLauncher_EnsureRunning_TimesOutWhenDriverNeverBecomesReachable(t 
 	}
 	if launchErr.Code != iosdriver.XctestErrLaunchTimeout {
 		t.Fatalf("Code = %q, want %q", launchErr.Code, iosdriver.XctestErrLaunchTimeout)
+	}
+}
+
+// cancelOnSleepClock cancels a context the first time the readiness
+// loop sleeps, so a test cancels the wait at a deterministic point
+// instead of racing a timer.
+type cancelOnSleepClock struct {
+	cancel context.CancelFunc
+}
+
+func (c *cancelOnSleepClock) NowMs() int64 { return 0 }
+
+func (c *cancelOnSleepClock) Sleep(ctx context.Context, _ int64) error {
+	c.cancel()
+	return ctx.Err()
+}
+
+var _ clock.Clock = (*cancelOnSleepClock)(nil)
+
+func TestXctestLauncher_EnsureRunning_CanceledDuringReadinessWait_KillsSpawnedXcodebuild(t *testing.T) {
+	projectDir, _ := newTestProjectDir(t)
+	createFreshRunnerApp(t, projectDir, iosdriver.KindSimulator, time.Now())
+	port := freeTCPPort(t)
+	spawnReturned := make(chan struct{})
+	runner := &fakeXcodebuildRunner{port: port, spawnReady: false, spawnReturned: spawnReturned}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l := iosdriver.NewXctestLauncher(runner, runner, &cancelOnSleepClock{cancel: cancel}, iosdriver.LaunchConfig{
+		ProjectDir: projectDir,
+		Port:       port,
+		Kind:       iosdriver.KindSimulator,
+		UDID:       "SIM-1",
+	})
+
+	_, err := l.EnsureRunning(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("EnsureRunning() error = %v, want context.Canceled", err)
+	}
+	select {
+	case <-spawnReturned:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the spawned xcodebuild process was still running after the launch was canceled")
 	}
 }

@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -99,10 +100,15 @@ type DeviceSessionDeps struct {
 type DeviceSession struct {
 	mu      sync.Mutex
 	active  *ActiveDevice
+	closed  bool
 	factory device.Factory
 	clock   orchestra.Clock
 	logger  logging.Logger
 }
+
+// errSessionClosed is returned by Select once the session has been
+// closed.
+var errSessionClosed = errors.New("session.select: session closed")
 
 // NewDeviceSession constructs a DeviceSession from deps.
 func NewDeviceSession(deps DeviceSessionDeps) *DeviceSession {
@@ -175,6 +181,11 @@ func (s *DeviceSession) Select(ctx context.Context, input SelectDeviceInput) (*A
 		ConnectedAt: s.clock.NowMs(),
 	}
 	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		_ = built.Driver.Disconnect()
+		return nil, errSessionClosed
+	}
 	s.active = active
 	s.mu.Unlock()
 	s.logger.Info("session.device_selected", logging.LogContext{
@@ -197,6 +208,17 @@ func (s *DeviceSession) CheckHealth(ctx context.Context) orchestra.HealthReport 
 		return orchestra.HealthReport{Selected: false}
 	}
 	return active.Orchestra.CheckHealth(ctx)
+}
+
+// Close disconnects the active driver and makes every later Select
+// release what it builds and fail, so a selection that was still
+// launching when the server stopped cannot leave a child running.
+// It is idempotent.
+func (s *DeviceSession) Close() {
+	s.mu.Lock()
+	s.closed = true
+	s.mu.Unlock()
+	s.Disconnect()
 }
 
 // Disconnect tears down the active driver and marks the session idle.
