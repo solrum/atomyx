@@ -132,9 +132,17 @@ func parseCaptureFlag(flag string) *netcapture.Config {
 // through device.ResolveDescriptor, so the device kind comes from the
 // device's identity as the probe sees it. An iOS --device that no
 // scan finds is reported as DEVICE_NOT_FOUND with a remedy.
-func resolveDescriptor(ctx context.Context, probe device.Probe, platform, deviceID string) (device.Descriptor, error) {
-	desc, err := device.ResolveDescriptor(ctx, probe, device.Platform(platform), deviceID)
+func resolveDescriptor(ctx context.Context, probe device.Probe, runners device.RunnerIdentifier, platform, deviceID string) (device.Descriptor, error) {
+	desc, err := device.ResolveDescriptor(ctx, probe, runners, device.Platform(platform), deviceID)
 	var notFound *device.DeviceNotFoundError
+	if errors.As(err, &notFound) && notFound.ID == "" {
+		return device.Descriptor{}, diag.New(
+			diag.CodeDeviceNotFound,
+			notFound.Error(),
+			"Serve the runner on the target device (make serve in platforms/ios-agent), or pass --device with an id from `atomyx list-devices`.",
+			err,
+		)
+	}
 	if errors.As(err, &notFound) {
 		return device.Descriptor{}, diag.New(
 			diag.CodeDeviceNotFound,

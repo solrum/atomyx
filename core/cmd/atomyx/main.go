@@ -48,6 +48,7 @@ func main() {
 
 	deps := cli.Deps{
 		Probe:   probe,
+		Runners: device.PingRunnerIdentifier{},
 		Factory: factory,
 		Clock:   clock,
 		Logger:  logger,

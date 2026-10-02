@@ -110,9 +110,10 @@ reachable:
 atomyx doctor --platform ios
 ```
 
-Without `--device`, the command dials the runner you are serving on its
-default port. With `--device <UDID>`, the CLI starts a runner of its
-own instead, see step 5.
+Without `--device`, the command targets the device of the runner you are
+serving on its default port, so only one device is involved. With
+`--device <UDID>`, the CLI starts a runner of its own instead, see
+step 5.
 
 Stop the driver with Ctrl-C in the terminal running
 `make ready-ios-sim`. Stopping only the `make` process itself, for
@@ -143,9 +144,10 @@ confirm readiness the same way:
 atomyx doctor --platform ios
 ```
 
-Without `--device`, the command dials the runner you are serving on its
-default port. With `--device <UDID>`, the CLI starts a runner of its
-own instead, see step 5.
+Without `--device`, the command targets the device of the runner you are
+serving on its default port, so only one device is involved. With
+`--device <UDID>`, the CLI starts a runner of its own instead, see
+step 5.
 
 Stop it with Ctrl-C in that terminal, the same way as the simulator.
 
@@ -193,9 +195,12 @@ atomyx run --file test.yml --platform android --device <serial>
 
 For iOS with `--device`, `atomyx` starts the driver itself and stops it
 when the command ends, so you do not need `make ready-ios-sim` or
-`make ready-ios` for it. Without `--device` it does not start one and
-dials the default port, 22087, where a driver you serve yourself must be
-listening. The first launch on a machine compiles the driver, which can
+`make ready-ios` for it. Without `--device` it does not start one. It asks
+the driver you serve yourself on the default port, 22087, which device it
+belongs to, and runs against that device. A driver that names no device
+is taken to serve the one connected iPhone. When no driver answers, or
+several iPhones are connected, the command fails with DEVICE_NOT_FOUND,
+so serve the driver or pass `--device`. The first launch on a machine compiles the driver, which can
 take several minutes, and progress lines are written to stderr.
 
 Driving a physical iPhone this way needs signing settings in the

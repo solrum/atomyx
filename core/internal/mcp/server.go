@@ -31,6 +31,7 @@ type Info struct {
 // session package defaults.
 type ServerDeps struct {
 	Probe    device.Probe
+	Runners  device.RunnerIdentifier
 	Factory  device.Factory
 	Storage  storage.Storage
 	RunStore *storage.RunStore
@@ -72,7 +73,7 @@ func NewServer(info Info, deps ServerDeps) *Server {
 
 	tracker := &runTracker{runs: runStore, storage: deps.Storage, clock: clk, logger: logger}
 	devices := NewDeviceSession(DeviceSessionDeps{
-		Factory: deps.Factory, Probe: deps.Probe, Clock: clk, TimerClock: timers, Logger: logger,
+		Factory: deps.Factory, Probe: deps.Probe, Runners: deps.Runners, Clock: clk, TimerClock: timers, Logger: logger,
 		Session: deps.Session, Timeouts: deps.Timeouts, Runs: tracker,
 	})
 	tc := &ToolContext{

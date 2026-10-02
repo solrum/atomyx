@@ -94,7 +94,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	// When both the device is unreachable and the file fails to
 	// parse, the device error is the one reported, because parsing
 	// never runs until the connection succeeds.
-	desc, err := resolveDescriptor(ctx, deps.Probe, platform, deviceID)
+	desc, err := resolveDescriptor(ctx, deps.Probe, deps.Runners, platform, deviceID)
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}

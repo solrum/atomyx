@@ -86,7 +86,8 @@ type ActiveDevice struct {
 }
 
 // DeviceSessionDeps constructs a DeviceSession. Probe resolves a
-// requested id to a device kind. Session carries the dependencies of
+// requested id to a device kind, and Runners names the device of an
+// already-served iOS runner when no id is given. Session carries the dependencies of
 // session.Open, and its Factory defaults to Factory, its Clock to Clock
 // and its Logger to Logger when unset. Clock and Logger default to the
 // system clock and a no-op logger. TimerClock drives the acquisition
@@ -98,6 +99,7 @@ type ActiveDevice struct {
 type DeviceSessionDeps struct {
 	Factory    device.Factory
 	Probe      device.Probe
+	Runners    device.RunnerIdentifier
 	Clock      orchestra.Clock
 	TimerClock clock.Clock
 	Logger     logging.Logger
@@ -178,9 +180,10 @@ type DeviceSession struct {
 	timerGen   uint64
 	timerStop  context.CancelFunc
 
-	probe  device.Probe
-	clock  orchestra.Clock
-	timers clock.Clock
+	probe   device.Probe
+	runners device.RunnerIdentifier
+	clock   orchestra.Clock
+	timers  clock.Clock
 	// timerBase is the parent of every idle timer's context. It is never
 	// canceled, so only a replaced or stopped timer ends early.
 	timerBase context.Context
@@ -240,7 +243,7 @@ func NewDeviceSession(deps DeviceSessionDeps) *DeviceSession {
 		sessionDeps.Role = "mcp"
 	}
 	return &DeviceSession{
-		state: holderUnselected, probe: deps.Probe, clock: nowClock, timers: timers, timerBase: context.Background(), logger: logger,
+		state: holderUnselected, probe: deps.Probe, runners: deps.Runners, clock: nowClock, timers: timers, timerBase: context.Background(), logger: logger,
 		deps: sessionDeps, timeouts: deps.Timeouts.WithDefaults(), runs: deps.Runs,
 	}
 }
@@ -678,7 +681,7 @@ func (s *DeviceSession) Disconnect() {
 // that is accepted on the wire and deliberately not consulted. An iOS
 // id no scan finds is reported as DEVICE_NOT_FOUND with a remedy.
 func (s *DeviceSession) resolveDescriptor(ctx context.Context, input SelectDeviceInput) (device.Descriptor, error) {
-	desc, err := device.ResolveDescriptor(ctx, s.probe, input.Platform, input.ID)
+	desc, err := device.ResolveDescriptor(ctx, s.probe, s.runners, input.Platform, input.ID)
 	var notFound *device.DeviceNotFoundError
 	if errors.As(err, &notFound) {
 		return device.Descriptor{}, diag.New(

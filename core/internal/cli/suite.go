@@ -100,7 +100,7 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 	deviceID := resolveDeviceID(flags, resolvedEnvironment)
 	proxyFlag := resolveProxyFlag(flags, resolvedEnvironment)
 
-	desc, err := resolveDescriptor(ctx, deps.Probe, platform, deviceID)
+	desc, err := resolveDescriptor(ctx, deps.Probe, deps.Runners, platform, deviceID)
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}

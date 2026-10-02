@@ -19,6 +19,10 @@ type Deps struct {
 	// Factory builds a connected driver and orchestra for the
 	// platform and device a run targets.
 	Factory device.Factory
+	// Runners identifies the iOS runner already served on the default
+	// control port, so a run without --device targets that runner's
+	// device. A nil value means no runner is ever found.
+	Runners device.RunnerIdentifier
 	// Clock times a script run's steps. Defaults to
 	// orchestra.SystemClock{} when nil.
 	Clock orchestra.Clock

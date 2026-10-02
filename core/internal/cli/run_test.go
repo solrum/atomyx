@@ -1123,6 +1123,7 @@ func TestRunScriptSecretResolvedFromEnvRefNeverPersistedInReport(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	deps := Deps{
 		Probe:   device.NewStaticProbe(nil),
+		Runners: servedSimulatorRunner{},
 		Factory: stagedMockFactory{tree: focusedInputTree()},
 		Stdout:  &stdout,
 		Stderr:  &stderr,

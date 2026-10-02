@@ -40,7 +40,7 @@ func (f *recordingFactory) Build(ctx context.Context, desc device.Descriptor) (d
 }
 
 func TestResolveDescriptorIosSimulatorUdid(t *testing.T) {
-	desc, err := resolveDescriptor(context.Background(), iosDevicesProbe(), "ios", testSimulatorUDID)
+	desc, err := resolveDescriptor(context.Background(), iosDevicesProbe(), nil, "ios", testSimulatorUDID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func TestResolveDescriptorIosSimulatorUdid(t *testing.T) {
 }
 
 func TestResolveDescriptorIosPhysicalUdid(t *testing.T) {
-	desc, err := resolveDescriptor(context.Background(), iosDevicesProbe(), "ios", testPhysicalUDID)
+	desc, err := resolveDescriptor(context.Background(), iosDevicesProbe(), nil, "ios", testPhysicalUDID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func TestResolveDescriptorIosPhysicalUdid(t *testing.T) {
 }
 
 func TestResolveDescriptorIosUnknownUdidIsDeviceNotFound(t *testing.T) {
-	_, err := resolveDescriptor(context.Background(), iosDevicesProbe(), "ios", "UNKNOWN")
+	_, err := resolveDescriptor(context.Background(), iosDevicesProbe(), nil, "ios", "UNKNOWN")
 	if err == nil {
 		t.Fatal("want an error for an unknown udid")
 	}
@@ -76,14 +76,35 @@ func TestResolveDescriptorIosUnknownUdidIsDeviceNotFound(t *testing.T) {
 	}
 }
 
-func TestResolveDescriptorNoDeviceFlagKeepsDefaults(t *testing.T) {
-	ios, err := resolveDescriptor(context.Background(), nil, "ios", "")
-	if err != nil || ios.ID != "" || ios.Kind != device.KindSimulator {
-		t.Fatalf("ios default: got %+v, %v", ios, err)
-	}
-	android, err := resolveDescriptor(context.Background(), nil, "android", "")
+func TestResolveDescriptorAndroidWithoutDeviceKeepsTheDefaultEmulator(t *testing.T) {
+	android, err := resolveDescriptor(context.Background(), nil, nil, "android", "")
 	if err != nil || android.ID != "emulator-5554" || android.Kind != device.KindEmulator {
 		t.Fatalf("android default: got %+v, %v", android, err)
+	}
+}
+
+type servedSimulatorRunner struct{}
+
+func (servedSimulatorRunner) IdentifyRunner(context.Context, int) (device.ServedRunner, bool) {
+	return device.ServedRunner{SimulatorUDID: testSimulatorUDID}, true
+}
+
+func TestResolveDescriptorIosWithoutDeviceUsesTheServedRunner(t *testing.T) {
+	desc, err := resolveDescriptor(context.Background(), nil, servedSimulatorRunner{}, "ios", "")
+	if err != nil || desc.ID != testSimulatorUDID || desc.Kind != device.KindSimulator {
+		t.Fatalf("got %+v, %v, want simulator %s", desc, err, testSimulatorUDID)
+	}
+}
+
+func TestResolveDescriptorIosWithoutDeviceAndNoRunnerIsDeviceNotFoundWithTheRemedy(t *testing.T) {
+	_, err := resolveDescriptor(context.Background(), iosDevicesProbe(), nil, "ios", "")
+
+	code, _, remedy := diag.Describe(err)
+	if code != diag.CodeDeviceNotFound {
+		t.Fatalf("code = %q, want %q", code, diag.CodeDeviceNotFound)
+	}
+	if !strings.Contains(remedy, "make serve") || !strings.Contains(remedy, "--device") {
+		t.Fatalf("remedy %q must say to serve the runner or pass --device", remedy)
 	}
 }
 

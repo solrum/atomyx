@@ -35,7 +35,7 @@ func Doctor(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	deviceID := resolveDeviceID(flags, nil)
 	jsonOutput := flagBool(flags, "--json")
 
-	desc, err := resolveDescriptor(ctx, deps.Probe, platform, deviceID)
+	desc, err := resolveDescriptor(ctx, deps.Probe, deps.Runners, platform, deviceID)
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}

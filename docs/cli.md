@@ -225,10 +225,14 @@ an `atomyx-mcp` server, can drive a device at a time.
 - If the device lease is lost while a run is in progress, the run is
   stopped and the command reports it.
 
-A run on iOS without `--device` has no device identity to key ownership
-or a runner on. It is not provisioned by the CLI and dials the default
-runner port, 22087, so it only works against a runner that was started
-separately. Pass `--device` for an automatically launched runner.
+A run on iOS without `--device` is not provisioned by the CLI. It asks
+the runner served on the default port, 22087, which device it belongs
+to, and takes ownership of that device like any other run. A runner
+that names no device is taken to serve the single connected iPhone. When
+no runner answers, or a runner that names no device is served while the
+number of connected iPhones is not exactly one, the command fails with
+DEVICE_NOT_FOUND. Serve the runner or pass `--device` for an
+automatically launched runner.
 
 ## driver list-devices
 

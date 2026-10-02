@@ -183,11 +183,20 @@ udid up in the device probe (`device.ResolveDescriptor` in
 `core/internal/device/resolve.go`, scanning booted simulators through
 `xcrun simctl` and paired devices through `idevice_id -l`). A udid the
 scan does not find fails with `DEVICE_NOT_FOUND` and a remedy. Without
-`--device`, an iOS run has no udid to launch or key a runner on, so the
-CLI does not provision one and dials the default runner port, 22087. That
-is safe because the driver refuses a runner whose ping reports a target
-udid, and it only works against a runner started separately, for example
-with `make serve`. Pass `--device` to have the CLI launch its own runner.
+`--device`, the CLI does not provision a runner. It pings the runner served
+on the default port, 22087, through the `device.RunnerIdentifier` port
+(`device.PingRunnerIdentifier` in
+`core/internal/device/runner_identifier.go`) and keys ownership on the
+device the ping names. A runner that reports `simulatorUdid` names that
+simulator, and one that reports `targetUdid` names that physical device.
+A runner that reports neither, such as one started without the launch
+environment, is taken to serve the single connected iPhone.
+The resulting descriptor carries port 22087, so nothing is launched and
+no runner record is written. A reaper therefore never ends that runner,
+because no Atomyx record names it. No answering runner, or a runner that
+names no device while the number of connected iPhones is not exactly
+one, fails with `DEVICE_NOT_FOUND` and a remedy. Pass `--device` to have
+the CLI launch its own runner.
 
 `IosDriver.Connect` (`core/internal/iosdriver/driver.go`) on a
 physical device first launches an `iproxy` USB tunnel as a background child process

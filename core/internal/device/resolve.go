@@ -10,16 +10,21 @@ import (
 // emulator, used when a caller names no Android device.
 const defaultAndroidSerial = "emulator-5554"
 
-// DeviceNotFoundError reports that a device id named by a caller is
-// not among the devices a probe found reachable. A caller maps it to
-// its own user-facing error surface.
+// DeviceNotFoundError reports that a device a caller named, or asked to
+// be inferred, is not reachable. A caller maps it to its own user-facing
+// error surface. ID is empty when the caller named no device, and Reason
+// then says why none could be inferred.
 type DeviceNotFoundError struct {
 	Platform Platform
 	ID       string
+	Reason   string
 }
 
 // Error implements error.
 func (e *DeviceNotFoundError) Error() string {
+	if e.ID == "" && e.Reason != "" {
+		return fmt.Sprintf("no %s device was named and none could be inferred: %s", e.Platform, e.Reason)
+	}
 	return fmt.Sprintf("no reachable %s device with id %q", e.Platform, e.ID)
 }
 
@@ -40,10 +45,16 @@ func (e *DeviceNotFoundError) Error() string {
 //     returns a *DeviceNotFoundError, because a driver built with a
 //     guessed kind either dials a control port nothing serves or
 //     skips the USB tunnel a physical device needs.
-//   - iOS without an id: a simulator Descriptor with an empty id,
-//     which the driver resolves to the booted simulator. No scan
-//     runs.
-func ResolveDescriptor(ctx context.Context, probe Probe, platform Platform, id string) (Descriptor, error) {
+//   - iOS without an id: the device comes from the runner served on
+//     the default control port, asked through runners. A runner that
+//     reports a simulator udid or a target device udid names that
+//     device. A runner that reports neither was served by hand for a
+//     physical device, so the single connected iPhone is used. Either
+//     Descriptor carries the default control port, so nothing is
+//     launched. No answering runner, or a runner that names no device
+//     while the number of connected iPhones is not exactly one,
+//     returns a *DeviceNotFoundError with an empty id.
+func ResolveDescriptor(ctx context.Context, probe Probe, runners RunnerIdentifier, platform Platform, id string) (Descriptor, error) {
 	if platform != PlatformIOS {
 		if id == "" {
 			id = defaultAndroidSerial
@@ -51,7 +62,7 @@ func ResolveDescriptor(ctx context.Context, probe Probe, platform Platform, id s
 		return Descriptor{ID: id, Platform: PlatformAndroid, Kind: KindEmulator}, nil
 	}
 	if id == "" {
-		return Descriptor{Platform: PlatformIOS, Kind: KindSimulator}, nil
+		return resolveServedRunner(ctx, probe, runners)
 	}
 	for _, d := range probe.Scan(ctx) {
 		if d.Platform == PlatformIOS && strings.EqualFold(d.ID, id) {
@@ -59,4 +70,38 @@ func ResolveDescriptor(ctx context.Context, probe Probe, platform Platform, id s
 		}
 	}
 	return Descriptor{}, &DeviceNotFoundError{Platform: PlatformIOS, ID: id}
+}
+
+// resolveServedRunner names the device behind the runner answering on
+// the default control port.
+func resolveServedRunner(ctx context.Context, probe Probe, runners RunnerIdentifier) (Descriptor, error) {
+	notFound := func(reason string) error {
+		return &DeviceNotFoundError{Platform: PlatformIOS, Reason: reason}
+	}
+	if runners == nil {
+		return Descriptor{}, notFound("no runner is being served")
+	}
+	got, ok := runners.IdentifyRunner(ctx, iosControlPort)
+	if !ok {
+		return Descriptor{}, notFound(fmt.Sprintf("no runner answers on port %d", iosControlPort))
+	}
+	switch {
+	case got.SimulatorUDID != "":
+		return Descriptor{ID: got.SimulatorUDID, Platform: PlatformIOS, Kind: KindSimulator, State: StateOnline, Port: iosControlPort}, nil
+	case got.TargetUDID != "":
+		return Descriptor{ID: got.TargetUDID, Platform: PlatformIOS, Kind: KindDevice, State: StateOnline, Port: iosControlPort}, nil
+	}
+	var phones []Descriptor
+	if probe != nil {
+		for _, d := range probe.Scan(ctx) {
+			if d.Platform == PlatformIOS && d.Kind == KindDevice && (d.State == "" || d.State == StateOnline) {
+				phones = append(phones, d)
+			}
+		}
+	}
+	if len(phones) != 1 {
+		return Descriptor{}, notFound(fmt.Sprintf("the served runner names no device and %d iPhones are connected", len(phones)))
+	}
+	d := phones[0]
+	return Descriptor{ID: d.ID, Platform: PlatformIOS, Name: d.Name, Kind: KindDevice, State: d.State, Port: iosControlPort}, nil
 }

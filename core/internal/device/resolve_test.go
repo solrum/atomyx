@@ -15,7 +15,7 @@ func iosProbeFixture() Probe {
 }
 
 func TestResolveDescriptor_IosSimulatorUdid(t *testing.T) {
-	d, err := ResolveDescriptor(context.Background(), iosProbeFixture(), PlatformIOS, "SIM-UDID")
+	d, err := ResolveDescriptor(context.Background(), iosProbeFixture(), nil, PlatformIOS, "SIM-UDID")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,7 +25,7 @@ func TestResolveDescriptor_IosSimulatorUdid(t *testing.T) {
 }
 
 func TestResolveDescriptor_IosPhysicalUdid(t *testing.T) {
-	d, err := ResolveDescriptor(context.Background(), iosProbeFixture(), PlatformIOS, "00008101-aaaa")
+	d, err := ResolveDescriptor(context.Background(), iosProbeFixture(), nil, PlatformIOS, "00008101-aaaa")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +35,7 @@ func TestResolveDescriptor_IosPhysicalUdid(t *testing.T) {
 }
 
 func TestResolveDescriptor_IosUnknownUdid(t *testing.T) {
-	_, err := ResolveDescriptor(context.Background(), iosProbeFixture(), PlatformIOS, "NOPE")
+	_, err := ResolveDescriptor(context.Background(), iosProbeFixture(), nil, PlatformIOS, "NOPE")
 	var nf *DeviceNotFoundError
 	if !errors.As(err, &nf) || nf.ID != "NOPE" {
 		t.Fatalf("err = %v, want DeviceNotFoundError for NOPE", err)
@@ -43,28 +43,18 @@ func TestResolveDescriptor_IosUnknownUdid(t *testing.T) {
 }
 
 func TestResolveDescriptor_IosIgnoresAndroidIds(t *testing.T) {
-	_, err := ResolveDescriptor(context.Background(), iosProbeFixture(), PlatformIOS, "emulator-5554")
+	_, err := ResolveDescriptor(context.Background(), iosProbeFixture(), nil, PlatformIOS, "emulator-5554")
 	if err == nil {
 		t.Fatal("an Android id must not resolve as an iOS device")
 	}
 }
 
-func TestResolveDescriptor_IosNoIdDefaultsToSimulatorWithoutScan(t *testing.T) {
-	d, err := ResolveDescriptor(context.Background(), nil, PlatformIOS, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if d.ID != "" || d.Kind != KindSimulator || d.Platform != PlatformIOS {
-		t.Fatalf("got %+v", d)
-	}
-}
-
 func TestResolveDescriptor_AndroidDefaultsAndPassesIdThrough(t *testing.T) {
-	d, err := ResolveDescriptor(context.Background(), nil, PlatformAndroid, "")
+	d, err := ResolveDescriptor(context.Background(), nil, nil, PlatformAndroid, "")
 	if err != nil || d.ID != "emulator-5554" || d.Kind != KindEmulator {
 		t.Fatalf("default: got %+v, %v", d, err)
 	}
-	d, err = ResolveDescriptor(context.Background(), nil, PlatformAndroid, "192.168.1.5:5555")
+	d, err = ResolveDescriptor(context.Background(), nil, nil, PlatformAndroid, "192.168.1.5:5555")
 	if err != nil || d.ID != "192.168.1.5:5555" {
 		t.Fatalf("explicit: got %+v, %v", d, err)
 	}

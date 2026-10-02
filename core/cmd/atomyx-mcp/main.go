@@ -89,6 +89,7 @@ func run() int {
 
 	server := mcp.NewServer(mcp.Info{Name: serverName, Version: serverVersion}, mcp.ServerDeps{
 		Probe:    probe,
+		Runners:  device.PingRunnerIdentifier{},
 		Factory:  factory,
 		Storage:  store,
 		Clock:    clock,

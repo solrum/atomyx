@@ -320,3 +320,22 @@ func TestReap_ASimulatorRunnerThatStillAnswersAfterSimctlIsReportedAndTheRecordK
 		t.Fatalf("record stat = %v, want the record kept", statErr)
 	}
 }
+
+func TestReap_NeverEndsAServedRunnerBecauseNoRecordNamesIt(t *testing.T) {
+	f := newReapFixture(t, IosAgentKindSimulator)
+	f.answering = func() (iosdriver.RunnerIdentity, bool) {
+		return iosdriver.RunnerIdentity{SimulatorUDID: reapTestUDID}, true
+	}
+
+	out := f.reap()
+
+	if out.Found || out.Signaled || out.TerminatedViaSimctl {
+		t.Fatalf("outcome = %+v, want nothing found and nothing ended", out)
+	}
+	if calls := f.signals.recorded(); len(calls) != 0 {
+		t.Fatalf("signals = %v, want none for a runner started by hand", calls)
+	}
+	if len(f.runner.Invocations()) != 0 {
+		t.Fatalf("invocations = %v, want no simctl call", f.runner.Invocations())
+	}
+}
