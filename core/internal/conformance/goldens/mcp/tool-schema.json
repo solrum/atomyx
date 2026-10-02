@@ -42,7 +42,7 @@
     }
   },
   "delete_run": {
-    "description": "Delete a persisted run record. Removes `runs/\u003cid\u003e` from storage. Associated bug records (`bugs/\u003crunId\u003e-bug-\u003cn\u003e`) are NOT cascade-deleted, and they remain accessible via get_bug with their runId field pointing at the now-missing run. Use list_bugs with the runId filter then delete_bug to clean those up individually if desired. Returns ok:false when the id is not found.",
+    "description": "Delete a persisted run. Removes every stored form of the run. Associated bug records (`bugs/\u003crunId\u003e-bug-\u003cn\u003e`) are NOT cascade-deleted, and they remain accessible via get_bug with their runId field pointing at the now-missing run. Use list_bugs with the runId filter then delete_bug to clean those up individually if desired. Returns ok:false when the id is not found.",
     "inputSchema": {
       "properties": {
         "id": {
@@ -248,7 +248,7 @@
     }
   },
   "get_run": {
-    "description": "Fetch a single persisted run by id. Returns the full record including findings and summary. Use list_runs first to discover available ids. Returns ok:false when the id is not found.",
+    "description": "Fetch a single persisted run by id. Returns the full record including findings, summary, `result`, and `outcome`. Use list_runs first to discover available ids. Returns ok:false when the id is not found.",
     "inputSchema": {
       "properties": {
         "id": {
@@ -485,7 +485,7 @@
     }
   },
   "list_runs": {
-    "description": "List persisted runs from storage, sorted by startedAt descending (most recent first). Returns summaries only. Use get_run to fetch the full record including findings. Supports status filter and offset/limit pagination. The response includes `totalMatching` so callers can decide whether to request another page.",
+    "description": "List persisted runs from storage, sorted by startedAt descending (most recent first). Returns summaries only. Each run carries `result` (passed, failed, or cancelled) and `outcome` (passed, failed, error, cancelled, deviceLost, or interrupted). `status` is kept for existing callers. Use get_run to fetch the full record including findings. Supports status filter and offset/limit pagination. The response includes `totalMatching` so callers can decide whether to request another page.",
     "inputSchema": {
       "properties": {
         "limit": {

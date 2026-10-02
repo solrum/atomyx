@@ -973,6 +973,11 @@ its findings.
 - Sorted by start time descending, so the newest run is first.
 - Returns summaries only, not the findings list or summary text. Use
   get_run for the full record.
+- Reads every run folder first, then every flat run record. A run id
+  present in both forms is listed once, from the run folder. Runs with
+  equal start times are ordered by id.
+- The status filter matches the `status` field of each summary. A run
+  that never recorded a completion has status `running`.
 - The status filter matches persisted runs, so a currently active,
   unfinished run does not appear until finish_run persists it, unless
   a previous start_run already force-closed and persisted it.
@@ -986,8 +991,17 @@ its findings.
 - `nextOffset`: offset for the next page, or absent when this page
   reached the end.
 - `runs`: array of run summaries, each with `id`, `name`, `source`,
-  `status`, `startedAt`, `finishedAt`, `durationMs`, `actionCount`, and
-  `findingsCount`.
+  `status`, `result`, `outcome`, `startedAt`, `finishedAt`, `durationMs`,
+  `actionCount`, and `findingsCount`.
+- `result` is the verdict and is one of `passed`, `failed`, or
+  `cancelled`. `outcome` is the precise reason the run ended and is one
+  of `passed`, `failed`, `error`, `cancelled`, `deviceLost`, or
+  `interrupted`. Every outcome belongs to exactly one result, so `error`
+  belongs to `failed`, and `cancelled`, `deviceLost`, and `interrupted`
+  belong to `cancelled`. A run that never recorded a completion reports
+  result `cancelled` and outcome `interrupted`. `status` is kept for
+  callers that predate `result` and `outcome`, so prefer the two newer
+  fields.
 
 **Errors and recovery**
 - An empty `runs` array with `totalMatching: 0` means no runs match
@@ -1011,13 +1025,15 @@ id is not yet known.
 | id | string | yes | none | Run id as returned by start_run. |
 
 **Behavior**
-- Reads the persisted record directly, so a run that was started but
-  never finished or force-closed will not be found here.
+- Reads the run folder first, then the flat run record, so a run is found
+  in whichever form it is stored. A run that was started but never
+  finished or force-closed is not stored yet, so it is not found here.
 
 **Returns**
 - `ok`: false when the id is not found, true otherwise.
 - `run`: the full persisted run record, including `findings` (each bug
-  attached during the session) and `summary`, when present.
+  attached during the session), `summary` when present, and the `result`
+  and `outcome` fields described under list_runs.
 
 **Errors and recovery**
 - `ok: false` means the id does not exist in storage. Confirm it with
@@ -1061,7 +1077,7 @@ the run is still active and has not been closed yet.
 ```
 
 ### delete_run
-Deletes a persisted run record.
+Deletes a persisted run.
 
 **Use when:** removing a stale or unwanted run from storage. Deleting
 a run does not delete its bug records, so call delete_bug afterward
@@ -1073,9 +1089,10 @@ for each of that run's bug records that also needs deleting.
 | id | string | yes | none | Run id to delete. |
 
 **Behavior**
-- Removes only the run record. Bug records created during that run
-  remain in storage and stay reachable with get_bug, but their runId
-  field then points at a run that no longer exists.
+- Removes the run in every form it is stored, run folder and flat record
+  alike, and succeeds when either one existed. Bug records created
+  during that run remain in storage and stay reachable with get_bug, but
+  their runId field then points at a run that no longer exists.
 - Use list_bugs with a runId filter to find those bug records, then
   delete_bug to remove each one individually if a full cleanup is
   wanted.

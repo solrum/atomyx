@@ -82,6 +82,7 @@ func NewServer(info Info, deps ServerDeps) *Server {
 		Traits:   traits,
 		Logger:   logger,
 		Storage:  deps.Storage,
+		Runs:     storage.NewRunCatalog(deps.Storage),
 		RunStore: runStore,
 		Clock:    clk,
 	}

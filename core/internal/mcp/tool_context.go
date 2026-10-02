@@ -28,6 +28,8 @@ type ToolContext struct {
 	// Storage is the persistence port for bug reports, case studies,
 	// and finished run records.
 	Storage storage.Storage
+	// Runs reads persisted runs from every stored form and deletes them.
+	Runs *storage.RunCatalog
 	// RunStore tracks the single in-flight test run.
 	RunStore *storage.RunStore
 	// Clock is the time source for handlers that poll or measure

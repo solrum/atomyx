@@ -1,0 +1,86 @@
+{
+  "count": 3,
+  "nextOffset": null,
+  "offset": 0,
+  "ok": true,
+  "runs": [
+    {
+      "actionCount": 2,
+      "durationMs": 5000,
+      "findingsCount": 1,
+      "finishedAt": 1790000005000,
+      "id": "20261002-101500-mcp-a1b2",
+      "name": "v1 run",
+      "outcome": "deviceLost",
+      "result": "cancelled",
+      "source": "exploratory",
+      "startedAt": 1790000000000,
+      "status": "cancelled"
+    },
+    {
+      "actionCount": 3,
+      "durationMs": 4000,
+      "findingsCount": 0,
+      "finishedAt": 1789000004000,
+      "id": "run-1789000000000-1",
+      "name": "legacy run",
+      "outcome": "passed",
+      "result": "passed",
+      "source": "exploratory",
+      "startedAt": 1789000000000,
+      "status": "passed"
+    },
+    {
+      "actionCount": 0,
+      "durationMs": 0,
+      "findingsCount": 0,
+      "id": "run-1788000000000-1",
+      "name": "stale run",
+      "outcome": "interrupted",
+      "result": "cancelled",
+      "source": "exploratory",
+      "startedAt": 1788000000000,
+      "status": "running"
+    }
+  ],
+  "totalMatching": 3
+}
+{
+  "ok": true,
+  "run": {
+    "actionCount": 2,
+    "durationMs": 5000,
+    "findings": [
+      {
+        "description": "d",
+        "id": "20261002-101500-mcp-a1b2-bug-1",
+        "timestamp": 1790000000001,
+        "title": "t"
+      }
+    ],
+    "finishedAt": 1790000005000,
+    "id": "20261002-101500-mcp-a1b2",
+    "name": "v1 run",
+    "outcome": "deviceLost",
+    "result": "cancelled",
+    "source": "exploratory",
+    "startedAt": 1790000000000,
+    "status": "cancelled",
+    "summary": "v1 summary"
+  }
+}
+{
+  "ok": true,
+  "run": {
+    "actionCount": 0,
+    "durationMs": 0,
+    "findings": [],
+    "id": "run-1788000000000-1",
+    "name": "stale run",
+    "outcome": "interrupted",
+    "result": "cancelled",
+    "source": "exploratory",
+    "startedAt": 1788000000000,
+    "status": "running"
+  }
+}

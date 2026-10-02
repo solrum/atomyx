@@ -57,8 +57,6 @@ var allowlist = map[string]bool{
 	"internal/report/fs_reporter.go": true,
 	// Names its own screenshots directory.
 	"internal/mcp/screenshot_tool.go": true,
-	// Lists the flat runs directory of legacy run records.
-	"internal/mcp/run_read_tool.go": true,
 	// Prefixes the flat legacy run record key with runs.
 	"internal/storage/records.go": true,
 }

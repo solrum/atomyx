@@ -103,6 +103,8 @@
               "finishedAt": "\u003cnormalized\u003e",
               "id": "\u003cnormalized\u003e",
               "name": "login smoke",
+              "outcome": "passed",
+              "result": "passed",
               "source": "exploratory",
               "startedAt": "\u003cnormalized\u003e",
               "status": "passed"
@@ -134,6 +136,8 @@
             "finishedAt": "\u003cnormalized\u003e",
             "id": "\u003cnormalized\u003e",
             "name": "login smoke",
+            "outcome": "passed",
+            "result": "passed",
             "source": "exploratory",
             "startedAt": "\u003cnormalized\u003e",
             "status": "passed",

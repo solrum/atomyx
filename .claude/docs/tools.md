@@ -54,10 +54,10 @@ type system enforces it.
 | `finish_run` | `core/internal/mcp/run_lifecycle_tool.go` | `status` (`passed`, `failed`, `error`), `summary` | the finished run record | `storage.RunStore.Finish` |
 | `report_bug` | `core/internal/mcp/report_bug_tool.go` | `title`, `description`, `captureScreenshot` | `{ok, id, runId, screenshotPath?}` | `storage.RunStore.RecordBug`, plus `Orchestra.Screenshot` when requested |
 | **Run and bug queries** | | | | |
-| `list_runs` | `core/internal/mcp/run_read_tool.go` | `status`, `limit`, `offset` | paginated run summaries | `storage.Storage.List` |
-| `get_run` | `core/internal/mcp/run_read_tool.go` | `id` | the full run record | `storage.Storage.Load` |
+| `list_runs` | `core/internal/mcp/run_read_tool.go` | `status`, `limit`, `offset` | paginated run summaries, each with `result` and `outcome` | `storage.RunCatalog.List` |
+| `get_run` | `core/internal/mcp/run_read_tool.go` | `id` | the full run record, with `result` and `outcome` | `storage.RunCatalog.Get` |
 | `update_run_summary` | `core/internal/mcp/run_read_tool.go` | `id`, `summary` | `{ok}` | `storage.Storage.Load` then `storage.Storage.Save` |
-| `delete_run` | `core/internal/mcp/run_read_tool.go` | `id` | `{ok}` | `storage.Storage.Delete` |
+| `delete_run` | `core/internal/mcp/run_read_tool.go` | `id` | `{ok}` | `storage.RunCatalog.Delete` |
 | `list_bugs` | `core/internal/mcp/bug_read_tool.go` | `runId`, `limit`, `offset` | paginated bug summaries, newest first | `storage.Storage.List` |
 | `get_bug` | `core/internal/mcp/bug_read_tool.go` | `id` | the full bug record | `storage.Storage.Load` |
 | `delete_bug` | `core/internal/mcp/bug_read_tool.go` | `id` | `{ok}`, and removes the bug record and its screenshot sub-record | `storage.Storage.Delete` |

@@ -204,3 +204,6 @@ func (f *FileStorage) pathFor(key, ext string) string {
 	safe := strings.ReplaceAll(key, "..", "_")
 	return filepath.Join(f.root, safe+"."+ext)
 }
+
+// Root returns the directory every record is stored under.
+func (f *FileStorage) Root() string { return f.root }
