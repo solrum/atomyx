@@ -264,6 +264,23 @@ corresponding area. For the high-level map see
   place. `Finalize` fixes the verdict from the outcome, and a second
   call returns an error. Call it after the last `AppendLog`, because
   it closes the log.
+- **Take `.migrate.lock` before touching a flat run record.** Run
+  migration holds `<root>/runs/.migrate.lock` exclusively for its whole
+  pass, and anything that deletes or edits a run record, whether the
+  flat file or the run folder, holds it shared first. `RunCatalog.Delete`
+  and `RunCatalog.SetSummary` do, and they refuse with
+  `ErrMigrationInProgress` instead of waiting. A new code path that
+  writes or removes run records outside the catalog must take
+  `runfolder.ShareMigration` too, or a migration can lose its edit or
+  bring a deleted run back.
+- **Make every migration step safe to repeat.** The folder is written
+  and read back before the original is deleted, in that order, so a crash
+  between the two leaves a verified folder and the original. The next
+  pass recognizes the identical folder, deletes only the original, and
+  never writes a second copy. Never delete an original before its folder
+  is verified, and never reuse an id that holds a different folder.
+  Scratch folders named `.import-*` under `runs/v1` are interrupted
+  work and are not runs.
 
 ## Tool layer (cross-platform)
 

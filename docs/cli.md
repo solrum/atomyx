@@ -31,7 +31,7 @@ atomyx <module> <command> [flags]
 |---|---|
 | `atomyx driver run` | Runs a single YML test script against a device. |
 | `atomyx driver suite` | Runs a named suite or an ad-hoc selection of flows. |
-| `atomyx driver doctor` | Checks that a device is reachable and healthy. |
+| `atomyx driver doctor` | Checks that a device is reachable and healthy, or migrates flat run records into run folders. |
 | `atomyx driver list-devices` | Lists Android, iOS simulator, and iOS physical devices. |
 | `atomyx driver version` | Prints the driver module's version. |
 | `atomyx skills init` | Copies the bundled skill and agent files into a project. |
@@ -230,6 +230,8 @@ Flags:
 | `--platform <ios\|android>` | Target platform. | `android` | no |
 | `--device <id>` | Device identifier, as reported by `atomyx driver list-devices`. | none | no |
 | `--json` | Outputs the report as JSON instead of text. | off | no |
+| `--migrate-runs` | Rewrites flat run records as run folders instead of checking a device. See below. | off | no |
+| `--report-dir <path>` | Run root for `--migrate-runs`. Defaults to `ATOMYX_STORAGE_DIR`, then `~/.atomyx`. | none | no |
 | `--help`, `-h` | Prints this command's usage and exits. | off | no |
 
 When another Atomyx process holds the device, doctor does not probe it.
@@ -243,6 +245,50 @@ when known. For a free device, `--json` carries `held: false` and
 Exit codes: `0` when the device is healthy or held by another process,
 `1` when it could not be reached or is unhealthy, `2` when the command
 was misused.
+
+### Migrating run records
+
+`atomyx doctor --migrate-runs` moves the run records that older
+versions kept as flat files, `<root>/runs/<id>.json`, into run folders,
+`<root>/runs/v1/<id>/`. Every run keeps its id, and no field is lost:
+name, source, status, findings, summary, action count, and duration all
+land in the folder's `meta.json`. It never needs a device and cannot be
+combined with `--platform` or `--device`.
+
+```
+atomyx doctor --migrate-runs
+atomyx doctor --migrate-runs --json --report-dir <path>
+```
+
+The run root is `--report-dir`, then `ATOMYX_STORAGE_DIR`, then
+`~/.atomyx`, the same root the MCP server uses.
+
+Safety:
+
+- A flat record is deleted only after its folder is written, read back,
+  and compared with the record.
+- A record that cannot be read, and a record whose id already names a
+  folder with different content, are reported and left where they are.
+- The command holds a lock on the run root while it works. A running
+  `atomyx-mcp` keeps listing and reading runs. Its `delete_run` and
+  `update_run_summary` calls return `RUN_BUSY` until the command ends,
+  so no edit is lost and no deleted run comes back.
+
+Idempotence: the command can be repeated after any interruption. It
+finishes the records that are left, never makes a second copy of a run,
+and changes nothing when no flat record remains.
+
+Output is a summary of four counts: `migrated`, `already migrated`,
+`conflicts`, and `damaged`, followed by one line per conflict or damaged
+record with its reason. `already migrated` counts records whose folder
+was written by an interrupted earlier pass and only needed the original
+removed. With `--json` the output carries `root`, `migrated`,
+`alreadyMigrated`, `conflicts`, `damaged`, and `scratchRemoved`, where
+each list is always present and each conflict or damaged entry has `id`
+and `reason`.
+
+Exit codes: `0` when no record is conflicting or damaged, `1` when one
+is or when storage failed, and `2` when the command was misused.
 
 ## Device ownership
 

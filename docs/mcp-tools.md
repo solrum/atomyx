@@ -1118,6 +1118,8 @@ the run is still active and has not been closed yet.
 - Error `RUN_BUSY` names the run and means a writer still holds it open,
   such as a run_script run in progress or a run another process is
   writing. Repeat the call after the run finishes.
+- Error `RUN_BUSY` can also mean a run migration is in progress. Nothing
+  was changed. Wait for the migration to finish, then repeat the call.
 - Error `INVALID_ARGUMENT` means the id is not a bare run id.
 
 **Example**
@@ -1159,6 +1161,9 @@ for each of that run's bug records that also needs deleting.
   The run folder is left untouched. Call finish_run if it is the run you
   opened, or wait for the other process to finish, then call delete_run
   again.
+- Error `RUN_BUSY` can also mean a run migration is in progress. The run
+  is left untouched. Wait for the migration to finish, then call
+  delete_run again.
 
 **Example**
 ```json

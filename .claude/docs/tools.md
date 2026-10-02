@@ -58,8 +58,8 @@ type system enforces it.
 | **Run and bug queries** | | | | |
 | `list_runs` | `core/internal/mcp/run_read_tool.go` | `status`, `limit`, `offset` | paginated run summaries, each with `result` and `outcome` (absent while running), plus `totalMatching` and `skipped` | `storage.RunCatalog.List` |
 | `get_run` | `core/internal/mcp/run_read_tool.go` | `id` | the full run record, with `result` and `outcome` (absent while running) | `storage.RunCatalog.Get` |
-| `update_run_summary` | `core/internal/mcp/run_read_tool.go` | `id`, `summary` | `{ok}`, `RUN_READ_ONLY` for a run with no summary field, or `RUN_BUSY` for a run a writer still holds open | `storage.RunCatalog.SetSummary` |
-| `delete_run` | `core/internal/mcp/run_read_tool.go` | `id` | `{ok}`, or `RUN_BUSY` for a run a writer still holds open, which is left untouched | `storage.RunCatalog.Delete` |
+| `update_run_summary` | `core/internal/mcp/run_read_tool.go` | `id`, `summary` | `{ok}`, `RUN_READ_ONLY` for a run with no summary field, or `RUN_BUSY` for a run a writer still holds open, or while a run migration holds the run store | `storage.RunCatalog.SetSummary` |
+| `delete_run` | `core/internal/mcp/run_read_tool.go` | `id` | `{ok}`, or `RUN_BUSY` for a run a writer still holds open, which is left untouched, or `RUN_BUSY` while a run migration holds the run store | `storage.RunCatalog.Delete` |
 | `list_bugs` | `core/internal/mcp/bug_read_tool.go` | `runId`, `limit`, `offset` | paginated bug summaries, newest first | `storage.Storage.List` |
 | `get_bug` | `core/internal/mcp/bug_read_tool.go` | `id` | the full bug record | `storage.Storage.Load` |
 | `delete_bug` | `core/internal/mcp/bug_read_tool.go` | `id` | `{ok}`, and removes the bug record and its screenshot sub-record | `storage.Storage.Delete` |
@@ -89,6 +89,15 @@ edits runs that carry a summary field, which are the runs written by
 by the CLI has none, and a run whose writer is another live process is
 not editable until it finishes and returns `RUN_BUSY`. A run with no
 summary field returns `RUN_READ_ONLY`.
+
+`delete_run` and `update_run_summary` hold the run migration lock in
+shared form for the length of the call, covering both the flat record
+and the run folder, so edits of different runs never block each other.
+While `atomyx doctor --migrate-runs` holds the lock exclusively, both
+tools refuse without waiting and return `RUN_BUSY` with a message that
+names the migration. The refusal changes nothing, so the caller repeats
+the call once the migration ends. This is what keeps a migration from
+losing a summary edit or bringing back a deleted run.
 
 `start_run` creates a run folder of kind `mcp` through `runfolder.Starter`
 at the storage root. The folder id is labeled with the selected
