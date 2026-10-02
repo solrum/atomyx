@@ -54,10 +54,10 @@ func TestHub_StartsEmptyAndKeepsOnlyTheLatestValueOfEachKind(t *testing.T) {
 		t.Fatalf("empty hub Latest() = %+v, want nothing known", snap)
 	}
 
-	hub.ObserveTree(rootTree("one"), 2)
-	hub.ObserveTree(rootTree("two"), 4)
-	hub.ObserveScreenshot([]byte("first"), 4)
-	hub.ObserveScreenshot([]byte("second"), 6)
+	hub.ObserveTree(rootTree("one"), 2, true)
+	hub.ObserveTree(rootTree("two"), 4, true)
+	hub.ObserveScreenshot([]byte("first"), 4, true)
+	hub.ObserveScreenshot([]byte("second"), 6, true)
 
 	snap := hub.Latest()
 	if snap.Tree.Attributes["id"] != "two" || snap.TreeEpoch != 4 || !snap.HasTree {
@@ -70,19 +70,19 @@ func TestHub_StartsEmptyAndKeepsOnlyTheLatestValueOfEachKind(t *testing.T) {
 
 func TestHub_PairedMeansTheTreeAndTheScreenshotShareAnEpoch(t *testing.T) {
 	hub := session.NewHub()
-	hub.ObserveTree(rootTree("a"), 2)
+	hub.ObserveTree(rootTree("a"), 2, true)
 	if hub.Latest().Paired {
 		t.Fatal("a tree alone reports paired")
 	}
-	hub.ObserveScreenshot(encodedPNG(t, 10, 20), 4)
+	hub.ObserveScreenshot(encodedPNG(t, 10, 20), 4, true)
 	if hub.Latest().Paired {
 		t.Fatal("a tree and a screenshot from different epochs report paired")
 	}
-	hub.ObserveTree(rootTree("b"), 4)
+	hub.ObserveTree(rootTree("b"), 4, true)
 	if !hub.Latest().Paired {
 		t.Fatal("a tree and a screenshot from one epoch report unpaired")
 	}
-	hub.ObserveScreenshot(encodedPNG(t, 10, 20), 6)
+	hub.ObserveScreenshot(encodedPNG(t, 10, 20), 6, true)
 	if hub.Latest().Paired {
 		t.Fatal("a newer screenshot from another epoch still reports paired")
 	}
@@ -105,10 +105,10 @@ func TestHub_ScaleIsScreenshotWidthOverScreenWidth(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			hub := session.NewHub()
-			hub.ObserveTree(rootTree("r"), 2)
-			hub.ObserveScreenshot(tc.image, 2)
+			hub.ObserveTree(rootTree("r"), 2, true)
+			hub.ObserveScreenshot(tc.image, 2, true)
 			if tc.size != nil {
-				hub.ObserveScreenSize(*tc.size, 0)
+				hub.ObserveScreenSize(*tc.size, 0, true)
 			}
 			snap := hub.Latest()
 			if snap.Scale != tc.wantScale || snap.ScreenshotFormat != tc.wantFormat {
@@ -123,9 +123,9 @@ func TestHub_ScaleIsScreenshotWidthOverScreenWidth(t *testing.T) {
 
 func TestHub_AnUnpairedCaptureIsNeverHighlightableEvenWithAScale(t *testing.T) {
 	hub := session.NewHub()
-	hub.ObserveScreenSize(wire.Size{Width: 100, Height: 200}, 2)
-	hub.ObserveScreenshot(encodedPNG(t, 200, 400), 4)
-	hub.ObserveTree(rootTree("r"), 2)
+	hub.ObserveScreenSize(wire.Size{Width: 100, Height: 200}, 2, true)
+	hub.ObserveScreenshot(encodedPNG(t, 200, 400), 4, true)
+	hub.ObserveTree(rootTree("r"), 2, true)
 	snap := hub.Latest()
 	if snap.Scale != 2 || snap.Paired || snap.Highlightable {
 		t.Fatalf("scale = %v, paired = %v, highlightable = %v, want a known scale but no pairing", snap.Scale, snap.Paired, snap.Highlightable)
@@ -135,7 +135,7 @@ func TestHub_AnUnpairedCaptureIsNeverHighlightableEvenWithAScale(t *testing.T) {
 func TestHub_LatestMasksSecretsAndLeavesTheStoredTreeUntouched(t *testing.T) {
 	hub := session.NewHub()
 	tree := secureTree("hunter2")
-	hub.ObserveTree(tree, 2)
+	hub.ObserveTree(tree, 2, true)
 
 	password := hub.Latest().Tree.Children[1].Attributes
 	if password["text"] != orchestra.SecureMask || password["value"] != orchestra.SecureMask || password["label"] != "Password" {
@@ -148,7 +148,7 @@ func TestHub_LatestMasksSecretsAndLeavesTheStoredTreeUntouched(t *testing.T) {
 
 func TestHub_MasksOncePerStoredTreeAndSharesTheCopyAcrossReads(t *testing.T) {
 	hub := session.NewHub()
-	hub.ObserveTree(secureTree("hunter2"), 2)
+	hub.ObserveTree(secureTree("hunter2"), 2, true)
 
 	first := hub.Latest().Tree.Children[1].Attributes
 	second := hub.Latest().Tree.Children[1].Attributes
@@ -156,7 +156,7 @@ func TestHub_MasksOncePerStoredTreeAndSharesTheCopyAcrossReads(t *testing.T) {
 		t.Fatal("two reads of one stored tree built two masked copies")
 	}
 
-	hub.ObserveTree(secureTree("other"), 2)
+	hub.ObserveTree(secureTree("other"), 2, true)
 	third := hub.Latest().Tree.Children[1].Attributes
 	if reflect.ValueOf(first).Pointer() == reflect.ValueOf(third).Pointer() || third["text"] != orchestra.SecureMask {
 		t.Fatalf("a new tree with the same epoch reused the old masked copy: %v", third)
@@ -171,9 +171,9 @@ func TestHub_ConcurrentPublishersAndReadersShareTreeMapsWithoutARace(t *testing.
 	for p := range 4 {
 		wg.Go(func() {
 			for i := range rounds {
-				hub.ObserveTree(shared, uint64(i))
-				hub.ObserveScreenshot(encodedPNG(t, 4, 4), uint64(i))
-				hub.ObserveScreenSize(wire.Size{Width: float64(p + 1), Height: 1}, uint64(i))
+				hub.ObserveTree(shared, uint64(i), true)
+				hub.ObserveScreenshot(encodedPNG(t, 4, 4), uint64(i), true)
+				hub.ObserveScreenSize(wire.Size{Width: float64(p + 1), Height: 1}, uint64(i), true)
 			}
 		})
 	}
@@ -224,7 +224,7 @@ func TestHub_ASubscriberThatNeverReadsIsDroppedAndNeverBlocksThePublisher(t *tes
 	const publishes = 200
 	healthyGot := 0
 	for i := range publishes {
-		hub.ObserveTree(rootTree("r"), uint64(i))
+		hub.ObserveTree(rootTree("r"), uint64(i), true)
 		got, _ := drain(healthy)
 		healthyGot += got
 	}
@@ -250,13 +250,13 @@ func TestHub_NotificationsCarryTheKindAndEpochOfTheCapture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hub.ObserveTree(rootTree("r"), 2)
-	hub.ObserveScreenshot([]byte("x"), 4)
-	hub.ObserveScreenSize(wire.Size{Width: 1, Height: 1}, 6)
+	hub.ObserveTree(rootTree("r"), 2, true)
+	hub.ObserveScreenshot([]byte("x"), 4, true)
+	hub.ObserveScreenSize(wire.Size{Width: 1, Height: 1}, 6, true)
 	want := []session.Observation{
-		{Kind: session.ObservedTree, Epoch: 2},
-		{Kind: session.ObservedScreenshot, Epoch: 4},
-		{Kind: session.ObservedScreenSize, Epoch: 6},
+		{Kind: session.ObservedTree, Epoch: 2, Revision: 1, Stable: true},
+		{Kind: session.ObservedScreenshot, Epoch: 4, Revision: 1, Stable: true},
+		{Kind: session.ObservedScreenSize, Epoch: 6, Revision: 1, Stable: true},
 	}
 	for _, w := range want {
 		if got := <-ch; got != w {
@@ -292,5 +292,48 @@ func TestHub_SubscriptionsEndWhenTheirContextEndsOrTheHubCloses(t *testing.T) {
 	endNow()
 	if _, err := session.NewHub().Subscribe(endedCtx); err == nil {
 		t.Fatal("Subscribe with an ended context succeeded")
+	}
+}
+
+func TestHub_TwoTreesStoredInOneEpochHaveDifferentRevisions(t *testing.T) {
+	hub := session.NewHub()
+	if got := hub.Latest().TreeRevision; got != 0 {
+		t.Fatalf("empty hub tree revision = %d, want 0", got)
+	}
+	hub.ObserveTree(rootTree("one"), 2, true)
+	first := hub.Latest()
+	hub.ObserveTree(rootTree("two"), 2, true)
+	second := hub.Latest()
+
+	if first.TreeEpoch != second.TreeEpoch {
+		t.Fatalf("epochs %d and %d differ, want one shared epoch", first.TreeEpoch, second.TreeEpoch)
+	}
+	if first.TreeRevision == 0 || second.TreeRevision <= first.TreeRevision {
+		t.Fatalf("revisions %d then %d, want a strictly increasing identity", first.TreeRevision, second.TreeRevision)
+	}
+	hub.ObserveScreenshot([]byte("a"), 2, true)
+	one := hub.Latest().ScreenshotRevision
+	hub.ObserveScreenshot([]byte("b"), 2, true)
+	if two := hub.Latest().ScreenshotRevision; one == 0 || two <= one {
+		t.Fatalf("screenshot revisions %d then %d, want a strictly increasing identity", one, two)
+	}
+}
+
+func TestHub_AnUnstableCaptureNeverPairs(t *testing.T) {
+	hub := session.NewHub()
+	hub.ObserveTree(rootTree("r"), 2, false)
+	hub.ObserveScreenshot(encodedPNG(t, 10, 20), 2, true)
+	if snap := hub.Latest(); snap.Paired || snap.Highlightable {
+		t.Fatalf("an unstable tree paired: %+v", snap)
+	}
+	hub.ObserveTree(rootTree("r"), 2, true)
+	hub.ObserveScreenSize(wire.Size{Width: 5, Height: 10}, 2, false)
+	snap := hub.Latest()
+	if !snap.Paired || snap.Scale != 0 || snap.Highlightable {
+		t.Fatalf("paired = %v, scale = %v, highlightable = %v, want a pair with no trusted scale", snap.Paired, snap.Scale, snap.Highlightable)
+	}
+	hub.ObserveScreenshot(encodedPNG(t, 10, 20), 2, false)
+	if hub.Latest().Paired {
+		t.Fatal("an unstable screenshot paired")
 	}
 }

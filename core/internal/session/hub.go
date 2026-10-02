@@ -29,23 +29,28 @@ type Hub struct {
 	closed bool
 	subs   map[*subscriber]struct{}
 
-	tree      wire.TreeNodeWire
-	treeEpoch uint64
-	treeSeq   uint64
-	hasTree   bool
+	tree       wire.TreeNodeWire
+	treeEpoch  uint64
+	treeSeq    uint64
+	treeStable bool
+	hasTree    bool
 
 	maskedSeq  uint64
 	maskedTree wire.TreeNodeWire
 
 	shot       []byte
 	shotEpoch  uint64
+	shotSeq    uint64
+	shotStable bool
 	shotFormat ImageFormat
 	shotWidth  int
 	hasShot    bool
 
-	size      wire.Size
-	sizeEpoch uint64
-	hasSize   bool
+	size       wire.Size
+	sizeEpoch  uint64
+	sizeSeq    uint64
+	sizeStable bool
+	hasSize    bool
 }
 
 var _ Observer = (*Hub)(nil)
@@ -61,30 +66,32 @@ func NewHub() *Hub {
 }
 
 // ObserveTree implements Observer.
-func (h *Hub) ObserveTree(tree wire.TreeNodeWire, epoch uint64) {
+func (h *Hub) ObserveTree(tree wire.TreeNodeWire, epoch uint64, stable bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.tree, h.treeEpoch, h.hasTree = tree, epoch, true
+	h.tree, h.treeEpoch, h.treeStable, h.hasTree = tree, epoch, stable, true
 	h.treeSeq++
-	h.notifyLocked(Observation{Kind: ObservedTree, Epoch: epoch})
+	h.notifyLocked(Observation{Kind: ObservedTree, Epoch: epoch, Revision: h.treeSeq, Stable: stable})
 }
 
 // ObserveScreenshot implements Observer.
-func (h *Hub) ObserveScreenshot(img []byte, epoch uint64) {
+func (h *Hub) ObserveScreenshot(img []byte, epoch uint64, stable bool) {
 	format, width := sniffImage(img)
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.shot, h.shotEpoch, h.hasShot = img, epoch, true
+	h.shot, h.shotEpoch, h.shotStable, h.hasShot = img, epoch, stable, true
 	h.shotFormat, h.shotWidth = format, width
-	h.notifyLocked(Observation{Kind: ObservedScreenshot, Epoch: epoch})
+	h.shotSeq++
+	h.notifyLocked(Observation{Kind: ObservedScreenshot, Epoch: epoch, Revision: h.shotSeq, Stable: stable})
 }
 
 // ObserveScreenSize implements Observer.
-func (h *Hub) ObserveScreenSize(size wire.Size, epoch uint64) {
+func (h *Hub) ObserveScreenSize(size wire.Size, epoch uint64, stable bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.size, h.sizeEpoch, h.hasSize = size, epoch, true
-	h.notifyLocked(Observation{Kind: ObservedScreenSize, Epoch: epoch})
+	h.size, h.sizeEpoch, h.sizeStable, h.hasSize = size, epoch, stable, true
+	h.sizeSeq++
+	h.notifyLocked(Observation{Kind: ObservedScreenSize, Epoch: epoch, Revision: h.sizeSeq, Stable: stable})
 }
 
 // Latest returns the newest captures. The masked copy of a tree is made
@@ -93,13 +100,14 @@ func (h *Hub) ObserveScreenSize(size wire.Size, epoch uint64) {
 func (h *Hub) Latest() Snapshot {
 	h.mu.Lock()
 	snap := Snapshot{
-		HasTree: h.hasTree, TreeEpoch: h.treeEpoch,
-		Screenshot: h.shot, HasScreenshot: h.hasShot, ScreenshotFormat: h.shotFormat, ScreenshotEpoch: h.shotEpoch,
+		HasTree: h.hasTree, TreeEpoch: h.treeEpoch, TreeRevision: h.treeSeq,
+		Screenshot: h.shot, HasScreenshot: h.hasShot, ScreenshotFormat: h.shotFormat,
+		ScreenshotEpoch: h.shotEpoch, ScreenshotRevision: h.shotSeq,
 	}
-	if h.hasShot && h.hasSize && h.shotWidth > 0 && h.size.Width > 0 {
+	if h.hasShot && h.hasSize && h.sizeStable && h.shotWidth > 0 && h.size.Width > 0 {
 		snap.Scale = float64(h.shotWidth) / h.size.Width
 	}
-	snap.Paired = h.hasTree && h.hasShot && h.treeEpoch == h.shotEpoch
+	snap.Paired = h.hasTree && h.hasShot && h.treeStable && h.shotStable && h.treeEpoch == h.shotEpoch
 	snap.Highlightable = snap.Paired && snap.Scale > 0
 	if !h.hasTree {
 		h.mu.Unlock()
@@ -123,12 +131,12 @@ func (h *Hub) Latest() Snapshot {
 	return snap
 }
 
-// sizeCurrent reports whether the screen size was read in the epoch of
-// the newest tree.
+// sizeCurrent reports whether a stable screen size was read in the epoch
+// of the newest tree.
 func (h *Hub) sizeCurrent() bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	return h.hasSize && h.hasTree && h.sizeEpoch == h.treeEpoch
+	return h.hasSize && h.sizeStable && h.hasTree && h.sizeEpoch == h.treeEpoch
 }
 
 // Subscribe reports every capture until ctx ends, the hub closes, or

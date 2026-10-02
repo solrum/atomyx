@@ -2,7 +2,7 @@ package session
 
 import (
 	"context"
-	"sync/atomic"
+	"sync"
 
 	"dev.atomyx/internal/driver"
 	"dev.atomyx/internal/wire"
@@ -23,8 +23,9 @@ type ObservedDriver interface {
 // NewObservingDriver wraps inner so that every call is forwarded
 // unchanged, every mutating call advances the action epoch, and every
 // successful Hierarchy, Screenshot and ScreenSize result is reported to
-// observer with the epoch that was active when the call began. A nil
-// observer discards the reports.
+// observer with the epoch that was active when the call began. A capture
+// that overlapped a mutating call is reported as unstable, see Observer.
+// A nil observer discards the reports.
 //
 // Errors and results pass through untouched, so errors.Is and errors.As
 // see exactly what the inner driver returned.
@@ -62,19 +63,56 @@ func NewObservingDriver(inner driver.Driver, observer Observer) ObservedDriver {
 type observingCore struct {
 	inner    driver.Driver
 	observer Observer
-	epoch    atomic.Uint64
+
+	mu       sync.Mutex
+	epoch    uint64
+	inflight int
+}
+
+// captureStart is the state of the action epoch as a capture began.
+type captureStart struct {
+	epoch uint64
+	quiet bool
 }
 
 var _ ObservedDriver = (*observingCore)(nil)
 
 func (o *observingCore) Unwrap() driver.Driver { return o.inner }
 
-func (o *observingCore) Epoch() uint64 { return o.epoch.Load() }
+func (o *observingCore) Epoch() uint64 {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.epoch
+}
 
 // mutate opens a mutating call and returns the function that closes it.
 func (o *observingCore) mutate() func() {
-	o.epoch.Add(1)
-	return func() { o.epoch.Add(1) }
+	o.mu.Lock()
+	o.epoch++
+	o.inflight++
+	o.mu.Unlock()
+	return func() {
+		o.mu.Lock()
+		o.epoch++
+		o.inflight--
+		o.mu.Unlock()
+	}
+}
+
+func (o *observingCore) beginCapture() captureStart {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return captureStart{epoch: o.epoch, quiet: o.inflight == 0}
+}
+
+// stable reports whether no mutating call overlapped the capture that
+// began at start. A call already in flight at the start fails it, and
+// so does any call that started or finished since, because either one
+// moves the epoch.
+func (o *observingCore) stable(start captureStart) bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return start.quiet && o.epoch == start.epoch
 }
 
 func (o *observingCore) Platform() string                  { return o.inner.Platform() }
@@ -85,28 +123,28 @@ func (o *observingCore) IsConnected() bool                 { return o.inner.IsCo
 func (o *observingCore) Ping(ctx context.Context) error    { return o.inner.Ping(ctx) }
 
 func (o *observingCore) Hierarchy(ctx context.Context) (wire.TreeNodeWire, error) {
-	epoch := o.epoch.Load()
+	start := o.beginCapture()
 	tree, err := o.inner.Hierarchy(ctx)
 	if err == nil {
-		o.observer.ObserveTree(tree, epoch)
+		o.observer.ObserveTree(tree, start.epoch, o.stable(start))
 	}
 	return tree, err
 }
 
 func (o *observingCore) Screenshot(ctx context.Context) ([]byte, error) {
-	epoch := o.epoch.Load()
+	start := o.beginCapture()
 	image, err := o.inner.Screenshot(ctx)
 	if err == nil {
-		o.observer.ObserveScreenshot(image, epoch)
+		o.observer.ObserveScreenshot(image, start.epoch, o.stable(start))
 	}
 	return image, err
 }
 
 func (o *observingCore) ScreenSize(ctx context.Context) (wire.Size, error) {
-	epoch := o.epoch.Load()
+	start := o.beginCapture()
 	size, err := o.inner.ScreenSize(ctx)
 	if err == nil {
-		o.observer.ObserveScreenSize(size, epoch)
+		o.observer.ObserveScreenSize(size, start.epoch, o.stable(start))
 	}
 	return size, err
 }

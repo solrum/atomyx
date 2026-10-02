@@ -346,7 +346,9 @@ for a host that does not need to split them.
    text and key input, and app launch, stop, kill, install, uninstall
    and data clear), and reports each successful tree, screenshot and
    screen size to the session's `session.Hub` together with the epoch
-   active when the capture began. It forwards `driver.StreamingTouchCapable`
+   active when the capture began. A capture is reported as unstable when
+   a mutating call was in flight as it began or started or finished
+   while it ran, and the hub never pairs an unstable capture. It forwards `driver.StreamingTouchCapable`
    and the launched-app accessors exactly when the wrapped driver has
    them, and exposes `Unwrap()`. A caller that asserts an optional
    interface uses `driver.As`, which looks through decorators.
@@ -377,12 +379,19 @@ A session is observable through the `session.Viewer` port, which
   The state is `idle` or `running` from the lease metadata, then `lost`
   or `closed`.
 - `Latest()` returns a `session.Snapshot` with the newest tree, the
-  newest screenshot, the format of the screenshot, the epoch of each,
-  the scale, `Paired` and `Highlightable`. Fields are added to the
-  struct over time, so callers read them by name.
+  newest screenshot, the format of the screenshot, the epoch and the
+  revision of each, the scale, `Paired` and `Highlightable`. Fields are
+  added to the struct over time, so callers read them by name.
 - `Subscribe(ctx)` returns a channel of `session.Observation` values,
-  each naming the kind and epoch of a new capture. A notification
-  carries no payload, and the subscriber reads `Latest()`.
+  each naming the kind, epoch, revision and stability of a new capture.
+  A notification carries no payload, and the subscriber reads `Latest()`.
+
+`TreeRevision` and `ScreenshotRevision` identify one stored capture.
+Each increases with every capture the hub stores, including captures of
+one epoch, so it is the identity a node path is valid against. Two trees
+fetched with no mutating call between them share a `TreeEpoch` and differ
+in `TreeRevision`. A client that sends a path back sends the revision it
+read the path from.
 
 The `Hub` behind it keeps only the newest tree, screenshot and screen
 size with their epochs, and never calls the device. A viewer therefore
@@ -402,7 +411,8 @@ selectors against the real tree.
 `ScreenSize` the driver reported, for every platform. The width comes
 from the image header, which is read without decoding the pixels, and the
 format (`png` or `jpeg`) is read from the bytes. `Paired` is true when the
-tree and the screenshot were fetched in the same action epoch.
+tree and the screenshot were fetched in the same action epoch and neither
+capture was unstable. An unstable screen size gives no scale.
 `Highlightable` is true when they are paired and a scale is known.
 Without a paired capture a viewer shows the tree alone.
 

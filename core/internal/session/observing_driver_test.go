@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"runtime"
 	"sort"
 	"sync"
 	"testing"
@@ -252,8 +253,9 @@ type hidingDriver struct{ driver.Driver }
 func (h *hidingDriver) Unwrap() driver.Driver { return h.Driver }
 
 type captureRecord struct {
-	kind  string
-	epoch uint64
+	kind   string
+	epoch  uint64
+	stable bool
 }
 
 type recordingObserver struct {
@@ -264,25 +266,39 @@ type recordingObserver struct {
 	sizes   []wire.Size
 }
 
-func (r *recordingObserver) ObserveTree(tree wire.TreeNodeWire, epoch uint64) {
+func (r *recordingObserver) ObserveTree(tree wire.TreeNodeWire, epoch uint64, stable bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.records = append(r.records, captureRecord{"tree", epoch})
+	r.records = append(r.records, captureRecord{"tree", epoch, stable})
 	r.trees = append(r.trees, tree)
 }
 
-func (r *recordingObserver) ObserveScreenshot(image []byte, epoch uint64) {
+func (r *recordingObserver) ObserveScreenshot(image []byte, epoch uint64, stable bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.records = append(r.records, captureRecord{"screenshot", epoch})
+	r.records = append(r.records, captureRecord{"screenshot", epoch, stable})
 	r.images = append(r.images, image)
 }
 
-func (r *recordingObserver) ObserveScreenSize(size wire.Size, epoch uint64) {
+func (r *recordingObserver) ObserveScreenSize(size wire.Size, epoch uint64, stable bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.records = append(r.records, captureRecord{"size", epoch})
+	r.records = append(r.records, captureRecord{"size", epoch, stable})
 	r.sizes = append(r.sizes, size)
+}
+
+// waitFor blocks until the observer holds at least n records.
+func (r *recordingObserver) waitFor(t *testing.T, n int) {
+	t.Helper()
+	for {
+		r.mu.Lock()
+		got := len(r.records)
+		r.mu.Unlock()
+		if got >= n {
+			return
+		}
+		runtime.Gosched()
+	}
 }
 
 func TestObservingDriver_ReportsCapturesWithTheEpochActiveWhenFetched(t *testing.T) {
@@ -300,7 +316,7 @@ func TestObservingDriver_ReportsCapturesWithTheEpochActiveWhenFetched(t *testing
 	_ = wrapped.Tap(ctx, wire.Point{X: 1, Y: 2})
 	_, _ = wrapped.Screenshot(ctx)
 
-	want := []captureRecord{{"tree", first}, {"screenshot", first}, {"size", first}, {"screenshot", wrapped.Epoch()}}
+	want := []captureRecord{{"tree", first, true}, {"screenshot", first, true}, {"size", first, true}, {"screenshot", wrapped.Epoch(), true}}
 	if !reflect.DeepEqual(observer.records, want) {
 		t.Fatalf("records = %+v, want %+v", observer.records, want)
 	}
@@ -309,6 +325,104 @@ func TestObservingDriver_ReportsCapturesWithTheEpochActiveWhenFetched(t *testing
 	}
 	if observer.trees[0].Attributes["id"] != "root" || string(observer.images[0]) != "png" || observer.sizes[0] != inner.Screen {
 		t.Fatalf("observer saw %+v %q %+v, want the values the driver returned", observer.trees[0], observer.images[0], observer.sizes[0])
+	}
+}
+
+// gatedDriver blocks the calls a test names, so a capture and a mutating
+// call can be made to overlap in a fixed order.
+type gatedDriver struct {
+	*mockdriver.Driver
+	tapEntered, tapRelease   chan struct{}
+	treeEntered, treeRelease chan struct{}
+}
+
+func newGatedDriver() *gatedDriver {
+	d := &gatedDriver{
+		Driver:      mockdriver.New(),
+		tapEntered:  make(chan struct{}),
+		tapRelease:  make(chan struct{}),
+		treeEntered: make(chan struct{}),
+		treeRelease: make(chan struct{}),
+	}
+	d.StageHierarchyRepeated(wire.TreeNodeWire{Attributes: map[string]string{"id": "root"}}, 4)
+	return d
+}
+
+func (d *gatedDriver) Tap(ctx context.Context, p wire.Point) error {
+	d.tapEntered <- struct{}{}
+	<-d.tapRelease
+	return d.Driver.Tap(ctx, p)
+}
+
+func (d *gatedDriver) Hierarchy(ctx context.Context) (wire.TreeNodeWire, error) {
+	d.treeEntered <- struct{}{}
+	<-d.treeRelease
+	return d.Driver.Hierarchy(ctx)
+}
+
+func TestObservingDriver_ACaptureDuringABlockedMutatingCallIsReportedUnstable(t *testing.T) {
+	ctx := context.Background()
+	inner := newGatedDriver()
+	observer := &recordingObserver{}
+	wrapped := session.NewObservingDriver(inner, observer)
+
+	tapDone := make(chan struct{})
+	go func() {
+		defer close(tapDone)
+		_ = wrapped.Tap(ctx, wire.Point{})
+	}()
+	<-inner.tapEntered
+
+	captureDone := make(chan struct{})
+	go func() {
+		defer close(captureDone)
+		_, _ = wrapped.Hierarchy(ctx)
+	}()
+	<-inner.treeEntered
+	inner.treeRelease <- struct{}{}
+	<-captureDone
+
+	inner.tapRelease <- struct{}{}
+	<-tapDone
+	if len(observer.records) != 1 || observer.records[0].stable {
+		t.Fatalf("records = %+v, want one unstable tree", observer.records)
+	}
+}
+
+func TestObservingDriver_ACaptureThatAMutatingCallInterruptedIsReportedUnstable(t *testing.T) {
+	ctx := context.Background()
+	inner := newGatedDriver()
+	observer := &recordingObserver{}
+	wrapped := session.NewObservingDriver(inner, observer)
+
+	captureDone := make(chan struct{})
+	go func() {
+		defer close(captureDone)
+		_, _ = wrapped.Hierarchy(ctx)
+	}()
+	<-inner.treeEntered
+
+	tapDone := make(chan struct{})
+	go func() {
+		defer close(tapDone)
+		_ = wrapped.Tap(ctx, wire.Point{})
+	}()
+	<-inner.tapEntered
+	inner.tapRelease <- struct{}{}
+	<-tapDone
+
+	inner.treeRelease <- struct{}{}
+	<-captureDone
+	if len(observer.records) != 1 || observer.records[0].stable {
+		t.Fatalf("records = %+v, want one unstable tree", observer.records)
+	}
+
+	go func() { _, _ = wrapped.Hierarchy(ctx) }()
+	<-inner.treeEntered
+	inner.treeRelease <- struct{}{}
+	observer.waitFor(t, 2)
+	if !observer.records[1].stable {
+		t.Fatal("a capture with no overlapping call after the call ended is unstable")
 	}
 }
 

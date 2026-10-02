@@ -34,6 +34,13 @@ const (
 type Observation struct {
 	Kind  ObservationKind
 	Epoch uint64
+	// Revision is the revision of the announced capture, the same value
+	// the next Latest carries as TreeRevision or ScreenshotRevision. A
+	// screen size has no revision in a Snapshot, so its count only
+	// orders sizes.
+	Revision uint64
+	// Stable is false when a mutating call overlapped the capture.
+	Stable bool
 }
 
 // Snapshot is the newest capture of each kind, as a viewer may show it.
@@ -44,8 +51,16 @@ type Snapshot struct {
 	// zero value while HasTree is false.
 	Tree    wire.TreeNodeWire
 	HasTree bool
-	// TreeEpoch is the action epoch the tree was fetched in.
+	// TreeEpoch is the action epoch the tree was fetched in. Several
+	// trees fetched with no mutating call between them share an epoch,
+	// so the epoch does not identify a tree.
 	TreeEpoch uint64
+	// TreeRevision identifies this stored tree. It increases with every
+	// tree the hub stores, including trees of one epoch, and is zero
+	// while HasTree is false. A node path, such as a child index chain,
+	// is valid only against the revision of the tree it was read from, so
+	// a client that sends a path back must send this revision with it.
+	TreeRevision uint64
 
 	// Screenshot holds the encoded image of the newest screenshot.
 	Screenshot    []byte
@@ -54,12 +69,17 @@ type Snapshot struct {
 	ScreenshotFormat ImageFormat
 	// ScreenshotEpoch is the action epoch the screenshot was fetched in.
 	ScreenshotEpoch uint64
+	// ScreenshotRevision identifies this stored screenshot the way
+	// TreeRevision identifies a tree. It is zero while HasScreenshot is
+	// false.
+	ScreenshotRevision uint64
 
 	// Scale is the screenshot pixel width divided by the screen width
 	// the driver reports. It is zero while either is unknown.
 	Scale float64
 	// Paired reports that the tree and the screenshot were fetched in
-	// the same action epoch, so they describe the same screen.
+	// the same action epoch and that no mutating call overlapped either
+	// capture, so they describe the same screen.
 	Paired bool
 	// Highlightable reports that a tree node's bounds can be drawn on
 	// the screenshot: the pair matches and a scale is known.

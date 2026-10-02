@@ -11,14 +11,20 @@ import "dev.atomyx/internal/wire"
 // Calls arrive on the goroutine of the driver call that produced the
 // capture, so an implementation must return quickly and must never
 // block on a slow consumer. Only successful captures are reported.
+//
+// A capture is stable when no mutating call was in flight as it began
+// and none started or finished before it returned. An unstable capture
+// is still reported, because it is the newest thing the device showed,
+// but its epoch proves nothing, so a consumer must never treat it as
+// half of a matched pair.
 type Observer interface {
-	ObserveTree(tree wire.TreeNodeWire, epoch uint64)
-	ObserveScreenshot(image []byte, epoch uint64)
-	ObserveScreenSize(size wire.Size, epoch uint64)
+	ObserveTree(tree wire.TreeNodeWire, epoch uint64, stable bool)
+	ObserveScreenshot(image []byte, epoch uint64, stable bool)
+	ObserveScreenSize(size wire.Size, epoch uint64, stable bool)
 }
 
 type noopObserver struct{}
 
-func (noopObserver) ObserveTree(wire.TreeNodeWire, uint64) {}
-func (noopObserver) ObserveScreenshot([]byte, uint64)      {}
-func (noopObserver) ObserveScreenSize(wire.Size, uint64)   {}
+func (noopObserver) ObserveTree(wire.TreeNodeWire, uint64, bool) {}
+func (noopObserver) ObserveScreenshot([]byte, uint64, bool)      {}
+func (noopObserver) ObserveScreenSize(wire.Size, uint64, bool)   {}
