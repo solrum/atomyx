@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/storage"
@@ -125,5 +128,97 @@ func TestDoctorFlagTableAcceptsMigrateRuns(t *testing.T) {
 	argv, err := ParseArgv([]string{"doctor", "--migrate-runs", "--report-dir", "/x", "--json"})
 	if err != nil || !flagBool(argv.Flags, "--migrate-runs") {
 		t.Fatalf("ParseArgv = %+v %v", argv, err)
+	}
+}
+
+func TestDoctorRefusesReportDirWithoutMigrateRuns(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := Doctor(context.Background(), Deps{Stdout: &stdout, Stderr: &stderr},
+		map[string]FlagValue{"--report-dir": t.TempDir()})
+	if code != 2 || !strings.Contains(stderr.String(), "--report-dir") || !strings.Contains(stderr.String(), "--migrate-runs") {
+		t.Fatalf("exit %d, stderr %q, want 2 naming both flags", code, stderr.String())
+	}
+}
+
+type failingDeleteStore struct {
+	storage.Storage
+	failKey string
+}
+
+func (s *failingDeleteStore) Delete(key string) error {
+	if key == s.failKey {
+		return errors.New("injected delete failure")
+	}
+	return s.Storage.Delete(key)
+}
+
+func TestMigrationThatStopsEarlyStillPrintsThePartialReport(t *testing.T) {
+	for _, jsonOutput := range []bool{false, true} {
+		root := seedLegacyRoot(t)
+		base, err := storage.NewFileStorage(storage.FileStorageOptions{Root: root})
+		if err != nil {
+			t.Fatal(err)
+		}
+		store := &failingDeleteStore{Storage: base, failKey: storage.RunKey("b")}
+		var stdout, stderr bytes.Buffer
+		code := runMigration(context.Background(), Deps{Stdout: &stdout, Stderr: &stderr}, store, root, jsonOutput)
+		if code != 1 || !strings.Contains(stderr.String(), "stopped early") {
+			t.Fatalf("json=%v exit %d, stderr %q", jsonOutput, code, stderr.String())
+		}
+		if jsonOutput {
+			var got struct {
+				Migrated        []string `json:"migrated"`
+				AlreadyMigrated []string `json:"alreadyMigrated"`
+			}
+			if err := json.Unmarshal(stdout.Bytes(), &got); err != nil || len(got.Migrated)+len(got.AlreadyMigrated) != 1 {
+				t.Fatalf("partial json report = %q %v", stdout.String(), err)
+			}
+		} else if !strings.Contains(stdout.String(), "migrated:") {
+			t.Fatalf("partial text report = %q", stdout.String())
+		}
+	}
+}
+
+type signalWriter struct {
+	once sync.Once
+	seen chan struct{}
+	buf  bytes.Buffer
+	mu   sync.Mutex
+}
+
+func (w *signalWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	w.buf.Write(p)
+	w.mu.Unlock()
+	w.once.Do(func() { close(w.seen) })
+	return len(p), nil
+}
+
+func TestMigrationPrintsOneWaitingLineWhenTheLockIsHeld(t *testing.T) {
+	root := seedLegacyRoot(t)
+	store, err := storage.NewFileStorage(storage.FileStorageOptions{Root: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	held, err := runfolder.LockMigration(root, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stderr := &signalWriter{seen: make(chan struct{})}
+	done := make(chan int, 1)
+	go func() {
+		done <- runMigration(context.Background(), Deps{Stdout: &bytes.Buffer{}, Stderr: stderr}, store, root, false)
+	}()
+	select {
+	case <-stderr.seen:
+	case <-time.After(10 * time.Second):
+		t.Fatal("no waiting line was printed")
+	}
+	_ = held.Release()
+	if code := <-done; code != 0 {
+		t.Fatalf("exit %d after the lock was released", code)
+	}
+	if got := stderr.buf.String(); got != "waiting for another run operation to finish\n" {
+		t.Fatalf("stderr = %q", got)
 	}
 }

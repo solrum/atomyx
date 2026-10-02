@@ -42,7 +42,7 @@ type migrationJSON struct {
 // 1 when a record is damaged, a record conflicts with an existing
 // folder, or storage failed, and 2 when the command is misused.
 func migrateRuns(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
-	stdout, stderr := deps.stdout(), deps.stderr()
+	stderr := deps.stderr()
 	for _, name := range deviceFlags {
 		if _, set := flags[name]; set {
 			_, _ = fmt.Fprintf(stderr, "error: %s checks run records only, so it cannot be combined with %s.\n", migrateRunsFlag, name)
@@ -58,18 +58,29 @@ func migrateRuns(ctx context.Context, deps Deps, flags map[string]FlagValue) int
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
-	report, err := storage.MigrateRuns(store, root, nil)
-	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "error: run migration stopped early: %v\n", err)
-		_, _ = fmt.Fprintf(stderr, "Run the command again to finish. Records already moved stay moved.\n")
-		return 1
+	return runMigration(ctx, deps, store, root, flagBool(flags, "--json"))
+}
+
+// runMigration migrates the flat records in store and prints the
+// report. A pass that stops early still prints the report of what it
+// did, before the error and the non-zero exit.
+func runMigration(ctx context.Context, deps Deps, store storage.Storage, root string, jsonOutput bool) int {
+	stdout, stderr := deps.stdout(), deps.stderr()
+	onWait := func() {
+		_, _ = fmt.Fprintf(stderr, "waiting for another run operation to finish\n")
 	}
-	if flagBool(flags, "--json") {
+	report, migrateErr := storage.MigrateRuns(store, root, onWait)
+	if jsonOutput {
 		if err := encodeJSON(stdout, toMigrationJSON(root, report)); err != nil {
 			return reportUncaught(ctx, stderr, deps.Debug, err)
 		}
 	} else {
 		printMigrationReport(stdout, root, report)
+	}
+	if migrateErr != nil {
+		_, _ = fmt.Fprintf(stderr, "error: run migration stopped early: %v\n", migrateErr)
+		_, _ = fmt.Fprintf(stderr, "Run the command again to finish. Records already moved stay moved.\n")
+		return 1
 	}
 	if !report.Clean() {
 		return 1
