@@ -52,6 +52,11 @@ data class RouteResponse(
             "application/json",
             """{"error":"${message.replace("\"", "\\\"")}"}""",
         )
+        fun busy(message: String) = RouteResponse(
+            NanoHTTPD.Response.Status.TOO_MANY_REQUESTS,
+            "application/json",
+            """{"error":"${message.replace("\"", "\\\"")}","retryable":true}""",
+        )
         fun serviceUnavailable(message: String) = RouteResponse(
             NanoHTTPD.Response.Status.SERVICE_UNAVAILABLE,
             "application/json",

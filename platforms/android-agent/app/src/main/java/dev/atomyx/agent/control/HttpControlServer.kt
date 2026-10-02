@@ -1,26 +1,10 @@
 package dev.atomyx.agent.control
 
 import android.util.Log
-import dev.atomyx.agent.control.router.AppsRoute
-import dev.atomyx.agent.control.router.ClearFocusedInputRoute
-import dev.atomyx.agent.control.router.CurrentActivityRoute
-import dev.atomyx.agent.control.router.DispatchGestureRoute
-import dev.atomyx.agent.control.router.ForceStopRoute
-import dev.atomyx.agent.control.router.HideKeyboardRoute
-import dev.atomyx.agent.control.router.KeyRoute
-import dev.atomyx.agent.control.router.KeyboardRoute
-import dev.atomyx.agent.control.router.LaunchRoute
-import dev.atomyx.agent.control.router.LongPressRoute
-import dev.atomyx.agent.control.router.PingRoute
-import dev.atomyx.agent.control.router.Route
 import dev.atomyx.agent.control.router.RouteRequest
 import dev.atomyx.agent.control.router.RouteResponse
 import dev.atomyx.agent.control.router.Router
-import dev.atomyx.agent.control.router.ScreenshotRoute
-import dev.atomyx.agent.control.router.SwipeRoute
-import dev.atomyx.agent.control.router.TapCoordsRoute
-import dev.atomyx.agent.control.router.TreeRoute
-import dev.atomyx.agent.control.router.TypeKeyboardRoute
+import dev.atomyx.agent.control.router.ShippedRoutes
 import dev.atomyx.agent.service.AtomyxAccessibilityService
 import fi.iki.elonen.NanoHTTPD
 
@@ -37,7 +21,7 @@ class HttpControlServer(
 ) : NanoHTTPD("127.0.0.1", port) {
 
     private val servicesHolder = AtomyxServicesHolder(accessibilityProvider)
-    private val router = Router(buildRoutes())
+    private val router = Router(ShippedRoutes.build())
 
     override fun serve(session: IHTTPSession): Response = try {
         // /health works without accessibility connected
@@ -79,25 +63,6 @@ class HttpControlServer(
         Log.e(TAG, "control server error", e)
         toResponse(RouteResponse.internalError("Internal error."))
     }
-
-    private fun buildRoutes(): List<Route> = listOf(
-        PingRoute(),
-        TreeRoute(),
-        KeyboardRoute(),
-        ScreenshotRoute(),
-        CurrentActivityRoute(),
-        AppsRoute(),
-        TapCoordsRoute(),
-        LongPressRoute(),
-        ClearFocusedInputRoute(),
-        HideKeyboardRoute(),
-        SwipeRoute(),
-        DispatchGestureRoute(),
-        TypeKeyboardRoute(),
-        KeyRoute(),
-        LaunchRoute(),
-        ForceStopRoute(),
-    )
 
     private fun toResponse(r: RouteResponse): Response =
         newFixedLengthResponse(r.status, r.mimeType, r.body)

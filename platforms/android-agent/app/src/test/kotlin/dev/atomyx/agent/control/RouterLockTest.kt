@@ -1,22 +1,10 @@
 package dev.atomyx.agent.control
 
-import dev.atomyx.agent.control.router.AppsRoute
-import dev.atomyx.agent.control.router.CurrentActivityRoute
-import dev.atomyx.agent.control.router.DispatchGestureRoute
-import dev.atomyx.agent.control.router.ForceStopRoute
-import dev.atomyx.agent.control.router.KeyRoute
-import dev.atomyx.agent.control.router.KeyboardRoute
-import dev.atomyx.agent.control.router.LaunchRoute
-import dev.atomyx.agent.control.router.PingRoute
 import dev.atomyx.agent.control.router.Route
 import dev.atomyx.agent.control.router.RouteRequest
 import dev.atomyx.agent.control.router.RouteResponse
 import dev.atomyx.agent.control.router.Router
-import dev.atomyx.agent.control.router.ScreenshotRoute
-import dev.atomyx.agent.control.router.SwipeRoute
-import dev.atomyx.agent.control.router.TapCoordsRoute
-import dev.atomyx.agent.control.router.TreeRoute
-import dev.atomyx.agent.control.router.TypeKeyboardRoute
+import dev.atomyx.agent.control.router.ShippedRoutes
 import fi.iki.elonen.NanoHTTPD
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CountDownLatch
@@ -33,7 +21,7 @@ import org.junit.Test
  * thread-state observation instead of timing, so a failure means the
  * contract broke and never that a machine was slow.
  */
-class UiTreeConcurrencyTest {
+class RouterLockTest {
 
     private val events = ConcurrentLinkedQueue<String>()
 
@@ -67,10 +55,11 @@ class UiTreeConcurrencyTest {
         body = "{}",
     )
 
-    /** Spins until [thread] has either finished or parked waiting for a lock. */
+    /** Spins until [thread] has either finished or parked waiting for a lock, bounded or not. */
     private fun awaitSettled(thread: Thread) {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(AWAIT_SECONDS)
         while (thread.isAlive && thread.state != Thread.State.WAITING &&
+            thread.state != Thread.State.TIMED_WAITING &&
             thread.state != Thread.State.BLOCKED
         ) {
             check(System.nanoTime() < deadline) { "thread never settled: ${thread.state}" }
@@ -148,17 +137,52 @@ class UiTreeConcurrencyTest {
     }
 
     @Test
-    fun everyShippedRouteDeclaresItsMutability() {
-        val reads = listOf(
-            PingRoute(), TreeRoute(), KeyboardRoute(), ScreenshotRoute(),
-            CurrentActivityRoute(), AppsRoute(),
+    fun aMutatingRequestStillQueuedAfterTheBoundedWaitGetsABusyResponseAndNeverRuns() {
+        val release = CountDownLatch(1)
+        val first = LatchedRoute("/actions/first", mutates = true, holdUntil = release)
+        val second = LatchedRoute("/actions/second", mutates = true)
+        val router = Router(listOf(first, second), mutationWaitMs = 1)
+
+        val firstThread = dispatchOnThread(router, first.path)
+        assertTrue(first.entered.await(AWAIT_SECONDS, TimeUnit.SECONDS))
+        val response = router.dispatch(NanoHTTPD.Method.POST, second.path, request(second.path), services)
+
+        assertEquals(NanoHTTPD.Response.Status.TOO_MANY_REQUESTS, response.status)
+        assertTrue(response.body, response.body.contains("\"retryable\":true"))
+        assertTrue(response.body, response.body.contains(Router.BUSY_MESSAGE))
+
+        release.countDown()
+        firstThread.join(JOIN_MS)
+        assertEquals(
+            "the queued action ran after its caller was told to retry",
+            listOf("enter /actions/first", "exit /actions/first"),
+            events.toList(),
         )
-        val actions = listOf(
-            TapCoordsRoute(), SwipeRoute(), DispatchGestureRoute(), TypeKeyboardRoute(),
-            KeyRoute(), LaunchRoute(), ForceStopRoute(),
+
+        val retry = router.dispatch(NanoHTTPD.Method.POST, second.path, request(second.path), services)
+        assertEquals(NanoHTTPD.Response.Status.OK, retry.status)
+    }
+
+    @Test
+    fun everyRouteTheServerRegistersDeclaresItsMutability() {
+        val readPaths = setOf("/ping", "/tree", "/keyboard", "/screenshot", "/current-activity", "/apps")
+        val shipped = ShippedRoutes.build()
+
+        assertTrue("no shipped routes", shipped.isNotEmpty())
+        shipped.forEach { route ->
+            if (route.path in readPaths) {
+                assertFalse("${route.path} must stay outside the lock", route.mutates)
+            } else {
+                assertTrue(
+                    "${route.path} must run behind the lock, or be added to the read paths on purpose",
+                    route.mutates,
+                )
+            }
+        }
+        assertTrue(
+            "a listed read path is not shipped: ${readPaths - shipped.map { it.path }.toSet()}",
+            shipped.map { it.path }.containsAll(readPaths),
         )
-        reads.forEach { assertFalse("${it.path} must stay outside the lock", it.mutates) }
-        actions.forEach { assertTrue("${it.path} must run behind the lock", it.mutates) }
     }
 
     private companion object {

@@ -33,7 +33,8 @@ private fun parseBody(body: String): JsonObject =
  *   "mechanism": "accessibility",
  *   "capabilities": {
  *     "canMultiPointer": false,
- *     "canPressure": false
+ *     "canPressure": false,
+ *     "secureFields": true
  *   }
  * }
  * ```
@@ -45,22 +46,32 @@ class PingRoute : Route {
     override val path = "/ping"
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
         val caps = services.gestureRunner.capabilitiesSnapshot()
-        return RouteResponse.ok(toJson(mapOf(
-            "ok" to true,
-            "agent" to "atomyx-android",
-            "sdkInt" to android.os.Build.VERSION.SDK_INT,
-            // `accessibility` names the one current mechanism: the
-            // AccessibilityService gesture surface. Future backends
-            // (e.g. a UiAutomation-based injector) would announce
-            // themselves here without changing the wire shape.
-            "mechanism" to "accessibility",
-            "capabilities" to mapOf(
-                "canMultiPointer" to caps.canMultiPointer,
-                "canPressure" to caps.canPressure,
-            ),
-        )))
+        return RouteResponse.ok(toJson(pingPayload(caps.canMultiPointer, caps.canPressure, android.os.Build.VERSION.SDK_INT)))
     }
 }
+
+/**
+ * The `/ping` response body. `secureFields` announces that every node in
+ * `/tree` reports isPassword, so the host can tell an agent that marks
+ * secret fields from one that predates the marker and would leave a
+ * password unmasked. A capability only ever gets added, so an older host
+ * ignores the ones it does not know.
+ */
+internal fun pingPayload(canMultiPointer: Boolean, canPressure: Boolean, sdkInt: Int): Map<String, Any> = mapOf(
+    "ok" to true,
+    "agent" to "atomyx-android",
+    "sdkInt" to sdkInt,
+    // `accessibility` names the one current mechanism: the
+    // AccessibilityService gesture surface. Future backends
+    // (e.g. a UiAutomation-based injector) would announce
+    // themselves here without changing the wire shape.
+    "mechanism" to "accessibility",
+    "capabilities" to mapOf(
+        "canMultiPointer" to canMultiPointer,
+        "canPressure" to canPressure,
+        "secureFields" to true,
+    ),
+)
 
 class TreeRoute : Route {
     override val mutates = false
