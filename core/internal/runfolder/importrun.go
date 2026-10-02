@@ -14,6 +14,11 @@ import (
 // Nothing is changed.
 var ErrImportConflict = errors.New("a different run folder already has this id")
 
+// ErrImportMismatch reports that the folder ImportRun wrote did not
+// read back equal to its source. The new folder is removed and the
+// source is untouched, so the failure concerns this run only.
+var ErrImportMismatch = errors.New("the written run folder does not match its source")
+
 // ImportOutcome says what ImportRun did.
 type ImportOutcome int
 
@@ -31,12 +36,18 @@ const (
 // versioned runs directory and renamed into place, so no reader sees a
 // half-made folder, and the written meta is read back and compared with
 // meta before ImportRun reports success. A read-back that differs
-// removes the new folder and returns an error.
+// removes the new folder and returns an error matching
+// ErrImportMismatch.
 //
-// An existing folder whose meta equals meta after normalization is not
-// touched and reports ImportExisting, which lets an interrupted import
-// run again. An existing folder with any other content returns
-// ErrImportConflict and is left as it is. An imported run gets no
+// A folder that was imported from the same source is not touched and
+// reports ImportExisting, which lets an interrupted import run again,
+// even after the folder was edited since. The source is identified by
+// Meta.ImportedFrom, so a caller sets it to a value that names the
+// source record. An existing folder whose meta equals meta, or equals
+// it apart from ImportedFrom, reports ImportExisting as well. An
+// existing folder with any other content returns ErrImportConflict and
+// is left as it is. The folder is published with a no-replace rename,
+// so a folder that appears after the check is never overwritten. An imported run gets no
 // run.lock, so readers treat it as having no live writer. The caller
 // supplies meta in the shape the Reader returns: an unfinished run
 // carries no Result and no Outcome.
@@ -53,7 +64,7 @@ func ImportRun(root string, meta Meta) (ImportOutcome, error) {
 		return 0, fmt.Errorf("%w: its meta is unreadable: %w", ErrImportConflict, err)
 	}
 	if found {
-		if reflect.DeepEqual(existing, meta) {
+		if alreadyImported(existing, meta) {
 			return ImportExisting, nil
 		}
 		return 0, ErrImportConflict
@@ -66,14 +77,18 @@ func ImportRun(root string, meta Meta) (ImportOutcome, error) {
 	if err != nil {
 		return 0, fmt.Errorf("creating scratch folder: %w", err)
 	}
+	if err := os.Chmod(scratch, dirMode); err != nil {
+		_ = os.RemoveAll(scratch)
+		return 0, fmt.Errorf("setting scratch folder mode: %w", err)
+	}
 	if err := writeMetaFile(scratch, meta); err != nil {
 		_ = os.RemoveAll(scratch)
 		return 0, err
 	}
 	dir := RunDir(root, meta.RunID)
-	if err := os.Rename(scratch, dir); err != nil {
+	if err := renameNoReplace(scratch, dir); err != nil {
 		_ = os.RemoveAll(scratch)
-		if _, statErr := os.Stat(dir); statErr == nil {
+		if errors.Is(err, fs.ErrExist) {
 			return 0, ErrImportConflict
 		}
 		return 0, fmt.Errorf("publishing run folder: %w", err)
@@ -85,12 +100,23 @@ func ImportRun(root string, meta Meta) (ImportOutcome, error) {
 	back, ok, err := reader.Get(meta.RunID)
 	if err != nil || !ok || !reflect.DeepEqual(back, meta) {
 		_ = os.RemoveAll(dir)
-		if err == nil {
-			err = errors.New("the written meta does not match the source")
+		reason := "the folder reads back different"
+		if err != nil {
+			reason = err.Error()
 		}
-		return 0, fmt.Errorf("verifying run folder %q: %w", meta.RunID, err)
+		return 0, fmt.Errorf("verifying run folder %q: %w: %s", meta.RunID, ErrImportMismatch, reason)
 	}
 	return ImportWritten, nil
+}
+
+func alreadyImported(existing, meta Meta) bool {
+	if meta.ImportedFrom != "" && existing.ImportedFrom == meta.ImportedFrom {
+		return true
+	}
+	if existing.ImportedFrom == "" {
+		existing.ImportedFrom = meta.ImportedFrom
+	}
+	return reflect.DeepEqual(existing, meta)
 }
 
 // RemoveImportScratch deletes the scratch folders an interrupted

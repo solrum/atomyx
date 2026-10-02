@@ -102,6 +102,11 @@ type MCPInfo struct {
 // run_script call inside an open MCP run writes into that run. A bare
 // run_script call with no open run is its own run of kind mcp.
 //
+// ImportedFrom is set only on a folder ImportRun created from a record
+// of another store, and holds that record's id. It lets a later import
+// tell that the folder is the record's own, however the folder was
+// edited since.
+//
 // FailedAtStep is the zero-based index of the step that failed, the
 // same value the script runner reports as its failed step index.
 // Display code adds one.
@@ -121,6 +126,7 @@ type Meta struct {
 	FailedAtStep  *int     `json:"failedAtStep,omitempty"`
 	TotalSteps    int      `json:"totalSteps,omitempty"`
 	MCP           *MCPInfo `json:"mcp,omitempty"`
+	ImportedFrom  string   `json:"importedFrom,omitempty"`
 }
 
 // ResultOf returns the Result an Outcome belongs to, and false for a

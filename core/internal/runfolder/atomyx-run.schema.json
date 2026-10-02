@@ -121,6 +121,10 @@
         "host": {
           "$ref": "#/definitions/Host"
         },
+        "importedFrom": {
+          "description": "Id of the record of another store this folder was imported from. Absent for a run written natively.",
+          "type": "string"
+        },
         "kind": {
           "description": "What started the run.",
           "enum": [

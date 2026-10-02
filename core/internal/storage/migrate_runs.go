@@ -70,7 +70,7 @@ func (r MigrationReport) Clean() bool {
 // to that point, and a later call finishes the rest.
 func MigrateRuns(store Storage, root string) (MigrationReport, error) {
 	var report MigrationReport
-	lock, err := runfolder.LockMigration(root)
+	lock, err := runfolder.LockMigration(root, nil)
 	if err != nil {
 		return report, err
 	}

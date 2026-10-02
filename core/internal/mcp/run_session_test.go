@@ -295,7 +295,7 @@ func TestDeleteAndSummaryUpdateAskToWaitWhileARunMigrationHoldsTheLock(t *testin
 	if err := r.store.Save(storage.RunKey("flat"), flat); err != nil {
 		t.Fatal(err)
 	}
-	lock, err := runfolder.LockMigration(r.root)
+	lock, err := runfolder.LockMigration(r.root, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -20,17 +20,25 @@ type MigrationLock struct {
 	f *os.File
 }
 
-// LockMigration takes the migration lock exclusively and waits until
-// it is free. Only one migration holds it at a time, and none holds it
+// LockMigration takes the migration lock exclusively. When another
+// holder has it, onWait is called once, if not nil, and then
+// LockMigration blocks until the lock is free. Only one migration holds it at a time, and none holds it
 // while an editor of run records holds the shared form. The lock is
 // held per open file, so a second acquisition inside the same process
 // conflicts exactly as one in another process would.
-func LockMigration(root string) (*MigrationLock, error) {
+func LockMigration(root string, onWait func()) (*MigrationLock, error) {
 	f, err := openMigrateLock(root)
 	if err != nil {
 		return nil, err
 	}
-	if err := flock.Exclusive(f); err != nil {
+	err = flock.TryExclusive(f)
+	if err != nil && flock.IsContended(err) {
+		if onWait != nil {
+			onWait()
+		}
+		err = flock.Exclusive(f)
+	}
+	if err != nil {
 		_ = f.Close()
 		return nil, fmt.Errorf("locking %s: %w", MigrateLockFileName, err)
 	}

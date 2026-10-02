@@ -349,7 +349,7 @@ func TestEditsDuringAMigrationAreRefusedSoNothingIsLostOrResurrected(t *testing.
 
 func TestEditsAreRefusedWhileTheMigrationLockIsHeld(t *testing.T) {
 	root, _ := newMigrationRoot(t)
-	held, err := runfolder.LockMigration(root)
+	held, err := runfolder.LockMigration(root, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

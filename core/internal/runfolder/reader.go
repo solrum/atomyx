@@ -70,8 +70,9 @@ type SkippedRun struct {
 // that holds no meta.json is not a run and is ignored, and so is an
 // import scratch folder or a folder that vanishes while the listing
 // runs. A folder whose meta cannot be read is left out of the result and
-// reported in skipped, so a single damaged run never hides the others. An error is returned
-// only when the run directory itself cannot be listed.
+// reported in skipped, so a single damaged run never hides the others.
+// An error is returned only when the run directory itself cannot be
+// listed.
 func (r *Reader) List() (metas []Meta, skipped []SkippedRun, err error) {
 	entries, err := os.ReadDir(VersionedRunsDir(r.root))
 	if err != nil {

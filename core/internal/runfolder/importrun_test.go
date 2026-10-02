@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func importMeta(id string, completed bool) Meta {
@@ -108,7 +109,7 @@ func TestMigrationLockExcludesEditorsAndSharesAmongThem(t *testing.T) {
 	_ = a.Release()
 	_ = b.Release()
 
-	m, err := LockMigration(root)
+	m, err := LockMigration(root, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,4 +125,109 @@ func TestMigrationLockExcludesEditorsAndSharesAmongThem(t *testing.T) {
 		t.Fatalf("editor after migration: %v", err)
 	}
 	_ = c.Release()
+}
+
+func TestImportRunRecognisesItsOwnFolderAfterAnEdit(t *testing.T) {
+	root := t.TempDir()
+	imported := importMeta("r", true)
+	imported.ImportedFrom = "r"
+	if _, err := ImportRun(root, imported); err != nil {
+		t.Fatal(err)
+	}
+	edited := imported
+	summary := "edited after the import"
+	edited.MCP = &MCPInfo{Name: "n", Source: "agent", Summary: &summary}
+	if err := writeMetaFile(RunDir(root, "r"), edited); err != nil {
+		t.Fatal(err)
+	}
+
+	if outcome, err := ImportRun(root, imported); err != nil || outcome != ImportExisting {
+		t.Fatalf("re-import after an edit = %v %v, want ImportExisting", outcome, err)
+	}
+	got, _, _ := NewReader(root).Get("r")
+	if got.MCP == nil || got.MCP.Summary == nil || *got.MCP.Summary != summary {
+		t.Fatalf("the edit was lost: %+v", got.MCP)
+	}
+
+	other := importMeta("r", true)
+	other.ImportedFrom = "someone-else"
+	if _, err := ImportRun(root, other); !errors.Is(err, ErrImportConflict) {
+		t.Fatalf("a folder imported from another record = %v, want ErrImportConflict", err)
+	}
+}
+
+func TestImportRunNeverReplacesAnExistingDirectory(t *testing.T) {
+	root := t.TempDir()
+	dir := RunDir(root, "r")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ImportRun(root, importMeta("r", true)); !errors.Is(err, ErrImportConflict) {
+		t.Fatalf("existing empty directory = %v, want ErrImportConflict", err)
+	}
+	if names := dirNames(t, dir); len(names) != 0 {
+		t.Fatalf("the existing directory was changed: %v", names)
+	}
+	if names := dirNames(t, VersionedRunsDir(root)); len(names) != 1 {
+		t.Fatalf("scratch folder left behind: %v", names)
+	}
+}
+
+func TestImportRunPublishesWithTheNormalRunFolderMode(t *testing.T) {
+	root := t.TempDir()
+	if _, err := ImportRun(root, importMeta("r", true)); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(RunDir(root, "r"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode().Perm() & 0o755; got != dirMode {
+		t.Fatalf("folder mode = %v, want %v", info.Mode().Perm(), os.FileMode(dirMode))
+	}
+}
+
+func TestImportRunReportsAReadBackThatDiffersAndRemovesTheFolder(t *testing.T) {
+	root := t.TempDir()
+	meta := importMeta("r", true)
+	meta.MCP = &MCPInfo{Name: "n", Source: "agent", Findings: []Finding{}}
+	_, err := ImportRun(root, meta)
+	if !errors.Is(err, ErrImportMismatch) {
+		t.Fatalf("ImportRun = %v, want ErrImportMismatch", err)
+	}
+	if _, statErr := os.Stat(RunDir(root, "r")); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("the mismatched folder was left: %v", statErr)
+	}
+}
+
+func TestLockMigrationTellsTheCallerWhenItHasToWait(t *testing.T) {
+	root := t.TempDir()
+	held, err := LockMigration(root, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waiting := make(chan struct{})
+	acquired := make(chan error, 1)
+	go func() {
+		l, err := LockMigration(root, func() { close(waiting) })
+		if err == nil {
+			err = l.Release()
+		}
+		acquired <- err
+	}()
+	select {
+	case <-waiting:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the waiting notice was never given")
+	}
+	_ = held.Release()
+	if err := <-acquired; err != nil {
+		t.Fatal(err)
+	}
+
+	free, err := LockMigration(root, func() { t.Error("notice given for a free lock") })
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = free.Release()
 }

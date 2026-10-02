@@ -103,5 +103,6 @@ func metaSchema() map[string]any {
 		"failedAtStep":  map[string]any{"type": "integer", "minimum": 0},
 		"totalSteps":    map[string]any{"type": "integer", "minimum": 0},
 		"mcp":           ref("MCPInfo"),
+		"importedFrom":  map[string]any{"type": "string", "description": "Id of the record of another store this folder was imported from. Absent for a run written natively."},
 	}, []string{"schemaVersion", "runId", "kind", "startedAt"})
 }
