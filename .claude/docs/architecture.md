@@ -376,9 +376,15 @@ composition root sets it.
 A session is observable through the `session.Viewer` port, which
 `*Session` implements:
 
-- `Info()` reports the device, the lease holder, the role and the state.
-  The state is `idle` or `running` from the lease metadata, then `lost`
-  or `closed`.
+- `Info()` reports the device, the lease holder, which carries the role,
+  and a typed `session.HolderState`. The values are `idle`, `running`,
+  `released`, `borrowed`, `lost` and `closed`. A session derives its state
+  from its own record, never from the lease metadata, so it is the same
+  with or without a lease. A session starts `idle`, its owner moves it
+  with `SetRunning` and `SetIdle`, `lost` and `closed` follow from its
+  lifecycle, and `closed` wins over `lost`. A session never reports
+  `released` or `borrowed`, because a holder in either state has no
+  session, so the layer that owns the lifecycle reports them.
 - `Latest()` returns a `session.Snapshot` with the newest tree, the
   newest screenshot, the format of the screenshot, the epoch and the
   revision of each, the scale, `Paired` and `Highlightable`. Fields are

@@ -98,20 +98,46 @@ type Snapshot struct {
 	Highlightable bool
 }
 
-// Info describes who holds the device and what they are doing. The
-// state comes from the lease metadata, so it is "idle" or "running"
-// while the session is live, and "lost" or "closed" afterwards.
+// HolderState is where a device holder stands in the holder state
+// machine. It is the shared vocabulary of every layer that reports a
+// holder, so a viewer reads one set of values whoever holds the device.
+type HolderState string
+
+const (
+	// StateIdle: the device is held, no tool call is in flight and no run
+	// is open. A freshly opened session starts here.
+	StateIdle HolderState = "idle"
+	// StateRunning: the device is held and a call is in flight or a run is
+	// open.
+	StateRunning HolderState = "running"
+	// StateReleased: the holder gave the device up after an idle timeout
+	// and remembers which device it had. A Session never reports it,
+	// because a released holder has no Session, so only the host that
+	// owns the lifecycle does.
+	StateReleased HolderState = "released"
+	// StateBorrowed: the holder handed the device to another process and
+	// keeps only a viewer connection. A Session never reports it, for the
+	// same reason as StateReleased.
+	StateBorrowed HolderState = "borrowed"
+	// StateLost: the holder lost the device without choosing to.
+	StateLost HolderState = "lost"
+	// StateClosed: the session was closed by its owner.
+	StateClosed HolderState = "closed"
+)
+
+// Info describes who holds the device and what they are doing. State is
+// the session's own state, set by its owner through SetRunning and
+// SetIdle, so it is the same with or without a lease.
 type Info struct {
 	Device device.Descriptor
 	Holder lease.Holder
-	Role   string
-	State  string
+	State  HolderState
 }
 
 // Viewer reads what a session has captured. It never calls the device,
 // so any number of viewers cost the holder nothing.
 type Viewer interface {
-	// Info reports the holder, its role and its state.
+	// Info reports the device, the holder and its state.
 	Info() Info
 	// Latest returns the newest capture of each kind. The tree has its
 	// secrets masked.

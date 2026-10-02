@@ -46,6 +46,8 @@ type Session struct {
 	mu       sync.Mutex
 	lostErr  error
 	saved    *LaunchState
+	// activity is StateIdle or StateRunning, as the owner last set it.
+	activity HolderState
 
 	relaunched bool
 
@@ -57,8 +59,9 @@ type Session struct {
 func newSession(ctx context.Context, deps Deps, desc device.Descriptor, identity device.Identity, held *lease.Lease, built device.Built, hub *Hub, gate *ActivityGate) *Session {
 	s := &Session{
 		deps: deps, desc: desc, identity: identity, lease: held, built: built, hub: hub, gate: gate,
-		lost:   make(chan struct{}),
-		closed: make(chan struct{}),
+		activity: StateIdle,
+		lost:     make(chan struct{}),
+		closed:   make(chan struct{}),
 	}
 	// The watcher outlives the Open call that started it, so it keeps
 	// ctx's values but not its cancellation.
@@ -147,24 +150,33 @@ func (s *Session) liveLaunchState() LaunchState {
 	return LaunchState{BundleID: bundleID, RunnerID: runnerID}
 }
 
-// SetRunning records in the lease metadata that the holder is working,
-// optionally with an open run, so another process that finds the device
-// held can say why. An empty runID means no run is open.
+// SetRunning marks the holder as working, optionally with an open run.
+// It sets the state Info reports and records it in the lease metadata,
+// so another process that finds the device held can say why. An empty
+// runID means no run is open.
 func (s *Session) SetRunning(runID string) error {
+	s.setActivity(StateRunning)
 	return s.updateHolder(func(h *lease.Holder) {
 		h.IdleSince = nil
 		h.RunID = runID
 	})
 }
 
-// SetIdle records in the lease metadata that the holder has gone idle
-// at the current time.
+// SetIdle marks the holder as idle at the current time, in the state
+// Info reports and in the lease metadata.
 func (s *Session) SetIdle() error {
+	s.setActivity(StateIdle)
 	now := time.UnixMilli(s.deps.Clock.NowMs()).UTC()
 	return s.updateHolder(func(h *lease.Holder) {
 		h.IdleSince = &now
 		h.RunID = ""
 	})
+}
+
+func (s *Session) setActivity(state HolderState) {
+	s.mu.Lock()
+	s.activity = state
+	s.mu.Unlock()
 }
 
 func (s *Session) updateHolder(mutate func(*lease.Holder)) error {

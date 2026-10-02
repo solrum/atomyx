@@ -13,6 +13,7 @@ import (
 	"dev.atomyx/internal/lease"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/session"
+	"dev.atomyx/internal/session/sessiontest"
 	"dev.atomyx/internal/wire"
 )
 
@@ -106,33 +107,82 @@ func TestSession_LatestMasksSecretsWhileTheOrchestraStillSeesThem(t *testing.T) 
 	}
 }
 
-func TestSession_InfoReportsTheHolderRoleAndState(t *testing.T) {
+func TestSession_InfoReportsTheHolderAndTheSessionsOwnState(t *testing.T) {
 	m := newManager(t, clock.SystemClock{})
 	s, err := session.Open(context.Background(), baseDeps(t, device.NewMockDriverFactory(), m), session.Request{Descriptor: androidDesc("A")})
 	if err != nil {
 		t.Fatal(err)
 	}
 	info := s.Info()
-	if info.Role != "cli" || info.Holder.Command != "atomyx run" || info.Device.ID != "A" {
+	if info.Holder.Role != "cli" || info.Holder.Command != "atomyx run" || info.Device.ID != "A" {
 		t.Fatalf("Info() = %+v, want the opener's role, command and device", info)
+	}
+	if info.State != session.StateIdle {
+		t.Fatalf("state = %q, want a freshly opened session to be idle", info.State)
 	}
 	if err := s.SetRunning("run-1"); err != nil {
 		t.Fatal(err)
 	}
-	if got := s.Info().State; got != "running (run open)" {
-		t.Fatalf("state = %q, want %q", got, "running (run open)")
+	if got := s.Info().State; got != session.StateRunning {
+		t.Fatalf("state = %q, want running", got)
 	}
 	if err := s.SetIdle(); err != nil {
 		t.Fatal(err)
 	}
-	if got := s.Info().State; got != "idle" {
+	if got := s.Info().State; got != session.StateIdle {
 		t.Fatalf("state = %q, want idle", got)
 	}
 	if err := s.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if got := s.Info().State; got != "closed" {
+	if got := s.Info().State; got != session.StateClosed {
 		t.Fatalf("state = %q, want closed", got)
+	}
+}
+
+func TestSession_InfoWithoutALeaseDoesNotDefaultToRunning(t *testing.T) {
+	s, _ := openMock(t)
+	if got := s.Info().State; got != session.StateIdle {
+		t.Fatalf("state = %q, want idle for an open session with no lease and no call", got)
+	}
+	if err := s.SetRunning(""); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.Info().State; got != session.StateRunning {
+		t.Fatalf("state = %q, want running after SetRunning with no lease", got)
+	}
+}
+
+// lostMockFactory builds like the mock factory and hands its test the
+// channel the session reads a lost control plane from.
+type lostMockFactory struct{ lost chan error }
+
+func (f lostMockFactory) Build(ctx context.Context, desc device.Descriptor) (device.Built, error) {
+	built, err := device.NewMockDriverFactory().Build(ctx, desc)
+	built.Lost = f.lost
+	return built, err
+}
+
+func (f lostMockFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
+}
+
+func TestSession_InfoReportsLostAndThenClosed(t *testing.T) {
+	lost := make(chan error, 1)
+	s, err := session.Open(context.Background(), session.Deps{Factory: lostMockFactory{lost: lost}}, session.Request{Descriptor: androidDesc("A")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lost <- &device.ProcessExitError{Component: device.LostRunner, Cause: errors.New("signal: killed")}
+	<-s.Lost()
+	if got := s.Info().State; got != session.StateLost {
+		t.Fatalf("state = %q, want lost", got)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.Info().State; got != session.StateClosed {
+		t.Fatalf("state = %q, want closed to win over lost", got)
 	}
 }
 

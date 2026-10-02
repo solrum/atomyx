@@ -16,15 +16,25 @@ func (s *Session) Info() Info {
 	if s.lease != nil {
 		holder = s.lease.Holder()
 	}
-	state := holder.State()
+	return Info{Device: s.desc, Holder: holder, State: s.holderState()}
+}
+
+// holderState reports the session's state. A closed session wins over a
+// lost one, because closing is the owner's last word.
+func (s *Session) holderState() HolderState {
 	select {
 	case <-s.closed:
-		state = "closed"
-	case <-s.lost:
-		state = "lost"
+		return StateClosed
 	default:
 	}
-	return Info{Device: s.desc, Holder: holder, Role: s.deps.Role, State: state}
+	select {
+	case <-s.lost:
+		return StateLost
+	default:
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.activity
 }
 
 // Latest implements Viewer.
