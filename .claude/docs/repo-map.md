@@ -15,7 +15,7 @@ test what you find (see [`development.md`](./development.md)).
 ## TL;DR
 
 The runtime is a single Go module (`dev.atomyx`) under `core/`, with
-five binaries in `core/cmd/` and one package per concern under
+six binaries in `core/cmd/` and one package per concern under
 `core/internal/`. Native platform projects live under `platforms/`.
 `apps/studio` is a separate desktop IDE with its own rules and is out
 of scope for this file.
@@ -60,6 +60,7 @@ atomyx/
 | `core/cmd/atomyx-mcp` | `atomyx-mcp` | The MCP stdio server over the tool surface in `core/internal/mcp`. |
 | `core/cmd/atomyx-runtime` | `atomyx-runtime` | The sidecar: a newline-delimited JSON-RPC bridge over stdin and stdout that drives a real device on a parent process's behalf. |
 | `core/cmd/gen-config-schema` | `gen-config-schema` | Regenerates the checked-in JSON Schema for the project config type from `core/internal/config`'s Go types. |
+| `core/cmd/gen-run-schema` | `gen-run-schema` | Regenerates the checked-in JSON Schema for the run folder `meta.json` from `core/internal/runfolder`'s Go types. |
 | `core/cmd/gen-script-schema` | `gen-script-schema` | Regenerates the checked-in JSON Schema for the script definition type from `core/internal/script`'s Go types. |
 | `core/cmd/internal/runnerprovision` | none | Builds the iOS runner provisioner that `atomyx` and `atomyx-mcp` wire into their driver factory, including where runner records live. |
 | `core/cmd/internal/sessionwire` | none | Builds the lease manager, identity resolver, orphaned runner reaper and session timeouts that `atomyx` and `atomyx-mcp` hand to `session.Open`, so both arbitrate devices the same way. |
@@ -87,6 +88,7 @@ atomyx/
 | `orchestra` | Composes Driver calls into selector resolution, priority broadening, scroll-into-view, obscurement, and retry. |
 | `process` | Abstracts external command execution (adb, xcrun, and similar) behind Runner and BackgroundRunner interfaces, carries extra child environment on the context, and reads process and host start times. |
 | `report` | Renders a run's result into a persisted report bundle: HTML, versioned JSON, and referenced screenshots. |
+| `runfolder` | Defines the run folder contract: the layout names, the `meta.json` record with its result and outcome enums, the legacy status mapping, and the generated JSON Schema. Depends on the standard library only. |
 | `runner` | Defines the command execution contract and the ScriptRunner that dispatches a parsed script's steps. |
 | `scenario` | Runs ordered groups of scripts and ordered sets of scripts or scenarios against a shared Orchestra. |
 | `script` | Owns the test-script schema, parser, and expression engine. |
@@ -109,8 +111,10 @@ Dev tooling `make -C core check` runs (see
 `core/scripts/check-no-raw-syscall-open.sh` (rejects a bare
 `syscall.Open(` or `unix.Open(` outside `core/internal/lease`),
 `core/scripts/check-sessiontest-imports.sh` (rejects a non-test file
-that imports `core/internal/session/sessiontest`), and
-`core/scripts/check-schema-fresh.sh` (the schema-freshness gate), plus
+that imports `core/internal/session/sessiontest`),
+`core/scripts/check-runfolder-layout.sh` (rejects a quoted run folder
+layout name outside `core/internal/runfolder`, with an allowlist of
+files not yet moved onto it), and `core/scripts/check-schema-fresh.sh` (the schema-freshness gate), plus
 their allowlist files.
 
 ## `platforms/`

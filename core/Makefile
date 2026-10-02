@@ -66,10 +66,11 @@ release:
 
 # Regenerate the checked-in JSON Schema files from the Go types that
 # define them. Run after any change to internal/script's or
-# internal/config's field or schema-generation types.
+# internal/config's or internal/runfolder's field or schema-generation types.
 gen-schema:
 	go run ./cmd/gen-script-schema -out internal/script/atomyx-script.schema.json
 	go run ./cmd/gen-config-schema -out internal/config/atomyx-config.schema.json
+	go run ./cmd/gen-run-schema -out internal/runfolder/atomyx-run.schema.json
 
 # Fail when the committed JSON Schema files no longer match the Go
 # structs they are generated from. Run this before trusting a schema
@@ -79,7 +80,7 @@ check-schema:
 
 # The full local gate for the core module: format, build, vet, the
 # layer-import gate, the lint gate, the comment gate, the raw-open
-# gate, the schema freshness gate, and the race-enabled test suite, in
+# gate, the run folder layout gate, the schema freshness gate, and the race-enabled test suite, in
 # that order, each one failing the target the moment it fails.
 # go-arch-lint and golangci-lint must already be on PATH (see CONTRIBUTING.md for the
 # install commands); golangci-lint must be v2.13.2, the version this
@@ -103,6 +104,8 @@ check:
 	bash scripts/check-no-raw-syscall-open.sh
 	@echo "Session test-helper import gate ..."
 	bash scripts/check-sessiontest-imports.sh
+	@echo "Run folder layout gate ..."
+	bash scripts/check-runfolder-layout.sh
 	@echo "Schema freshness gate ..."
 	bash scripts/check-schema-fresh.sh
 	@echo "Test ..."

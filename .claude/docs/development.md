@@ -18,7 +18,7 @@ document here.
 ## TL;DR
 
 ```bash
-cd core && make build          # builds all five binaries into core/bin/
+cd core && make build          # builds all six binaries into core/bin/
 cd core && go test ./...       # unit and conformance tests
 ```
 
@@ -32,7 +32,8 @@ From `core/`:
 
 ```bash
 make build          # go build into core/bin/: atomyx, atomyx-mcp,
-                     # atomyx-runtime, gen-config-schema, gen-script-schema
+                     # atomyx-runtime, gen-config-schema, gen-run-schema,
+                     # gen-script-schema
 make test           # go test ./...
 ```
 
@@ -54,6 +55,7 @@ the repo-wide lints alongside it, runs these steps in order:
 | Comment gate | `bash scripts/check-comments.sh` |
 | Raw syscall.Open gate | `bash scripts/check-no-raw-syscall-open.sh` |
 | Session test-helper import gate | `bash scripts/check-sessiontest-imports.sh` |
+| Run folder layout gate | `bash scripts/check-runfolder-layout.sh` |
 | Schema freshness gate | `bash scripts/check-schema-fresh.sh` |
 | Test | `go test -race ./...` |
 
@@ -62,19 +64,23 @@ The layer-import gate reads `core/.go-arch-lint.yml`. See
 The comment gate forbids two things in production Go source:
 comments that anchor current behavior to a superseded implementation,
 and prose that uses a banned punctuation mark as a stand-in for a
-connecting word. The schema-freshness gate confirms the two
-committed JSON Schema files still match the Go structs that generate
+connecting word. The run folder layout gate rejects the names `runs`, `v1`,
+`artifacts`, `report`, and `screenshots` as quoted path segments in
+production Go outside `core/internal/runfolder`. The schema-freshness
+gate confirms the committed JSON Schema files still match the Go structs that generate
 them.
 
 ## Regenerating the JSON Schema files
 
 Run after any change to a field or schema-generation type in
-`core/internal/script` or `core/internal/config`:
+`core/internal/script`, `core/internal/config`, or
+`core/internal/runfolder`:
 
 ```bash
 cd core
 make gen-schema      # writes internal/script/atomyx-script.schema.json
-                      # and internal/config/atomyx-config.schema.json
+                      # internal/config/atomyx-config.schema.json,
+                      # and internal/runfolder/atomyx-run.schema.json
 make check-schema     # fails if the committed files no longer match
 ```
 

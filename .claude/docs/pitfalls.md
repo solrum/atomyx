@@ -217,6 +217,27 @@ corresponding area. For the high-level map see
   The runner recovers it as an interrupted step without an error log, and
   only a panic while the run's context is still live is logged.
 
+## Run folder layout
+
+- **Never spell a layout name outside `core/internal/runfolder`.** The
+  names `runs`, `v1`, `artifacts`, `report`, and `screenshots` are the
+  on-disk contract of a run folder. Call `runfolder.RunDir`,
+  `ArtifactsDir`, `ReportDir`, or `LooseScreenshotsDir` instead.
+  `core/scripts/check-runfolder-layout.sh` flags a quoted name used as
+  a call argument, as a whole assignment value, inside a join with
+  `report`, inside a slashed path such as `"runs/v1"`, or in a link
+  format such as `screenshots/%s`. Struct tags, config keys, and
+  index expressions are not flagged. The gate carries an explicit
+  allowlist of files that still spell a name. Remove an entry when its
+  file moves onto `runfolder`, and never add one for new code.
+- **A new field in `meta.json` needs a schema regeneration.** Change
+  the `runfolder` types, then run `make -C core gen-schema`. The
+  schema-freshness gate fails on a stale `atomyx-run.schema.json`.
+- **A reshaped field breaks external readers.** Studio and run-folder
+  consumers parse `meta.json` with unknown fields ignored, so adding a
+  field is safe and renaming or retyping one is not. Treat that as a
+  breaking change that needs an ADR.
+
 ## Tool layer (cross-platform)
 
 - **Never branch on the session's platform inside a tool handler.**

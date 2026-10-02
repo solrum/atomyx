@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "runId": "20261002-101500-pixel-7-a1b2",
+  "kind": "script",
+  "scriptPath": "flows/login.yml",
+  "scriptName": "login",
+  "deviceId": "emulator-5554",
+  "device": {
+    "platform": "android",
+    "kind": "emulator",
+    "hardwareId": "hw-1",
+    "name": "Pixel 7"
+  },
+  "host": {
+    "atomyxVersion": "0.1.0",
+    "agentVersion": "0.1.0"
+  },
+  "startedAt": 1790000000000,
+  "completedAt": 1790000005000,
+  "result": "failed",
+  "outcome": "error",
+  "failedAtStep": 3,
+  "totalSteps": 9,
+  "mcp": {
+    "name": "smoke",
+    "source": "mcp",
+    "actionCount": 4,
+    "findings": [
+      {
+        "id": "b1",
+        "title": "t",
+        "description": "d",
+        "timestamp": 1790000001000
+      }
+    ],
+    "summary": "done",
+    "durationMs": 5000
+  }
+}

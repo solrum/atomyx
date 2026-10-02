@@ -1,0 +1,191 @@
+{
+  "$id": "https://schemas.atomyx.dev/run.schema.json",
+  "$ref": "#/definitions/RunMeta",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "Device": {
+      "additionalProperties": true,
+      "properties": {
+        "hardwareId": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "platform"
+      ],
+      "type": "object"
+    },
+    "Finding": {
+      "additionalProperties": true,
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "screenshotPath": {
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "Epoch milliseconds.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "description",
+        "timestamp"
+      ],
+      "type": "object"
+    },
+    "Host": {
+      "additionalProperties": true,
+      "properties": {
+        "agentVersion": {
+          "type": "string"
+        },
+        "atomyxVersion": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "MCPInfo": {
+      "additionalProperties": true,
+      "properties": {
+        "actionCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "durationMs": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "findings": {
+          "items": {
+            "$ref": "#/definitions/Finding"
+          },
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "source",
+        "actionCount",
+        "findings",
+        "durationMs"
+      ],
+      "type": "object"
+    },
+    "RunMeta": {
+      "additionalProperties": true,
+      "properties": {
+        "completedAt": {
+          "description": "Epoch milliseconds when the run finished. Absent for a run that never finished.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "device": {
+          "$ref": "#/definitions/Device"
+        },
+        "deviceId": {
+          "type": "string"
+        },
+        "failedAtStep": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "host": {
+          "$ref": "#/definitions/Host"
+        },
+        "kind": {
+          "description": "What started the run.",
+          "enum": [
+            "script",
+            "suite",
+            "mcp"
+          ],
+          "type": "string"
+        },
+        "mcp": {
+          "$ref": "#/definitions/MCPInfo"
+        },
+        "outcome": {
+          "description": "Precise reason the run ended.",
+          "enum": [
+            "passed",
+            "failed",
+            "error",
+            "cancelled",
+            "deviceLost",
+            "interrupted"
+          ],
+          "type": "string"
+        },
+        "result": {
+          "description": "Coarse verdict.",
+          "enum": [
+            "passed",
+            "failed",
+            "cancelled"
+          ],
+          "type": "string"
+        },
+        "runId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "schemaVersion": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "scriptName": {
+          "type": "string"
+        },
+        "scriptPath": {
+          "type": "string"
+        },
+        "startedAt": {
+          "description": "Epoch milliseconds when the run started.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "totalSteps": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "runId",
+        "kind",
+        "startedAt"
+      ],
+      "type": "object"
+    }
+  }
+}
