@@ -80,3 +80,23 @@ func parseAllocatedPort(stdout string) (int, error) {
 	}
 	return port, nil
 }
+
+// ForwardHostPort returns the host port that reaches devicePort on
+// serial. A forward adb already holds for that serial and device port
+// is reused, and otherwise adb allocates a fresh host port, so no
+// device is tied to a fixed host port another device could claim.
+func ForwardHostPort(ctx context.Context, proc process.Runner, serial string, devicePort int) (int, error) {
+	remote := fmt.Sprintf("tcp:%d", devicePort)
+	forwards, err := listAdbForwards(ctx, proc)
+	if err != nil {
+		return 0, fmt.Errorf("androiddriver: adb forward --list: %w", err)
+	}
+	if port, found := findSerialForward(forwards, serial, remote); found {
+		return port, nil
+	}
+	result, err := proc.Run(ctx, "adb", "-s", serial, "forward", "tcp:0", remote)
+	if err != nil {
+		return 0, fmt.Errorf("androiddriver: adb forward tcp:0: %w", err)
+	}
+	return parseAllocatedPort(result.Stdout)
+}

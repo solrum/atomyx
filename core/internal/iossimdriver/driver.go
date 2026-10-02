@@ -326,3 +326,15 @@ func (d *IosSimDriver) DeviceInfo(ctx context.Context) (driver.DeviceInfo, error
 func (d *IosSimDriver) ScreenSize(ctx context.Context) (wire.Size, error) {
 	return d.delegate.ScreenSize(ctx)
 }
+
+// LaunchedApp reports the app the underlying runner driver last
+// launched and the launch identifier of the runner it is connected to.
+func (d *IosSimDriver) LaunchedApp() (bundleID, runnerID string) {
+	return d.delegate.LaunchedApp()
+}
+
+// RestoreLaunchedApp seeds the underlying runner driver's tracked app
+// when the connected runner is the same instance that launched it.
+func (d *IosSimDriver) RestoreLaunchedApp(bundleID, fromRunnerID string) bool {
+	return d.delegate.RestoreLaunchedApp(bundleID, fromRunnerID)
+}

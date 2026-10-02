@@ -228,7 +228,12 @@ Build and run layout, both under `platforms/ios-agent/build`:
 - One shared build. `xcodebuild build-for-testing` runs under an
   exclusive lock on `build/.build.lock`. The decision to build is taken
   after the lock is held, so launches that start together build once and
-  the others find the product current.
+  the others find the product current. The `make` build and test targets
+  in `platforms/ios-agent` run their `xcodebuild` step under the same
+  lock through `perl`'s `flock`, so a manual build and a launcher never
+  compile into the directory together. The build stamp on the product is
+  the time the build started, so a source edited during a build still
+  reads as newer than the product.
 - One run directory per target, `build/run-<udid>`. Each target runs
   `xcodebuild test-without-building -xctestrun <file from the shared
   build>` with that directory as its `-derivedDataPath` and a result
@@ -248,12 +253,14 @@ Build and run layout, both under `platforms/ios-agent/build`:
 
 | Field | Meaning |
 |---|---|
+| `udid` | Simulator or device the runner was launched for |
+| `kind` | `simulator` or `device` |
 | `runnerId` | Launch identifier the runner echoes in `ping` |
 | `hostPort` | Host port the runner or its tunnel answers on |
 | `pid` | Process id of the `xcodebuild` process |
 | `pgid` | Process group id, equal to `pid` because the runner leads its own group |
-| `processStartTime` | Start time of that process, to the second, in UTC |
-| `hostBootTime` | Host boot time, to the second, in UTC |
+| `processStartTime` | Start time of that process, read from the kernel, in UTC |
+| `hostBootTime` | Host boot time, read from the kernel, in UTC |
 | `startedAt` | Time the record was written, in UTC |
 
 `kill` removes the file only while it still names its own `runnerId`. A
@@ -261,6 +268,34 @@ record that survives means the launching process ended without stopping
 its runner. The same `pid` after a reboot or after the process ended can
 name an unrelated process, so a reader trusts it only when
 `processStartTime` and `hostBootTime` still match.
+
+#### Orphan reaping
+
+`session.Open` reads the record after it has acquired the device lease,
+because a free lease proves the process that wrote the record is gone.
+`device.RunnerReaper` then ends the orphan. It reads the process through
+`process.Inspector`, which asks the kernel for the pid's start time,
+user, command name and process group, and it signals the recorded group
+only when all of these hold:
+
+- The record decodes, names the device being opened, and carries a
+  `udid` and a `kind`. Any other record is deleted without signaling.
+- The host boot time matches the recorded one within five seconds. The
+  kernel boot time moves when the wall clock is stepped, so a larger
+  difference means a reboot and the record is deleted.
+- The pid is alive, its start time matches within two seconds, its user
+  is the current user, and its command is `xcodebuild`.
+- The process group is greater than 1, differs from the reaper's own, and
+  is the group the live process belongs to.
+
+The group receives `SIGTERM`, then `SIGKILL` after the shutdown grace
+period. A simulator runner app runs under the simulator's own launchd, so
+it sits outside the `xcodebuild` group. After the group is gone the
+reaper pings the recorded `hostPort`, and a runner that still answers
+with the recorded `runnerId` is ended with `xcrun simctl terminate`. A
+runner that survives that is reported in the log and the record stays for
+the next acquirer. A physical device runner has no such survivor, and the
+`iproxy` tunnel of a killed process is not part of the record.
 
 ### Runner identity and port
 

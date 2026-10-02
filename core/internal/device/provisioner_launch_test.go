@@ -20,9 +20,12 @@ import (
 
 const (
 	testRunnerPidBase = 9100
-	testPsStartTime   = "Thu Oct  2 10:15:02 2026"
 	testBootSeconds   = 1759372800
 )
+
+// testProcessStart is the start time the fixture's inspector reports for
+// every launched runner process.
+var testProcessStart = time.Date(2026, time.October, 2, 10, 15, 2, 0, time.UTC)
 
 // runnerFarm is a process.BackgroundRunner that models the processes a
 // launch starts. A started xcodebuild records the environment the
@@ -38,6 +41,12 @@ type runnerFarm struct {
 	procs       []*farmProcess
 	runnerEnv   []string
 	nextPid     int
+	// inspector, when set, learns every started process so a record of it
+	// can read its start time.
+	inspector *process.FakeInspector
+	// exitFirstRunners makes the first N started runners exit at once with
+	// status 65, modeling a runner that lost the race for its port.
+	exitFirstRunners int
 }
 
 type farmProcess struct {
@@ -71,6 +80,9 @@ func (f *runnerFarm) Start(ctx context.Context, name string, args ...string) (pr
 
 	proc := &farmProcess{FakeBackgroundProcess: process.NewFakeBackgroundProcess(), name: name}
 	proc.SetPid(pid)
+	if f.inspector != nil {
+		f.inspector.Set(process.ProcessInfo{PID: pid, PGID: pid, Command: name, StartTime: testProcessStart})
+	}
 	switch name {
 	case "iproxy":
 		hostPort, _, _ := strings.Cut(args[0], ":")
@@ -82,7 +94,15 @@ func (f *runnerFarm) Start(ctx context.Context, name string, args ...string) (pr
 		go serveIdentity(listener, identityFieldsOf(runnerEnv))
 		f.t.Cleanup(func() { _ = listener.Close() })
 	case "xcodebuild":
-		if envOf(runnerEnv, "TEST_RUNNER_ATOMYX_TARGET_UDID") == "" {
+		f.mu.Lock()
+		exitEarly := f.exitFirstRunners > 0
+		if exitEarly {
+			f.exitFirstRunners--
+		}
+		f.mu.Unlock()
+		if exitEarly {
+			proc.Exit(65)
+		} else if envOf(runnerEnv, "TEST_RUNNER_ATOMYX_TARGET_UDID") == "" {
 			port := envOf(runnerEnv, "TEST_RUNNER_ATOMYX_PORT")
 			listener, err := new(net.ListenConfig).Listen(ctx, "tcp", "127.0.0.1:"+port)
 			if err != nil {
@@ -175,6 +195,7 @@ type launchFixture struct {
 	stateDir   string
 	runner     *process.Fake
 	farm       *runnerFarm
+	inspector  *process.FakeInspector
 }
 
 func newLaunchFixture(t *testing.T) *launchFixture {
@@ -198,15 +219,15 @@ func newLaunchFixture(t *testing.T) *launchFixture {
 		}
 	}
 	runner := process.NewFake()
-	runner.Stub(func(name string, _ []string) bool { return name == "ps" }, process.Result{Stdout: testPsStartTime + "\n"}, nil)
-	runner.Stub(func(name string, _ []string) bool { return name == "sysctl" },
-		process.Result{Stdout: fmt.Sprintf("{ sec = %d, usec = 5 } Thu Oct  2 07:20:00 2026\n", testBootSeconds)}, nil)
-	return &launchFixture{projectDir: projectDir, stateDir: t.TempDir(), runner: runner, farm: newRunnerFarm(t)}
+	inspector := process.NewFakeInspector(time.Unix(testBootSeconds, 0).UTC())
+	farm := newRunnerFarm(t)
+	farm.inspector = inspector
+	return &launchFixture{projectDir: projectDir, stateDir: t.TempDir(), runner: runner, farm: farm, inspector: inspector}
 }
 
 func (f *launchFixture) provisioner(logger logging.Logger) *DriverProvisioner {
 	return NewDriverProvisioner(DriverProvisionerDeps{
-		Runner: f.runner, Background: f.farm, Clock: instantClock{},
+		Runner: f.runner, Background: f.farm, Clock: instantClock{}, Inspector: f.inspector,
 		IosProjectDir: f.projectDir, IosDevTeam: "TEAM123", Logger: logger,
 		RunnerStateDir: f.stateDir,
 		RunnerStateKey: func(udid string) string { return "key-" + udid },
@@ -255,15 +276,16 @@ func TestDriverProvisioner_EnsureIOSAgent_Simulator_LaunchesOnAReservedPortAndRe
 	}
 	wantPid := testRunnerPidBase + 1
 	want := RunnerState{
+		UDID: "SIM-1", Kind: "simulator",
 		RunnerID: runnerID, HostPort: port, Pid: wantPid, Pgid: wantPid,
-		ProcessStartTime: time.Date(2026, time.October, 2, 10, 15, 2, 0, time.Local).UTC(),
+		ProcessStartTime: testProcessStart,
 		HostBootTime:     time.Unix(testBootSeconds, 0).UTC(),
 		StartedAt:        fixedNow,
 	}
 	if !state.ProcessStartTime.Equal(want.ProcessStartTime) || !state.HostBootTime.Equal(want.HostBootTime) || !state.StartedAt.Equal(want.StartedAt) {
 		t.Errorf("recorded times = %+v, want %+v", state, want)
 	}
-	if state.RunnerID != want.RunnerID || state.HostPort != want.HostPort || state.Pid != want.Pid || state.Pgid != want.Pgid {
+	if state.UDID != want.UDID || state.Kind != want.Kind || state.RunnerID != want.RunnerID || state.HostPort != want.HostPort || state.Pid != want.Pid || state.Pgid != want.Pgid {
 		t.Errorf("record = %+v, want %+v", state, want)
 	}
 	if info, err := os.Stat(fx.statePath("SIM-1")); err != nil || info.Mode().Perm() != 0o600 {
@@ -368,11 +390,6 @@ func TestDriverProvisioner_EnsureIOSAgent_WithoutAStateDirectoryWritesNoRecord(t
 	if len(entries) != 0 {
 		t.Errorf("state directory holds %v, want nothing", entries)
 	}
-	for _, inv := range fx.runner.Invocations() {
-		if inv.Name == "ps" || inv.Name == "sysctl" {
-			t.Errorf("ran %s without a state directory, want no host identity queries", inv.Name)
-		}
-	}
 }
 
 func TestDriverProvisioner_Kill_KeepsTheRecordOfALaterRunner(t *testing.T) {
@@ -463,7 +480,7 @@ func TestDriverProvisioner_ReservePort_NeverHandsOutAHeldPort(t *testing.T) {
 	if first != 40001 || second != 40002 {
 		t.Fatalf("reserved %d then %d, want 40001 then 40002 because the kernel re-offered a held port", first, second)
 	}
-	p.releasePorts([]int{first})
+	p.releasePorts(first)
 	again := []int{40001}
 	p.freePort = func() (int, error) { return again[0], nil }
 	if got, err := p.reservePort(); err != nil || got != 40001 {
@@ -525,5 +542,112 @@ func TestDriverProvisioner_EnsureIOSAgent_DeviceWithoutDevTeamReturnsTheSigningR
 	}
 	if got := fx.farm.Invocations(); len(got) != 0 {
 		t.Fatalf("background starts = %+v, want nothing launched without a development team", got)
+	}
+}
+
+func freeLoopbackPort(t *testing.T) int {
+	t.Helper()
+	port, err := operatingSystemFreePort()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return port
+}
+
+func TestDriverProvisioner_Kill_RunsItsWorkOnceSoALaterLaunchKeepsItsPort(t *testing.T) {
+	fx := newLaunchFixture(t)
+	p := fx.provisioner(nil)
+	shared := freeLoopbackPort(t)
+	p.freePort = func() (int, error) { return shared, nil }
+
+	_, killFirst, err := p.EnsureIOSAgent(context.Background(), "SIM-1", IosAgentKindSimulator)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := killFirst(); err != nil {
+		t.Fatal(err)
+	}
+	_, killSecond, err := p.EnsureIOSAgent(context.Background(), "SIM-1", IosAgentKindSimulator)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = killSecond() }()
+
+	if err := killFirst(); err != nil {
+		t.Fatalf("second kill() error = %v", err)
+	}
+
+	p.mu.Lock()
+	_, stillHeld := p.reserved[shared]
+	p.mu.Unlock()
+	if !stillHeld {
+		t.Fatal("a repeated kill() released the port a later launch holds")
+	}
+}
+
+func TestDriverProvisioner_EnsureIOSAgent_AFailedAttemptsPortIsFreeBeforeTheNextAllocation(t *testing.T) {
+	fx := newLaunchFixture(t)
+	fx.farm.exitFirstRunners = 1
+	p := fx.provisioner(nil)
+	first, second := freeLoopbackPort(t), freeLoopbackPort(t)
+	ports := []int{first, second}
+	var heldAtSecondAllocation bool
+	calls := 0
+	p.freePort = func() (int, error) {
+		port := ports[calls]
+		calls++
+		if calls == 2 {
+			p.mu.Lock()
+			_, heldAtSecondAllocation = p.reserved[first]
+			p.mu.Unlock()
+		}
+		return port, nil
+	}
+
+	port, kill, err := p.EnsureIOSAgent(context.Background(), "SIM-1", IosAgentKindSimulator)
+	if err != nil {
+		t.Fatalf("EnsureIOSAgent() error = %v, want the retry to succeed", err)
+	}
+	defer func() { _ = kill() }()
+
+	if port != second {
+		t.Fatalf("port = %d, want the second attempt's %d", port, second)
+	}
+	if heldAtSecondAllocation {
+		t.Error("the failed first attempt's port was still reserved when the second attempt allocated")
+	}
+	p.mu.Lock()
+	held := len(p.reserved)
+	p.mu.Unlock()
+	if held != 1 {
+		t.Errorf("reserved ports = %d, want only the live runner's port", held)
+	}
+}
+
+func TestDriverProvisioner_EnsureAndroidAgent_ForwardsEachSerialToItsOwnAllocatedHostPort(t *testing.T) {
+	runner := process.NewFake()
+	runner.Stub(process.ExactMatch("adb", "-s", "A", "forward", "tcp:0", "tcp:8765"), process.Result{Stdout: "41001\n"}, nil)
+	runner.Stub(process.ExactMatch("adb", "-s", "B", "forward", "tcp:0", "tcp:8765"), process.Result{Stdout: "41002\n"}, nil)
+	p := NewDriverProvisioner(DriverProvisionerDeps{
+		Runner: runner, Background: process.NewFakeBackground(), Clock: instantClock{},
+		AndroidAPKPath: filepath.Join(t.TempDir(), "missing.apk"),
+	})
+
+	// The launch fails at the missing APK, after the forward is made.
+	_ = p.EnsureAndroidAgent(context.Background(), "A")
+	_ = p.EnsureAndroidAgent(context.Background(), "B")
+
+	var forwards []string
+	for _, inv := range runner.Invocations() {
+		if len(inv.Args) >= 4 && inv.Args[2] == "forward" && inv.Args[3] != "--list" {
+			forwards = append(forwards, strings.Join(inv.Args, " "))
+		}
+	}
+	want := []string{
+		"-s A forward tcp:0 tcp:8765", "-s A forward tcp:41001 tcp:8765",
+		"-s B forward tcp:0 tcp:8765", "-s B forward tcp:41002 tcp:8765",
+	}
+	if strings.Join(forwards, "|") != strings.Join(want, "|") {
+		t.Fatalf("forwards = %v, want %v, so no serial shares a fixed host port", forwards, want)
 	}
 }

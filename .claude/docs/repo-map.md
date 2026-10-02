@@ -72,7 +72,7 @@ atomyx/
 | `clock` | Time-source abstraction every polling loop, timeout, and retry uses instead of calling the standard library directly. |
 | `config` | Owns the project config schema, its file-discovery and YAML loader, schema validation, and environment reference resolution. |
 | `conformance` | Drives the Go runtime's implementation of an operation and asserts its output against a frozen golden fixture. |
-| `device` | Discovers reachable Android and iOS devices and builds a live Driver plus Orchestra pair for whichever one a caller selects. For an iOS target it launches the runner through a provisioner and ties the runner's lifetime to the driver. |
+| `device` | Discovers reachable Android and iOS devices and builds a live Driver plus Orchestra pair for whichever one a caller selects. For an iOS target it launches the runner through a provisioner and ties the runner's lifetime to the driver, and it ends a runner a crashed process left behind. |
 | `diag` | Defines the stable error-code taxonomy every user-facing surface reports a failure through. |
 | `driver` | Defines the platform-neutral Driver contract every concrete adapter implements. |
 | `core/internal/driver/drivertest` | The Driver contract suite: table-driven invariant tests any implementer must satisfy. |
@@ -90,6 +90,7 @@ atomyx/
 | `scenario` | Runs ordered groups of scripts and ordered sets of scripts or scenarios against a shared Orchestra. |
 | `script` | Owns the test-script schema, parser, and expression engine. |
 | `core/internal/script/expression` | Implements the test-script expression language: tokenizing, parsing, and evaluating. |
+| `session` | Opens a device for one process: identity, lease, orphaned runner reaping, then the driver, and the owner's lifecycle of the result. |
 | `sidecar` | Implements the host-side control process: a JSON-RPC bridge, method dispatcher, session, and event bus. |
 | `skills` | Embeds and copies the Atomyx skill and agent markdown files a consumer project installs. |
 | `storage` | Persistence primitives the MCP tool layer builds on: a JSON and markdown record store plus the in-flight run tracker. |

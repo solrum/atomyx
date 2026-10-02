@@ -24,15 +24,15 @@ const (
 	// a long-lived holder.
 	InodeRecheckPeriod = 5 * time.Second
 
-	// acquireRetryWindow is how long an acquirer keeps retrying a
+	// AcquireRetryWindow is how long an acquirer keeps retrying a
 	// contended flock before reporting a conflict. A process that is
 	// mid-acquire or about to exit can hold the flock for a few
 	// milliseconds without being a genuine conflict.
-	acquireRetryWindow = 200 * time.Millisecond
+	AcquireRetryWindow = 200 * time.Millisecond
 
-	// acquirePollInterval is the pause between flock attempts inside the
+	// AcquirePollInterval is the pause between flock attempts inside the
 	// retry window.
-	acquirePollInterval = 25 * time.Millisecond
+	AcquirePollInterval = 25 * time.Millisecond
 
 	// maxAcquireAttempts bounds how many times acquire restarts after
 	// finding the lock file replaced.
@@ -152,7 +152,7 @@ func (m *Manager) lockFile(ctx context.Context, path string) (*os.File, error) {
 }
 
 func (m *Manager) flockWithRetry(ctx context.Context, f *os.File) error {
-	deadline := m.clock.NowMs() + acquireRetryWindow.Milliseconds()
+	deadline := m.clock.NowMs() + AcquireRetryWindow.Milliseconds()
 	for {
 		err := flock(f, syscall.LOCK_EX|syscall.LOCK_NB)
 		if err == nil {
@@ -164,7 +164,7 @@ func (m *Manager) flockWithRetry(ctx context.Context, f *os.File) error {
 		if m.clock.NowMs() >= deadline {
 			return err
 		}
-		if err := m.clock.Sleep(ctx, acquirePollInterval.Milliseconds()); err != nil {
+		if err := m.clock.Sleep(ctx, AcquirePollInterval.Milliseconds()); err != nil {
 			return err
 		}
 	}

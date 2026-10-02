@@ -51,6 +51,7 @@ flowchart TB
     runner["runner (step handlers)"]
     scenario["scenario (script and suite sequencing)"]
     device["device (probe + factory)"]
+    session["session (Open: identity, lease, driver)"]
 
     mcp["mcp (MCP server)"]
     cli["cli (atomyx binary)"]
@@ -77,6 +78,10 @@ flowchart TB
     iosdriver --> device
     iossimdriver --> device
     orchestra --> device
+    device --> session
+    lease --> session
+    session --> cli
+    session --> mcp
 
     orchestra --> mcp
     runner --> mcp
@@ -284,6 +289,48 @@ queries with no side effect on the device:
 import `device`, so the caller resolves the identity first and passes
 the key down.
 
+## Session ownership
+
+`core/internal/session` is the one path by which a process takes a
+device. `session.Open(ctx, deps, req)` does these steps in this order:
+
+1. Resolves the canonical identity through `device.IdentityResolver`.
+   An identity failure returns a coded error before any lease is taken:
+   an unauthorized, offline or unavailable Android device is
+   `AGENT_UNREACHABLE` with a remedy for that state, and a device that
+   exposes no usable identity is `DEVICE_NOT_FOUND`.
+2. Acquires the lease for that identity. A conflict is `DEVICE_HELD`,
+   or `DEVICE_RELEASED_HELD` when the request is a `Reacquire`, and in
+   both cases no driver is built.
+3. For an iOS target, ends an orphaned runner a crashed earlier holder
+   left behind, through `device.RunnerReaper`. This runs only after the
+   lease is held, because that is what proves the previous holder is
+   gone. A failure to end the orphan is logged and does not block the
+   open.
+4. Builds the driver through `device.Factory`, with the device tagged on
+   the context through `logging.WithDevice` so every log line from the
+   driver carries `deviceId` and `hardwareId`.
+5. Offers the previous driver's launched-app state to the new driver.
+   The iOS drivers apply it only when the runner they reached reports the
+   same launch id as the one that launched the app.
+
+The returned `Session` owns the lease, the driver and a goroutine that
+runs `Lease.Watch`. A replaced lock file that cannot be re-acquired
+closes `Session.Lost()`. `Session.Close` stops the watcher, disconnects
+the driver within the shared shutdown grace period, which also stops a
+runner the factory launched, and then releases the lease. The lock-file
+metadata follows the holder through `SetRunning` and `SetIdle`, so a
+second process that finds the device held can report why.
+
+The CLI commands `run`, `suite` and `doctor` and the MCP server's device
+selection all go through `session.Open`. A nil `Deps.Leases` disables
+exclusion for a single-process host such as a test, and every production
+composition root sets it.
+
+`session` may depend on `device`, `lease`, `diag`, `orchestra`, `driver`,
+`shutdown` and the common leaves. It never imports `mcp`, `cli` or
+`inspector`.
+
 ## Dependency direction and its enforcement
 
 Dependency direction across every package under `core/internal/` is
@@ -302,6 +349,9 @@ The shape the config encodes:
   own doc comments.
 - **`transport`** may depend only on `wire` and `diag`.
 - **`lease`** may depend only on `diag` and the common leaves.
+- **`session`** may depend on `device`, `lease`, `orchestra`, `driver`,
+  `diag` and `shutdown`. `cli` and `mcp` may depend on `session`, and it
+  may not depend on either of them.
 - **`driver`** may depend only on `wire` and `transport`. The three
   concrete implementers (`androiddriver`, `iosdriver`,
   `iossimdriver`) may depend on `driver`, `transport`, `process`, and

@@ -112,6 +112,9 @@ type IosDriver struct {
 
 	capabilities         driver.Capabilities
 	lastLaunchedBundleID string
+	// connectedRunnerID is the launch identifier the runner reported in
+	// the ping that completed Connect. Empty when the runner reports none.
+	connectedRunnerID string
 
 	iproxyStop func()
 
@@ -165,6 +168,7 @@ type pingCapabilities struct {
 
 type pingResponse struct {
 	Capabilities pingCapabilities `json:"capabilities"`
+	RunnerID     string           `json:"runnerId"`
 }
 
 // Connect opens the transport and verifies the runner is live via a
@@ -189,6 +193,7 @@ func (d *IosDriver) Connect(ctx context.Context) error {
 		return err
 	}
 	d.lastLaunchedBundleID = ""
+	d.connectedRunnerID = ""
 	if d.opts.Kind == KindDevice && !d.opts.ExternalTunnel {
 		if err := d.launchIproxy(ctx); err != nil {
 			return diag.New(diag.CodeAgentUnreachable,
@@ -209,7 +214,30 @@ func (d *IosDriver) Connect(ctx context.Context) error {
 	}
 	d.capabilities.CanMultiPointer = pong.Capabilities.CanMultiPointer
 	d.capabilities.CanPressure = pong.Capabilities.CanPressure
+	d.connectedRunnerID = pong.RunnerID
 	return nil
+}
+
+// LaunchedApp reports the bundle id of the app this driver last
+// launched or saw in front, and the launch identifier of the runner
+// the driver is connected to. Either value is empty when unknown.
+func (d *IosDriver) LaunchedApp() (bundleID, runnerID string) {
+	return d.lastLaunchedBundleID, d.connectedRunnerID
+}
+
+// RestoreLaunchedApp seeds the launch-tracked bundle id from an earlier
+// driver, and reports whether it did. It applies the value only when
+// the runner this driver connected to is the same runner instance that
+// launched the app, which it confirms by the runner's launch
+// identifier: a runner that reports none, or a different one, proves
+// nothing about the app, so the tracked state stays empty and the next
+// launch dispatches normally.
+func (d *IosDriver) RestoreLaunchedApp(bundleID, fromRunnerID string) bool {
+	if bundleID == "" || fromRunnerID == "" || d.connectedRunnerID != fromRunnerID {
+		return false
+	}
+	d.lastLaunchedBundleID = bundleID
+	return true
 }
 
 // Disconnect closes the transport, stops the iproxy tunnel if one was

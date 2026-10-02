@@ -24,7 +24,12 @@ const runnerStateFileMode = 0o600
 // leads its own process group, so the two are equal. ProcessStartTime
 // and HostBootTime let a later reader confirm a live pid is still the
 // process recorded here and not an unrelated one that reused the pid.
+// UDID and Kind name the target the runner was launched for, so a
+// reader can tell a record that belongs to its device from one that
+// does not.
 type RunnerState struct {
+	UDID             string    `json:"udid"`
+	Kind             string    `json:"kind"`
 	RunnerID         string    `json:"runnerId"`
 	HostPort         int       `json:"hostPort"`
 	Pid              int       `json:"pid"`

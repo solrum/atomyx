@@ -98,8 +98,8 @@ func TestAcquire_RetriesAContendedFlockForTheRetryWindowBeforeConflict(t *testin
 	if _, err := m.Acquire(context.Background(), key, testHolder(2, "b")); err == nil {
 		t.Fatal("expected conflict")
 	}
-	if got := clk.NowMs(); got < acquireRetryWindow.Milliseconds() {
-		t.Fatalf("clock advanced %dms, want at least the %v retry window", got, acquireRetryWindow)
+	if got := clk.NowMs(); got < AcquireRetryWindow.Milliseconds() {
+		t.Fatalf("clock advanced %dms, want at least the %v retry window", got, AcquireRetryWindow)
 	}
 }
 

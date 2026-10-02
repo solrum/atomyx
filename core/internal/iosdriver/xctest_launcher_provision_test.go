@@ -458,3 +458,83 @@ func TestXctestLauncher_EnsureRunning_ABuildMarksTheProductCurrentSoLaterLaunche
 		t.Fatalf("second launch builds = %d, want 0 because the first build stamped the product", got)
 	}
 }
+
+func TestXctestLauncher_EnsureRunning_TheBuildStampIsTheTimeTheBuildStartedNotEnded(t *testing.T) {
+	projectDir, pbxproj := newTestProjectDir(t)
+	runnerApp := createFreshRunnerApp(t, projectDir, iosdriver.KindSimulator, time.Now().Add(-time.Hour))
+	if err := os.Chtimes(pbxproj, time.Now(), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	var buildRanAt time.Time
+	runner := &fakeXcodebuildRunner{spawnReady: true, reportData: `"simulatorUdid":"SIM-1"`, buildGate: func() { buildRanAt = time.Now() }}
+	l := newSimLauncherIn(t, projectDir, runner, &fakeClock{}, iosdriver.LaunchConfig{UDID: "SIM-1", Port: freeTCPPort(t)})
+
+	kill, err := l.EnsureRunning(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = kill()
+
+	info, err := os.Stat(runnerApp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if buildRanAt.IsZero() {
+		t.Fatal("the build never ran")
+	}
+	if info.ModTime().After(buildRanAt) {
+		t.Fatalf("product stamp %v is later than the moment the build ran %v, so a source edited during the build would look older than the product", info.ModTime(), buildRanAt)
+	}
+}
+
+func TestXctestLauncher_EnsureRunning_ReleasesEveryFailedAttemptsPortBeforeTheNextAttempt(t *testing.T) {
+	p1, p2, p3 := freeTCPPort(t), freeTCPPort(t), freeTCPPort(t)
+	runner := &fakeXcodebuildRunner{spawnReady: true, exitFirstSpawns: 2}
+	var events []string
+	allocations := []int{p1, p2, p3}
+	cfg := iosdriver.LaunchConfig{
+		AllocatePort: func() (int, error) {
+			port := allocations[0]
+			allocations = allocations[1:]
+			events = append(events, "allocate "+strconv.Itoa(port))
+			return port, nil
+		},
+		ReleasePort: func(port int) { events = append(events, "release "+strconv.Itoa(port)) },
+	}
+	l := newSimLauncher(t, runner, cfg)
+
+	kill, err := l.EnsureRunning(context.Background())
+	if err != nil {
+		t.Fatalf("EnsureRunning() error = %v", err)
+	}
+	defer func() { _ = kill() }()
+
+	want := []string{
+		"allocate " + strconv.Itoa(p1), "release " + strconv.Itoa(p1),
+		"allocate " + strconv.Itoa(p2), "release " + strconv.Itoa(p2),
+		"allocate " + strconv.Itoa(p3),
+	}
+	if strings.Join(events, ",") != strings.Join(want, ",") {
+		t.Fatalf("events = %v, want %v, so a failed attempt frees its port before the next allocation and the live runner's port stays held", events, want)
+	}
+}
+
+func TestXctestLauncher_EnsureRunning_ReleasesTheLastFailedAttemptsPort(t *testing.T) {
+	ports := make([]int, 0, iosdriver.XctestMaxLaunchAttempts)
+	for range iosdriver.XctestMaxLaunchAttempts {
+		ports = append(ports, freeTCPPort(t))
+	}
+	runner := &fakeXcodebuildRunner{spawnReady: true, exitFirstSpawns: 100}
+	var released []int
+	l := newSimLauncher(t, runner, iosdriver.LaunchConfig{
+		AllocatePort: sequencePorts(t, ports...),
+		ReleasePort:  func(port int) { released = append(released, port) },
+	})
+
+	if _, err := l.EnsureRunning(context.Background()); err == nil {
+		t.Fatal("EnsureRunning() error = nil, want the launch to fail")
+	}
+	if len(released) != len(ports) {
+		t.Fatalf("released = %v, want every attempt's port %v", released, ports)
+	}
+}

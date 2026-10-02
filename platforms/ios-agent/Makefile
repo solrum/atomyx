@@ -45,6 +45,15 @@ BUILD_STAMP        := $(DERIVED)/.build-for-testing
 DEVICE_BUILD_STAMP := $(DERIVED)/.build-for-testing-device
 SWIFT_SOURCES      := $(shell find Tests App -name '*.swift' 2>/dev/null)
 
+# Every step that compiles into $(DERIVED) runs under an exclusive flock on
+# $(DERIVED)/.build.lock, the same lock the Go launcher takes before its own
+# build, so a make target and a launcher never build into the shared
+# directory at the same time. perl supplies flock(2) because neither macOS
+# nor stock Linux images share one lock utility, and macOS lockf uses a
+# different locking family that does not exclude a flock holder. The lock
+# is released when the build command exits.
+LOCK_RUN = perl -MFcntl=:flock -e 'open(my $$f, ">>", shift) or die "build lock: $$!"; flock($$f, LOCK_EX) or die "build lock: $$!"; system(@ARGV); exit($$? >> 8)' $(DERIVED)/.build.lock
+
 # --- Simulator defaults (auto-detected) -----------------------------
 # Auto-detect the first booted simulator's UDID. The 36-char anchor
 # in the grep pattern ensures we only match the UUID, not `(Booted)`.
@@ -205,14 +214,16 @@ generate:
 	@$(MAKE) $(PROJECT)
 
 build: check-udid $(PROJECT)
-	xcodebuild build-for-testing \
+	@mkdir -p $(DERIVED)
+	$(LOCK_RUN) xcodebuild build-for-testing \
 		-project $(PROJECT) \
 		-scheme $(SCHEME) \
 		-destination '$(DESTINATION)' \
 		-derivedDataPath $(DERIVED)
 
 test: check-udid $(PROJECT)
-	xcodebuild test \
+	@mkdir -p $(DERIVED)
+	$(LOCK_RUN) xcodebuild test \
 		-project $(PROJECT) \
 		-scheme $(SCHEME) \
 		-destination '$(DESTINATION)' \
@@ -224,7 +235,8 @@ test: check-udid $(PROJECT)
 # chain below builds both automatically; an unchanged checkout skips
 # straight to serving.
 $(BUILD_STAMP): $(PROJECT) $(SWIFT_SOURCES)
-	xcodebuild build-for-testing \
+	@mkdir -p $(DERIVED)
+	$(LOCK_RUN) xcodebuild build-for-testing \
 		-project $(PROJECT) \
 		-scheme $(SCHEME) \
 		-destination '$(DESTINATION)' \
@@ -303,7 +315,8 @@ check-device:
 	fi
 
 build-device: check-device $(PROJECT)
-	xcodebuild build-for-testing \
+	@mkdir -p $(DERIVED)
+	$(LOCK_RUN) xcodebuild build-for-testing \
 		-project $(PROJECT) \
 		-scheme $(SCHEME) \
 		-destination '$(DEVICE_DESTINATION)' \
@@ -311,7 +324,8 @@ build-device: check-device $(PROJECT)
 		$(SIGN_OVERRIDES)
 
 test-device: check-device $(PROJECT)
-	xcodebuild test \
+	@mkdir -p $(DERIVED)
+	$(LOCK_RUN) xcodebuild test \
 		-project $(PROJECT) \
 		-scheme $(SCHEME) \
 		-destination '$(DEVICE_DESTINATION)' \
@@ -340,7 +354,8 @@ install-device: build-device
 # on a file target defeats staleness tracking, forcing a rebuild on
 # every invocation regardless of whether the stamp is current.
 $(DEVICE_BUILD_STAMP): $(PROJECT) $(SWIFT_SOURCES)
-	xcodebuild build-for-testing \
+	@mkdir -p $(DERIVED)
+	$(LOCK_RUN) xcodebuild build-for-testing \
 		-project $(PROJECT) \
 		-scheme $(SCHEME) \
 		-destination '$(DEVICE_DESTINATION)' \

@@ -155,6 +155,31 @@ corresponding area. For the high-level map see
   flock, never from the pid or command in the file, because a dead
   holder's metadata can linger until the next acquirer overwrites it.
 
+## Session ownership
+
+- **Reap an orphaned runner only after the lease is held.** A free lease
+  is the proof that the process that wrote the runner record is gone.
+  Reaping before the lease, or without it, can signal the runner of a
+  live holder.
+- **Never signal a recorded process group without proving it is the
+  recorded process.** The pid, start time, user, command (`xcodebuild`)
+  and process group must all match, the host must not have rebooted, and
+  the group must be greater than 1 and not the caller's own. A pid can be
+  reused after the original process exits.
+- **Read process identity from the kernel, not from `ps` text.** The
+  start time, user, command and process group come from one
+  `process.Inspector` query, so they describe the same process. A
+  parsed `ps` line is zone and locale dependent.
+- **A simulator runner outlives its `xcodebuild` group.** The runner app
+  runs under the simulator's launchd. After signaling the group, confirm
+  the recorded port no longer answers with the recorded runner id, and
+  fall back to `simctl terminate` when it does.
+- **Take the lease before `EnsureIOSAgent`.** Two launches for one device
+  share `build/run-<udid>`, so the lease is what serializes them.
+- **Run the provisioner's `kill` once.** It stops the runner and releases
+  the reserved port. A second call must not release a port a later
+  launch has since reserved.
+
 ## Tool layer (cross-platform)
 
 - **Never branch on the session's platform inside a tool handler.**

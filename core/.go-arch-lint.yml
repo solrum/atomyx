@@ -278,6 +278,9 @@ deps:
       - lease
       - attach
       - runfolder
+      - shutdown
+      - session
+      - drivermock
   inspector:
     mayDependOn:
       - wire

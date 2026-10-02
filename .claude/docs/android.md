@@ -162,7 +162,12 @@ Reallocation happens at `Connect` time only. A forward dropped in the
 middle of a run surfaces as an ordinary call failure for that run.
 
 Multiple concurrent devices: each driver gets its own host port from
-adb, so no per-driver port configuration is needed.
+adb, so no per-driver port configuration is needed. The sidecar's
+`DriverProvisioner.EnsureAndroidAgent` follows the same rule through
+`androiddriver.ForwardHostPort`: it reuses the forward adb already holds
+for the serial, or lets adb allocate one, and builds its health client
+and its launcher against that port, so two serials never contend for the
+fixed 8765.
 
 Proxy, certificate, and screen-lock setup for a physical device are
 covered in `android-device-setup.md`, not here.

@@ -3,55 +3,68 @@ package process
 import (
 	"context"
 	"errors"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
 
-func TestStartTime_ParsesPsOutputInLocalTimeAndAsksForTheCLocale(t *testing.T) {
-	f := NewFake()
-	f.Default = Result{Stdout: " Thu Oct  2 10:15:02 2026\n"}
-
-	got, err := StartTime(context.Background(), f, 4242)
+func TestSystemInspector_ReportsTheRunningProcess(t *testing.T) {
+	info, err := SystemInspector{}.Inspect(os.Getpid())
 	if err != nil {
-		t.Fatalf("StartTime() error = %v", err)
+		t.Fatalf("Inspect(self) error = %v", err)
 	}
-	want := time.Date(2026, time.October, 2, 10, 15, 2, 0, time.Local).UTC()
-	if !got.Equal(want) {
-		t.Fatalf("StartTime() = %v, want %v", got, want)
+	if info.PID != os.Getpid() || info.UID != os.Geteuid() || info.PGID != OwnProcessGroup() {
+		t.Fatalf("Inspect(self) = %+v, want pid %d uid %d pgid %d", info, os.Getpid(), os.Geteuid(), OwnProcessGroup())
 	}
-	calls := f.Invocations()
-	if len(calls) != 1 || calls[0].Name != "ps" {
-		t.Fatalf("invocations = %+v, want one ps call", calls)
+	if info.Command == "" || !strings.HasPrefix(filepath.Base(os.Args[0]), info.Command) {
+		t.Fatalf("Inspect(self).Command = %q, want the test binary name", info.Command)
 	}
-	if len(calls[0].Env) != 1 || calls[0].Env[0] != "LC_ALL=C" {
-		t.Fatalf("env = %v, want LC_ALL=C so the month and weekday names parse", calls[0].Env)
+	if info.StartTime.IsZero() || info.StartTime.After(time.Now().Add(time.Second)) {
+		t.Fatalf("Inspect(self).StartTime = %v, want a past time", info.StartTime)
 	}
 }
 
-func TestStartTime_PsFailureAndGarbageAreErrors(t *testing.T) {
-	failing := NewFake()
-	failing.DefaultErr = errors.New("no such process")
-	if _, err := StartTime(context.Background(), failing, 1); err == nil {
-		t.Fatal("StartTime() error = nil, want the ps failure")
+func TestSystemInspector_AnExitedProcessIsNotFound(t *testing.T) {
+	cmd := exec.CommandContext(context.Background(), "true")
+	if err := cmd.Run(); err != nil {
+		t.Fatal(err)
 	}
-	garbage := NewFake()
-	garbage.Default = Result{Stdout: "not a time"}
-	if _, err := StartTime(context.Background(), garbage, 1); err == nil {
-		t.Fatal("StartTime() error = nil, want a parse failure")
+	if _, err := (SystemInspector{}).Inspect(cmd.Process.Pid); !errors.Is(err, ErrProcessNotFound) {
+		t.Fatalf("Inspect(exited pid) error = %v, want ErrProcessNotFound", err)
+	}
+	if _, err := (SystemInspector{}).Inspect(0); !errors.Is(err, ErrProcessNotFound) {
+		t.Fatalf("Inspect(0) error = %v, want ErrProcessNotFound", err)
 	}
 }
 
-func TestParseSysctlBootTime(t *testing.T) {
-	got, err := parseSysctlBootTime("{ sec = 1759372800, usec = 41230 } Thu Oct  2 07:20:00 2026\n")
+func TestSystemInspector_BootTimePrecedesProcessStart(t *testing.T) {
+	boot, err := SystemInspector{}.BootTime()
 	if err != nil {
-		t.Fatalf("parseSysctlBootTime() error = %v", err)
+		t.Fatalf("BootTime() error = %v", err)
 	}
-	if !got.Equal(time.Unix(1759372800, 0)) {
-		t.Fatalf("parseSysctlBootTime() = %v, want unix 1759372800", got)
+	self, err := SystemInspector{}.Inspect(os.Getpid())
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, bad := range []string{"", "usec = 5", "{ sec = x, usec = 1 }"} {
-		if _, err := parseSysctlBootTime(bad); err == nil {
-			t.Errorf("parseSysctlBootTime(%q) error = nil, want a parse failure", bad)
-		}
+	if !boot.Before(self.StartTime) {
+		t.Fatalf("boot %v is not before this process start %v", boot, self.StartTime)
+	}
+}
+
+func TestFakeInspector_ReportsWhatTheTestSets(t *testing.T) {
+	f := NewFakeInspector(time.Unix(100, 0))
+	f.Set(ProcessInfo{PID: 7, Command: "xcodebuild"})
+	if got, err := f.Inspect(7); err != nil || got.Command != "xcodebuild" {
+		t.Fatalf("Inspect(7) = %+v, %v", got, err)
+	}
+	f.Remove(7)
+	if _, err := f.Inspect(7); !errors.Is(err, ErrProcessNotFound) {
+		t.Fatalf("Inspect(removed) error = %v, want ErrProcessNotFound", err)
+	}
+	if boot, _ := f.BootTime(); !boot.Equal(time.Unix(100, 0)) {
+		t.Fatalf("BootTime() = %v", boot)
 	}
 }

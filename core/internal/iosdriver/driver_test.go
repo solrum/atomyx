@@ -1415,3 +1415,58 @@ func equalArgs(got, want []string) bool {
 	}
 	return true
 }
+
+func connectedDriverWithRunnerID(t *testing.T, runnerID string) *iosdriver.IosDriver {
+	t.Helper()
+	conn := newDefaultFakeConn()
+	conn.Respond("ping", func(map[string]any) (map[string]any, error) {
+		return map[string]any{"capabilities": map[string]any{}, "runnerId": runnerID}, nil
+	})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	if err := d.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	return d
+}
+
+func TestIosDriver_LaunchedApp_ReportsTheTrackedAppAndTheRunnerItConnectedTo(t *testing.T) {
+	d := connectedDriverWithRunnerID(t, "runner-A")
+	if err := d.LaunchApp(context.Background(), "com.example.app", driver.LaunchArgs{}); err != nil {
+		t.Fatal(err)
+	}
+
+	bundle, runnerID := d.LaunchedApp()
+
+	if bundle != "com.example.app" || runnerID != "runner-A" {
+		t.Fatalf("LaunchedApp() = %q, %q, want com.example.app and runner-A", bundle, runnerID)
+	}
+}
+
+func TestIosDriver_RestoreLaunchedApp_AppliesOnlyWhenTheSameRunnerInstanceAnswers(t *testing.T) {
+	noReset := true
+	attach := driver.LaunchArgs{NoReset: &noReset}
+
+	same := connectedDriverWithRunnerID(t, "runner-A")
+	if !same.RestoreLaunchedApp("com.example.app", "runner-A") {
+		t.Fatal("RestoreLaunchedApp() = false for the same runner instance")
+	}
+	if bundle, _ := same.LaunchedApp(); bundle != "com.example.app" {
+		t.Fatalf("tracked bundle after restore = %q, want com.example.app", bundle)
+	}
+	if err := same.LaunchApp(context.Background(), "com.example.app", attach); err != nil {
+		t.Fatal(err)
+	}
+
+	other := connectedDriverWithRunnerID(t, "runner-B")
+	if other.RestoreLaunchedApp("com.example.app", "runner-A") {
+		t.Fatal("RestoreLaunchedApp() = true for a different runner instance")
+	}
+	if bundle, _ := other.LaunchedApp(); bundle != "" {
+		t.Fatalf("tracked bundle after a refused restore = %q, want none", bundle)
+	}
+
+	unidentified := connectedDriverWithRunnerID(t, "")
+	if unidentified.RestoreLaunchedApp("com.example.app", "") {
+		t.Fatal("RestoreLaunchedApp() = true although neither runner carries a launch id")
+	}
+}

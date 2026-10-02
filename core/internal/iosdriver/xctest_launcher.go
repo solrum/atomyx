@@ -192,6 +192,11 @@ type LaunchConfig struct {
 	// lost bind race. XctestLauncher.Port reports the port the last
 	// attempt used.
 	AllocatePort func() (int, error)
+	// ReleasePort receives the host port of every launch attempt that
+	// failed, as soon as the attempt has been torn down, so a caller that
+	// reserved the port frees it before the next attempt or the final
+	// error. Nil ignores it.
+	ReleasePort func(port int)
 	// Warn receives a one-line warning when a runner is adopted without
 	// a launch identifier. Nil discards it.
 	Warn func(message string)
@@ -416,6 +421,7 @@ func (l *XctestLauncher) ensureBuilt(ctx context.Context, xcodeprojPath, buildDi
 		return nil
 	}
 	l.progress(XctestProgressBuilding)
+	buildStarted := time.Now()
 	if err := l.build(ctx, xcodeprojPath, buildDir); err != nil {
 		return err
 	}
@@ -423,10 +429,12 @@ func (l *XctestLauncher) ensureBuilt(ctx context.Context, xcodeprojPath, buildDi
 	// modification time alone, so sources touched without a content
 	// change would keep the product looking stale and every later launch
 	// would rebuild. Stamping the product records that the build has
-	// seen those sources. A failure to stamp only costs one redundant
-	// build on the next launch, so it is not reported.
-	now := time.Now()
-	_ = os.Chtimes(runnerApp, now, now)
+	// seen those sources. The stamp is the time the build started, not
+	// the time it ended, because a source edited while the build ran may
+	// not be in the product and must still read as newer than it. A
+	// failure to stamp only costs one redundant build on the next launch,
+	// so it is not reported.
+	_ = os.Chtimes(runnerApp, buildStarted, buildStarted)
 	return nil
 }
 
@@ -496,6 +504,9 @@ func (l *XctestLauncher) launchWithRetry(ctx context.Context, xctestrun, runDeri
 		kill, err := l.spawnAndWait(ctx, port, runDerived, args)
 		if err == nil {
 			return kill, nil
+		}
+		if l.cfg.AllocatePort != nil && l.cfg.ReleasePort != nil {
+			l.cfg.ReleasePort(port)
 		}
 		if l.cfg.AllocatePort == nil || attempt >= XctestMaxLaunchAttempts || !isPortConflictFailure(err) {
 			return noopKill, err

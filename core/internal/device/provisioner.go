@@ -86,6 +86,10 @@ type DriverProvisionerDeps struct {
 	IosCodeSignStyle       string
 	IosProvisioningProfile string
 	AndroidAPKPath         string
+	// Inspector reads the start time of a launched runner and the host
+	// boot time for the runner record. A nil Inspector defaults to
+	// process.SystemInspector{}.
+	Inspector process.Inspector
 	// IosScheme, IosProjectFile, IosRunnerApp, and IosOnlyTesting
 	// override the corresponding Xcode project identifiers the
 	// XCUITest launcher builds and spawns against. Each defaults to
@@ -124,6 +128,7 @@ type DriverProvisioner struct {
 	background process.BackgroundRunner
 	clock      orchestra.Clock
 	logger     logging.Logger
+	inspector  process.Inspector
 	deps       DriverProvisionerDeps
 
 	// freePort asks the operating system for a currently free host
@@ -152,8 +157,12 @@ func NewDriverProvisioner(deps DriverProvisionerDeps) *DriverProvisioner {
 	if logger == nil {
 		logger = logging.NoopLogger{}
 	}
+	inspector := deps.Inspector
+	if inspector == nil {
+		inspector = process.SystemInspector{}
+	}
 	return &DriverProvisioner{
-		runner: deps.Runner, background: background, clock: clock, logger: logger, deps: deps,
+		runner: deps.Runner, background: background, clock: clock, logger: logger, inspector: inspector, deps: deps,
 		freePort: operatingSystemFreePort, newRunnerID: randomRunnerID, now: time.Now,
 		reserved: make(map[int]struct{}),
 	}
@@ -269,7 +278,7 @@ func (p *DriverProvisioner) reservePort() (int, error) {
 	return 0, fmt.Errorf("reserve a host port: every candidate was already held by another launch")
 }
 
-func (p *DriverProvisioner) releasePorts(ports []int) {
+func (p *DriverProvisioner) releasePorts(ports ...int) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	for _, port := range ports {
@@ -283,7 +292,8 @@ func (p *DriverProvisioner) releasePorts(ports []int) {
 // launcher requires the runner to echo, and for a physical device owns
 // the USB tunnel that maps the host port onto the runner. The returned
 // kill stops the runner, the tunnel and the runner record, and releases
-// the reserved ports.
+// the reserved port. It runs its work once however many times it is
+// called.
 func (p *DriverProvisioner) EnsureIOSAgent(ctx context.Context, udid string, kind IosAgentKind) (int, func() error, error) {
 	driverKind := iosdriver.KindSimulator
 	if kind == IosAgentKindDevice {
@@ -318,33 +328,28 @@ func (p *DriverProvisioner) EnsureIOSAgent(ctx context.Context, udid string, kin
 		Progress:                     func(message string) { progress.Info(message, nil) },
 	}
 
-	var ports []int
 	if !p.deps.FixedIosPort {
 		cfg.RunnerID = p.newRunnerID()
-		cfg.AllocatePort = func() (int, error) {
-			port, err := p.reservePort()
-			if err == nil {
-				ports = append(ports, port)
-			}
-			return port, err
-		}
+		cfg.AllocatePort = p.reservePort
+		cfg.ReleasePort = func(port int) { p.releasePorts(port) }
 		cfg.AfterSpawn = p.afterSpawn(udid, kind, cfg.RunnerID)
 	}
 
 	launcher := iosdriver.NewXctestLauncher(p.runner, p.background, p.clock, cfg)
 	kill, err := launcher.EnsureRunning(ctx)
 	if err != nil {
-		p.releasePorts(ports)
 		return 0, kill, err
 	}
 	if p.deps.FixedIosPort {
 		return launcher.Port(), kill, nil
 	}
-	return launcher.Port(), func() error {
+	port := launcher.Port()
+	stop := sync.OnceValue(func() error {
 		err := kill()
-		p.releasePorts(ports)
+		p.releasePorts(port)
 		return err
-	}, nil
+	})
+	return port, stop, nil
 }
 
 // afterSpawn builds the launcher hook that runs once the runner process
@@ -353,7 +358,7 @@ func (p *DriverProvisioner) EnsureIOSAgent(ctx context.Context, udid string, kin
 // needs. The stop function it returns removes both.
 func (p *DriverProvisioner) afterSpawn(udid string, kind IosAgentKind, runnerID string) func(context.Context, iosdriver.SpawnedRunner) (func(), error) {
 	return func(ctx context.Context, spawned iosdriver.SpawnedRunner) (func(), error) {
-		statePath, err := p.recordRunner(ctx, udid, runnerID, spawned)
+		statePath, err := p.recordRunner(udid, kind, runnerID, spawned)
 		if err != nil {
 			return nil, err
 		}
@@ -383,25 +388,27 @@ func (p *DriverProvisioner) afterSpawn(udid string, kind IosAgentKind, runnerID 
 
 // recordRunner writes the runner record for a spawned runner and
 // returns its path, or an empty path when records are disabled.
-func (p *DriverProvisioner) recordRunner(ctx context.Context, udid, runnerID string, spawned iosdriver.SpawnedRunner) (string, error) {
+func (p *DriverProvisioner) recordRunner(udid string, kind IosAgentKind, runnerID string, spawned iosdriver.SpawnedRunner) (string, error) {
 	if p.deps.RunnerStateDir == "" || p.deps.RunnerStateKey == nil {
 		return "", nil
 	}
-	started, err := process.StartTime(ctx, p.runner, spawned.Pid)
+	info, err := p.inspector.Inspect(spawned.Pid)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("record the runner: %w", err)
 	}
-	booted, err := process.BootTime(ctx, p.runner)
+	booted, err := p.inspector.BootTime()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("record the runner: %w", err)
 	}
 	path := RunnerStatePath(p.deps.RunnerStateDir, p.deps.RunnerStateKey(udid))
 	err = WriteRunnerState(path, RunnerState{
+		UDID:             udid,
+		Kind:             string(kind),
 		RunnerID:         runnerID,
 		HostPort:         spawned.HostPort,
 		Pid:              spawned.Pid,
 		Pgid:             spawned.Pid,
-		ProcessStartTime: started,
+		ProcessStartTime: info.StartTime,
 		HostBootTime:     booted,
 		StartedAt:        p.now().UTC(),
 	})
@@ -411,16 +418,22 @@ func (p *DriverProvisioner) recordRunner(ctx context.Context, udid, runnerID str
 	return path, nil
 }
 
-// EnsureAndroidAgent implements AgentProvisioner.
+// EnsureAndroidAgent implements AgentProvisioner. The host port is the
+// forward adb already holds for serial, or a fresh one adb allocates,
+// so two devices never contend for one fixed host port.
 func (p *DriverProvisioner) EnsureAndroidAgent(ctx context.Context, serial string) error {
 	apkPath := p.deps.AndroidAPKPath
 	if apkPath == "" {
 		apkPath = os.Getenv("ATOMYX_ANDROID_APK")
 	}
-	client := transport.NewHTTPClient("127.0.0.1", androidControlPort)
+	hostPort, err := androiddriver.ForwardHostPort(ctx, p.runner, serial, androidControlPort)
+	if err != nil {
+		return err
+	}
+	client := transport.NewHTTPClient("127.0.0.1", hostPort)
 	launcher := androiddriver.NewAgentLauncher(p.runner, p.clock, client, androiddriver.AgentLauncherOptions{
 		Serial:     serial,
-		HostPort:   androidControlPort,
+		HostPort:   hostPort,
 		DevicePort: androidControlPort,
 		APKPath:    apkPath,
 	})
