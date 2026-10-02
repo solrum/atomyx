@@ -48,7 +48,9 @@ const (
 // Timing defaults and the poll cadence EnsureRunning uses while
 // waiting for a freshly spawned driver to answer the ping handshake.
 const (
-	xctestDefaultBuildTimeoutMs  int64 = 300_000
+	// DefaultBuildTimeoutMs bounds one runner build when the launch
+	// configuration sets none.
+	DefaultBuildTimeoutMs        int64 = 300_000
 	xctestDefaultLaunchTimeoutMs int64 = 90_000
 	xctestPollIntervalMs         int64 = 500
 	// xctestBuildLockPollMs is the pause between attempts to take the
@@ -310,7 +312,7 @@ func NewXctestLauncher(proc process.Runner, background process.BackgroundRunner,
 		cfg.Port = defaultIosPort
 	}
 	if cfg.BuildTimeoutMs == 0 {
-		cfg.BuildTimeoutMs = xctestDefaultBuildTimeoutMs
+		cfg.BuildTimeoutMs = DefaultBuildTimeoutMs
 	}
 	if cfg.LaunchTimeoutMs == 0 {
 		cfg.LaunchTimeoutMs = xctestDefaultLaunchTimeoutMs
