@@ -1073,10 +1073,11 @@ the run is still active and has not been closed yet.
 **Behavior**
 - Replaces the summary field only. Every other field on the run,
   including status, findings, and durationMs, is left untouched.
-- Works only on a persisted run, so it has no effect on a run that is
-  still active. Call finish_run first.
-- Applies to runs stored as flat records. A run stored as a versioned
-  run folder is read-only here.
+- Works on the open run and on a finished run. The summary is written
+  into the run folder of a run started by start_run or run_script, or
+  into the flat record of a run stored in the flat form.
+- A run with no summary field, such as one written by the atomyx CLI,
+  is read-only here. So is a run that another process is still writing.
 - The id must be a bare run id. An id that contains a path separator is
   rejected as an invalid argument.
 
@@ -1087,8 +1088,8 @@ the run is still active and has not been closed yet.
 **Errors and recovery**
 - `ok: false` means the id does not exist. Confirm it with list_runs
   or get_run before retrying.
-- Error `RUN_READ_ONLY` names the run and means it is stored as a
-  versioned run folder, whose summary cannot be updated.
+- Error `RUN_READ_ONLY` names the run and means it has no summary
+  field, or that another process is still writing it.
 - Error `INVALID_ARGUMENT` means the id is not a bare run id.
 
 **Example**

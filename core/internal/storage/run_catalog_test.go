@@ -265,3 +265,25 @@ func TestRunCatalogSetSummary(t *testing.T) {
 		t.Fatal("a traversal id changed a folder meta")
 	}
 }
+
+func TestRunCatalogSetSummaryEditsAVersionedRunWithASummaryField(t *testing.T) {
+	root := t.TempDir()
+	fs, _ := NewFileStorage(FileStorageOptions{Root: root})
+	dir := runfolder.RunDir(root, "m")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `{"schemaVersion":1,"runId":"m","kind":"mcp","startedAt":1,"completedAt":5,"outcome":"passed","mcp":{"name":"smoke","source":"s","actionCount":0,"durationMs":4}}`
+	if err := os.WriteFile(filepath.Join(dir, runfolder.MetaFileName), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c := NewRunCatalog(fs, root, nil)
+
+	if ok, err := c.SetSummary("m", "reviewed"); !ok || err != nil {
+		t.Fatalf("SetSummary: %v %v", ok, err)
+	}
+	meta, ok, err := c.Get("m")
+	if err != nil || !ok || meta.MCP == nil || meta.MCP.Summary == nil || *meta.MCP.Summary != "reviewed" || meta.MCP.Name != "smoke" {
+		t.Fatalf("meta after SetSummary: %+v ok=%v err=%v", meta, ok, err)
+	}
+}

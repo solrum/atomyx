@@ -224,19 +224,30 @@ func TestGetRunOnADamagedFolderFallsBackOrNamesTheRun(t *testing.T) {
 	}
 }
 
-func TestUpdateRunSummaryRefusesVersionedRunsAndTraversal(t *testing.T) {
+func TestUpdateRunSummaryEditsMCPRunsAndRefusesScriptRunsAndTraversal(t *testing.T) {
 	root := t.TempDir()
 	store, call := fileBackedServer(t, root)
 	const id = "20261002-101500-mcp-a1b2"
+	const scriptID = "20261002-101600-login-c3d4"
 	writeV1Run(t, root, finishedV1Meta(id, 1_790_000_000_000))
-	metaPath := filepath.Join(runfolder.RunDir(root, id), runfolder.MetaFileName)
+	scriptMeta := finishedV1Meta(scriptID, 1_790_000_100_000)
+	scriptMeta.Kind, scriptMeta.MCP = runfolder.KindScript, nil
+	writeV1Run(t, root, scriptMeta)
+	metaPath := filepath.Join(runfolder.RunDir(root, scriptID), runfolder.MetaFileName)
 	before, err := os.ReadFile(metaPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if got := call("update_run_summary", map[string]any{"id": id, "summary": "x"}); got["code"] != "RUN_READ_ONLY" || !strings.Contains(got["message"].(string), id) {
-		t.Fatalf("versioned run: got %v", got)
+	if got := call("update_run_summary", map[string]any{"id": id, "summary": "edited"}); got["ok"] != true {
+		t.Fatalf("mcp run: got %v", got)
+	}
+	run := call("get_run", map[string]any{"id": id})["run"].(map[string]any)
+	if run["summary"] != "edited" || run["name"] != "v1 run" || run["outcome"] != "deviceLost" {
+		t.Fatalf("get_run after update: got %v", run)
+	}
+	if got := call("update_run_summary", map[string]any{"id": scriptID, "summary": "x"}); got["code"] != "RUN_READ_ONLY" || !strings.Contains(got["message"].(string), scriptID) {
+		t.Fatalf("script run: got %v", got)
 	}
 	if got := call("update_run_summary", map[string]any{"id": "v1/" + id + "/meta", "summary": "x"}); got["code"] != "INVALID_ARGUMENT" {
 		t.Fatalf("traversal id: got %v, want INVALID_ARGUMENT", got)

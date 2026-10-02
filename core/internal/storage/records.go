@@ -1,14 +1,16 @@
 package storage
 
+import "dev.atomyx/internal/runfolder"
+
 const (
-	// RunKeyPrefix namespaces persisted run records in Storage.
-	RunKeyPrefix = "runs/"
+	// RunKeyPrefix namespaces the flat run records of the legacy form in
+	// Storage.
+	RunKeyPrefix = runfolder.LegacyRecordKeyPrefix
 	// BugKeyPrefix namespaces persisted bug records in Storage.
 	BugKeyPrefix = "bugs/"
 )
 
-// RunKey returns the Storage key a persisted run record is saved and
-// loaded under.
+// RunKey returns the Storage key a flat run record is loaded under.
 func RunKey(id string) string { return RunKeyPrefix + id }
 
 // BugKey returns the Storage key a persisted bug record is saved and

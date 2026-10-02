@@ -56,7 +56,7 @@ type system enforces it.
 | **Run and bug queries** | | | | |
 | `list_runs` | `core/internal/mcp/run_read_tool.go` | `status`, `limit`, `offset` | paginated run summaries, each with `result` and `outcome` (absent while running), plus `totalMatching` and `skipped` | `storage.RunCatalog.List` |
 | `get_run` | `core/internal/mcp/run_read_tool.go` | `id` | the full run record, with `result` and `outcome` (absent while running) | `storage.RunCatalog.Get` |
-| `update_run_summary` | `core/internal/mcp/run_read_tool.go` | `id`, `summary` | `{ok}`, or `RUN_READ_ONLY` for a versioned run | `storage.RunCatalog.SetSummary` |
+| `update_run_summary` | `core/internal/mcp/run_read_tool.go` | `id`, `summary` | `{ok}`, or `RUN_READ_ONLY` for a run with no summary field or one another process is still writing | `storage.RunCatalog.SetSummary` |
 | `delete_run` | `core/internal/mcp/run_read_tool.go` | `id` | `{ok}` | `storage.RunCatalog.Delete` |
 | `list_bugs` | `core/internal/mcp/bug_read_tool.go` | `runId`, `limit`, `offset` | paginated bug summaries, newest first | `storage.Storage.List` |
 | `get_bug` | `core/internal/mcp/bug_read_tool.go` | `id` | the full bug record | `storage.Storage.Load` |
@@ -76,8 +76,10 @@ composition root with the run directory and a `runfolder.Liveness`. The
 MCP server uses its `RunStore`, so only its own active run is live. A
 `list_runs` call also reports `skipped`, the count of stored runs that
 could not be read, which `totalMatching` excludes. `update_run_summary`
-edits flat run records only, and a versioned run folder returns
-`RUN_READ_ONLY`.
+edits runs that carry a summary field, which are the runs written by
+`start_run` and `run_script` and runs stored as flat records. A run written
+by the CLI has none, and a run whose writer is another live process is
+not editable until it finishes, so both return `RUN_READ_ONLY`.
 
 Tools are registered in `core/internal/mcp/server.go`'s `NewServer`
 in a fixed, explicit order grouped by concern (matching the grouping

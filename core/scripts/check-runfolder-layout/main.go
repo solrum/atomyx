@@ -53,8 +53,6 @@ const (
 var allowlist = map[string]bool{
 	// Names its own screenshots directory.
 	"internal/mcp/screenshot_tool.go": true,
-	// Prefixes the flat legacy run record key with runs.
-	"internal/storage/records.go": true,
 }
 
 var alwaysNames = map[string]bool{

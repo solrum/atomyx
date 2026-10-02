@@ -22,6 +22,10 @@ const (
 	LockFileName = "run.lock"
 )
 
+// LegacyRecordKeyPrefix is the storage key prefix of the flat run
+// records that predate run folders. Only readers use it.
+const LegacyRecordKeyPrefix = runsDirName + "/"
+
 // RunsDir returns the directory under root that holds every run, both
 // versioned folders and flat records not yet migrated.
 func RunsDir(root string) string {

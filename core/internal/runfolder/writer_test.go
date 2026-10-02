@@ -292,3 +292,70 @@ func TestArtifactsDirIsCreatedOnDemand(t *testing.T) {
 		t.Fatalf("artifacts dir missing: %v", err)
 	}
 }
+
+func TestUpdateRewritesTheLiveMetaAndKeepsTheRunOpen(t *testing.T) {
+	root := t.TempDir()
+	w := startOne(t, root)
+	summary := "mid run"
+
+	err := w.Update(func(m *Meta) {
+		m.MCP = &MCPInfo{Name: "n", Summary: &summary}
+		m.RunID, m.StartedAt = "other", 1
+		done := int64(9)
+		m.CompletedAt, m.Result, m.Outcome = &done, ResultPassed, OutcomePassed
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	meta, ok, err := NewReader(root).Get(w.ID())
+	if err != nil || !ok {
+		t.Fatalf("read back: ok=%v err=%v", ok, err)
+	}
+	if meta.MCP == nil || meta.MCP.Summary == nil || *meta.MCP.Summary != summary {
+		t.Fatalf("mcp block = %+v", meta.MCP)
+	}
+	if meta.RunID != w.ID() || meta.StartedAt != testNow.UnixMilli() || meta.CompletedAt != nil || meta.Outcome != "" {
+		t.Fatalf("update changed a protected field: %+v", meta)
+	}
+	if err := w.Finalize(OutcomePassed, nil); err != nil {
+		t.Fatalf("finalize after update: %v", err)
+	}
+	if err := w.Update(func(*Meta) {}); !errors.Is(err, ErrFinalized) {
+		t.Fatalf("update after finalize: %v", err)
+	}
+}
+
+func TestSetSummaryRewritesAFinishedRunAndRefusesLiveOrSummarylessRuns(t *testing.T) {
+	root := t.TempDir()
+	w, err := newTestStarter(root, 0xab, 0xcd).Start("m", Meta{Kind: KindMCP, MCP: &MCPInfo{Name: "keep"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = w.Close() })
+
+	if ok, err := SetSummary(root, w.ID(), "x"); !ok || !errors.Is(err, ErrRunLive) {
+		t.Fatalf("live run: ok=%v err=%v", ok, err)
+	}
+	if err := w.Finalize(OutcomePassed, nil); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := SetSummary(root, w.ID(), "after"); !ok || err != nil {
+		t.Fatalf("finished run: ok=%v err=%v", ok, err)
+	}
+	meta, _, _ := NewReader(root).Get(w.ID())
+	if meta.MCP.Name != "keep" || meta.MCP.Summary == nil || *meta.MCP.Summary != "after" || meta.Outcome != OutcomePassed {
+		t.Fatalf("meta after SetSummary = %+v", meta)
+	}
+	if ok, err := SetSummary(root, "missing", "x"); ok || err != nil {
+		t.Fatalf("missing run: ok=%v err=%v", ok, err)
+	}
+
+	script, err := newTestStarter(root, 0x01, 0x02).Start("s", Meta{Kind: KindScript})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = script.Finalize(OutcomePassed, nil)
+	if ok, err := SetSummary(root, script.ID(), "x"); !ok || !errors.Is(err, ErrNoSummary) {
+		t.Fatalf("script run: ok=%v err=%v", ok, err)
+	}
+}

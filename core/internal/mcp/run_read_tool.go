@@ -203,9 +203,11 @@ func registerUpdateRunSummaryTool(server *mcp.Server, tc *ToolContext) {
 			"the summary wasn't known at finish_run time, or to append context " +
 			"discovered by a later investigation. Only the summary field is " +
 			"mutated, while all other fields (status, findings, durationMs, …) are " +
-			"preserved. Applies to runs stored as flat records. A run stored as a " +
-			"versioned run folder returns error RUN_READ_ONLY naming the run. Returns " +
-			"ok:false when the id is not found.",
+			"preserved. Applies to runs started by start_run or run_script, whether " +
+			"open or finished. A run with no summary field, such as one written by " +
+			"the atomyx CLI, returns error RUN_READ_ONLY naming the run. A run another " +
+			"process is still writing returns the same error until it finishes. " +
+			"Returns ok:false when the id is not found.",
 		InputSchema: updateRunSummaryInputSchema,
 	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		if err := validateToolArguments(updateRunSummarySchema, req.Params.Arguments); err != nil {
@@ -250,8 +252,15 @@ func summaryUpdateErrorResult(id string, err error) *mcp.CallToolResult {
 	case errors.Is(err, storage.ErrRunReadOnly):
 		return errorResult(diag.New(
 			diag.CodeRunReadOnly,
-			fmt.Sprintf("run %s is stored as a versioned run folder, so its summary cannot be updated", id),
-			"Read the run with get_run. Only runs stored as flat records accept a summary update.",
+			fmt.Sprintf("run %s has no summary field, so its summary cannot be updated", id),
+			"Read the run with get_run. Only runs started by start_run or run_script accept a summary update.",
+			err,
+		))
+	case errors.Is(err, storage.ErrRunLive):
+		return errorResult(diag.New(
+			diag.CodeRunReadOnly,
+			fmt.Sprintf("run %s is still being written by another process, so its summary cannot be updated yet", id),
+			"Wait for that run to finish, then update its summary.",
 			err,
 		))
 	}

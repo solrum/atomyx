@@ -192,3 +192,15 @@ func TestRunStoreIsLiveOnlyForTheActiveRun(t *testing.T) {
 		t.Fatal("a finished run reported live")
 	}
 }
+
+func TestRunStoreStartUsesTheSuppliedID(t *testing.T) {
+	s := NewRunStore()
+	run := s.Start(StartOptions{ID: "20261002-070309-pixel-abcd", Name: "n"}).Run
+
+	if run.ID != "20261002-070309-pixel-abcd" {
+		t.Fatalf("id = %q", run.ID)
+	}
+	if !s.IsLive(run.ID) {
+		t.Fatal("the supplied id is not reported live")
+	}
+}

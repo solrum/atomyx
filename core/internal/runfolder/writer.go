@@ -191,6 +191,32 @@ func (w *Writer) Finalize(outcome Outcome, mutate func(*Meta)) error {
 	return w.releaseLocked()
 }
 
+// Update applies mutate to a copy of the live meta and replaces
+// meta.json with it, so a field that changes while the run is open,
+// such as a summary, reaches the disk without waiting for Finalize.
+// mutate cannot change the run id, the start time, the schema version,
+// or the verdict, and the run stays open. An update on a finalized or
+// closed Writer returns ErrFinalized or ErrClosed. A write failure
+// leaves the meta as it was.
+func (w *Writer) Update(mutate func(*Meta)) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if err := w.checkOpen(); err != nil {
+		return err
+	}
+	next := w.meta
+	mutate(&next)
+	next.SchemaVersion, next.RunID, next.StartedAt = w.meta.SchemaVersion, w.meta.RunID, w.meta.StartedAt
+	next.CompletedAt, next.Result, next.Outcome = nil, "", ""
+	prev := w.meta
+	w.meta = next
+	if err := w.writeMeta(); err != nil {
+		w.meta = prev
+		return err
+	}
+	return nil
+}
+
 // Close releases the run's lock without recording an outcome, which
 // leaves the run to read as interrupted. Closing a finalized or closed
 // Writer is a no-op.
@@ -265,15 +291,21 @@ func (w *Writer) LogTruncated() bool {
 	return w.truncated
 }
 
-// writeMeta replaces meta.json atomically. The content is flushed to a
-// temporary file in the same directory, renamed over meta.json, and
-// the directory is flushed so the rename survives a crash.
+// writeMeta replaces meta.json with the Writer's meta.
 func (w *Writer) writeMeta() error {
-	body, err := json.MarshalIndent(w.meta, "", "  ")
+	return writeMetaFile(w.dir, w.meta)
+}
+
+// writeMetaFile replaces meta.json in dir atomically. The content is
+// flushed to a temporary file in the same directory, renamed over
+// meta.json, and the directory is flushed so the rename survives a
+// crash.
+func writeMetaFile(dir string, meta Meta) error {
+	body, err := json.MarshalIndent(meta, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encoding %s: %w", MetaFileName, err)
 	}
-	tmp, err := os.CreateTemp(w.dir, MetaFileName+".*.tmp")
+	tmp, err := os.CreateTemp(dir, MetaFileName+".*.tmp")
 	if err != nil {
 		return fmt.Errorf("creating temporary %s: %w", MetaFileName, err)
 	}
@@ -285,11 +317,11 @@ func (w *Writer) writeMeta() error {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("writing temporary %s: %w", MetaFileName, err)
 	}
-	if err := os.Rename(tmpPath, filepath.Join(w.dir, MetaFileName)); err != nil {
+	if err := os.Rename(tmpPath, filepath.Join(dir, MetaFileName)); err != nil {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("replacing %s: %w", MetaFileName, err)
 	}
-	return syncDir(w.dir)
+	return syncDir(dir)
 }
 
 func syncDir(dir string) error {

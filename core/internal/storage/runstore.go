@@ -75,8 +75,11 @@ func (SystemClock) NowMs() int64 { return time.Now().UnixMilli() }
 // StartOptions configures RunStore.Start. Source is a pointer so an
 // explicitly empty string and an omitted value stay distinguishable:
 // omitting Source defaults to "unknown", while an explicit empty
-// string is stored as given.
+// string is stored as given. A non-empty ID becomes the run's id, so a
+// caller that already owns the run's durable identity keeps one id for
+// both. An empty ID takes the next generated one.
 type StartOptions struct {
+	ID     string
 	Name   string
 	Source *string
 }
@@ -132,8 +135,12 @@ func (r *RunStore) Start(opts StartOptions) StartRunResult {
 	}
 
 	startedAt := r.clock.NowMs()
+	id := opts.ID
+	if id == "" {
+		id = fmt.Sprintf("run-%d-%d", startedAt, r.nextID)
+	}
 	run := &RunRecord{
-		ID:          fmt.Sprintf("run-%d-%d", startedAt, r.nextID),
+		ID:          id,
 		Name:        opts.Name,
 		Source:      source,
 		StartedAt:   startedAt,

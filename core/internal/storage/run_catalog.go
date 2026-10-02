@@ -13,9 +13,13 @@ import (
 // ErrInvalidRunID is returned for an id that is not a bare run id.
 var ErrInvalidRunID = errors.New("run id must be a bare id without path separators")
 
-// ErrRunReadOnly is returned when a write targets a versioned run
-// folder, which this catalog only reads.
-var ErrRunReadOnly = errors.New("run is stored as a versioned run folder, which cannot be edited here")
+// ErrRunReadOnly is returned when a summary update targets a versioned
+// run folder that carries no summary, such as the run of a CLI script.
+var ErrRunReadOnly = errors.New("run is stored as a versioned run folder that has no summary field")
+
+// ErrRunLive is returned when a summary update targets a run that
+// another process is still writing.
+var ErrRunLive = errors.New("run is still being written by another process")
 
 // DamagedRunError reports a run whose stored record exists but cannot
 // be read. It names the run so a caller can tell which one failed.
@@ -43,7 +47,7 @@ type RunListing struct {
 // the catalog's Liveness, so an unfinished run is either running, with
 // no result and no outcome, or interrupted.
 //
-// Its only writes are Delete and SetSummary on a flat record.
+// Its only writes are Delete and SetSummary.
 type RunCatalog struct {
 	versioned *runfolder.Reader
 	root      string
@@ -177,16 +181,25 @@ func ignoreNotExist(err error) error {
 	return err
 }
 
-// SetSummary replaces the summary of the flat record for id and reports
-// whether the record exists. It returns ErrInvalidRunID for an id that
-// is not a bare run id and ErrRunReadOnly when the id names a versioned
-// run folder, which is never modified here.
+// SetSummary replaces the summary of the run with the given id and
+// reports whether the run exists. It edits the versioned folder when
+// one exists and the flat record otherwise. It returns ErrInvalidRunID
+// for an id that is not a bare run id. A versioned run with no summary
+// field returns ErrRunReadOnly, and one whose writer is still running
+// returns ErrRunLive.
 func (c *RunCatalog) SetSummary(id, summary string) (bool, error) {
 	if !runfolder.ValidRunID(id) {
 		return false, ErrInvalidRunID
 	}
 	if c.versioned != nil && c.versioned.Has(id) {
-		return false, ErrRunReadOnly
+		ok, err := runfolder.SetSummary(c.root, id, summary)
+		switch {
+		case errors.Is(err, runfolder.ErrNoSummary):
+			return ok, ErrRunReadOnly
+		case errors.Is(err, runfolder.ErrRunLive):
+			return ok, ErrRunLive
+		}
+		return ok, err
 	}
 	var record PersistedRun
 	ok, err := c.legacy.store.Load(RunKey(id), &record)
