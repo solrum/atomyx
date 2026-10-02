@@ -85,7 +85,11 @@ FLAGS
   --report <formats>       Write a report bundle in the given
                            comma-separated formats: html, json, or
                            both.
-  --report-dir <path>      Report bundle output directory.
+  --report-dir <path>      Run root. The run folder is written under
+                           <path>/runs/v1/<id>/, and alone this flag
+                           implies an html report. Defaults to the
+                           config report.outDir, then
+                           ATOMYX_STORAGE_DIR, then ~/.atomyx.
   --help, -h               Show this message.
 
 EXAMPLES
