@@ -429,7 +429,8 @@ Contract:
   `{"truncated":true,"limitBytes":N}` ends the file, after which
   further lines are dropped silently.
 - **Evidence.** One `artifacts/` directory holds every screenshot and
-  piece of failure evidence. The report lives in the sibling
+  piece of failure evidence. An MCP `screenshot` taken with no run open
+  goes to `LooseScreenshotsDir` under the root instead. The report lives in the sibling
   `report/` directory and links files as `../artifacts/<file>`.
 - **Compatibility.** Readers accept `schemaVersion` values up to their
   own and ignore unknown fields. Writers never reshape a field within

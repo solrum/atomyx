@@ -107,6 +107,7 @@ func run() int {
 		RunStore:   runStore,
 		Runs:       runs,
 		RunStarter: runStarter,
+		RunRoot:    runRoot,
 		Clock:      clock,
 		Logger:     logger,
 		Session:    sessionDeps,

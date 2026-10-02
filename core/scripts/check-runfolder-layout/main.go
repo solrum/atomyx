@@ -47,14 +47,6 @@ const (
 	selfDir = "scripts/check-runfolder-layout/"
 )
 
-// allowlist holds the production files that still spell a layout name.
-// Each entry states what the file spells and why it is tolerated.
-// Never add an entry for new code.
-var allowlist = map[string]bool{
-	// Names its own screenshots directory.
-	"internal/mcp/screenshot_tool.go": true,
-}
-
 var alwaysNames = map[string]bool{
 	"runs": true, "artifacts": true, "screenshots": true,
 }
@@ -122,7 +114,7 @@ func scan(root string) ([]string, error) {
 		if !strings.HasSuffix(rel, ".go") || strings.HasSuffix(rel, "_test.go") {
 			return nil
 		}
-		if strings.HasPrefix(rel, ownDir) || strings.HasPrefix(rel, selfDir) || allowlist[rel] {
+		if strings.HasPrefix(rel, ownDir) || strings.HasPrefix(rel, selfDir) {
 			return nil
 		}
 		src, readErr := os.ReadFile(path)

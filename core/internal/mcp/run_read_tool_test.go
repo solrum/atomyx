@@ -65,7 +65,7 @@ func fileBackedServerWithLiveness(t *testing.T, root string, live runfolder.Live
 	}
 	cs, ctx := testServer(t, ServerDeps{
 		Probe: device.NewStaticProbe(), Factory: device.NewMockDriverFactory(), Storage: store,
-		Runs: storage.NewRunCatalog(store, root, live), RunStarter: testRunStarter(root),
+		Runs: storage.NewRunCatalog(store, root, live), RunStarter: testRunStarter(root), RunRoot: root,
 	})
 	call := func(name string, args map[string]any) map[string]any {
 		_, decoded := callTool(t, cs, ctx, name, args)

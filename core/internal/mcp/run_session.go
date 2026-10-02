@@ -1,10 +1,14 @@
 package mcp
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/logging"
+	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/storage"
 )
@@ -42,22 +46,28 @@ type runSession struct {
 	store   *storage.RunStore
 	catalog *storage.RunCatalog
 	starter RunStarter
+	root    string
+	clock   orchestra.Clock
 	logger  logging.Logger
 
-	mu     sync.Mutex
-	writer *runfolder.Writer
+	mu        sync.Mutex
+	writer    *runfolder.Writer
+	artifacts *artifactCounter
 }
 
 type runSessionDeps struct {
 	Store   *storage.RunStore
 	Catalog *storage.RunCatalog
 	Starter RunStarter
+	Root    string
+	Clock   orchestra.Clock
 	Logger  logging.Logger
 }
 
 func newRunSession(deps runSessionDeps) *runSession {
 	return &runSession{
-		store: deps.Store, catalog: deps.Catalog, starter: deps.Starter, logger: deps.Logger,
+		store: deps.Store, catalog: deps.Catalog, starter: deps.Starter,
+		root: deps.Root, clock: deps.Clock, logger: deps.Logger, artifacts: &artifactCounter{},
 	}
 }
 
@@ -103,7 +113,7 @@ func (s *runSession) Start(name string, source *string, dev *device.Descriptor) 
 			"id": predecessor.ID, "newRunId": started.Run.ID,
 		})
 	}
-	s.writer = writer
+	s.writer, s.artifacts = writer, &artifactCounter{}
 	return startedRun{Run: started.Run, Superseded: started.ErroredPredecessor}, nil
 }
 
@@ -137,6 +147,33 @@ func (s *runSession) CloseOpenRun(outcome runfolder.Outcome, summary string) str
 	s.writer = nil
 	s.logger.Info("run.closed_by_session", logging.LogContext{"id": run.ID, "outcome": string(outcome)})
 	return run.ID
+}
+
+// SaveScreenshot writes an image into the open run's artifacts
+// directory, or into the loose screenshots directory under the storage
+// root when no run is open, and returns the file path.
+func (s *runSession) SaveScreenshot(data []byte) (string, error) {
+	s.mu.Lock()
+	open := s.writer
+	s.mu.Unlock()
+
+	var dir string
+	if open != nil {
+		var err error
+		if dir, err = open.ArtifactsDir(); err != nil {
+			return "", err
+		}
+	} else {
+		dir = runfolder.LooseScreenshotsDir(s.root)
+		if err := os.MkdirAll(dir, screenshotDirMode); err != nil {
+			return "", err
+		}
+	}
+	path := filepath.Join(dir, fmt.Sprintf("screenshot-%d.%s", s.clock.NowMs(), detectScreenshotExt(data)))
+	if err := os.WriteFile(path, data, artifactFileMode); err != nil {
+		return "", err
+	}
+	return path, nil
 }
 
 // SetSummary replaces the summary of the run with the given id and

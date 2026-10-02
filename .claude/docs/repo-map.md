@@ -84,7 +84,7 @@ atomyx/
 | `flock` | The advisory file lock primitive: a non-blocking exclusive flock on an open file, unlock, a contention check, and a descriptor-versus-path identity check. Depends on the standard library only. |
 | `lease` | Gives each physical device at most one driving process through a per-device flock, and probes it without writing. |
 | `logging` | The structured logging port every layer writes through, so the host chooses the destination. |
-| `mcp` | Builds the Atomyx MCP server: server construction, tool registration, the tool handlers themselves, and the `DeviceSession` holder state machine with its idle timers and clock-driven tool budget. |
+| `mcp` | Builds the Atomyx MCP server: server construction, tool registration, the tool handlers themselves, the run session that owns the open run and its run folder, and the `DeviceSession` holder state machine with its idle timers and clock-driven tool budget. |
 | `netcapture` | The concrete network-capture adapters a script run observes HTTP traffic through. |
 | `orchestra` | Composes Driver calls into selector resolution, priority broadening, scroll-into-view, obscurement, and retry. |
 | `process` | Abstracts external command execution (adb, xcrun, and similar) behind Runner and BackgroundRunner interfaces, carries extra child environment on the context, and reads process and host start times. |
@@ -98,7 +98,7 @@ atomyx/
 | `core/internal/session/sessiontest` | Test-only helpers for a session host, such as a lease manager over a throwaway directory. Only `_test.go` files import it. |
 | `sidecar` | Implements the host-side control process: a JSON-RPC bridge, method dispatcher, session, and event bus. |
 | `skills` | Embeds and copies the Atomyx skill and agent markdown files a consumer project installs. |
-| `storage` | Persistence primitives the MCP tool layer builds on: a JSON and markdown record store plus the in-flight run tracker. |
+| `storage` | Persistence primitives the MCP tool layer builds on: a JSON and markdown record store, the in-flight run tracker, and the run catalog that reads versioned run folders and flat records. |
 | `storageroot` | Resolves the storage root shared by the CLI and the MCP server: an explicit path, then `ATOMYX_STORAGE_DIR`, then `~/.atomyx`. |
 | `suite` | Discovers the ordered set of script and scenario files a suite selector resolves to. |
 | `transport` | Implements the device-facing clients: HTTP for the Android agent, TCP JSON for the iOS agent. |
@@ -116,8 +116,7 @@ Dev tooling `make -C core check` runs (see
 that imports `core/internal/session/sessiontest`),
 `core/scripts/check-runfolder-layout/` (a Go program that rejects a
 run folder layout name spelled as a string literal outside
-`core/internal/runfolder`, with an allowlist of files that still
-spell one), and `core/scripts/check-schema-fresh.sh` (the schema-freshness gate), plus
+`core/internal/runfolder`), and `core/scripts/check-schema-fresh.sh` (the schema-freshness gate), plus
 their allowlist files.
 
 ## `platforms/`

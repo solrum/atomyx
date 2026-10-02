@@ -556,7 +556,7 @@
     }
   },
   "run_script": {
-    "description": "Execute a YAML test script deterministically against the current device. Steps run in order, and execution stops on the first failure. Returns structured results with a pass or fail outcome per step. When a failure happened because the device or agent went unreachable rather than an ordinary assertion or command failure, the failed step and the top level result both carry deviceLost true. A script whose proxy field is \"required\" needs a proxy argument on this call; without one the result carries ok false, zero steps, and a top level abort object naming why. Use this for regression runs or replaying recorded flows, not for exploratory testing.",
+    "description": "Execute a YAML test script deterministically against the current device. Steps run in order, and execution stops on the first failure. Returns structured results with a pass or fail outcome per step. When a failure happened because the device or agent went unreachable rather than an ordinary assertion or command failure, the failed step and the top level result both carry deviceLost true. A script whose proxy field is \"required\" needs a proxy argument on this call; without one the result carries ok false, zero steps, and a top level abort object naming why. Use this for regression runs or replaying recorded flows, not for exploratory testing. Inside a run opened by start_run, the script's screenshots go into that run. With no run open, the call is its own run, finalized when the script ends.",
     "inputSchema": {
       "properties": {
         "env": {
@@ -581,7 +581,7 @@
     }
   },
   "screenshot": {
-    "description": "Use this only as a last resort, when get_ui_tree cannot answer your question (e.g. custom-rendered canvas, Flutter without semantics, visual layout validation, or when you suspect the UI tree is missing elements). Saves a compressed JPEG to .atomyx/screenshots/ and returns the file path. Read the file to view. Always try get_ui_tree or find_element FIRST because they are faster, cheaper, and give you actionable selectors directly.",
+    "description": "Use this only as a last resort, when get_ui_tree cannot answer your question (e.g. custom-rendered canvas, Flutter without semantics, visual layout validation, or when you suspect the UI tree is missing elements). Saves the image into the open run's artifacts folder when a run is open, and otherwise into the screenshots folder of the Atomyx storage root, and returns the file path. Read the file to view. Always try get_ui_tree or find_element FIRST because they are faster, cheaper, and give you actionable selectors directly.",
     "inputSchema": {
       "properties": {},
       "type": "object"

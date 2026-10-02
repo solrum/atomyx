@@ -51,7 +51,8 @@ func newGoMcpClientSession(t *testing.T, ctx context.Context, program *McpDriver
 		Runs:     storage.NewRunCatalog(store, root, storage.NewRunLiveness(runStore, root)),
 		RunStarter: runfolder.NewStarter(root,
 			func() time.Time { return mcpConformanceEpoch }, &mcpSuffixReader{}),
-		Clock: orchestra.NewFakeClock(mcpConformanceEpoch.UnixMilli()),
+		RunRoot: root,
+		Clock:   orchestra.NewFakeClock(mcpConformanceEpoch.UnixMilli()),
 	})
 	if err != nil {
 		t.Fatalf("Go mcp NewServer: %v", err)

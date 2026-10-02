@@ -47,6 +47,9 @@ func withRunDeps(t testing.TB, deps ServerDeps) ServerDeps {
 	if deps.RunStarter == nil {
 		deps.RunStarter = testRunStarter(root)
 	}
+	if deps.RunRoot == "" {
+		deps.RunRoot = root
+	}
 	return deps
 }
 

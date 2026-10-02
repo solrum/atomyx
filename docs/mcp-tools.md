@@ -427,7 +427,8 @@ None.
 
 **Behavior**
 - Requires an active device. Call select_device first.
-- Saves the captured image under a fixed screenshots folder relative to the current working directory, compressed as JPEG when the underlying capture is already JPEG, or as PNG otherwise. The tool does not return image bytes inline. The caller reads the file at the returned path to view it.
+- When a run is open, saves the image into that run's `artifacts` folder, next to the rest of the run's evidence. With no run open, saves it into the `screenshots` folder directly under the storage root, which is `~/.atomyx` unless the storage directory environment variable overrides it, so the location never depends on the server's working directory.
+- The image is JPEG when the underlying capture is already JPEG, and PNG otherwise. The tool does not return image bytes inline. The caller reads the file at the returned path to view it.
 
 **Returns**
 - `path`: absolute file path to the saved image.
@@ -436,7 +437,7 @@ None.
 
 **Errors and recovery**
 - No active device: select a device with select_device, then retry.
-- A file-system failure while saving surfaces as a tool error. Check that the working directory is writable and retry.
+- A file-system failure while saving surfaces as a tool error. Check that the storage root is writable and retry.
 
 **Example**
 ```json
@@ -815,6 +816,8 @@ Execute a YAML test script against the currently bound device, one step at a tim
 **Behavior**
 - Requires a device already bound with select_device. With no device bound, the call fails immediately without parsing the script.
 - The script is parsed and validated before anything runs. A structurally invalid script (an unrecognized command, a malformed step, a failed validation rule) fails the call before any step executes.
+- Inside a run opened by start_run, the script writes into that run, so its screenshots land in the run's `artifacts` folder and no second run is created. The run stays open afterwards.
+- With no run open, the call is its own run of kind `mcp`, labeled with the script's name. The run is finalized when the script ends, with outcome `passed` when every step passed, `failed` when a step failed, `deviceLost` when the device went unreachable, `cancelled` when the call was canceled, and `error` when the script could not run to a result. Read it back with list_runs and get_run.
 - Preconditions and required flows declared in the script, if any, are evaluated before the script's own steps. A failed precondition or a failed required flow is reported as a single synthetic step at index 0 (with command "preconditions" or "requires") and stops the run before any of the script's own steps execute.
 - If the script declares `proxy: required` and this call carries no proxy argument (and none is otherwise configured), the run is refused before any step executes: ok is false, steps is empty, totalSteps still reports the script's full declared count, and the top level abort object names the code `PROXY_REQUIRED`, an operator-facing message, and a remedy naming the `proxy` argument. See yml-script-reference.md's Proxy Setup section for how to configure capture per platform.
 - Steps run strictly in order. Execution stops at the first step whose result is not ok. Steps after that point are not attempted and do not appear in the result.

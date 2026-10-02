@@ -3,37 +3,59 @@ package mcp
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/diag"
 	mockdriver "dev.atomyx/internal/driver/mock"
+	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/storage"
 )
 
-func TestScreenshotSavesFileAndReturnsPath(t *testing.T) {
-	drv := mockdriver.New()
-	cs, ctx := testServer(t, ServerDeps{
-		Probe:   device.NewStaticProbe(),
-		Factory: singleMockDriverFactory{driver: drv},
-		Storage: storage.NewInMemoryStorage(),
-	})
-	selectMockDevice(t, cs, ctx)
+func TestScreenshotWithNoRunSavesUnderTheSharedScreenshotsDirectory(t *testing.T) {
+	r := newRunServer(t)
+	selectMockDevice(t, r.cs, t.Context())
 
-	result, decoded := callTool(t, cs, ctx, "screenshot", map[string]any{})
-	if result.IsError {
-		t.Fatalf("screenshot: unexpected isError: %v", decoded)
-	}
+	decoded := r.call("screenshot", map[string]any{})
 	path, _ := decoded["path"].(string)
-	if path == "" {
-		t.Fatalf("screenshot: missing path in %v", decoded)
+	if path == "" || decoded["format"] != "png" {
+		t.Fatalf("screenshot = %v", decoded)
 	}
-	t.Cleanup(func() { _ = os.Remove(path) })
-	if decoded["format"] != "png" {
-		t.Fatalf("screenshot format: got %v, want png", decoded["format"])
+	if filepath.Dir(path) != runfolder.LooseScreenshotsDir(r.root) {
+		t.Fatalf("path %q, want a file directly under %q", path, runfolder.LooseScreenshotsDir(r.root))
 	}
 	if _, err := os.Stat(path); err != nil {
-		t.Fatalf("screenshot: file not written at %q: %v", path, err)
+		t.Fatalf("screenshot file not written: %v", err)
+	}
+	if metas, _, _ := runfolder.NewReader(r.root).List(); len(metas) != 0 {
+		t.Fatalf("a screenshot with no run open created %d run folders", len(metas))
+	}
+}
+
+func TestScreenshotInsideARunLandsInItsArtifactsAndFinishFinalizesIt(t *testing.T) {
+	r := newRunServer(t)
+	selectMockDevice(t, r.cs, t.Context())
+	id := r.call("start_run", map[string]any{"name": "smoke"})["id"].(string)
+
+	path, _ := r.call("screenshot", map[string]any{})["path"].(string)
+	if filepath.Dir(path) != runfolder.ArtifactsDir(runfolder.RunDir(r.root, id)) {
+		t.Fatalf("path %q, want a file in the run's artifacts directory", path)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("screenshot file not written: %v", err)
+	}
+	if _, err := os.Stat(runfolder.LooseScreenshotsDir(r.root)); !os.IsNotExist(err) {
+		t.Fatalf("a screenshot inside a run created the shared directory: %v", err)
+	}
+
+	r.call("finish_run", map[string]any{})
+	meta := r.onlyMeta(t)
+	if meta.Outcome != runfolder.OutcomePassed || meta.CompletedAt == nil {
+		t.Fatalf("meta = %+v, want a finalized passed run", meta)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("screenshot missing after finish: %v", err)
 	}
 }
 

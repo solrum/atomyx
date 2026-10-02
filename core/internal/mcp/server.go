@@ -20,13 +20,13 @@ type Info struct {
 }
 
 // ServerDeps are the services NewServer wires into every tool
-// handler. Probe, Factory, Storage, Runs, and RunStarter are required.
+// handler. Probe, Factory, Storage, Runs, RunStarter, and RunRoot are required.
 // Probe backs list_devices, Factory backs select_device, Storage holds
 // bug reports and case studies, and Runs reads every stored run. Runs
 // is built by the composition root over the run directory with a
 // runfolder.Liveness that covers every writer it knows of, so a run
 // another process is writing lists as running. RunStarter creates the
-// run folders of new runs under that same directory. RunStore, Clock,
+// run folders of new runs under RunRoot, the same directory. RunStore, Clock,
 // and Logger default to a fresh in-memory RunStore, the system clock,
 // and a no-op logger when left zero-valued.
 //
@@ -43,7 +43,10 @@ type ServerDeps struct {
 	Runs     *storage.RunCatalog
 	// RunStarter creates the run folder of each run the server starts.
 	RunStarter RunStarter
-	Clock      orchestra.Clock
+	// RunRoot is the storage root that holds the run folders RunStarter
+	// creates and the screenshots taken with no run open.
+	RunRoot string
+	Clock   orchestra.Clock
 	// TimerClock drives tool call budgets, the device acquisition
 	// budget and the idle timers. It defaults to the system clock, and
 	// only a test that controls time injects another.
@@ -58,8 +61,8 @@ type ServerDeps struct {
 // pass it to Serve to run it over stdio. It returns an error when a
 // required dependency is missing.
 func NewServer(info Info, deps ServerDeps) (*Server, error) {
-	if deps.Runs == nil || deps.RunStarter == nil {
-		return nil, errors.New("mcp: ServerDeps needs Runs and RunStarter")
+	if deps.Runs == nil || deps.RunStarter == nil || deps.RunRoot == "" {
+		return nil, errors.New("mcp: ServerDeps needs Runs, RunStarter, and RunRoot")
 	}
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    info.Name,
@@ -84,7 +87,8 @@ func NewServer(info Info, deps ServerDeps) (*Server, error) {
 	}
 
 	runSession := newRunSession(runSessionDeps{
-		Store: runStore, Catalog: deps.Runs, Starter: deps.RunStarter, Logger: logger,
+		Store: runStore, Catalog: deps.Runs, Starter: deps.RunStarter,
+		Root: deps.RunRoot, Clock: clk, Logger: logger,
 	})
 	devices := NewDeviceSession(DeviceSessionDeps{
 		Factory: deps.Factory, Probe: deps.Probe, Runners: deps.Runners, Clock: clk, TimerClock: timers, Logger: logger,

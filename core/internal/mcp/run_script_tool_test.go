@@ -1,10 +1,18 @@
 package mcp
 
 import (
+	"context"
+	"errors"
+	"os"
+	"strings"
 	"testing"
 
 	"dev.atomyx/internal/device"
 	mockdriver "dev.atomyx/internal/driver/mock"
+	"dev.atomyx/internal/logging"
+	"dev.atomyx/internal/orchestra"
+	"dev.atomyx/internal/runfolder"
+	"dev.atomyx/internal/runner"
 	"dev.atomyx/internal/storage"
 )
 
@@ -84,5 +92,132 @@ func TestRunScriptDeviceLostFlagsFailedStepAndTopLevel(t *testing.T) {
 	step0 := steps[0].(map[string]any)
 	if step0["deviceLost"] != true {
 		t.Fatalf("run_script (device lost) steps[0]: got deviceLost=%v, want true", step0["deviceLost"])
+	}
+}
+
+const passingScreenshotScript = "appId: com.example.app\nname: Smoke Flow\nsteps:\n  - screenshot: home\n"
+
+func artifactFiles(t *testing.T, runDir string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(runfolder.ArtifactsDir(runDir))
+	if err != nil {
+		t.Fatalf("reading artifacts: %v", err)
+	}
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	return names
+}
+
+func TestRunScriptInsideAnOpenRunWritesIntoItAndCreatesNoSecondRun(t *testing.T) {
+	r := newRunServer(t)
+	selectMockDevice(t, r.cs, t.Context())
+	id := r.call("start_run", map[string]any{"name": "explore"})["id"].(string)
+
+	for range 2 {
+		got := r.call("run_script", map[string]any{"script": passingScreenshotScript})
+		if got["ok"] != true {
+			t.Fatalf("run_script = %v", got)
+		}
+	}
+
+	metas, _, err := runfolder.NewReader(r.root).List()
+	if err != nil || len(metas) != 1 || metas[0].RunID != id || metas[0].CompletedAt != nil {
+		t.Fatalf("run folders = %+v (%v), want only the open run, still open", metas, err)
+	}
+	files := artifactFiles(t, runfolder.RunDir(r.root, id))
+	if len(files) != 2 || files[0] == files[1] {
+		t.Fatalf("artifacts = %v, want two distinct screenshots", files)
+	}
+}
+
+func TestBareRunScriptIsItsOwnRunFinalizedWhenTheScriptEnds(t *testing.T) {
+	r := newRunServer(t)
+	selectMockDevice(t, r.cs, t.Context())
+
+	if got := r.call("run_script", map[string]any{"script": passingScreenshotScript}); got["ok"] != true {
+		t.Fatalf("run_script = %v", got)
+	}
+	meta := r.onlyMeta(t)
+	if meta.Kind != runfolder.KindMCP || meta.Outcome != runfolder.OutcomePassed || meta.CompletedAt == nil {
+		t.Fatalf("meta = %+v, want a finalized passed mcp run", meta)
+	}
+	if !strings.Contains(meta.RunID, "-smoke-flow-") || meta.ScriptName != "Smoke Flow" || meta.TotalSteps != 1 {
+		t.Fatalf("meta = %+v, want the script name in the label, name, and step count", meta)
+	}
+	if len(artifactFiles(t, runfolder.RunDir(r.root, meta.RunID))) != 1 {
+		t.Fatal("the script screenshot is not in the run's artifacts")
+	}
+	if runfolder.NewLockLiveness(r.root).IsLive(meta.RunID) {
+		t.Fatal("the finished script run still holds its lock")
+	}
+}
+
+func TestBareRunScriptThatFailsAStepFinalizesAsFailed(t *testing.T) {
+	r := newRunServer(t)
+	selectMockDevice(t, r.cs, t.Context())
+
+	script := "appId: com.example.app\nname: Broken\nsteps:\n  - assertVisible: \"Does Not Exist\"\n"
+	r.call("run_script", map[string]any{"script": script})
+
+	meta := r.onlyMeta(t)
+	if meta.Outcome != runfolder.OutcomeFailed || meta.FailedAtStep == nil || *meta.FailedAtStep != 0 {
+		t.Fatalf("meta = %+v, want failed at step 0", meta)
+	}
+}
+
+func TestScriptOutcomeMapsEveryWayAScriptCanEnd(t *testing.T) {
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	lost := runner.ScriptResult{Abort: &runner.RunAbort{Reason: runner.RunAbortDeviceLost}}
+	cases := []struct {
+		name   string
+		ctx    context.Context
+		result runner.ScriptResult
+		err    error
+		want   runfolder.Outcome
+	}{
+		{"passed", context.Background(), runner.ScriptResult{Ok: true}, nil, runfolder.OutcomePassed},
+		{"failed", context.Background(), runner.ScriptResult{}, nil, runfolder.OutcomeFailed},
+		{"device lost", context.Background(), lost, nil, runfolder.OutcomeDeviceLost},
+		{"error", context.Background(), runner.ScriptResult{}, errors.New("boom"), runfolder.OutcomeError},
+		{"canceled", canceled, runner.ScriptResult{}, nil, runfolder.OutcomeCancelled},
+		{"canceled with error", canceled, lost, errors.New("boom"), runfolder.OutcomeCancelled},
+		{"passed before cancel", canceled, runner.ScriptResult{Ok: true}, nil, runfolder.OutcomePassed},
+	}
+	for _, c := range cases {
+		if got := scriptOutcome(c.ctx, c.result, c.err); got != c.want {
+			t.Errorf("%s: outcome = %s, want %s", c.name, got, c.want)
+		}
+	}
+}
+
+func TestBareScriptRunFinalizesAsCancelledWhenTheContextIsCanceled(t *testing.T) {
+	root := t.TempDir()
+	runStore := storage.NewRunStore()
+	session := newRunSession(runSessionDeps{
+		Store: runStore, Catalog: testRunCatalog(storage.NewInMemoryStorage(), root, runStore),
+		Starter: testRunStarter(root), Root: root, Clock: orchestra.NewFakeClock(0), Logger: logging.NoopLogger{},
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+
+	_, err := session.RunScript(ctx, "slow", nil, func(scriptTarget) (runner.ScriptResult, error) {
+		cancel()
+		return runner.ScriptResult{}, ctx.Err()
+	})
+
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want the cancellation passed through", err)
+	}
+	metas, _, readErr := runfolder.NewReader(root).List()
+	if readErr != nil || len(metas) != 1 {
+		t.Fatalf("run folders = %d (%v)", len(metas), readErr)
+	}
+	if metas[0].Outcome != runfolder.OutcomeCancelled || metas[0].Result != runfolder.ResultCancelled {
+		t.Fatalf("meta = %s/%s, want cancelled", metas[0].Result, metas[0].Outcome)
+	}
+	if runfolder.NewLockLiveness(root).IsLive(metas[0].RunID) {
+		t.Fatal("the canceled run still holds its lock")
 	}
 }

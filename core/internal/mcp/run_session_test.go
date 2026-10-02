@@ -32,6 +32,7 @@ func newRunServer(t *testing.T) runServer {
 		RunStore:   runStore,
 		Runs:       testRunCatalog(store, root, runStore),
 		RunStarter: testRunStarter(root),
+		RunRoot:    root,
 	})
 	return runServer{root: root, store: store, cs: cs, call: func(name string, args map[string]any) map[string]any {
 		_, decoded := callTool(t, cs, ctx, name, args)

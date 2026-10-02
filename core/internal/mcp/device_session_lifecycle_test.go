@@ -117,6 +117,8 @@ func newLifecycleFixture(t *testing.T) *lifecycleFixture {
 		Store:   runStore,
 		Catalog: testRunCatalog(storage.NewInMemoryStorage(), f.root, runStore),
 		Starter: testRunStarter(f.root),
+		Root:    f.root,
+		Clock:   f.clk,
 		Logger:  logging.NoopLogger{},
 	})
 	f.devices = f.newDevices("atomyx-mcp", f.factory)

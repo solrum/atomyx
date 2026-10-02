@@ -115,7 +115,9 @@ func toScriptResultWire(result runner.ScriptResult) scriptResultWire {
 
 // registerRunScriptTool adds the run_script tool: parses a YAML
 // script and executes it deterministically against the active
-// device, step by step, stopping on the first failure.
+// device, step by step, stopping on the first failure. The script
+// writes into the open run when there is one, and is its own run
+// otherwise.
 func registerRunScriptTool(server *mcp.Server, tc *ToolContext) {
 	server.AddTool(&mcp.Tool{
 		Name: "run_script",
@@ -128,7 +130,9 @@ func registerRunScriptTool(server *mcp.Server, tc *ToolContext) {
 			"\"required\" needs a proxy argument on this call; without one the result " +
 			"carries ok false, zero steps, and a top level abort object naming why. " +
 			"Use this for regression runs or replaying recorded flows, not for " +
-			"exploratory testing.",
+			"exploratory testing. Inside a run opened by start_run, the script's " +
+			"screenshots go into that run. With no run open, the call is its own " +
+			"run, finalized when the script ends.",
 		InputSchema: runScriptInputSchema,
 	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		if err := validateToolArguments(runScriptSchema, req.Params.Arguments); err != nil {
@@ -152,14 +156,18 @@ func registerRunScriptTool(server *mcp.Server, tc *ToolContext) {
 			return errorResult(err), nil
 		}
 
-		scriptRunner := runner.NewScriptRunner(runner.ScriptRunnerDeps{
-			Orchestra:      orch,
-			Clock:          tc.Clock,
-			Logger:         tc.Logger,
-			Commands:       runner.DefaultCommands(),
-			NetworkCapture: networkCapture,
-		})
-		result, err := scriptRunner.Run(ctx, def)
+		result, err := tc.RunSession.RunScript(ctx, def.Name, tc.Session.SelectedDescriptor(),
+			func(target scriptTarget) (runner.ScriptResult, error) {
+				return runner.NewScriptRunner(runner.ScriptRunnerDeps{
+					Orchestra:      orch,
+					Clock:          tc.Clock,
+					Logger:         tc.Logger,
+					RunID:          target.RunID,
+					Commands:       runner.DefaultCommands(),
+					NetworkCapture: networkCapture,
+					Artifacts:      target.Artifacts,
+				}).Run(ctx, def)
+			})
 		if err != nil {
 			return errorResult(err), nil
 		}

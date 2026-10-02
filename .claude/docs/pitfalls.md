@@ -235,9 +235,8 @@ corresponding area. For the high-level map see
   `"runs/v1"` or `screenshots/%s`, or that is exactly `v1` or
   `report` as an argument of a `filepath`, `path`, or `os` call.
   Struct tags, import paths, prose, URLs, and format identifiers such
-  as `atomyx/v1` are not flagged. The gate carries an explicit
-  allowlist of files that still spell a name. Remove an entry when its
-  file moves onto `runfolder`, and never add one for new code.
+  as `atomyx/v1` are not flagged. The gate has no allowlist, so a
+  new spelling outside `runfolder` fails it.
 - **A new field in `meta.json` needs a schema regeneration.** Change
   the `runfolder` types, then run `make -C core gen-schema`. The
   schema-freshness gate fails on a stale `atomyx-run.schema.json`.

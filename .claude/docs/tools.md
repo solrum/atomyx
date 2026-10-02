@@ -40,7 +40,7 @@ type system enforces it.
 | **Screen** | | | | |
 | `get_ui_tree` | `core/internal/mcp/get_ui_tree_tool.go` | `limit`, `includeSystemOverlays` | `{total, returned, truncated, nodes[]}` | `Orchestra.Hierarchy` |
 | `find_element` | `core/internal/mcp/find_element_tool.go` | a `Selector` (id, label, text, value, hint, role, enabled, clickable, focused, nth) | element details plus center, or `{found:false}` | `Orchestra.FindOne` |
-| `screenshot` | `core/internal/mcp/screenshot_tool.go` | none | `{path, sizeBytes, format}`, and writes the image under `.atomyx/screenshots/` | `Orchestra.Screenshot` |
+| `screenshot` | `core/internal/mcp/screenshot_tool.go` | none | `{path, sizeBytes, format}`, and writes the image into the open run's `artifacts` directory, or under `<root>/screenshots` when no run is open | `Orchestra.Screenshot`, then `runSession.SaveScreenshot` |
 | **Actions** | | | | |
 | `tap` | `core/internal/mcp/tap_tool.go` | `selector`, or `x`/`y` | `ActionResult`, or `{ok, detail}` for the coordinate path | `Orchestra.Tap` (selector) or `Orchestra.TapAt` (coordinates) |
 | `tap_and_wait_transition` | `core/internal/mcp/tap_and_wait_transition_tool.go` | `selector`, `waitForAbsent`, `waitForAppear`, `timeoutMs`, `maxTimeoutMs`, `intervalMs`, `loadingKeywords` | `ActionResult` plus transition diagnostics, classifying a timeout as still-loading, dialog-shown, overlay-unknown, partial-transition, or no-change | `Orchestra.Tap` then `Orchestra.WaitForTransition` |
@@ -65,7 +65,7 @@ type system enforces it.
 | `add_case_study` | `core/internal/mcp/case_study_tool.go` | `title`, `trigger`, `solution`, `example` | `{ok}` | `storage.Storage.Save` |
 | `get_case_studies` | `core/internal/mcp/case_study_tool.go` | `month`, `limit`, `offset` | paginated case-study bodies | `storage.Storage.List` then `storage.Storage.Load` |
 | **Script execution** | | | | |
-| `run_script` | `core/internal/mcp/run_script_tool.go` | `script` (YAML), `env` | structured per-step results: `{scriptName, ok, steps[], totalSteps, passedSteps, failedAtStep?, durationMs, deviceLost?}`, and each step carries its own `deviceLost?` | `script.ParseScript` then `runner.ScriptRunner.Run` |
+| `run_script` | `core/internal/mcp/run_script_tool.go` | `script` (YAML), `env` | structured per-step results: `{scriptName, ok, steps[], totalSteps, passedSteps, failedAtStep?, durationMs, deviceLost?}`, and each step carries its own `deviceLost?` | `script.ParseScript` then `runSession.RunScript`, which runs `runner.ScriptRunner.Run` inside the open run, or inside a run of its own finalized when the script ends |
 
 Run verdicts in `list_runs` and `get_run` depend on liveness. A run
 with no completion time and a live writer has status `running` and no
