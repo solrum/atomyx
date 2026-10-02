@@ -1,0 +1,18 @@
+[
+  {
+    "matchCount": 2,
+    "selector": {
+      "label": "Add to cart",
+      "nth": 1,
+      "role": "button"
+    },
+    "unique": true
+  },
+  {
+    "matchCount": 3,
+    "selector": {
+      "label": "Add to cart"
+    },
+    "unique": false
+  }
+]

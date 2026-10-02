@@ -1,0 +1,12 @@
+{
+  "name": "suggest-ios-identical-cells-fall-back-to-nth",
+  "description": "two iOS cells that are identical in every attribute are pinned by document order",
+  "function": "suggestSelectors",
+  "targetPath": [3],
+  "tree": {"attributes":{"class":"other","role":"other"},"children":[
+{"attributes":{"class":"secureTextField","id":"password","label":"Password","role":"secure-text-field","secure":"true","text":"hunter2","value":"hunter2"},"children":[],"clickable":true},
+{"attributes":{"class":"textField","id":"email","label":"Email","role":"text-field","text":"a@b.co","value":"a@b.co"},"children":[],"clickable":true},
+{"attributes":{"class":"cell","label":"Settings","role":"cell"},"children":[],"clickable":true},
+{"attributes":{"class":"cell","label":"Settings","role":"cell"},"children":[],"clickable":true},
+{"attributes":{"class":"image","label":"Settings","role":"image"},"children":[],"clickable":false}]}
+}

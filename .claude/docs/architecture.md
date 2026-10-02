@@ -167,6 +167,15 @@ the same canonical attribute keys at the `Driver` boundary, and
 `CompileSelector` tries whichever fields the caller supplied in
 priority order.
 
+`core/internal/orchestra/selector_suggest.go` runs the same policy in
+reverse: `SuggestSelectors` takes a tree and a node path (child indexes
+from the root) and returns ranked candidate selectors for that node.
+A candidate counts as unique only when `CompileSelector` against the
+same tree resolves to the target and matches nothing else. Role and
+state constraints are added only when they make an ambiguous candidate
+unique, `Nth` is the last resort, and the text and value of a secure
+node are never used.
+
 ## Driver implementers
 
 Four packages implement `Driver`, all verified against the same

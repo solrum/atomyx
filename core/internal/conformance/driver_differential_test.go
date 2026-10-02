@@ -145,6 +145,16 @@ func goDriverOutput(c *DriverCase) ([]byte, error) {
 		}{From: from, To: to})
 	case "clamp":
 		return json.Marshal(orchestra.ClampF(*c.Value, *c.Min, *c.Max))
+	case "suggestSelectors":
+		var tree wire.TreeNodeWire
+		if err := json.Unmarshal(c.Tree, &tree); err != nil {
+			return nil, fmt.Errorf("decoding tree: %w", err)
+		}
+		suggestions, err := orchestra.SuggestSelectors(tree, c.TargetPath)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(suggestions)
 	default:
 		panic("unreachable: DriverCase validates function during load")
 	}

@@ -1,0 +1,10 @@
+[
+  {
+    "matchCount": 1,
+    "selector": {
+      "role": "text",
+      "text": "Sign in"
+    },
+    "unique": true
+  }
+]

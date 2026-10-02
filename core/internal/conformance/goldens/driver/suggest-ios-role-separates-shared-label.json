@@ -1,0 +1,10 @@
+[
+  {
+    "matchCount": 1,
+    "selector": {
+      "label": "Settings",
+      "role": "image"
+    },
+    "unique": true
+  }
+]

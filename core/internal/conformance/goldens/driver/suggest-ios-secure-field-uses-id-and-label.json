@@ -1,0 +1,16 @@
+[
+  {
+    "matchCount": 1,
+    "selector": {
+      "id": "password"
+    },
+    "unique": true
+  },
+  {
+    "matchCount": 1,
+    "selector": {
+      "label": "Password"
+    },
+    "unique": true
+  }
+]

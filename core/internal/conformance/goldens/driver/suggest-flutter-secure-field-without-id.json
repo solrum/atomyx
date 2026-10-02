@@ -1,0 +1,9 @@
+[
+  {
+    "matchCount": 1,
+    "selector": {
+      "label": "Card number"
+    },
+    "unique": true
+  }
+]

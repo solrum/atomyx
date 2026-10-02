@@ -1,0 +1,12 @@
+{
+  "name": "suggest-flutter-label-only-buttons-fall-back-to-nth",
+  "description": "Flutter semantics nodes with no id and identical state are pinned by document order",
+  "function": "suggestSelectors",
+  "targetPath": [1],
+  "tree": {"attributes":{"class":"android.view.View","role":"container"},"children":[
+{"attributes":{"class":"android.view.View","label":"Add to cart","role":"button"},"children":[],"clickable":true,"enabled":true},
+{"attributes":{"class":"android.view.View","label":"Add to cart","role":"button"},"children":[],"clickable":true,"enabled":true},
+{"attributes":{"class":"android.view.View","label":"Add to cart","role":"image"},"children":[]},
+{"attributes":{"class":"android.widget.EditText","label":"Card number","role":"text-field","secure":"true","text":"4111111111111111","value":"4111111111111111"},"children":[],"focused":true},
+{"attributes":{"class":"android.view.View","role":"container"},"children":[]}]}
+}

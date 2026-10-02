@@ -1,0 +1,10 @@
+[
+  {
+    "matchCount": 1,
+    "selector": {
+      "enabled": true,
+      "text": "Sign in"
+    },
+    "unique": true
+  }
+]

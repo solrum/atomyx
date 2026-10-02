@@ -1,0 +1,12 @@
+{
+  "name": "suggest-android-duplicate-buttons-use-enabled",
+  "description": "two Android buttons with the same text and role are told apart by the enabled state",
+  "function": "suggestSelectors",
+  "targetPath": [2],
+  "tree": {"attributes":{"class":"android.widget.FrameLayout","role":"container"},"children":[
+{"attributes":{"class":"android.widget.EditText","hint":"Password","id":"com.example:id/password","role":"text-field","secure":"true","text":"hunter2"},"children":[]},
+{"attributes":{"class":"android.widget.EditText","id":"com.example:id/email","role":"text-field","text":"a@b.co"},"children":[]},
+{"attributes":{"class":"android.widget.Button","role":"button","text":"Sign in"},"children":[],"clickable":true,"enabled":true},
+{"attributes":{"class":"android.widget.Button","role":"button","text":"Sign in"},"children":[],"clickable":true,"enabled":false},
+{"attributes":{"class":"android.widget.TextView","role":"text","text":"Sign in"},"children":[]}]}
+}

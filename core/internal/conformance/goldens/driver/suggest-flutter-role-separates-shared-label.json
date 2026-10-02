@@ -1,0 +1,10 @@
+[
+  {
+    "matchCount": 1,
+    "selector": {
+      "label": "Add to cart",
+      "role": "image"
+    },
+    "unique": true
+  }
+]

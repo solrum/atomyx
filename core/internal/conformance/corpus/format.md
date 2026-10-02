@@ -120,7 +120,7 @@ Common fields:
 - `function` (string, required): one of `"compileSelector"`,
   `"find-in-tree"`, `"detectObscurement"`, `"hashVisibleLeaves"`,
   `"bucketBounds"`, `"swipeDirection"`, `"scrollTowardElement"`,
-  `"swipeCenter"`, or `"clamp"`. The remaining fields required depend
+  `"swipeCenter"`, `"clamp"`, or `"suggestSelectors"`. The remaining fields required depend
   on which.
 
 `"compileSelector"`, `"find-in-tree"`, and `"detectObscurement"` take
@@ -198,6 +198,11 @@ scroll-search probe dispatches for a blind center-column swipe.
 `"clamp"` takes `value`, `min`, and `max` (numbers, all required) and
 returns `value` clamped into `[min, max]`, or `min` when the range is
 inverted (`max < min`).
+
+`"suggestSelectors"` takes a `tree` and a `targetPath` (array of
+child indexes from the root, `[]` for the root, required) and returns
+the ranked candidates `orchestra.SuggestSelectors` produces, each as
+`{selector, unique, matchCount}`.
 
 Adding a case:
 

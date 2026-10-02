@@ -1,0 +1,18 @@
+[
+  {
+    "matchCount": 2,
+    "selector": {
+      "label": "Settings",
+      "nth": 1,
+      "role": "cell"
+    },
+    "unique": true
+  },
+  {
+    "matchCount": 3,
+    "selector": {
+      "label": "Settings"
+    },
+    "unique": false
+  }
+]

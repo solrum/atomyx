@@ -24,6 +24,7 @@ type DriverCase struct {
 	Fraction          *float64        `json:"fraction,omitempty"`
 	Bounds            json.RawMessage `json:"bounds,omitempty"`
 	MaxScrollFraction *float64        `json:"maxScrollFraction,omitempty"`
+	TargetPath        []int           `json:"targetPath,omitempty"`
 	Value             *float64        `json:"value,omitempty"`
 	Min               *float64        `json:"min,omitempty"`
 	Max               *float64        `json:"max,omitempty"`
@@ -58,6 +59,13 @@ func loadDriverCase(path string) (*DriverCase, error) {
 		}
 		if len(c.Tree) == 0 {
 			return nil, fmt.Errorf("driver corpus case %s: missing tree", path)
+		}
+	case c.Function == "suggestSelectors":
+		if len(c.Tree) == 0 {
+			return nil, fmt.Errorf("driver corpus case %s: missing tree", path)
+		}
+		if c.TargetPath == nil {
+			return nil, fmt.Errorf("driver corpus case %s: missing targetPath", path)
 		}
 	case c.Function == "hashVisibleLeaves":
 		if len(c.Tree) == 0 {
@@ -109,7 +117,7 @@ func loadDriverCase(path string) (*DriverCase, error) {
 		}
 	default:
 		return nil, fmt.Errorf(
-			"driver corpus case %s: function must be one of \"compileSelector\", \"find-in-tree\", \"detectObscurement\", \"hashVisibleLeaves\", \"bucketBounds\", \"swipeDirection\", \"scrollTowardElement\", \"swipeCenter\", \"clamp\", got %q",
+			"driver corpus case %s: function must be one of \"compileSelector\", \"find-in-tree\", \"detectObscurement\", \"hashVisibleLeaves\", \"bucketBounds\", \"swipeDirection\", \"scrollTowardElement\", \"swipeCenter\", \"clamp\", \"suggestSelectors\", got %q",
 			path, c.Function,
 		)
 	}

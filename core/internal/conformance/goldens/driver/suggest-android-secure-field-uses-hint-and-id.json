@@ -1,0 +1,16 @@
+[
+  {
+    "matchCount": 1,
+    "selector": {
+      "id": "com.example:id/password"
+    },
+    "unique": true
+  },
+  {
+    "matchCount": 1,
+    "selector": {
+      "hint": "Password"
+    },
+    "unique": true
+  }
+]

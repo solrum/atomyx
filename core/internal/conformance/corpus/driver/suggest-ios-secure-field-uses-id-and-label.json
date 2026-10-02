@@ -1,0 +1,12 @@
+{
+  "name": "suggest-ios-secure-field-uses-id-and-label",
+  "description": "an iOS secure text field is suggested by id and label, never by its secret value",
+  "function": "suggestSelectors",
+  "targetPath": [0],
+  "tree": {"attributes":{"class":"other","role":"other"},"children":[
+{"attributes":{"class":"secureTextField","id":"password","label":"Password","role":"secure-text-field","secure":"true","text":"hunter2","value":"hunter2"},"children":[],"clickable":true},
+{"attributes":{"class":"textField","id":"email","label":"Email","role":"text-field","text":"a@b.co","value":"a@b.co"},"children":[],"clickable":true},
+{"attributes":{"class":"cell","label":"Settings","role":"cell"},"children":[],"clickable":true},
+{"attributes":{"class":"cell","label":"Settings","role":"cell"},"children":[],"clickable":true},
+{"attributes":{"class":"image","label":"Settings","role":"image"},"children":[],"clickable":false}]}
+}
