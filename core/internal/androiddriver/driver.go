@@ -31,10 +31,24 @@ type Options struct {
 	Serial string
 
 	// HostPort is the host-side TCP port forwarded to the device.
-	// Defaults to 8765. Set a distinct value per driver when more
-	// than one Android driver runs concurrently against different
-	// devices.
+	// Defaults to 8765 when zero. Ignored when AllocateHostPort is
+	// set.
 	HostPort int
+
+	// AllocateHostPort asks adb to pick a free host port for this
+	// device ("adb forward tcp:0 <devicePort>") instead of using
+	// HostPort. Connect reuses a forward that already maps this serial
+	// to DevicePort, and otherwise creates one and records the port adb
+	// printed. This is the setting to use whenever more than one
+	// Android driver may run on the workstation at the same time.
+	// Requires NewTransport, because the transport can only be built
+	// once the port is known.
+	AllocateHostPort bool
+
+	// NewTransport builds the transport for the host port Connect
+	// settled on. Required when AllocateHostPort is set, and ignored
+	// otherwise.
+	NewTransport func(hostPort int) Transport
 
 	// DevicePort is the device-side port the agent's HTTP server
 	// listens on. Defaults to 8765.
@@ -63,6 +77,10 @@ type AndroidDriver struct {
 	// a prior run, or another driver instance may still depend on a
 	// forward it did not create.
 	forwardOwnedByThis bool
+
+	// hostPort is the host-side port the live forward uses: the fixed
+	// option value, or the port adb allocated for this serial.
+	hostPort int
 }
 
 // New constructs an AndroidDriver bound to opts.Serial. t and proc
@@ -76,6 +94,7 @@ func New(t Transport, proc process.Runner, opts Options) *AndroidDriver {
 		opts.DevicePort = defaultAndroidPort
 	}
 	return &AndroidDriver{
+		hostPort:  opts.HostPort,
 		opts:      opts,
 		transport: t,
 		proc:      proc,
@@ -139,20 +158,21 @@ func (d *AndroidDriver) Connect(ctx context.Context) error {
 		return err
 	}
 
-	localPort := fmt.Sprintf("tcp:%d", d.opts.HostPort)
 	remotePort := fmt.Sprintf("tcp:%d", d.opts.DevicePort)
 
 	forwards, err := listAdbForwards(ctx, d.proc)
 	if err != nil {
-		return diag.New(diag.CodeAgentUnreachable,
-			fmt.Sprintf("could not reach the agent on device %s", d.opts.Serial),
-			"Confirm the device is connected and unlocked, then try again.",
-			fmt.Errorf("androiddriver: adb forward --list: %w", err))
+		return d.unreachable(fmt.Errorf("androiddriver: adb forward --list: %w", err))
 	}
 
+	if d.opts.AllocateHostPort {
+		return d.connectAllocated(ctx, forwards, remotePort)
+	}
+
+	localPort := fmt.Sprintf("tcp:%d", d.opts.HostPort)
 	if existing, found := findAdbForward(forwards, localPort); found {
 		if existing.serial != d.opts.Serial || existing.remote != remotePort {
-			return diag.New(diag.CodeDeviceBusy,
+			return diag.New(diag.CodeHostPortInUse,
 				fmt.Sprintf("could not reach the agent on device %s: its forwarded port is already claimed by a different device", d.opts.Serial),
 				"Remove the conflicting adb forward for the other device, then try again.",
 				nil)
@@ -162,14 +182,53 @@ func (d *AndroidDriver) Connect(ctx context.Context) error {
 		if _, err := d.proc.Run(ctx, "adb",
 			"-s", d.opts.Serial, "forward", localPort, remotePort,
 		); err != nil {
-			return diag.New(diag.CodeAgentUnreachable,
-				fmt.Sprintf("could not reach the agent on device %s", d.opts.Serial),
-				"Confirm the device is connected and unlocked, then try again.",
-				fmt.Errorf("androiddriver: adb forward: %w", err))
+			return d.unreachable(fmt.Errorf("androiddriver: adb forward: %w", err))
 		}
 		d.forwardOwnedByThis = true
 	}
+	d.hostPort = d.opts.HostPort
+	return d.finishConnect(ctx)
+}
 
+// connectAllocated is the AllocateHostPort branch of Connect. It
+// reuses a live forward that maps this serial to the device port,
+// and otherwise lets adb allocate a fresh host port. A reused forward
+// whose agent does not answer at the transport level is treated as
+// stale, which is what adb kill-server or a device reboot leaves
+// behind, so it is removed and a fresh forward is allocated once.
+func (d *AndroidDriver) connectAllocated(ctx context.Context, forwards []adbForward, remotePort string) error {
+	if d.opts.NewTransport == nil {
+		return d.unreachable(errors.New("androiddriver: AllocateHostPort requires Options.NewTransport"))
+	}
+
+	if port, found := findSerialForward(forwards, d.opts.Serial, remotePort); found {
+		d.hostPort = port
+		d.forwardOwnedByThis = false
+		d.transport = d.opts.NewTransport(port)
+		err := d.finishConnect(ctx)
+		if err == nil || !isStaleForwardFailure(err) {
+			return err
+		}
+		_, _ = d.proc.Run(ctx, "adb", "-s", d.opts.Serial, "forward", "--remove", fmt.Sprintf("tcp:%d", port))
+	}
+
+	result, err := d.proc.Run(ctx, "adb", "-s", d.opts.Serial, "forward", "tcp:0", remotePort)
+	if err != nil {
+		return d.unreachable(fmt.Errorf("androiddriver: adb forward tcp:0: %w", err))
+	}
+	port, err := parseAllocatedPort(result.Stdout)
+	if err != nil {
+		return d.unreachable(err)
+	}
+	d.hostPort = port
+	d.forwardOwnedByThis = true
+	d.transport = d.opts.NewTransport(port)
+	return d.finishConnect(ctx)
+}
+
+// finishConnect verifies the agent answers /health and runs the /ping
+// capability handshake against the forward Connect settled on.
+func (d *AndroidDriver) finishConnect(ctx context.Context) error {
 	if _, err := d.transport.Health(ctx); err != nil {
 		return d.classifyHealthFailure(fmt.Errorf("androiddriver: health check: %w", err))
 	}
@@ -179,6 +238,21 @@ func (d *AndroidDriver) Connect(ctx context.Context) error {
 	}
 	d.connected = true
 	return nil
+}
+
+// isStaleForwardFailure reports whether err is a health failure where
+// the agent never answered, as opposed to an agent that answered and
+// reported itself not ready.
+func isStaleForwardFailure(err error) bool {
+	code, _, _ := diag.Describe(err)
+	return code == diag.CodeAgentUnreachable
+}
+
+func (d *AndroidDriver) unreachable(cause error) error {
+	return diag.New(diag.CodeAgentUnreachable,
+		fmt.Sprintf("could not reach the agent on device %s", d.opts.Serial),
+		"Confirm the device is connected and unlocked, then try again.",
+		cause)
 }
 
 // Disconnect removes the adb forward only when this Connect call
@@ -195,7 +269,7 @@ func (d *AndroidDriver) Disconnect() error {
 	if d.forwardOwnedByThis {
 		_, _ = d.proc.Run(context.Background(), "adb",
 			"-s", d.opts.Serial, "forward", "--remove",
-			fmt.Sprintf("tcp:%d", d.opts.HostPort),
+			fmt.Sprintf("tcp:%d", d.hostPort),
 		)
 	}
 	d.connected = false

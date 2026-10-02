@@ -114,15 +114,15 @@ corresponding area. For the high-level map see
 - **A host-side forward is a shared resource, not a per-driver one.**
   The local port `AndroidDriver.Connect`
   (`core/internal/androiddriver/driver.go`) forwards to the device is
-  a real listening socket on the workstation, so two driver instances,
-  a prior run, or an operator's manual `adb forward` can all be
-  pointing at it already. `Connect` checks `adb forward --list` before
-  creating one, reuses a forward that already matches this serial and
-  device port, and fails with a device-busy diagnostic when the port
-  is claimed by something else instead of silently replacing it.
-  `AndroidDriver.Disconnect` removes the forward only when this
-  `Connect` call is the one that created it, so it never tears down a
-  forward some other caller still depends on.
+  a real listening socket on the workstation. Never hard-code a host
+  port for a new Android driver: set `Options.AllocateHostPort` so adb
+  picks a free one per device, and supply `Options.NewTransport` so the
+  client is built after the port is known. `Connect` reuses a forward
+  that already maps this serial to the device port, and
+  `Disconnect` removes only a forward this `Connect` created. With a
+  fixed `HostPort`, a port already forwarded to a different device
+  fails with `HOST_PORT_IN_USE`, not `DEVICE_BUSY`, which is reserved
+  for a foreign automation session.
 
 ## Tool layer (cross-platform)
 

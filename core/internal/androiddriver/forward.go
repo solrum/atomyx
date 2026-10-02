@@ -2,6 +2,8 @@ package androiddriver
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 	"strings"
 
 	"dev.atomyx/internal/process"
@@ -46,4 +48,35 @@ func findAdbForward(forwards []adbForward, localPort string) (adbForward, bool) 
 		}
 	}
 	return adbForward{}, false
+}
+
+const maxPort = 65535
+
+// findSerialForward returns the host port of a forward that already
+// maps serial to remote, if any.
+func findSerialForward(forwards []adbForward, serial, remote string) (int, bool) {
+	for _, f := range forwards {
+		if f.serial != serial || f.remote != remote || !strings.HasPrefix(f.local, "tcp:") {
+			continue
+		}
+		port, err := strconv.Atoi(strings.TrimPrefix(f.local, "tcp:"))
+		if err != nil || port <= 0 || port > maxPort {
+			continue
+		}
+		return port, true
+	}
+	return 0, false
+}
+
+// parseAllocatedPort reads the host port "adb forward tcp:0 ..."
+// prints on stdout. Empty or non-numeric output is an error rather
+// than a guess, because a wrong port would silently talk to something
+// else.
+func parseAllocatedPort(stdout string) (int, error) {
+	text := strings.TrimSpace(stdout)
+	port, err := strconv.Atoi(text)
+	if err != nil || port <= 0 || port > maxPort {
+		return 0, fmt.Errorf("androiddriver: adb forward tcp:0 printed %q, want a host port number", text)
+	}
+	return port, nil
 }

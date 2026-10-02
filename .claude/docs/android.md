@@ -133,19 +133,36 @@ a foreign automation session already driving the device (a live
 already has the device), then ensures the adb forward is in place,
 verifies `/health`, then runs the `/ping` capability handshake.
 Because a host-side local port is a real listening socket shared by
-the whole workstation, `Connect` first checks `adb forward --list`: it
-reuses a forward already pointing at this serial and device port
-without recreating it, creates one when none exists, and fails with a
-device-busy diagnostic when the local port is already forwarded
-somewhere else. `AndroidDriver.Disconnect` removes the forward only
-when this `Connect` call is the one that created it, so a forward
-left behind by another run, an operator's manual setup, or another
-driver instance sharing the same port survives a single driver's
-disconnect.
+the whole workstation, `Connect` first checks `adb forward --list`.
+`device.DriverFactory` builds every Android driver with
+`Options.AllocateHostPort`, which works as follows:
 
-Multiple concurrent devices: pass distinct `HostPort` values to each
-`androiddriver.Options`. `adb forward` is scoped per `(serial,
-hostPort)` pair.
+- A forward that already maps this serial to the device port is
+  reused, and `Disconnect` leaves it in place.
+- Otherwise `Connect` runs `adb -s <serial> forward tcp:0
+  tcp:<devicePort>`, takes the host port adb prints, and removes that
+  forward on `Disconnect`. Empty or non-numeric output from adb is an
+  `AGENT_UNREACHABLE` error.
+- A reused forward whose agent does not answer is treated as stale
+  (`adb kill-server` and device reboots leave these behind). `Connect`
+  removes it and allocates a fresh one once. An agent that answers
+  with `AGENT_NOT_READY` is not stale and is never reallocated.
+- The transport is built after allocation through
+  `Options.NewTransport`, which is required when `AllocateHostPort`
+  is set.
+
+Without `AllocateHostPort`, `Options.HostPort` (default 8765) is the
+fixed host port. In that mode `Connect` reuses a forward already
+pointing at this serial and device port, creates one when none
+exists, and fails with `HOST_PORT_IN_USE` when the local port is
+already forwarded to a different device or device port.
+`DEVICE_BUSY` stays reserved for a foreign automation session.
+
+Reallocation happens at `Connect` time only. A forward dropped in the
+middle of a run surfaces as an ordinary call failure for that run.
+
+Multiple concurrent devices: each driver gets its own host port from
+adb, so no per-driver port configuration is needed.
 
 Proxy, certificate, and screen-lock setup for a physical device are
 covered in `android-device-setup.md`, not here.

@@ -47,6 +47,10 @@ const (
 	// CodeDeviceBusy means a pre-run check found another automation
 	// session already driving the target device.
 	CodeDeviceBusy = "DEVICE_BUSY"
+	// CodeHostPortInUse means the host-side port a device's adb
+	// forward needs is already forwarded to a different device, so the
+	// forward cannot be created without severing that other device.
+	CodeHostPortInUse = "HOST_PORT_IN_USE"
 	// CodeInvalidAppID means an app id failed format validation before
 	// reaching a device call: it was empty, too long, or contained a
 	// character outside the set a package name or bundle id allows.

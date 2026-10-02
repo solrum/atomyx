@@ -344,10 +344,10 @@ func TestAndroidDriver_Connect_ExistingMatchingForward_ReusesItWithoutRecreating
 	}
 }
 
-// TestAndroidDriver_Connect_ConflictingForwardDifferentSerial_ReturnsDeviceBusy
+// TestAndroidDriver_Connect_ConflictingForwardDifferentSerial_ReturnsHostPortInUse
 // proves Connect refuses to steal a local port another device already
 // holds a forward on, rather than silently replacing it.
-func TestAndroidDriver_Connect_ConflictingForwardDifferentSerial_ReturnsDeviceBusy(t *testing.T) {
+func TestAndroidDriver_Connect_ConflictingForwardDifferentSerial_ReturnsHostPortInUse(t *testing.T) {
 	runner := process.NewFake()
 	runner.Stub(process.ExactMatch("adb", "forward", "--list"),
 		process.Result{Stdout: "S2 tcp:9001 tcp:8765\n"}, nil)
@@ -361,8 +361,8 @@ func TestAndroidDriver_Connect_ConflictingForwardDifferentSerial_ReturnsDeviceBu
 		t.Fatal("IsConnected() = true after a conflicting forward, want false")
 	}
 	code, message, remedy := diag.Describe(err)
-	if code != diag.CodeDeviceBusy {
-		t.Fatalf("Connect() code = %q, want %q", code, diag.CodeDeviceBusy)
+	if code != diag.CodeHostPortInUse {
+		t.Fatalf("Connect() code = %q, want %q", code, diag.CodeHostPortInUse)
 	}
 	if remedy == "" {
 		t.Fatal("Connect() remedy is empty, want an actionable hint")
@@ -376,11 +376,11 @@ func TestAndroidDriver_Connect_ConflictingForwardDifferentSerial_ReturnsDeviceBu
 	}
 }
 
-// TestAndroidDriver_Connect_ConflictingForwardDifferentDevicePort_ReturnsDeviceBusy
+// TestAndroidDriver_Connect_ConflictingForwardDifferentDevicePort_ReturnsHostPortInUse
 // proves the same conflict is caught when the local port belongs to
 // this driver's own serial but points at a different device port,
 // which is just as unsafe to silently replace.
-func TestAndroidDriver_Connect_ConflictingForwardDifferentDevicePort_ReturnsDeviceBusy(t *testing.T) {
+func TestAndroidDriver_Connect_ConflictingForwardDifferentDevicePort_ReturnsHostPortInUse(t *testing.T) {
 	runner := process.NewFake()
 	runner.Stub(process.ExactMatch("adb", "forward", "--list"),
 		process.Result{Stdout: "S1 tcp:9001 tcp:7000\n"}, nil)
@@ -391,8 +391,8 @@ func TestAndroidDriver_Connect_ConflictingForwardDifferentDevicePort_ReturnsDevi
 		t.Fatal("Connect() error = nil, want a conflict when the local port already forwards to a different device port")
 	}
 	code, _, _ := diag.Describe(err)
-	if code != diag.CodeDeviceBusy {
-		t.Fatalf("Connect() code = %q, want %q", code, diag.CodeDeviceBusy)
+	if code != diag.CodeHostPortInUse {
+		t.Fatalf("Connect() code = %q, want %q", code, diag.CodeHostPortInUse)
 	}
 }
 

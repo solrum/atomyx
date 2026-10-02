@@ -16,10 +16,10 @@ import (
 )
 
 // androidControlPort and iosControlPort are the fixed ports the
-// Android and iOS agents listen on. A Factory both dials the
-// transport client at this port and passes it as the driver's own
-// port option, so the two must agree; naming them here keeps that
-// coupling visible in one place instead of two magic numbers.
+// Android and iOS agents listen on. The Android port is the
+// device-side port only, since the host-side port is allocated per
+// device. The iOS port is both dialed by the transport client and
+// passed as the driver's own port option, so those two must agree.
 const (
 	androidControlPort = 8765
 	iosControlPort     = 22087
@@ -136,11 +136,13 @@ func (f *DriverFactory) Build(ctx context.Context, desc Descriptor) (Built, erro
 // direct-HID path, always gets the XCUITest path.
 func (f *DriverFactory) createDriver(ctx context.Context, desc Descriptor) (driver.Driver, error) {
 	if desc.Platform == PlatformAndroid {
-		client := transport.NewHTTPClient("127.0.0.1", androidControlPort, transport.WithHTTPLogger(f.logger))
-		return androiddriver.New(client, f.runner, androiddriver.Options{
-			Serial:     desc.ID,
-			HostPort:   androidControlPort,
-			DevicePort: androidControlPort,
+		return androiddriver.New(nil, f.runner, androiddriver.Options{
+			Serial:           desc.ID,
+			AllocateHostPort: true,
+			DevicePort:       androidControlPort,
+			NewTransport: func(hostPort int) androiddriver.Transport {
+				return transport.NewHTTPClient("127.0.0.1", hostPort, transport.WithHTTPLogger(f.logger))
+			},
 		}), nil
 	}
 
