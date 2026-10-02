@@ -513,6 +513,24 @@ build on the `.Built(` and `.Orchestra(` accessors, on
   route declares `Operator`, true for an action taken on behalf of the
   person at the page. Only operator routes count as activity for the
   idle release, so polling never keeps a device held.
+- **Idle release and reconnect.** `Host` owns the device lifecycle and
+  is itself the `session.Controller` the server and every route group
+  receive, so a route never captures a controller that a release or a
+  reconnect replaced.
+  - After `session.mcpIdleTimeoutMs` with no operator action, the host
+    closes the held session, which releases the lease. Only a route
+    that declares `Operator` counts as an action, so polls of the
+    session, tree, screenshot and event routes never keep the device.
+  - While released, every route except `GET /api/v1/session` answers
+    `410` with code `DEVICE_RELEASED`, and the session route reports
+    state `released`.
+  - `POST /api/v1/reconnect` is an operator action that acquires the
+    device through the same prepare and open path as the first
+    acquisition and swaps it in, without a new server or token. A
+    device another process holds answers `409` with `DEVICE_HELD`, and
+    the host stays released. The page then reads a fresh tree, because
+    the new session has captured nothing yet.
+  - The device is never re-acquired without that request.
 - **Read routes.** `ReadRoutes` serves what the session already holds
   and never calls the device, except for the one operator action.
   - `GET /api/v1/session` returns the device, the holder and the

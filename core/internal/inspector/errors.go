@@ -17,6 +17,7 @@ const (
 	codeNoTree           = "NO_TREE"
 	codeNoScreenshot     = "NO_SCREENSHOT"
 	codeSessionClosed    = "SESSION_CLOSED"
+	codeDeviceReleased   = "DEVICE_RELEASED"
 	codeTreeStale        = "TREE_STALE"
 	codeNodeNotFound     = "NODE_NOT_FOUND"
 	codeHostNotAllowed   = "HOST_NOT_ALLOWED"
@@ -45,13 +46,17 @@ func writeFailure(w http.ResponseWriter, err error) {
 	case errors.Is(err, session.ErrClosed):
 		writeCoded(w, http.StatusGone, codeSessionClosed, "the session is closed", "Reconnect to the device to inspect it again.")
 		return
+	case errors.Is(err, ErrReleased):
+		writeCoded(w, http.StatusGone, codeDeviceReleased, "the inspector released the device after it sat idle",
+			"Press reconnect on the page to take the device again.")
+		return
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 		writeCoded(w, http.StatusServiceUnavailable, codeInternal, "the request was cancelled before it finished", "")
 		return
 	}
 	code, message, remedy := diag.Describe(err)
 	switch code {
-	case diag.CodeHolderBusy:
+	case diag.CodeHolderBusy, diag.CodeDeviceHeld:
 		writeCoded(w, http.StatusConflict, code, message, remedy)
 	case diag.CodeInvalidArgument:
 		writeCoded(w, http.StatusBadRequest, code, message, remedy)
