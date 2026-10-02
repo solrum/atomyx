@@ -21,7 +21,6 @@ current code or docs.
 - [Typing can fail on the iOS Simulator when a field never reports focus or a keyboard](#typing-can-fail-on-the-ios-simulator-when-a-field-never-reports-focus-or-a-keyboard)
 - [A misplaced otherwise in a handle step is silently ignored](#a-misplaced-otherwise-in-a-handle-step-is-silently-ignored)
 - [A focus-timeout error omits the field name for role-only selectors](#a-focus-timeout-error-omits-the-field-name-for-role-only-selectors)
-- [A killed command on a physical iPhone can leave its USB tunnel running](#a-killed-command-on-a-physical-iphone-can-leave-its-usb-tunnel-running)
 - [The CLI needs signing settings in the environment to drive a physical iPhone](#the-cli-needs-signing-settings-in-the-environment-to-drive-a-physical-iphone)
 - [An iOS run without --device is not provisioned](#an-ios-run-without---device-is-not-provisioned)
 
@@ -160,24 +159,6 @@ generic wording.
 **Workaround**: add a `label` or `text` value to the selector when
 the target element has one, so the error names the field that failed
 to take focus.
-
-## A killed command on a physical iPhone can leave its USB tunnel running
-
-**Symptom**: after `kill -9` of an `atomyx` or `atomyx-mcp` process that
-was driving a physical iPhone, an `iproxy` process keeps running. The
-orphaned test runner is ended by the next command for that device, but
-the tunnel is not.
-
-**Where**: iOS physical devices, after an uncatchable kill of the host
-process. A normal exit, Ctrl-C, or SIGTERM stops the tunnel.
-
-**Why**: the tunnel runs in its own process group and the runner record
-names only the runner's process group, so the next command has no
-record of the tunnel to end.
-
-**Workaround**: list leftovers with `pgrep -fl iproxy` and stop the
-ones you no longer need with `kill <pid>`. A leftover tunnel does not
-block the next command, which uses a different host port.
 
 ## The CLI needs signing settings in the environment to drive a physical iPhone
 

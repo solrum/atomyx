@@ -314,8 +314,11 @@ it sits outside the `xcodebuild` group. After the group is gone the
 reaper pings the recorded `hostPort`, and a runner that still answers
 with the recorded `runnerId` is ended with `xcrun simctl terminate`. A
 runner that survives that is reported in the log and the record stays for
-the next acquirer. A physical device runner has no such survivor, and the
-`iproxy` tunnel of a killed process is not part of the record.
+the next acquirer. A physical device runner has no such survivor. Its
+`iproxy` tunnel is recorded as `tunnelPid` and `tunnelStartTime` once the
+tunnel is up. The reaper ends it the same way under the same checks,
+except that the command must be `iproxy` and the tunnel must lead its own
+process group.
 
 ### Runner identity and port
 

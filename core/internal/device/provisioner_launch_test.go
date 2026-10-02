@@ -651,3 +651,40 @@ func TestDriverProvisioner_EnsureAndroidAgent_ForwardsEachSerialToItsOwnAllocate
 		t.Fatalf("forwards = %v, want %v, so no serial shares a fixed host port", forwards, want)
 	}
 }
+
+func TestDriverProvisioner_EnsureIOSAgent_Device_RecordsTheTunnelProcess(t *testing.T) {
+	fx := newLaunchFixture(t)
+	p := fx.provisioner(nil)
+	_, kill, err := p.EnsureIOSAgent(context.Background(), "DEV-1", IosAgentKindDevice)
+	if err != nil {
+		t.Fatalf("EnsureIOSAgent() error = %v", err)
+	}
+	defer func() { _ = kill() }()
+
+	state, err := ReadRunnerState(fx.statePath("DEV-1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tunnelPid := fx.farm.started("iproxy")[0].Pid()
+	if state.TunnelPid != tunnelPid || !state.TunnelStartTime.Equal(testProcessStart) {
+		t.Fatalf("record tunnel = pid %d start %v, want pid %d start %v", state.TunnelPid, state.TunnelStartTime, tunnelPid, testProcessStart)
+	}
+	if state.Pid != fx.farm.started("xcodebuild")[0].Pid() {
+		t.Errorf("record runner pid = %d, want it kept when the tunnel is added", state.Pid)
+	}
+}
+
+func TestDriverProvisioner_EnsureIOSAgent_Simulator_RecordsNoTunnel(t *testing.T) {
+	fx := newLaunchFixture(t)
+	p := fx.provisioner(nil)
+	_, kill, err := p.EnsureIOSAgent(context.Background(), "SIM-1", IosAgentKindSimulator)
+	if err != nil {
+		t.Fatalf("EnsureIOSAgent() error = %v", err)
+	}
+	defer func() { _ = kill() }()
+
+	state, err := ReadRunnerState(fx.statePath("SIM-1"))
+	if err != nil || state.TunnelPid != 0 {
+		t.Fatalf("record = %+v (%v), want no tunnel pid for a simulator", state, err)
+	}
+}

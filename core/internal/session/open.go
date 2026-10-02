@@ -202,6 +202,9 @@ func (d Deps) reapOrphan(ctx context.Context, desc device.Descriptor, key lease.
 	case outcome.Signaled || outcome.TerminatedViaSimctl:
 		d.Logger.Info("ended an orphaned runner", fields)
 	}
+	if outcome.TunnelSignaled {
+		d.Logger.Info("ended an orphaned iproxy tunnel", logging.LogContext{"udid": desc.ID})
+	}
 }
 
 // mapIdentityError turns the typed identity errors of the device

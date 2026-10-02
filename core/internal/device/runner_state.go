@@ -27,6 +27,11 @@ const runnerStateFileMode = 0o600
 // UDID and Kind name the target the runner was launched for, so a
 // reader can tell a record that belongs to its device from one that
 // does not.
+//
+// TunnelPid and TunnelStartTime identify the iproxy process that tunnels
+// a physical device's runner port, written once the tunnel is up. The
+// tunnel leads its own process group. TunnelPid is zero for a simulator
+// runner and for a tunnel the launcher reused instead of starting.
 type RunnerState struct {
 	UDID             string    `json:"udid"`
 	Kind             string    `json:"kind"`
@@ -37,6 +42,8 @@ type RunnerState struct {
 	ProcessStartTime time.Time `json:"processStartTime"`
 	HostBootTime     time.Time `json:"hostBootTime"`
 	StartedAt        time.Time `json:"startedAt"`
+	TunnelPid        int       `json:"tunnelPid,omitempty"`
+	TunnelStartTime  time.Time `json:"tunnelStartTime"`
 }
 
 // RunnerStatePath returns the path of the runner record for key inside

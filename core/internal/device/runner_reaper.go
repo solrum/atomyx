@@ -33,9 +33,13 @@ const (
 	// reapProbeTimeout bounds one ping of the recorded runner port.
 	reapProbeTimeout = iosdriver.RunnerProbeTimeout
 
-	// reapCommand is the only process name the reaper signals, because the
-	// record names an xcodebuild process group and nothing else.
+	// reapCommand is the process name of a runner group the reaper signals,
+	// because the record names an xcodebuild process group.
 	reapCommand = "xcodebuild"
+
+	// reapTunnelCommand is the only other process name the reaper signals,
+	// because the record names the iproxy tunnel of a physical device.
+	reapTunnelCommand = "iproxy"
 
 	// DefaultRunnerBundleID is the bundle id of the XCUITest runner app
 	// the launcher installs on a simulator, which survives its
@@ -56,6 +60,12 @@ type ReapOutcome struct {
 	Signaled bool
 	// PGID is the process group the record named.
 	PGID int
+	// TunnelSignaled reports that the recorded iproxy tunnel was sent a
+	// signal.
+	TunnelSignaled bool
+	// TunnelKilled reports that the tunnel needed SIGKILL after SIGTERM
+	// and the grace period.
+	TunnelKilled bool
 	// Killed reports that the group needed SIGKILL after SIGTERM and the
 	// grace period.
 	Killed bool
@@ -156,7 +166,11 @@ func NewRunnerReaper(deps RunnerReaperDeps) *RunnerReaper {
 // predates a reboot, or whose pid is gone or now belongs to another
 // process, is removed without signaling anything. A record that names
 // the live xcodebuild process group it recorded is sent SIGTERM, then
-// SIGKILL after the grace period. For a simulator, a runner that still
+// SIGKILL after the grace period. The iproxy tunnel the record names is
+// ended the same way once it passes the same checks: still the recorded
+// process, owned by the caller, leading its own group, and an iproxy
+// command. A tunnel that fails a check is left alone and the runner is
+// handled as usual. For a simulator, a runner that still
 // answers its recorded port with its recorded launch id after the group
 // is gone is ended with simctl.
 //
@@ -174,13 +188,20 @@ func (r *RunnerReaper) Reap(ctx context.Context, statePath, udid string) (ReapOu
 	if reason := r.unusableRecord(state, udid); reason != "" {
 		return r.discard(statePath, reason), nil
 	}
+	tunnelSignaled, tunnelKilled, err := r.reapTunnel(ctx, state)
+	outcome.TunnelSignaled, outcome.TunnelKilled = tunnelSignaled, tunnelKilled
+	if err != nil {
+		return outcome, err
+	}
 	alive, reason := r.isRecordedRunner(state)
 	if reason != "" {
-		return r.discard(statePath, reason), nil
+		discarded := r.discard(statePath, reason)
+		discarded.TunnelSignaled, discarded.TunnelKilled = tunnelSignaled, tunnelKilled
+		return discarded, nil
 	}
 	if alive {
 		outcome.Signaled = true
-		killed, err := r.endGroup(ctx, state)
+		killed, err := r.endGroup(ctx, state.Pid, state.Pgid)
 		outcome.Killed = killed
 		if err != nil {
 			return outcome, err
@@ -253,28 +274,69 @@ func (r *RunnerReaper) isRecordedRunner(state RunnerState) (alive bool, reason s
 	return true, ""
 }
 
-// endGroup sends SIGTERM to the recorded group, waits for its leader to
-// go, and sends SIGKILL when the grace period passes first. It reports
-// whether SIGKILL was needed.
-func (r *RunnerReaper) endGroup(ctx context.Context, state RunnerState) (killed bool, err error) {
-	if err := r.deps.Signals.SignalGroup(state.Pgid, syscall.SIGTERM); err != nil && !errors.Is(err, syscall.ESRCH) {
-		return false, fmt.Errorf("signal the orphaned runner group %d: %w", state.Pgid, err)
+// endGroup sends SIGTERM to the group pgid led by pid, waits for the
+// leader to go, and sends SIGKILL when the grace period passes first. It
+// reports whether SIGKILL was needed.
+func (r *RunnerReaper) endGroup(ctx context.Context, pid, pgid int) (killed bool, err error) {
+	if err := r.deps.Signals.SignalGroup(pgid, syscall.SIGTERM); err != nil && !errors.Is(err, syscall.ESRCH) {
+		return false, fmt.Errorf("signal the orphaned process group %d: %w", pgid, err)
 	}
-	gone, err := r.waitForExit(ctx, state.Pid)
+	gone, err := r.waitForExit(ctx, pid)
 	if err != nil || gone {
 		return false, err
 	}
-	if err := r.deps.Signals.SignalGroup(state.Pgid, syscall.SIGKILL); err != nil && !errors.Is(err, syscall.ESRCH) {
-		return true, fmt.Errorf("kill the orphaned runner group %d: %w", state.Pgid, err)
+	if err := r.deps.Signals.SignalGroup(pgid, syscall.SIGKILL); err != nil && !errors.Is(err, syscall.ESRCH) {
+		return true, fmt.Errorf("kill the orphaned process group %d: %w", pgid, err)
 	}
-	gone, err = r.waitForExit(ctx, state.Pid)
+	gone, err = r.waitForExit(ctx, pid)
 	if err != nil {
 		return true, err
 	}
 	if !gone {
-		return true, fmt.Errorf("the orphaned runner group %d did not exit after SIGKILL", state.Pgid)
+		return true, fmt.Errorf("the orphaned process group %d did not exit after SIGKILL", pgid)
 	}
 	return true, nil
+}
+
+// reapTunnel ends the iproxy tunnel the record names when it is still the
+// recorded process. A tunnel that has gone, or that fails a guard, is not
+// signaled.
+func (r *RunnerReaper) reapTunnel(ctx context.Context, state RunnerState) (signaled, killed bool, err error) {
+	if state.TunnelPid <= 1 {
+		return false, false, nil
+	}
+	info, err := r.deps.Inspector.Inspect(state.TunnelPid)
+	if errors.Is(err, process.ErrProcessNotFound) {
+		return false, false, nil
+	}
+	if err != nil {
+		r.deps.Logger.Warn("left the recorded tunnel alone", logging.LogContext{"reason": "the recorded tunnel cannot be inspected"})
+		return false, false, nil
+	}
+	if reason := r.unusableTunnel(state, info); reason != "" {
+		r.deps.Logger.Warn("left the recorded tunnel alone", logging.LogContext{"reason": reason})
+		return false, false, nil
+	}
+	killed, err = r.endGroup(ctx, state.TunnelPid, state.TunnelPid)
+	return true, killed, err
+}
+
+// unusableTunnel reports why a live process cannot be the recorded
+// tunnel, or an empty string when it is.
+func (r *RunnerReaper) unusableTunnel(state RunnerState, info process.ProcessInfo) string {
+	switch {
+	case state.TunnelPid == r.deps.OwnPGID:
+		return "the recorded tunnel is this process's own group"
+	case absDuration(info.StartTime.Sub(state.TunnelStartTime)) > startTimeTolerance:
+		return "the recorded tunnel pid now belongs to a different process"
+	case info.UID != r.deps.OwnUID:
+		return "the recorded tunnel belongs to another user"
+	case info.Command != reapTunnelCommand:
+		return "the recorded tunnel is not iproxy"
+	case info.PGID != state.TunnelPid:
+		return "the recorded tunnel does not lead its own process group"
+	}
+	return ""
 }
 
 // waitForExit polls until pid is gone or the grace period passes, and

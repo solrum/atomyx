@@ -40,16 +40,26 @@ type recordingSignaler struct {
 	mu        sync.Mutex
 	calls     []signalCall
 	inspector *process.FakeInspector
-	pid       int
 	exitOn    map[syscall.Signal]bool
+	// ignoresTerm names groups that survive SIGTERM.
+	ignoresTerm map[int]bool
+	// failWith makes a group report an error for every signal. An ESRCH
+	// also removes the group, as a vanished group would.
+	failWith map[int]error
 }
 
 func (s *recordingSignaler) SignalGroup(pgid int, sig syscall.Signal) error {
 	s.mu.Lock()
 	s.calls = append(s.calls, signalCall{pgid: pgid, sig: sig})
 	s.mu.Unlock()
-	if s.exitOn[sig] {
-		s.inspector.Remove(s.pid)
+	if err := s.failWith[pgid]; err != nil {
+		if errors.Is(err, syscall.ESRCH) {
+			s.inspector.Remove(pgid)
+		}
+		return err
+	}
+	if s.exitOn[sig] && (sig != syscall.SIGTERM || !s.ignoresTerm[pgid]) {
+		s.inspector.Remove(pgid)
 	}
 	return nil
 }
@@ -78,7 +88,7 @@ func newReapFixture(t *testing.T, kind IosAgentKind) *reapFixture {
 	f.inspector.Set(process.ProcessInfo{
 		PID: reapTestPid, PGID: reapTestPid, UID: reapTestUID, Command: "xcodebuild", StartTime: reapTestStart,
 	})
-	f.signals = &recordingSignaler{inspector: f.inspector, pid: reapTestPid, exitOn: map[syscall.Signal]bool{syscall.SIGTERM: true}}
+	f.signals = &recordingSignaler{inspector: f.inspector, exitOn: map[syscall.Signal]bool{syscall.SIGTERM: true}}
 	f.runner = process.NewFake()
 	f.answering = func() (iosdriver.RunnerIdentity, bool) { return iosdriver.RunnerIdentity{}, false }
 	f.reaper = NewRunnerReaper(RunnerReaperDeps{

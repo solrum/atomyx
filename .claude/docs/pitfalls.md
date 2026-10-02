@@ -162,9 +162,12 @@ corresponding area. For the high-level map see
   Reaping before the lease, or without it, can signal the runner of a
   live holder.
 - **Never signal a recorded process group without proving it is the
-  recorded process.** The pid, start time, user, command (`xcodebuild`)
-  and process group must all match, the host must not have rebooted, and
-  the group must be greater than 1 and not the caller's own. A pid can be
+  recorded process.** The pid, start time, user, command (`xcodebuild`
+  for the runner, `iproxy` for the tunnel of a physical device) and
+  process group must all match, the host must not have rebooted, and the
+  group must be greater than 1 and not the caller's own. The runner
+  record names the tunnel through `tunnelPid` and `tunnelStartTime`, and
+  a tunnel that fails any check is left running. A pid can be
   reused after the original process exits.
 - **Read process identity from the kernel, not from `ps` text.** The
   start time, user, command and process group come from one

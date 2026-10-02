@@ -384,7 +384,7 @@ func (p *DriverProvisioner) iosLaunchConfig(udid string, kind IosAgentKind) iosd
 // needs. The stop function it returns removes both.
 func (p *DriverProvisioner) afterSpawn(udid string, kind IosAgentKind, runnerID string) func(context.Context, iosdriver.SpawnedRunner) (func(), error) {
 	return func(ctx context.Context, spawned iosdriver.SpawnedRunner) (func(), error) {
-		statePath, err := p.recordRunner(udid, kind, runnerID, spawned)
+		statePath, state, err := p.recordRunner(udid, kind, runnerID, spawned)
 		if err != nil {
 			return nil, err
 		}
@@ -396,12 +396,19 @@ func (p *DriverProvisioner) afterSpawn(udid string, kind IosAgentKind, runnerID 
 		if kind != IosAgentKindDevice {
 			return removeRecord, nil
 		}
-		stopTunnel, err := iosdriver.StartTunnel(ctx, p.background, p.clock, iosdriver.TunnelConfig{
+		stopTunnel, tunnelPid, err := iosdriver.StartTunnel(ctx, p.background, p.clock, iosdriver.TunnelConfig{
 			UDID: udid, HostPort: spawned.HostPort, RunnerID: runnerID,
 		})
 		if err != nil {
 			removeRecord()
 			return nil, err
+		}
+		if tunnelPid > 0 && statePath != "" {
+			if err := p.recordTunnel(statePath, state, tunnelPid); err != nil {
+				stopTunnel()
+				removeRecord()
+				return nil, err
+			}
 		}
 		return func() {
 			if stopTunnel != nil {
@@ -413,21 +420,22 @@ func (p *DriverProvisioner) afterSpawn(udid string, kind IosAgentKind, runnerID 
 }
 
 // recordRunner writes the runner record for a spawned runner and
-// returns its path, or an empty path when records are disabled.
-func (p *DriverProvisioner) recordRunner(udid string, kind IosAgentKind, runnerID string, spawned iosdriver.SpawnedRunner) (string, error) {
+// returns its path and content, or an empty path when records are
+// disabled.
+func (p *DriverProvisioner) recordRunner(udid string, kind IosAgentKind, runnerID string, spawned iosdriver.SpawnedRunner) (string, RunnerState, error) {
 	if p.deps.RunnerStateDir == "" || p.deps.RunnerStateKey == nil {
-		return "", nil
+		return "", RunnerState{}, nil
 	}
 	info, err := p.inspector.Inspect(spawned.Pid)
 	if err != nil {
-		return "", fmt.Errorf("record the runner: %w", err)
+		return "", RunnerState{}, fmt.Errorf("record the runner: %w", err)
 	}
 	booted, err := p.inspector.BootTime()
 	if err != nil {
-		return "", fmt.Errorf("record the runner: %w", err)
+		return "", RunnerState{}, fmt.Errorf("record the runner: %w", err)
 	}
 	path := RunnerStatePath(p.deps.RunnerStateDir, p.deps.RunnerStateKey(udid))
-	err = WriteRunnerState(path, RunnerState{
+	state := RunnerState{
 		UDID:             udid,
 		Kind:             string(kind),
 		RunnerID:         runnerID,
@@ -437,11 +445,24 @@ func (p *DriverProvisioner) recordRunner(udid string, kind IosAgentKind, runnerI
 		ProcessStartTime: info.StartTime,
 		HostBootTime:     booted,
 		StartedAt:        p.now().UTC(),
-	})
-	if err != nil {
-		return "", err
 	}
-	return path, nil
+	if err := WriteRunnerState(path, state); err != nil {
+		return "", RunnerState{}, err
+	}
+	return path, state, nil
+}
+
+// recordTunnel rewrites the runner record at path with the iproxy process
+// that tunnels the runner's port, so a later process can end it when this
+// one dies without stopping it.
+func (p *DriverProvisioner) recordTunnel(path string, state RunnerState, tunnelPid int) error {
+	info, err := p.inspector.Inspect(tunnelPid)
+	if err != nil {
+		return fmt.Errorf("record the tunnel: %w", err)
+	}
+	state.TunnelPid = tunnelPid
+	state.TunnelStartTime = info.StartTime
+	return WriteRunnerState(path, state)
 }
 
 // EnsureAndroidAgent implements AgentProvisioner. The host port is the
