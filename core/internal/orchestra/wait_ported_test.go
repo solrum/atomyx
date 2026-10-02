@@ -59,18 +59,19 @@ func TestBoundsIntersect(t *testing.T) {
 
 func TestHasTypedChange(t *testing.T) {
 	tests := []struct {
-		name, actual, label string
-		want                bool
+		name, actual, label, hint string
+		want                      bool
 	}{
-		{"empty-actual", "", "Password", false},
-		{"unchanged-from-label", "Password", "Password", false},
-		{"changed", "abc", "Password", true},
-		{"changed-from-empty-label", "abc", "", true},
+		{"empty-actual", "", "Password", "", false},
+		{"unchanged-from-label", "Password", "Password", "", false},
+		{"unchanged-from-hint", "Email", "", "Email", false},
+		{"changed", "abc", "Password", "", true},
+		{"changed-from-empty-label", "abc", "", "", true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := hasTypedChange(tc.actual, tc.label); got != tc.want {
-				t.Fatalf("hasTypedChange(%q, %q) = %v, want %v", tc.actual, tc.label, got, tc.want)
+			if got := hasTypedChange(tc.actual, tc.label, tc.hint); got != tc.want {
+				t.Fatalf("hasTypedChange(%q, %q, %q) = %v, want %v", tc.actual, tc.label, tc.hint, got, tc.want)
 			}
 		})
 	}
@@ -370,5 +371,32 @@ func TestWaitForTreeStable_TimesOutWhileTreeKeepsChanging(t *testing.T) {
 	var timeout *WaitTimeoutError
 	if !errors.As(err, &timeout) {
 		t.Fatalf("got error %v (%T), want *WaitTimeoutError", err, err)
+	}
+}
+
+func TestWaitForInputCommitted_AnEmptyAndroidFieldReportingItsHintIsNotCommitted(t *testing.T) {
+	anchor := wire.Bounds{Left: 10, Top: 10, Right: 110, Bottom: 50}
+	for name, secure := range map[string]bool{"plain field": false, "secure field": true} {
+		t.Run(name, func(t *testing.T) {
+			d := mock.New()
+			field := nodeWithRole("field", "Password", RoleTextField, "10,10,110,50")
+			field.Attributes[AttrHint] = "Password"
+			if secure {
+				field.Attributes[AttrSecure] = wire.AttrSecureTrue
+			}
+			d.StageHierarchy(node("root", "", "0,0,430,932", field))
+
+			// "hunter22" has the length of the hint, so a count check
+			// that ignored the hint would confirm an input that never landed.
+			_, err := WaitForInputCommitted(context.Background(), WaitForInputCommittedOptions{
+				Driver: d, AnchorBounds: anchor, Expected: "hunter22",
+				Clock: NewFakeClock(0), TimeoutMs: 200, IntervalMs: 50,
+			})
+
+			var timeout *WaitTimeoutError
+			if !errors.As(err, &timeout) {
+				t.Fatalf("error = %v, want a wait timeout because the field still shows its hint", err)
+			}
+		})
 	}
 }

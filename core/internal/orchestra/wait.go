@@ -376,7 +376,8 @@ type WaitForInputCommittedOptions struct {
 //   - Every other input role is verified by exact string match.
 //
 // Either role also accepts a weaker "typed change" signal, that is, the
-// text attribute is non-empty and differs from the label, used when the
+// text attribute is non-empty and differs from both the label and the
+// hint, used when the
 // strong postcondition hasn't caught up yet, because some platforms
 // lag the accessibility value behind the type dispatch by more than
 // this wait's timeout on long strings.
@@ -449,28 +450,29 @@ func areaOf(c *TreeCursor) float64 {
 	return (b.Right - b.Left) * (b.Bottom - b.Top)
 }
 
+// matchesInputExpectation reports whether cursor shows the typed
+// text. An empty Android field reports its hint as its text, so a
+// text equal to the hint never counts as a typed change, and it never
+// satisfies the masked-count check of a secure field either.
 func matchesInputExpectation(cursor *TreeCursor, expected string, expectedLength int) bool {
-	actual := cursor.Node.Attributes[AttrText]
-	label := cursor.Node.Attributes[AttrLabel]
+	attrs := cursor.Node.Attributes
+	actual, label, hint := attrs[AttrText], attrs[AttrLabel], attrs[AttrHint]
 
 	if IsSecure(cursor.Node) {
-		if utf8.RuneCountInString(actual) == expectedLength {
+		if actual != hint && utf8.RuneCountInString(actual) == expectedLength {
 			return true
 		}
-		return hasTypedChange(actual, label)
+		return hasTypedChange(actual, label, hint)
 	}
 
 	if actual == expected {
 		return true
 	}
-	return hasTypedChange(actual, label)
+	return hasTypedChange(actual, label, hint)
 }
 
-func hasTypedChange(actual, label string) bool {
-	if actual == "" {
-		return false
-	}
-	return actual != label
+func hasTypedChange(actual, label, hint string) bool {
+	return actual != "" && actual != label && actual != hint
 }
 
 // WaitForTreeStableOptions configures WaitForTreeStable.
