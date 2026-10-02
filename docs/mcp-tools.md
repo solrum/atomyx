@@ -209,6 +209,7 @@ Bind the session to one device so every other device-driving tool operates on it
 - ok false with code DEVICE_NOT_FOUND means an iOS id is not among the reachable devices. Other reasons typically mean the id does not currently match a reachable device, or the device toolchain rejected the connection. Call list_devices again to confirm the id is still valid and the device is online, then retry.
 - ok false with code DEVICE_HELD means another Atomyx process is driving the device. The reason names that process and its state. Wait for it to finish or ask the operator to stop it, then call select_device again.
 - ok false with code TOOL_TIMEOUT means the device did not become ready within the acquisition budget. Check that the device is connected and unlocked, then retry.
+- ok false with code AGENT_NOT_READY on an Android device can also mean the installed agent is too old to mark secret fields. select_device first reinstalls the agent when it can find the agent APK, so this error means no current APK was found or the agent is still out of date. Build the agent, or point ATOMYX_ANDROID_APK at a current APK, then call select_device again.
 - ok false with code RUNNER_BUILD_TIMEOUT means building the iOS runner, or waiting for another process that is building it, did not finish within the build timeout. This is a different failure from TOOL_TIMEOUT. Wait for any other Atomyx process that is building the runner to finish, check that Xcode is installed and responsive, then call select_device again.
 
 **Example**

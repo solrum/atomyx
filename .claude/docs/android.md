@@ -72,7 +72,7 @@ adb-forward lifecycle, and tree normalization
 
 | Driver port method | Wire route | Agent handler | Notes |
 |---|---|---|---|
-| `Connect()` | `GET /health` then `GET /ping` | `HttpControlServer` inline health check, then `PingRoute` | A `/ping` failure is swallowed, so `Connect` keeps conservative capability defaults and an agent build predating the handshake still works at single-pointer, no-pressure. A `/health` failure fails `Connect`, classified per the note below. |
+| `Connect()` | `GET /health` then `GET /ping` | `HttpControlServer` inline health check, then `PingRoute` | A `/ping` call that cannot reach the agent is swallowed, so `Connect` keeps conservative capability defaults. An agent that answers `/ping` without `capabilities.secureFields`, or with an error status because it predates the route, is stale: see the note below. A `/health` failure fails `Connect`, classified per the note below. |
 | `Ping()` | `GET /health` | `HttpControlServer` inline health check | Bounded to a 1s probe timeout so a caller gets a fast answer. Classified per the note below. |
 | `Hierarchy()` | `GET /tree` | `TreeRoute` then `UiTreeService.dumpTree` | Returns the hierarchical tree, then `NormalizeAndroidTree` maps it to the canonical shape. |
 | `Tap()` | `POST /actions/tap_coords` | `TapCoordsRoute` then `GestureDispatcher.tapAt` then `GestureRunner.dispatch` | |
@@ -102,6 +102,25 @@ reports `AGENT_UNREACHABLE` with a remedy to confirm the agent is
 running, while a `503` reports `AGENT_NOT_READY` with the response's
 own reason as the message and a remedy to re-enable the accessibility
 service, since the agent process answered and named what is wrong.
+
+`/ping` carries `capabilities.secureFields: true` in every agent that
+reports `isPassword` on tree nodes. The capability list only grows, so
+a host ignores capabilities it does not know and a new agent keeps
+working with an older host. `Connect` treats an agent without the
+capability as stale, because it would leave a password unmasked. When
+the driver was built with a reinstall hook, which the device factory
+supplies from its provisioner, `Connect` runs the install and
+accessibility rebind path once, ignoring the readiness probe, and pings
+again. It fails with `AGENT_NOT_READY` and a remedy to build or point
+`ATOMYX_ANDROID_APK` at a current agent when no APK can be found, when
+no hook exists, or when the agent is still stale afterwards.
+
+A mutating request waits for the router lock for at most 5 seconds. A
+request still queued after that is refused with `429`
+`{"error":"<message>","retryable":true}` and never runs, so a gesture
+the host already gave up on cannot fire later. The driver reports it as
+`AGENT_NOT_READY` with a remedy to wait for the running gesture and
+repeat the call, and the remedy says the refused call did not run.
 
 ## Setup and run
 
@@ -266,7 +285,7 @@ outside the lock are `PingRoute`, `TreeRoute`, `KeyboardRoute`,
 `ScreenshotRoute`, `CurrentActivityRoute`, and `AppsRoute`. They only
 read state, and a gesture can run for tens of seconds, so a screenshot
 or tree read during a held gesture must not wait for it. Tree reads
-serialize against each other through `UiTreeService`'s own guard. A
+serialize against each other through `UiTreeService`'s own guard. The server registers its routes from `ShippedRoutes`, the one list the router tests also walk. A
 `capture` waypoint inside `DispatchGestureRoute` calls the screenshot
 surface directly on its own thread, so it never contends for the lock.
 

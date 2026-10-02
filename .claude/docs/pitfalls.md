@@ -18,6 +18,18 @@ corresponding area. For the high-level map see
   runs mutating routes one at a time. Mark a route false only when it
   reads state or must stay answerable during a held gesture, because
   a false route runs concurrently with whatever action is in flight.
+  A new route goes into `ShippedRoutes`, and `RouterLockTest` fails
+  until its path is classified as a read or runs behind the lock.
+- **A mutating route that waits too long is refused, never delayed.**
+  `Router` waits for its lock at most `MUTATION_LOCK_WAIT_MS` and then
+  returns `429` with `retryable: true` without running the route.
+  Never replace the bounded wait by an unbounded lock, because the host
+  has already given up by then and the action would fire as a ghost.
+- **Add a capability to `/ping` instead of changing its existing
+  fields.** The host reads `capabilities.secureFields` to detect an
+  agent that cannot mark secret fields, and an agent without it is
+  reinstalled or refused. A new agent behavior the host depends on
+  needs its own capability and the same stale-agent handling.
 - **Never replace `serviceInfo` wholesale in `onServiceConnected`.**
   Augment it instead. Replacing it with a fresh
   `AccessibilityServiceInfo()` clobbers the capability and flag values
