@@ -37,7 +37,7 @@ GO_RELEASE_BINARIES  ?= atomyx atomyx-mcp atomyx-runtime
 build:
 	@echo "Building core binaries into bin/ (version $(GO_BUILD_VERSION)) ..."
 	@go build -ldflags "-X $(GO_VERSION_PKG).Version=$(GO_BUILD_VERSION)" -o bin/ ./cmd/...
-	@echo "Built: atomyx atomyx-mcp atomyx-runtime gen-config-schema gen-script-schema"
+	@echo "Built: atomyx atomyx-mcp atomyx-runtime gen-config-schema gen-run-schema gen-script-schema"
 
 test:
 	go test ./...
