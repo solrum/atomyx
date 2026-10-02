@@ -64,7 +64,7 @@ func run() int {
 	)
 	simHid := device.NewSimHidManager(background)
 	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Background: background, Clock: clock, SimHid: simHid, Logger: logger})
-	provisioner := device.NewDriverProvisioner(device.DriverProvisionerDeps{Runner: procRunner, Background: background, Clock: clock})
+	provisioner := device.NewDriverProvisioner(device.DriverProvisionerDeps{Runner: procRunner, Background: background, Clock: clock, FixedIosPort: true})
 
 	dispatcher := sidecar.NewDispatcher()
 	events := sidecar.NewEventBus()

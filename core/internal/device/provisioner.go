@@ -2,12 +2,18 @@ package device
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"dev.atomyx/internal/androiddriver"
 	"dev.atomyx/internal/iosdriver"
+	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/process"
 	"dev.atomyx/internal/transport"
@@ -43,13 +49,17 @@ const (
 // interface.
 type AgentProvisioner interface {
 	// EnsureIOSAgent brings the XCUITest driver up for udid and blocks
-	// until it answers ready or a launcher failure is confirmed. kill
-	// is never nil: calling it stops the driver process this call
-	// spawned (a no-op if this call spawned none, for example because
-	// a driver was already running). The caller owns kill and must
-	// invoke it once the agent is no longer needed, or the spawned
-	// process outlives the caller with nothing left able to stop it.
-	EnsureIOSAgent(ctx context.Context, udid string, kind IosAgentKind) (kill func() error, err error)
+	// until it answers ready or a launcher failure is confirmed. port is
+	// the host port the driver answers on, which a caller dials.
+	//
+	// kill is never nil: calling it stops the driver process this call
+	// spawned, along with the USB tunnel it started for a physical
+	// device and the runner record it wrote (a no-op if this call spawned
+	// none, for example because a driver was already running). The caller
+	// owns kill and must invoke it once the agent is no longer needed,
+	// or the spawned process outlives the caller with nothing left able
+	// to stop it.
+	EnsureIOSAgent(ctx context.Context, udid string, kind IosAgentKind) (port int, kill func() error, err error)
 	EnsureAndroidAgent(ctx context.Context, serial string) error
 }
 
@@ -84,17 +94,48 @@ type DriverProvisionerDeps struct {
 	IosProjectFile string
 	IosRunnerApp   string
 	IosOnlyTesting string
+	// Logger receives the "building runner" and "starting runner"
+	// progress lines of a launch, so a first launch that compiles the
+	// runner shows activity instead of hanging silently. A nil Logger
+	// discards them.
+	Logger logging.Logger
+	// RunnerStateDir is the directory that holds the per-device runner
+	// record. Empty disables the record. RunnerStateKey maps a device
+	// UDID to the file key inside that directory. The directory and the
+	// key come from the caller because this package does not know how
+	// devices are keyed.
+	RunnerStateDir string
+	RunnerStateKey func(udid string) string
+	// FixedIosPort makes every launch use the fixed control port 22087
+	// instead of a port allocated per launch. A runner already answering
+	// there is adopted, no runner record is written, and no tunnel is
+	// started, because the driver that dials the runner starts its own.
+	// A host that exposes a single fixed port to its own clients sets it.
+	FixedIosPort bool
 }
 
 // DriverProvisioner is the production AgentProvisioner: each call
 // constructs a fresh XctestLauncher or AgentLauncher and blocks on its
-// EnsureRunning. It holds no per-device state of its own. Dedup and
-// status tracking belong to the caller.
+// EnsureRunning. Apart from the set of host ports it has handed out, it
+// holds no per-device state of its own. Dedup and status tracking belong
+// to the caller.
 type DriverProvisioner struct {
 	runner     process.Runner
 	background process.BackgroundRunner
 	clock      orchestra.Clock
+	logger     logging.Logger
 	deps       DriverProvisionerDeps
+
+	// freePort asks the operating system for a currently free host
+	// port. It is a field so a test can script collisions.
+	freePort func() (int, error)
+	// newRunnerID returns a fresh launch identifier.
+	newRunnerID func() string
+	// now reports the current time for the runner record.
+	now func() time.Time
+
+	mu       sync.Mutex
+	reserved map[int]struct{}
 }
 
 // NewDriverProvisioner constructs a DriverProvisioner from deps.
@@ -107,7 +148,15 @@ func NewDriverProvisioner(deps DriverProvisionerDeps) *DriverProvisioner {
 	if background == nil {
 		panic("device.NewDriverProvisioner: Background runner is required")
 	}
-	return &DriverProvisioner{runner: deps.Runner, background: background, clock: clock, deps: deps}
+	logger := deps.Logger
+	if logger == nil {
+		logger = logging.NoopLogger{}
+	}
+	return &DriverProvisioner{
+		runner: deps.Runner, background: background, clock: clock, logger: logger, deps: deps,
+		freePort: operatingSystemFreePort, newRunnerID: randomRunnerID, now: time.Now,
+		reserved: make(map[int]struct{}),
+	}
 }
 
 var _ AgentProvisioner = (*DriverProvisioner)(nil)
@@ -169,11 +218,73 @@ func resolveIosProjectDir(configured, env string) string {
 	return ""
 }
 
-// EnsureIOSAgent implements AgentProvisioner. It holds no per-device
-// state of its own: the kill XctestLauncher.EnsureRunning returns is
-// passed straight through, and tracking it against udid for a later
-// teardown is the caller's job, per DriverProvisioner's own doc.
-func (p *DriverProvisioner) EnsureIOSAgent(ctx context.Context, udid string, kind IosAgentKind) (func() error, error) {
+// reservePortAttempts bounds how many times reservePort asks the
+// operating system for a port before giving up on finding one that no
+// other launch in this process holds.
+const reservePortAttempts = 16
+
+// operatingSystemFreePort binds 127.0.0.1:0, reads the port the kernel
+// chose, and releases it.
+func operatingSystemFreePort() (int, error) {
+	l, err := new(net.ListenConfig).Listen(context.Background(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = l.Close() }()
+	return l.Addr().(*net.TCPAddr).Port, nil
+}
+
+// randomRunnerID returns a random launch identifier, unique per launch.
+func randomRunnerID() string {
+	var raw [8]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		panic(fmt.Sprintf("device: read random bytes: %v", err))
+	}
+	return hex.EncodeToString(raw[:])
+}
+
+// reservePort returns a free host port that no other launch in this
+// process holds. Binding 127.0.0.1:0 yields a port free at that moment,
+// but the kernel can hand the same port out again once it is released,
+// so the reserved set is what keeps two concurrent launches from
+// receiving one port. A launch in another process can still take the
+// port before the runner binds it, which the launcher's bounded retry
+// covers.
+func (p *DriverProvisioner) reservePort() (int, error) {
+	for range reservePortAttempts {
+		port, err := p.freePort()
+		if err != nil {
+			return 0, fmt.Errorf("reserve a host port: %w", err)
+		}
+		p.mu.Lock()
+		_, taken := p.reserved[port]
+		if !taken {
+			p.reserved[port] = struct{}{}
+		}
+		p.mu.Unlock()
+		if !taken {
+			return port, nil
+		}
+	}
+	return 0, fmt.Errorf("reserve a host port: every candidate was already held by another launch")
+}
+
+func (p *DriverProvisioner) releasePorts(ports []int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, port := range ports {
+		delete(p.reserved, port)
+	}
+}
+
+// EnsureIOSAgent implements AgentProvisioner. Unless the provisioner
+// was built with FixedIosPort, every call launches its own runner on a
+// freshly reserved host port, tagged with a launch identifier the
+// launcher requires the runner to echo, and for a physical device owns
+// the USB tunnel that maps the host port onto the runner. The returned
+// kill stops the runner, the tunnel and the runner record, and releases
+// the reserved ports.
+func (p *DriverProvisioner) EnsureIOSAgent(ctx context.Context, udid string, kind IosAgentKind) (int, func() error, error) {
 	driverKind := iosdriver.KindSimulator
 	if kind == IosAgentKindDevice {
 		driverKind = iosdriver.KindDevice
@@ -191,7 +302,8 @@ func (p *DriverProvisioner) EnsureIOSAgent(ctx context.Context, udid string, kin
 	if profile == "" {
 		profile = os.Getenv("ATOMYX_PROVISIONING_PROFILE_SPECIFIER")
 	}
-	launcher := iosdriver.NewXctestLauncher(p.runner, p.background, p.clock, iosdriver.LaunchConfig{
+	progress := p.logger.Child(logging.LogContext{"udid": udid, "kind": string(kind)})
+	cfg := iosdriver.LaunchConfig{
 		ProjectDir:                   projectDir,
 		Port:                         iosControlPort,
 		Kind:                         driverKind,
@@ -203,8 +315,100 @@ func (p *DriverProvisioner) EnsureIOSAgent(ctx context.Context, udid string, kin
 		ProjectFileName:              p.deps.IosProjectFile,
 		RunnerAppName:                p.deps.IosRunnerApp,
 		OnlyTestingTarget:            p.deps.IosOnlyTesting,
+		Progress:                     func(message string) { progress.Info(message, nil) },
+	}
+
+	var ports []int
+	if !p.deps.FixedIosPort {
+		cfg.RunnerID = p.newRunnerID()
+		cfg.AllocatePort = func() (int, error) {
+			port, err := p.reservePort()
+			if err == nil {
+				ports = append(ports, port)
+			}
+			return port, err
+		}
+		cfg.AfterSpawn = p.afterSpawn(udid, kind, cfg.RunnerID)
+	}
+
+	launcher := iosdriver.NewXctestLauncher(p.runner, p.background, p.clock, cfg)
+	kill, err := launcher.EnsureRunning(ctx)
+	if err != nil {
+		p.releasePorts(ports)
+		return 0, kill, err
+	}
+	if p.deps.FixedIosPort {
+		return launcher.Port(), kill, nil
+	}
+	return launcher.Port(), func() error {
+		err := kill()
+		p.releasePorts(ports)
+		return err
+	}, nil
+}
+
+// afterSpawn builds the launcher hook that runs once the runner process
+// exists and before it is probed: it records the runner for crash
+// recovery, then for a physical device starts the USB tunnel the probe
+// needs. The stop function it returns removes both.
+func (p *DriverProvisioner) afterSpawn(udid string, kind IosAgentKind, runnerID string) func(context.Context, iosdriver.SpawnedRunner) (func(), error) {
+	return func(ctx context.Context, spawned iosdriver.SpawnedRunner) (func(), error) {
+		statePath, err := p.recordRunner(ctx, udid, runnerID, spawned)
+		if err != nil {
+			return nil, err
+		}
+		removeRecord := func() {
+			if statePath != "" {
+				removeRunnerStateOf(statePath, runnerID)
+			}
+		}
+		if kind != IosAgentKindDevice {
+			return removeRecord, nil
+		}
+		stopTunnel, err := iosdriver.StartTunnel(ctx, p.background, p.clock, iosdriver.TunnelConfig{
+			UDID: udid, HostPort: spawned.HostPort, RunnerID: runnerID,
+		})
+		if err != nil {
+			removeRecord()
+			return nil, err
+		}
+		return func() {
+			if stopTunnel != nil {
+				stopTunnel()
+			}
+			removeRecord()
+		}, nil
+	}
+}
+
+// recordRunner writes the runner record for a spawned runner and
+// returns its path, or an empty path when records are disabled.
+func (p *DriverProvisioner) recordRunner(ctx context.Context, udid, runnerID string, spawned iosdriver.SpawnedRunner) (string, error) {
+	if p.deps.RunnerStateDir == "" || p.deps.RunnerStateKey == nil {
+		return "", nil
+	}
+	started, err := process.StartTime(ctx, p.runner, spawned.Pid)
+	if err != nil {
+		return "", err
+	}
+	booted, err := process.BootTime(ctx, p.runner)
+	if err != nil {
+		return "", err
+	}
+	path := RunnerStatePath(p.deps.RunnerStateDir, p.deps.RunnerStateKey(udid))
+	err = WriteRunnerState(path, RunnerState{
+		RunnerID:         runnerID,
+		HostPort:         spawned.HostPort,
+		Pid:              spawned.Pid,
+		Pgid:             spawned.Pid,
+		ProcessStartTime: started,
+		HostBootTime:     booted,
+		StartedAt:        p.now().UTC(),
 	})
-	return launcher.EnsureRunning(ctx)
+	if err != nil {
+		return "", err
+	}
+	return path, nil
 }
 
 // EnsureAndroidAgent implements AgentProvisioner.
@@ -241,6 +445,7 @@ type FakeProvisioner struct {
 	iosCalls      []FakeIOSCall
 	androidCalls  []string
 	iosKillCounts map[string]int
+	iosPorts      map[string]int
 
 	// gate, when non-nil, is waited on before every call returns. A
 	// test sets it to hold a call open through the "building" or
@@ -257,6 +462,7 @@ func NewFakeProvisioner() *FakeProvisioner {
 		iosResult:     make(map[string]error),
 		androidResult: make(map[string]error),
 		iosKillCounts: make(map[string]int),
+		iosPorts:      make(map[string]int),
 	}
 }
 
@@ -268,6 +474,14 @@ func (f *FakeProvisioner) SetIOSResult(udid string, err error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.iosResult[udid] = err
+}
+
+// SetIOSPort makes EnsureIOSAgent report port for udid. The default is
+// the fixed control port.
+func (f *FakeProvisioner) SetIOSPort(udid string, port int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.iosPorts[udid] = port
 }
 
 // SetAndroidResult makes the next EnsureAndroidAgent calls for serial
@@ -306,18 +520,22 @@ func (f *FakeProvisioner) AndroidCalls() []string {
 // records its own invocation count against udid, retrievable via
 // IOSKillCount, so a test can assert a teardown path actually
 // stopped the simulated driver process instead of leaking it.
-func (f *FakeProvisioner) EnsureIOSAgent(ctx context.Context, udid string, kind IosAgentKind) (func() error, error) {
+func (f *FakeProvisioner) EnsureIOSAgent(ctx context.Context, udid string, kind IosAgentKind) (int, func() error, error) {
 	f.mu.Lock()
 	f.iosCalls = append(f.iosCalls, FakeIOSCall{UDID: udid, Kind: kind})
 	gate := f.gate
 	err := f.iosResult[udid]
+	port, ok := f.iosPorts[udid]
+	if !ok {
+		port = iosControlPort
+	}
 	f.mu.Unlock()
 
 	if gate != nil {
 		select {
 		case <-gate:
 		case <-ctx.Done():
-			return func() error { return nil }, ctx.Err()
+			return 0, func() error { return nil }, ctx.Err()
 		}
 	}
 	kill := func() error {
@@ -326,7 +544,7 @@ func (f *FakeProvisioner) EnsureIOSAgent(ctx context.Context, udid string, kind 
 		f.mu.Unlock()
 		return nil
 	}
-	return kill, err
+	return port, kill, err
 }
 
 // IOSKillCount reports how many times the kill function returned by

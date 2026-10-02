@@ -125,13 +125,19 @@ make setup   # xcodegen + xcodebuild build-for-testing
 make serve   # runs the driver, blocks the terminal
 ```
 
-`make setup` auto-detects the first booted simulator's UDID.
+`make setup` auto-detects the first booted simulator's UDID. The
+`atomyx` CLI and `atomyx-mcp` do not need `make serve`: they launch their
+own runner for the target, see Launch from the CLI and MCP. `make serve`
+and `make serve-device` remain for contributors who drive the runner by
+hand, attach a debugger, or read its output live.
+
 `iosdriver.XctestLauncher` (`core/internal/iosdriver/xctest_launcher.go`)
-is reuse-first: when the expected runner is already answering `ping` on the
-target port, it skips `xcodebuild` entirely. Otherwise it spawns
+builds the runner when it is missing or stale, then spawns
 `xcodebuild test-without-building` as a background child process
 (`process.BackgroundRunner`), which stays up until the launcher's kill
-function stops it.
+function stops it. A launcher without a port allocator is reuse-first:
+when the expected runner is already answering `ping` on the fixed port,
+it skips `xcodebuild` entirely.
 
 **Physical device**:
 
@@ -178,9 +184,83 @@ scan does not find fails with `DEVICE_NOT_FOUND` and a remedy. Without
 `IosDriver.Connect` (`core/internal/iosdriver/driver.go`) on a
 physical device first launches an `iproxy` USB tunnel as a background child process
 and waits for it to become reachable before dialing. `Disconnect` stops
-the tunnel. On a simulator it dials
-`127.0.0.1:22087` directly, because the simulator shares the host's
-network namespace.
+the tunnel. A driver built with `Options.ExternalTunnel` skips that
+launch, because the provisioner that started the runner already owns the
+tunnel. On a simulator the driver dials the host port directly, because
+the simulator shares the host's network namespace.
+
+### Launch from the CLI and MCP
+
+`DriverFactory` (`core/internal/device/factory.go`) takes an optional
+`AgentProvisioner` in `DriverFactoryDeps.Provisioner`. `atomyx` and
+`atomyx-mcp` wire a `DriverProvisioner` there through
+`core/cmd/internal/runnerprovision`. `atomyx-runtime` wires none and keeps
+dialing the fixed port of the runner its own `ensureIosAgent` service
+launched. That service builds its provisioner with `FixedIosPort`, so it
+adopts a runner on `22087`, starts no tunnel, and writes no runner record.
+
+For an iOS descriptor that has an id and no port of its own, `Build` calls
+`EnsureIOSAgent(ctx, udid, kind)`, which returns `(port, kill, err)`, and
+dials `port`. The returned `kill` is attached to the driver's
+`Options.OnDisconnect`, so every path that disconnects the driver also
+stops the runner: `run`, `suite`, `doctor`, and the MCP session. A
+provisioning failure is reported with `AGENT_UNREACHABLE`, carrying the
+launcher's own message, so a signing problem still names
+`ATOMYX_DEV_TEAM`.
+
+Each launch does the following:
+
+- Reserves a free host port by binding `127.0.0.1:0`, and records it in
+  the provisioner's in-process reserved set so two concurrent launches
+  never receive the same port. A launch in another process can still take
+  the port first, which the bounded retry covers.
+- Assigns a fresh runner id and requires the runner to echo it.
+- Passes the three `TEST_RUNNER_` variables through `process.WithEnv`,
+  which carries extra environment on the context so `Runner.Run` and
+  `BackgroundRunner.Start` keep their signatures.
+- For a physical device, starts `iproxy <hostPort>:22087` from the
+  launcher's `AfterSpawn` hook, before the ping wait, and stops it in
+  `kill`.
+- Writes the runner record described below as soon as the process exists.
+
+Build and run layout, both under `platforms/ios-agent/build`:
+
+- One shared build. `xcodebuild build-for-testing` runs under an
+  exclusive lock on `build/.build.lock`. The decision to build is taken
+  after the lock is held, so launches that start together build once and
+  the others find the product current.
+- One run directory per target, `build/run-<udid>`. Each target runs
+  `xcodebuild test-without-building -xctestrun <file from the shared
+  build>` with that directory as its `-derivedDataPath` and a result
+  bundle inside it, so concurrent targets never share mutable state.
+- The build timeout is 300 s. The launch wait for the runner to answer
+  `ping` is 90 s. A first launch on a fresh machine compiles the Swift
+  runner.
+- The launcher reports `building runner` before a build and `starting
+  runner` before each launch through the logger in
+  `DriverProvisionerDeps`. The CLI and the MCP server write both lines to
+  stderr as log records.
+
+#### Runner record
+
+`<runtime dir>/<key>.ios-runner.json` is written at launch and removed by
+`kill`, where `<key>` is the device's lease key. It holds:
+
+| Field | Meaning |
+|---|---|
+| `runnerId` | Launch identifier the runner echoes in `ping` |
+| `hostPort` | Host port the runner or its tunnel answers on |
+| `pid` | Process id of the `xcodebuild` process |
+| `pgid` | Process group id, equal to `pid` because the runner leads its own group |
+| `processStartTime` | Start time of that process, to the second, in UTC |
+| `hostBootTime` | Host boot time, to the second, in UTC |
+| `startedAt` | Time the record was written, in UTC |
+
+`kill` removes the file only while it still names its own `runnerId`. A
+record that survives means the launching process ended without stopping
+its runner. The same `pid` after a reboot or after the process ended can
+name an unrelated process, so a reader trusts it only when
+`processStartTime` and `hostBootTime` still match.
 
 ### Runner identity and port
 
@@ -190,7 +270,8 @@ passes each variable to `xcodebuild` with a `TEST_RUNNER_` prefix, which
 `xcodebuild` strips before the test runner starts. Only variables in
 `xcodebuild`'s own environment are forwarded, so a `NAME=value` operand
 on its command line has no effect. `XctestLauncher` therefore starts the
-runner as `env TEST_RUNNER_<NAME>=<value> xcodebuild test-without-building`.
+runner with `process.WithEnv` on the start context, which adds the
+variables to the child's environment.
 
 | Variable | Meaning | Default |
 |---|---|---|
@@ -216,7 +297,10 @@ requested target (`iosdriver.ExpectedRunner` in
 - A reported UDID that differs from the requested one is refused even
   when the runner id matches.
 - A runner that reports no identity at all, such as one built before
-  these fields existed, is refused. Rebuild it with `make build`.
+  these fields existed, is refused with a message that names the remedy.
+  Stop it, rebuild the runner with `make build`, and start it again.
+  `make serve` and `make serve-device` rebuild automatically when a Swift
+  source or the project file is newer than the last build.
 
 A refused runner surfaces as `IproxyErrBindConflict` from the tunnel
 launch and as `XctestErrRunnerMismatch` from the launcher. The direct
@@ -241,7 +325,9 @@ allocator the port is fixed, so the first failure is returned.
 For a hand-started runner, `make serve ATOMYX_PORT=<port>` binds it to a
 port other than the default. `make serve-device` always passes
 `DEVICE_UDID` as the target identity. Keep the default `ATOMYX_PORT` for
-a device, because `iproxy` maps to the fixed device-side port.
+a device, because `iproxy` maps to the fixed device-side port. Both
+targets run the products from the shared build with their own derived
+data path, `RUN_DERIVED`, which defaults to `build/run-<udid>`.
 
 ## Platform-specific quirks
 

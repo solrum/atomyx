@@ -10,6 +10,9 @@ import (
 type Invocation struct {
 	Name string
 	Args []string
+	// Env is the additional environment the call's context carried
+	// through WithEnv, or nil when it carried none.
+	Env []string
 }
 
 // Matcher reports whether an invocation matches a stubbed response.
@@ -87,7 +90,7 @@ func (f *Fake) Run(ctx context.Context, name string, args ...string) (Result, er
 
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.invocations = append(f.invocations, Invocation{Name: name, Args: append([]string(nil), args...)})
+	f.invocations = append(f.invocations, Invocation{Name: name, Args: append([]string(nil), args...), Env: append([]string(nil), EnvFrom(ctx)...)})
 	for _, s := range f.stubs {
 		if s.match(name, args) {
 			return s.result, s.err

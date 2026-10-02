@@ -24,6 +24,7 @@ func (p *openPipeProcess) Wait() (process.BackgroundResult, error) {
 	return p.result, nil
 }
 func (p *openPipeProcess) Kill() error { return nil }
+func (p *openPipeProcess) Pid() int    { return 0 }
 
 type blockingReader struct{ never chan struct{} }
 

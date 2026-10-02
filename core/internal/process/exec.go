@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"time"
 
@@ -78,6 +79,9 @@ func (e Exec) Run(ctx context.Context, name string, args ...string) (Result, err
 	}
 
 	cmd := exec.CommandContext(runCtx, name, args...)
+	if env := EnvFrom(ctx); len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

@@ -14,7 +14,7 @@ import (
 func TestFakeProvisioner_EnsureIOSAgent_KillIsNonNilAndTracksInvocations(t *testing.T) {
 	p := NewFakeProvisioner()
 
-	kill, err := p.EnsureIOSAgent(context.Background(), "udid-1", IosAgentKindSimulator)
+	_, kill, err := p.EnsureIOSAgent(context.Background(), "udid-1", IosAgentKindSimulator)
 	if err != nil {
 		t.Fatalf("EnsureIOSAgent() error = %v", err)
 	}
@@ -46,7 +46,7 @@ func TestFakeProvisioner_EnsureIOSAgent_CanceledGate_ReturnsNonNilKill(t *testin
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	kill, err := p.EnsureIOSAgent(ctx, "udid-1", IosAgentKindSimulator)
+	_, kill, err := p.EnsureIOSAgent(ctx, "udid-1", IosAgentKindSimulator)
 	if err == nil {
 		t.Fatal("EnsureIOSAgent() error = nil, want the canceled ctx error")
 	}

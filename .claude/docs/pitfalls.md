@@ -379,15 +379,28 @@ first.
   Switching between simulator and device targets still requires
   stopping one driver before starting the other.
 - **The XCUITest process and, for a physical device, the `iproxy`
-  tunnel are two separate pieces of state.**
+  tunnel are two separate pieces of state, and exactly one owner starts
+  each.** With a provisioner in `DriverFactoryDeps`,
   `DriverProvisioner.EnsureIOSAgent`
-  (`core/internal/device/provisioner.go`) uses `XctestLauncher` to
-  build and reuse-or-spawn the XCUITest process for both a simulator
-  and a device target, reusing an already-answering process when one
-  is found. The `iproxy` tunnel itself is established separately, by
-  `IosDriver.Connect` (`core/internal/iosdriver/iproxy.go`), only for a
-  device target. A device UDID being selected does not by itself
-  guarantee either piece was already running.
+  (`core/internal/device/provisioner.go`) starts the runner on a port
+  reserved for that target and, for a device, the tunnel as well, so the
+  driver it feeds is built with `Options.ExternalTunnel` and starts no
+  tunnel of its own. Without a provisioner (the sidecar), the runner is
+  someone else's and `IosDriver.Connect`
+  (`core/internal/iosdriver/iproxy.go`) starts the tunnel for a device
+  target. Never start a tunnel from both sides.
+- **Never share a derived data path between targets, and never build
+  outside the build lock.** Every launch builds once into
+  `platforms/ios-agent/build` under an exclusive lock on
+  `build/.build.lock`, and takes the decision to build only after the
+  lock is held. Each target then runs `test-without-building -xctestrun`
+  from its own `build/run-<udid>` derived data path. A second build or a
+  second runner writing into the same path corrupts the other's session.
+- **Attach the runner's `kill` to the driver's teardown, never to a
+  caller's own cleanup.** The provisioned driver stops its runner in
+  `Disconnect` through `Options.OnDisconnect`, so every path that
+  disconnects it also stops the runner. A new caller that builds a driver
+  and forgets `Disconnect` leaks an `xcodebuild` process group.
 - **Long-lived child processes go through `BackgroundRunner`, never
   `Runner.Run`.** `iproxy` and the XCUITest runner
   (`xcodebuild test-without-building`) are started with
@@ -397,11 +410,12 @@ first.
   the launcher drain the child's stdout, stop it by killing its process
   group through the `BackgroundProcess` handle, and receive the runner
   by constructor injection from the composition roots.
-- **`make serve-device` uses `test-without-building` and does not
-  rebuild the Swift driver.** After changing any Swift source under
-  `platforms/ios-agent/Tests/`, run `make build-device` (or
-  `make setup-device`) before `make serve-device`, or the running
-  process is the stale binary from the previous build.
+- **`make serve-device` uses `test-without-building`, and its build
+  stamp depends on the Swift sources and the project file.** After a
+  change under `platforms/ios-agent/Tests/` or `App/`, the next
+  `make serve` or `make serve-device` rebuilds before it serves. Calling
+  `xcodebuild test-without-building` by hand skips that check and runs
+  the stale binary from the previous build.
 - **A Derived-Data or module-cache path breaks after the driver
   directory is renamed or moved.** Xcode's precompiled headers embed
   an absolute path to the module cache location. If

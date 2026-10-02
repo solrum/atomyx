@@ -37,9 +37,13 @@ REPO_ROOT := $(abspath ../..)
 # test bundle for the simulator and device destinations respectively.
 # Kept apart because the two destinations build into the same derived
 # data path but are not interchangeable: a stamp only means its own
-# destination is ready to serve.
+# destination is ready to serve. Each stamp depends on the Swift sources
+# and the project definition, so editing either rebuilds the runner
+# before it serves. A runner built before launch identities existed is
+# refused when it answers a ping, and a stale stamp would keep serving it.
 BUILD_STAMP        := $(DERIVED)/.build-for-testing
 DEVICE_BUILD_STAMP := $(DERIVED)/.build-for-testing-device
+SWIFT_SOURCES      := $(shell find Tests App -name '*.swift' 2>/dev/null)
 
 # --- Simulator defaults (auto-detected) -----------------------------
 # Auto-detect the first booted simulator's UDID. The 36-char anchor
@@ -68,6 +72,14 @@ DEVICE_DESTINATION ?= platform=iOS,id=$(DEVICE_UDID)
 # a launcher-managed one. serve-device always reports DEVICE_UDID as the
 # runner target identity.
 ATOMYX_PORT ?=
+# serve and serve-device run the products that build-for-testing wrote into
+# $(DERIVED), from a derived data path of their own, so a hand-started runner
+# never shares mutable state with a launcher-managed one or with a runner for
+# another target. The xctestrun file is resolved when the recipe runs, after
+# the build prerequisite has produced it.
+RUN_DERIVED ?= $(DERIVED)/run-$(if $(DEVICE_UDID),$(DEVICE_UDID),$(UDID))
+XCTESTRUN_SIM    = $(lastword $(sort $(wildcard $(DERIVED)/Build/Products/$(SCHEME)_iphonesimulator*.xctestrun)))
+XCTESTRUN_DEVICE = $(lastword $(sort $(wildcard $(DERIVED)/Build/Products/$(SCHEME)_iphoneos*.xctestrun)))
 SERVE_ENV := $(if $(ATOMYX_PORT),TEST_RUNNER_ATOMYX_PORT=$(ATOMYX_PORT))
 SERVE_DEVICE_ENV := $(SERVE_ENV) TEST_RUNNER_ATOMYX_TARGET_UDID=$(DEVICE_UDID)
 
@@ -211,7 +223,7 @@ test: check-udid $(PROJECT)
 # clone has neither $(PROJECT) nor this stamp, so serve's prerequisite
 # chain below builds both automatically; an unchanged checkout skips
 # straight to serving.
-$(BUILD_STAMP): $(PROJECT)
+$(BUILD_STAMP): $(PROJECT) $(SWIFT_SOURCES)
 	xcodebuild build-for-testing \
 		-project $(PROJECT) \
 		-scheme $(SCHEME) \
@@ -221,11 +233,12 @@ $(BUILD_STAMP): $(PROJECT)
 	@touch $(BUILD_STAMP)
 
 serve: check-udid $(BUILD_STAMP)
+	@rm -rf $(RUN_DERIVED)/serve.xcresult
 	$(SERVE_ENV) xcodebuild test-without-building \
-		-project $(PROJECT) \
-		-scheme $(SCHEME) \
+		-xctestrun $(XCTESTRUN_SIM) \
 		-destination '$(DESTINATION)' \
-		-derivedDataPath $(DERIVED) \
+		-derivedDataPath $(RUN_DERIVED) \
+		-resultBundlePath $(RUN_DERIVED)/serve.xcresult \
 		-only-testing:AtomyxDriverAgent/AtomyxDriverAgent/testServeCommands
 
 # Pointer-gesture smoke: runs 7 W3C patterns against a live
@@ -326,7 +339,7 @@ install-device: build-device
 # prerequisite here (unlike serve-device below): a phony prerequisite
 # on a file target defeats staleness tracking, forcing a rebuild on
 # every invocation regardless of whether the stamp is current.
-$(DEVICE_BUILD_STAMP): $(PROJECT)
+$(DEVICE_BUILD_STAMP): $(PROJECT) $(SWIFT_SOURCES)
 	xcodebuild build-for-testing \
 		-project $(PROJECT) \
 		-scheme $(SCHEME) \
@@ -337,13 +350,13 @@ $(DEVICE_BUILD_STAMP): $(PROJECT)
 	@touch $(DEVICE_BUILD_STAMP)
 
 serve-device: check-device $(DEVICE_BUILD_STAMP)
+	@rm -rf $(RUN_DERIVED)/serve.xcresult
 	$(SERVE_DEVICE_ENV) xcodebuild test-without-building \
-		-project $(PROJECT) \
-		-scheme $(SCHEME) \
+		-xctestrun $(XCTESTRUN_DEVICE) \
 		-destination '$(DEVICE_DESTINATION)' \
-		-derivedDataPath $(DERIVED) \
-		-only-testing:AtomyxDriverAgent/AtomyxDriverAgent/testServeCommands \
-		$(SIGN_OVERRIDES)
+		-derivedDataPath $(RUN_DERIVED) \
+		-resultBundlePath $(RUN_DERIVED)/serve.xcresult \
+		-only-testing:AtomyxDriverAgent/AtomyxDriverAgent/testServeCommands
 
 setup-device: build-device
 

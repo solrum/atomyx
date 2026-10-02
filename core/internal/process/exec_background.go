@@ -3,6 +3,7 @@ package process
 import (
 	"context"
 	"io"
+	"os"
 	"os/exec"
 	"sync"
 	"syscall"
@@ -60,6 +61,9 @@ func (r ExecBackground) Start(ctx context.Context, name string, args ...string) 
 	// child forked (for example a shell running a background job)
 	// would survive Kill as an orphan.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if env := EnvFrom(ctx); len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
 	cmd.WaitDelay = ioDrainDelay
 	if r.waitDelay > 0 {
 		cmd.WaitDelay = r.waitDelay
@@ -91,6 +95,13 @@ type execBackgroundProcess struct {
 }
 
 func (p *execBackgroundProcess) Stdout() io.Reader { return p.stdout }
+
+func (p *execBackgroundProcess) Pid() int {
+	if p.cmd.Process == nil {
+		return 0
+	}
+	return p.cmd.Process.Pid
+}
 
 func (p *execBackgroundProcess) Wait() (BackgroundResult, error) {
 	p.mu.Lock()

@@ -61,6 +61,7 @@ atomyx/
 | `core/cmd/atomyx-runtime` | `atomyx-runtime` | The sidecar: a newline-delimited JSON-RPC bridge over stdin and stdout that drives a real device on a parent process's behalf. |
 | `core/cmd/gen-config-schema` | `gen-config-schema` | Regenerates the checked-in JSON Schema for the project config type from `core/internal/config`'s Go types. |
 | `core/cmd/gen-script-schema` | `gen-script-schema` | Regenerates the checked-in JSON Schema for the script definition type from `core/internal/script`'s Go types. |
+| `core/cmd/internal/runnerprovision` | none | Builds the iOS runner provisioner that `atomyx` and `atomyx-mcp` wire into their driver factory, including where runner records live. |
 
 ## `core/internal/`: one package per concern
 
@@ -71,7 +72,7 @@ atomyx/
 | `clock` | Time-source abstraction every polling loop, timeout, and retry uses instead of calling the standard library directly. |
 | `config` | Owns the project config schema, its file-discovery and YAML loader, schema validation, and environment reference resolution. |
 | `conformance` | Drives the Go runtime's implementation of an operation and asserts its output against a frozen golden fixture. |
-| `device` | Discovers reachable Android and iOS devices and builds a live Driver plus Orchestra pair for whichever one a caller selects. |
+| `device` | Discovers reachable Android and iOS devices and builds a live Driver plus Orchestra pair for whichever one a caller selects. For an iOS target it launches the runner through a provisioner and ties the runner's lifetime to the driver. |
 | `diag` | Defines the stable error-code taxonomy every user-facing surface reports a failure through. |
 | `driver` | Defines the platform-neutral Driver contract every concrete adapter implements. |
 | `core/internal/driver/drivertest` | The Driver contract suite: table-driven invariant tests any implementer must satisfy. |
@@ -83,7 +84,7 @@ atomyx/
 | `mcp` | Builds the Atomyx MCP server: server construction, tool registration, and the tool handlers themselves. |
 | `netcapture` | The concrete network-capture adapters a script run observes HTTP traffic through. |
 | `orchestra` | Composes Driver calls into selector resolution, priority broadening, scroll-into-view, obscurement, and retry. |
-| `process` | Abstracts external command execution (adb, xcrun, and similar) behind a Runner interface. |
+| `process` | Abstracts external command execution (adb, xcrun, and similar) behind Runner and BackgroundRunner interfaces, carries extra child environment on the context, and reads process and host start times. |
 | `report` | Renders a run's result into a persisted report bundle: HTML, versioned JSON, and referenced screenshots. |
 | `runner` | Defines the command execution contract and the ScriptRunner that dispatches a parsed script's steps. |
 | `scenario` | Runs ordered groups of scripts and ordered sets of scripts or scenarios against a shared Orchestra. |

@@ -307,7 +307,10 @@ type tunnelProcess struct {
 	err      error
 	exitCode int
 	stderr   string
+	pid      int
 }
+
+func (p *tunnelProcess) Pid() int { return p.pid }
 
 func (p *tunnelProcess) Stdout() io.Reader { return p.stdout }
 

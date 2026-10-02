@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"dev.atomyx/cmd/internal/runnerprovision"
 	"dev.atomyx/internal/cli"
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/logging"
@@ -34,7 +35,8 @@ func main() {
 		device.NewAndroidAdbProbe(procRunner),
 		device.NewIosBootedSimulatorProbe(procRunner),
 	)
-	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Background: background, Clock: clock, Logger: logger})
+	provisioner := runnerprovision.New(procRunner, background, clock, logger)
+	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Background: background, Clock: clock, Logger: logger, Provisioner: provisioner})
 
 	deps := cli.Deps{
 		Probe:   probe,

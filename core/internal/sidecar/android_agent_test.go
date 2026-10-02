@@ -181,7 +181,7 @@ type panickingProvisioner struct{}
 
 var _ device.AgentProvisioner = panickingProvisioner{}
 
-func (panickingProvisioner) EnsureIOSAgent(context.Context, string, device.IosAgentKind) (func() error, error) {
+func (panickingProvisioner) EnsureIOSAgent(context.Context, string, device.IosAgentKind) (int, func() error, error) {
 	panic("ios agent panic")
 }
 

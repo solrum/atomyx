@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/process"
 )
 
@@ -68,26 +69,40 @@ type IproxyError struct {
 
 func (e *IproxyError) Error() string { return e.Message }
 
-// launchIproxy starts the USB tunnel for a physical device by running
-// "iproxy <port>:<port> -u <udid>", and
-// does not return until the tunnel is confirmed reachable or one of
-// the IproxyErrorCode failure modes is confirmed instead. iproxy is a
-// long-running tunnel process, not a command that completes, so it is
-// started through the injected BackgroundRunner. Runner.Run applies a
-// fallback timeout to a deadline-less context, which would kill the
-// tunnel mid-session. A successful launch keeps the process running,
-// independent of ctx, until stopIproxy (or this function's own
-// cleanup on failure) kills its process group. Calling launchIproxy while a tunnel is already running replaces it,
-// matching Disconnect followed by a fresh Connect.
+// TunnelConfig configures StartTunnel.
+type TunnelConfig struct {
+	// UDID is the physical device the tunnel reaches.
+	UDID string
+	// HostPort is the host port the tunnel listens on.
+	HostPort int
+	// RunnerID is the launch identifier of the runner expected behind
+	// the tunnel. Empty means identity rests on the UDID alone.
+	RunnerID string
+	// Warn receives a one-line warning when an existing runner is
+	// adopted without a launch identifier. Nil discards it.
+	Warn func(message string)
+}
+
+// StartTunnel starts the USB tunnel for a physical device by running
+// "iproxy <hostPort>:22087 -u <udid>", and does not return until the
+// tunnel is confirmed reachable or one of the IproxyErrorCode failure
+// modes is confirmed instead. iproxy is a long-running tunnel process,
+// not a command that completes, so it is started through bg.
+// Runner.Run applies a fallback timeout to a deadline-less context,
+// which would kill the tunnel mid-session. A successful start keeps the
+// process running, independent of ctx, until the returned stop function
+// (or this function's own cleanup on failure) kills its process group.
+// stop is nil when an existing tunnel to the expected runner was
+// reused, because that tunnel belongs to someone else.
 //
-// Two guards make it safe for Connect to dial immediately after this
-// returns successfully:
+// Two guards make it safe to dial immediately after this returns
+// successfully:
 //
-//   - Port-conflict detection before spawn. If 127.0.0.1:port already
-//     has a listener, it is probed with the same ping handshake this
-//     driver's own wire protocol speaks. A listener that answers as the
-//     expected runner (see ExpectedRunner) is an existing Atomyx driver
-//     tunnel and is reused without spawning a second iproxy. A
+//   - Port-conflict detection before spawn. If 127.0.0.1:hostPort
+//     already has a listener, it is probed with the same ping handshake
+//     this driver's own wire protocol speaks. A listener that answers as
+//     the expected runner (see ExpectedRunner) is an existing Atomyx
+//     driver tunnel and is reused without spawning a second iproxy. A
 //     listener that does not answer, or answers as a different runner,
 //     is refused with IproxyErrBindConflict instead of racing whatever
 //     else is bound there.
@@ -98,69 +113,87 @@ func (e *IproxyError) Error() string { return e.Message }
 //     UDID, iproxy missing from PATH, a device-trust failure, or any
 //     other spawn failure) so a caller never dials a tunnel that has
 //     already failed. The poll cadence and the iproxyTunnelUpTimeout
-//     deadline both run against d.opts.Clock, so a test can drive
+//     deadline both run against clk, so a test can drive
 //     IproxyErrTunnelTimeout deterministically with a fake clock
 //     instead of waiting on real time.
-func (d *IosDriver) launchIproxy(ctx context.Context) error {
-	if canConnectTCP(ctx, d.opts.Port, iproxyPortProbeTimeout) {
-		want := ExpectedRunner{UDID: d.opts.UDID, Kind: KindDevice, RunnerID: d.opts.RunnerID}
-		found, unmanaged, idErr := CheckRunnerIdentity(ctx, d.opts.Port, iproxyPingProbeTimeout, want)
+//
+// The tunnel is up when the host port accepts connections, which can
+// precede the runner answering on the device, so a caller that starts
+// the tunnel before the runner polls the ping handshake afterwards.
+func StartTunnel(ctx context.Context, bg process.BackgroundRunner, clk clock.Clock, cfg TunnelConfig) (stop func(), err error) {
+	if canConnectTCP(ctx, cfg.HostPort, iproxyPortProbeTimeout) {
+		want := ExpectedRunner{UDID: cfg.UDID, Kind: KindDevice, RunnerID: cfg.RunnerID}
+		found, unmanaged, idErr := CheckRunnerIdentity(ctx, cfg.HostPort, iproxyPingProbeTimeout, want)
 		if idErr != nil {
-			return &IproxyError{Code: IproxyErrBindConflict, Message: idErr.Error()}
+			return nil, &IproxyError{Code: IproxyErrBindConflict, Message: idErr.Error()}
 		}
 		if found {
-			if unmanaged && d.opts.Warn != nil {
-				d.opts.Warn(unmanagedRunnerWarning(d.opts.Port))
+			if unmanaged && cfg.Warn != nil {
+				cfg.Warn(unmanagedRunnerWarning(cfg.HostPort))
 			}
-			return nil
+			return nil, nil
 		}
-		return &IproxyError{
+		return nil, &IproxyError{
 			Code: IproxyErrBindConflict,
 			Message: fmt.Sprintf(
 				"port %d on 127.0.0.1 already has a listener that is not an Atomyx driver tunnel; "+
 					"stop whatever is bound there before connecting to device %s",
-				d.opts.Port, d.opts.UDID,
+				cfg.HostPort, cfg.UDID,
 			),
 		}
 	}
 
-	portMapping := fmt.Sprintf("%d:%d", d.opts.Port, deviceRunnerPort)
-	proc, startErr := d.background.Start(context.WithoutCancel(ctx), "iproxy", portMapping, "-u", d.opts.UDID)
+	portMapping := fmt.Sprintf("%d:%d", cfg.HostPort, deviceRunnerPort)
+	proc, startErr := bg.Start(context.WithoutCancel(ctx), "iproxy", portMapping, "-u", cfg.UDID)
 	if startErr != nil {
-		return classifyIproxyExit(startErr)
+		return nil, classifyIproxyExit(startErr)
 	}
-	exited, stop := superviseBackground(proc, func(_ process.BackgroundResult, err error) error {
+	exited, stopProc := superviseBackground(proc, func(_ process.BackgroundResult, err error) error {
 		return classifyIproxyExit(err)
 	})
 
 	probe := func() (bool, error) {
-		return canConnectTCP(ctx, d.opts.Port, iproxyPortProbeTimeout), nil
+		return canConnectTCP(ctx, cfg.HostPort, iproxyPortProbeTimeout), nil
 	}
 	outcome, err := process.AwaitReady(
-		ctx, d.opts.Clock, probe, exited,
+		ctx, clk, probe, exited,
 		iproxyTunnelPollInterval.Milliseconds(), iproxyTunnelUpTimeout.Milliseconds(),
 	)
 	switch outcome {
 	case process.ReadinessReady:
-		d.iproxyStop = stop
-		return nil
+		return stopProc, nil
 	case process.ReadinessExited:
-		stop()
-		return err
+		stopProc()
+		return nil, err
 	case process.ReadinessTimeout:
-		stop()
-		return &IproxyError{
+		stopProc()
+		return nil, &IproxyError{
 			Code: IproxyErrTunnelTimeout,
 			Message: fmt.Sprintf(
 				"iproxy tunnel did not become reachable on 127.0.0.1:%d within %s; "+
 					"is the Swift driver actually running on device %s?",
-				d.opts.Port, iproxyTunnelUpTimeout, d.opts.UDID,
+				cfg.HostPort, iproxyTunnelUpTimeout, cfg.UDID,
 			),
 		}
 	default: // process.ReadinessCtxDone
-		stop()
+		stopProc()
+		return nil, err
+	}
+}
+
+// launchIproxy starts the tunnel for this driver's device and keeps its
+// stop function for Disconnect. Calling it while a tunnel is already
+// running replaces it, matching Disconnect followed by a fresh Connect.
+func (d *IosDriver) launchIproxy(ctx context.Context) error {
+	d.stopIproxy()
+	stop, err := StartTunnel(ctx, d.background, d.opts.Clock, TunnelConfig{
+		UDID: d.opts.UDID, HostPort: d.opts.Port, RunnerID: d.opts.RunnerID, Warn: d.opts.Warn,
+	})
+	if err != nil {
 		return err
 	}
+	d.iproxyStop = stop
+	return nil
 }
 
 // classifyIproxyExit turns the error from starting or waiting on a

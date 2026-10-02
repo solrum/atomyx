@@ -35,6 +35,10 @@ type BackgroundProcess interface {
 	// Kill terminates the process if it is still running. Killing an
 	// already-exited process is a no-op.
 	Kill() error
+	// Pid reports the operating system process id of the started
+	// process. A BackgroundRunner starts every process as the leader of
+	// its own process group, so the process group id equals Pid.
+	Pid() int
 }
 
 // BackgroundRunner starts an external command and returns a handle to

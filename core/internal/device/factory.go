@@ -66,6 +66,12 @@ type DriverFactoryDeps struct {
 	// context carrying a run id (see logging.WithRunID) logs a
 	// completion line correlated to that run.
 	Logger logging.Logger
+	// Provisioner launches the XCUITest runner for an iOS target that
+	// names no port of its own, so a build needs no runner started by
+	// hand. The built driver owns the returned kill and runs it in
+	// Disconnect. A nil Provisioner leaves the factory dialing the fixed
+	// control port, which a caller that runs its own runner relies on.
+	Provisioner AgentProvisioner
 }
 
 // DriverFactory picks the concrete driver family for a device's
@@ -80,6 +86,8 @@ type DriverFactory struct {
 	clock      orchestra.Clock
 	simHid     simHidStarter
 	logger     logging.Logger
+
+	provisioner AgentProvisioner
 }
 
 // NewDriverFactory constructs a DriverFactory from deps.
@@ -96,7 +104,10 @@ func NewDriverFactory(deps DriverFactoryDeps) *DriverFactory {
 	if background == nil {
 		panic("device.NewDriverFactory: Background runner is required")
 	}
-	return &DriverFactory{runner: deps.Runner, background: background, clock: clock, simHid: deps.SimHid, logger: logger}
+	return &DriverFactory{
+		runner: deps.Runner, background: background, clock: clock, simHid: deps.SimHid, logger: logger,
+		provisioner: deps.Provisioner,
+	}
 }
 
 var _ Factory = (*DriverFactory)(nil)
@@ -147,15 +158,37 @@ func (f *DriverFactory) createDriver(ctx context.Context, desc Descriptor) (driv
 	}
 
 	kind := iosdriver.KindDevice
+	agentKind := IosAgentKindDevice
 	if desc.Kind == KindSimulator {
 		kind = iosdriver.KindSimulator
+		agentKind = IosAgentKindSimulator
 	}
 	port := iosControlPort
 	if desc.Port != 0 {
 		port = desc.Port
 	}
-	conn := transport.NewTCPClient("127.0.0.1", port, transport.WithTCPLogger(f.logger))
 	iosOpts := iosdriver.Options{UDID: desc.ID, Kind: kind, Port: port, Background: f.background}
+
+	// A descriptor that names its own port belongs to a caller that runs
+	// its own runner there, and a descriptor with no id names no target
+	// to launch a runner for, so only a descriptor with an id and
+	// without a port is provisioned.
+	stopRunner := func() {}
+	if f.provisioner != nil && desc.Port == 0 && desc.ID != "" {
+		provisioned, kill, err := f.provisioner.EnsureIOSAgent(ctx, desc.ID, agentKind)
+		if err != nil {
+			if kill != nil {
+				_ = kill()
+			}
+			return nil, iosdriver.ProvisionFailure(desc.ID, err)
+		}
+		port = provisioned
+		stopRunner = func() { _ = kill() }
+		iosOpts.Port = port
+		iosOpts.ExternalTunnel = kind == iosdriver.KindDevice
+		iosOpts.OnDisconnect = stopRunner
+	}
+	conn := transport.NewTCPClient("127.0.0.1", port, transport.WithTCPLogger(f.logger))
 
 	hidPort := desc.HidPort
 	if desc.Kind == KindSimulator && hidPort == 0 && f.simHid != nil &&
@@ -167,12 +200,18 @@ func (f *DriverFactory) createDriver(ctx context.Context, desc Descriptor) (driv
 
 	if desc.Kind == KindSimulator && hidPort != 0 {
 		if idErr := f.verifySimulatorRunner(ctx, port, desc.ID); idErr != nil {
+			stopRunner()
 			return nil, idErr
 		}
-		return iossimdriver.New(conn, f.runner, iossimdriver.NewDialer(), iossimdriver.Options{
+		drv, err := iossimdriver.New(conn, f.runner, iossimdriver.NewDialer(), iossimdriver.Options{
 			Options: iosOpts,
 			HidPort: hidPort,
 		})
+		if err != nil {
+			stopRunner()
+			return nil, err
+		}
+		return drv, nil
 	}
 	return iosdriver.New(conn, f.runner, iosOpts), nil
 }

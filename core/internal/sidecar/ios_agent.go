@@ -161,7 +161,7 @@ func (s *IosAgentService) Ensure(udid string, kind device.IosAgentKind) IosAgent
 	go func() {
 		defer s.inflight.Done()
 		defer s.recoverEnsurePanic(udid)
-		kill, err := s.provisioner.EnsureIOSAgent(s.ctx, udid, kind)
+		_, kill, err := s.provisioner.EnsureIOSAgent(s.ctx, udid, kind)
 		if err != nil {
 			s.markFailed(udid, err.Error())
 			return

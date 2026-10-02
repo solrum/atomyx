@@ -92,6 +92,13 @@ type fakeXcodebuildRunner struct {
 	// reportData, when set, replaces the identity fields of the ping
 	// reply entirely.
 	reportData string
+	// buildGate, when set, runs at the start of every build-for-testing
+	// call, so a test can hold a build open or count builds.
+	buildGate func()
+	// spawnGate, when set, holds the spawned runner back from listening
+	// until it is closed, modeling a runner that only becomes reachable
+	// once something else, such as a tunnel, is up.
+	spawnGate <-chan struct{}
 }
 
 // defaultIdentityFields is the identity a fake runner reports when a
@@ -99,23 +106,9 @@ type fakeXcodebuildRunner struct {
 // a test aimed at either kind finds a runner that belongs to it.
 const defaultIdentityFields = `"simulatorUdid":"SIM-1","targetUdid":"DEV-1"`
 
-// unwrapEnv splits the launcher's "env VAR=value... command args"
-// invocation into the environment assignments and the wrapped
-// command, so tests assert the xcodebuild argv and the launch
-// environment independently.
-func unwrapEnv(name string, args []string) (env []string, cmd string, cmdArgs []string) {
-	if name != "env" {
-		return nil, name, args
-	}
-	i := 0
-	for i < len(args) && strings.Contains(args[i], "=") {
-		i++
-	}
-	if i >= len(args) {
-		return args, name, nil
-	}
-	return args[:i], args[i], args[i+1:]
-}
+// fakeRunnerPidBase offsets the process id a spawned fake reports, so
+// the n-th spawn reports fakeRunnerPidBase plus n.
+const fakeRunnerPidBase = 7000
 
 func envValue(env []string, key string) string {
 	for _, kv := range env {
@@ -160,13 +153,43 @@ func (r *fakeXcodebuildRunner) Run(_ context.Context, name string, args ...strin
 		return process.Result{}, errors.New("test-without-building must be started through the BackgroundRunner")
 	}
 	if len(args) > 0 && args[0] == "build-for-testing" {
+		if r.buildGate != nil {
+			r.buildGate()
+		}
+		if r.buildErr == nil {
+			writeBuildProducts(args)
+		}
 		return r.buildResult, r.buildErr
 	}
 	return process.Result{}, nil
 }
 
+// writeBuildProducts simulates what a successful build-for-testing
+// leaves behind: the runner app and the .xctestrun file for the
+// destination's platform, under the derived data path named in args.
+func writeBuildProducts(args []string) {
+	var derived, scheme, destination string
+	for i := 0; i+1 < len(args); i++ {
+		switch args[i] {
+		case "-derivedDataPath":
+			derived = args[i+1]
+		case "-scheme":
+			scheme = args[i+1]
+		case "-destination":
+			destination = args[i+1]
+		}
+	}
+	sdk, config := "iphonesimulator", "Debug-iphonesimulator"
+	if strings.HasPrefix(destination, "platform=iOS,") {
+		sdk, config = "iphoneos", "Debug-iphoneos"
+	}
+	products := filepath.Join(derived, "Build", "Products")
+	_ = os.MkdirAll(filepath.Join(products, config, "AtomyxDriverAgent-Runner.app"), 0o755)
+	_ = os.WriteFile(filepath.Join(products, scheme+"_"+sdk+"27.0-arm64.xctestrun"), []byte("{}"), 0o644)
+}
+
 func (r *fakeXcodebuildRunner) Start(ctx context.Context, name string, args ...string) (process.BackgroundProcess, error) {
-	env, name, args := unwrapEnv(name, args)
+	env := process.EnvFrom(ctx)
 	r.record(name, args)
 	r.mu.Lock()
 	r.spawnEnvs = append(r.spawnEnvs, env)
@@ -177,7 +200,7 @@ func (r *fakeXcodebuildRunner) Start(ctx context.Context, name string, args ...s
 	}
 	ctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	pr, pw := io.Pipe()
-	proc := &tunnelProcess{cancel: cancel, stdout: pr, done: make(chan struct{})}
+	proc := &tunnelProcess{cancel: cancel, stdout: pr, done: make(chan struct{}), pid: fakeRunnerPidBase + spawnIndex}
 	go func() {
 		defer close(proc.done)
 		defer func() { _ = pw.Close() }()
@@ -203,6 +226,16 @@ func (r *fakeXcodebuildRunner) runSpawn(ctx context.Context, proc *tunnelProcess
 		return ctx.Err()
 	}
 
+	if r.spawnGate != nil {
+		select {
+		case <-r.spawnGate:
+		case <-ctx.Done():
+			if r.spawnReturned != nil {
+				close(r.spawnReturned)
+			}
+			return ctx.Err()
+		}
+	}
 	port := r.port
 	if port == 0 {
 		port, _ = strconv.Atoi(envValue(env, "TEST_RUNNER_ATOMYX_PORT"))
@@ -293,6 +326,14 @@ func createFreshRunnerApp(t *testing.T, projectDir string, kind iosdriver.Kind, 
 	if err := os.MkdirAll(runnerApp, 0o755); err != nil {
 		t.Fatalf("mkdir runnerApp: %v", err)
 	}
+	sdk := "iphonesimulator"
+	if kind == iosdriver.KindDevice {
+		sdk = "iphoneos"
+	}
+	xctestrun := filepath.Join(projectDir, "build", "Build", "Products", "AtomyxDriver_"+sdk+"27.0-arm64.xctestrun")
+	if err := os.WriteFile(xctestrun, []byte("{}"), 0o644); err != nil {
+		t.Fatalf("write xctestrun: %v", err)
+	}
 	if err := os.Chtimes(runnerApp, mtime, mtime); err != nil {
 		t.Fatalf("chtimes runnerApp: %v", err)
 	}
@@ -310,16 +351,25 @@ func wantBuildArgs(destination string, signOverrides ...string) []string {
 	return append(args, signOverrides...)
 }
 
-func wantSpawnArgs(destination string, signOverrides ...string) []string {
-	args := []string{
+// wantSpawnArgs is the argv of the runner launch for udid. XCTESTRUN,
+// RUNDERIVED and RESULT are placeholders substituteProjectPaths resolves
+// against the project directory.
+func wantSpawnArgs(destination, udid string) []string {
+	return []string{
 		"test-without-building",
-		"-project", "PROJECT",
-		"-scheme", "AtomyxDriver",
+		"-xctestrun", "XCTESTRUN:" + sdkOf(destination),
 		"-destination", destination,
-		"-derivedDataPath", "DERIVED",
+		"-derivedDataPath", "RUNDERIVED:" + udid,
+		"-resultBundlePath", "RESULT:" + udid,
 		"-only-testing:AtomyxDriverAgent/AtomyxDriverAgent/testServeCommands",
 	}
-	return append(args, signOverrides...)
+}
+
+func sdkOf(destination string) string {
+	if strings.HasPrefix(destination, "platform=iOS,") {
+		return "iphoneos"
+	}
+	return "iphonesimulator"
 }
 
 var simulatorSignOverrides = []string{
@@ -350,11 +400,17 @@ func substituteProjectPaths(args []string, projectDir string) []string {
 	derived := filepath.Join(projectDir, "build")
 	out := make([]string, len(args))
 	for i, a := range args {
-		switch a {
-		case "PROJECT":
+		switch {
+		case a == "PROJECT":
 			out[i] = xcodeproj
-		case "DERIVED":
+		case a == "DERIVED":
 			out[i] = derived
+		case strings.HasPrefix(a, "XCTESTRUN:"):
+			out[i] = filepath.Join(derived, "Build", "Products", "AtomyxDriver_"+strings.TrimPrefix(a, "XCTESTRUN:")+"27.0-arm64.xctestrun")
+		case strings.HasPrefix(a, "RUNDERIVED:"):
+			out[i] = filepath.Join(derived, "run-"+strings.TrimPrefix(a, "RUNDERIVED:"))
+		case strings.HasPrefix(a, "RESULT:"):
+			out[i] = filepath.Join(derived, "run-"+strings.TrimPrefix(a, "RESULT:"), "runner.xcresult")
 		default:
 			out[i] = a
 		}
@@ -441,7 +497,7 @@ func TestXctestLauncher_EnsureRunning_BuildsThenSpawnsWithExactArgv_Simulator(t 
 	}
 
 	wantSpawn := substituteProjectPaths(
-		wantSpawnArgs("platform=iOS Simulator,id=SIM-1", simulatorSignOverrides...),
+		wantSpawnArgs("platform=iOS Simulator,id=SIM-1", "SIM-1"),
 		projectDir,
 	)
 	if invocations[1].Name != "xcodebuild" || !equalArgs(invocations[1].Args, wantSpawn) {
@@ -565,7 +621,7 @@ func TestXctestLauncher_EnsureRunning_PhysicalDevice_UsesDeviceDestinationAndSig
 	}
 
 	wantSpawn := substituteProjectPaths(
-		wantSpawnArgs("platform=iOS,id=DEV-1", deviceSignOverrides("TEAM123")...),
+		wantSpawnArgs("platform=iOS,id=DEV-1", "DEV-1"),
 		projectDir,
 	)
 	if !equalArgs(invocations[1].Args, wantSpawn) {
@@ -630,7 +686,7 @@ func TestXctestLauncher_EnsureRunning_PhysicalDevice_ManualSigningPassesProfile(
 	if !equalArgs(invocations[0].Args, wantBuild) {
 		t.Fatalf("build args = %+v, want %v", invocations[0].Args, wantBuild)
 	}
-	wantSpawn := substituteProjectPaths(wantSpawnArgs("platform=iOS,id=DEV-1", manual...), projectDir)
+	wantSpawn := substituteProjectPaths(wantSpawnArgs("platform=iOS,id=DEV-1", "DEV-1"), projectDir)
 	if !equalArgs(invocations[1].Args, wantSpawn) {
 		t.Fatalf("spawn args = %+v, want %v", invocations[1].Args, wantSpawn)
 	}
@@ -840,8 +896,8 @@ func TestXctestLauncher_EnsureRunning_BuildsThenSpawnsWithExactArgv_CustomIdenti
 	}
 
 	spawnArgs := invocations[1].Args
-	if !containsArgPair(spawnArgs, "-scheme", "CustomScheme") {
-		t.Fatalf("spawn args = %+v, want -scheme CustomScheme", spawnArgs)
+	if !containsArgPair(spawnArgs, "-xctestrun", filepath.Join(projectDir, "build", "Build", "Products", "CustomScheme_iphonesimulator27.0-arm64.xctestrun")) {
+		t.Fatalf("spawn args = %+v, want the xctestrun file of CustomScheme", spawnArgs)
 	}
 	wantOnlyTesting := "-only-testing:CustomAgent/CustomAgent/testServeCommands"
 	if !containsArg(spawnArgs, wantOnlyTesting) {

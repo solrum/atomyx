@@ -224,10 +224,11 @@ quirks.
 ## End-to-end smoke (real device plus MCP)
 
 ```bash
-# 1. Start the on-device control server (iOS simulator example)
-cd platforms/ios-agent && make serve   # blocks
+# 1. An iOS target needs no manual step, because atomyx-mcp launches its
+#    own runner for the selected device. To drive the runner by hand
+#    instead, run `make serve` in platforms/ios-agent, which blocks.
 
-# 2. In another terminal, build and run the MCP server
+# 2. Build and run the MCP server
 cd core && make build
 ./bin/atomyx-mcp
 

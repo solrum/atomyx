@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"dev.atomyx/internal/clock"
@@ -71,6 +72,18 @@ type Options struct {
 	// Warn receives a one-line warning when a runner is adopted
 	// without a launch identifier. Nil discards it.
 	Warn func(message string)
+
+	// ExternalTunnel states that something else owns the USB tunnel to
+	// a physical device, already running on Port, so Connect does not
+	// start an iproxy of its own. A driver built without a provisioner
+	// leaves it false and starts and stops its own tunnel.
+	ExternalTunnel bool
+
+	// OnDisconnect runs once, after Disconnect has closed the transport
+	// and stopped any tunnel the driver started. A factory that
+	// provisioned the runner itself sets it to stop that runner, so
+	// every path that disconnects the driver also releases the runner.
+	OnDisconnect func()
 }
 
 // IosDriver implements driver.Driver over the Swift XCUITest runner's
@@ -101,6 +114,8 @@ type IosDriver struct {
 	lastLaunchedBundleID string
 
 	iproxyStop func()
+
+	disconnectOnce sync.Once
 }
 
 // New constructs an IosDriver bound to opts.UDID. conn and proc are
@@ -174,7 +189,7 @@ func (d *IosDriver) Connect(ctx context.Context) error {
 		return err
 	}
 	d.lastLaunchedBundleID = ""
-	if d.opts.Kind == KindDevice {
+	if d.opts.Kind == KindDevice && !d.opts.ExternalTunnel {
 		if err := d.launchIproxy(ctx); err != nil {
 			return diag.New(diag.CodeAgentUnreachable,
 				fmt.Sprintf("could not reach the agent on device %s", d.opts.UDID),
@@ -198,13 +213,17 @@ func (d *IosDriver) Connect(ctx context.Context) error {
 }
 
 // Disconnect closes the transport, stops the iproxy tunnel if one was
-// launched, and clears launch-tracked state. It is idempotent: the
+// launched, clears launch-tracked state, and runs Options.OnDisconnect
+// the first time it is called. It is idempotent: the
 // underlying Conn.Close and the iproxy stop are both safe to call
 // when nothing is running.
 func (d *IosDriver) Disconnect() error {
 	_ = d.conn.Close()
 	d.stopIproxy()
 	d.lastLaunchedBundleID = ""
+	if d.opts.OnDisconnect != nil {
+		d.disconnectOnce.Do(d.opts.OnDisconnect)
+	}
 	return nil
 }
 

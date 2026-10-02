@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"dev.atomyx/cmd/internal/runnerprovision"
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/mcp"
@@ -66,7 +67,8 @@ func run() int {
 		device.NewAndroidAdbProbe(procRunner),
 		device.NewIosProbe(procRunner),
 	)
-	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Background: background, Clock: clock, Logger: logger})
+	provisioner := runnerprovision.New(procRunner, background, clock, logger)
+	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Background: background, Clock: clock, Logger: logger, Provisioner: provisioner})
 
 	// storage.NewFileStorage resolves its root as opts.Root, then the
 	// ATOMYX_STORAGE_DIR environment variable, then "~/.atomyx". An

@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"dev.atomyx/internal/clock"
@@ -30,14 +31,35 @@ const (
 	xctestOnlyTestingTarget = "AtomyxDriverAgent/AtomyxDriverAgent/testServeCommands"
 	xctestConfigSimulator   = "Debug-iphonesimulator"
 	xctestConfigDevice      = "Debug-iphoneos"
+	// xctestSDKSimulator and xctestSDKDevice are the platform names
+	// xcodebuild puts in the .xctestrun file name, after the scheme.
+	xctestSDKSimulator = "iphonesimulator"
+	xctestSDKDevice    = "iphoneos"
+	xctestrunSuffix    = ".xctestrun"
+	// xctestBuildLockName is the lock file inside the shared build
+	// directory that serializes builds across launches and processes.
+	xctestBuildLockName = ".build.lock"
+	// xctestRunDirPrefix and xctestResultBundleName name each target's own
+	// derived data directory and result bundle under the build directory.
+	xctestRunDirPrefix     = "run-"
+	xctestResultBundleName = "runner.xcresult"
 )
 
 // Timing defaults and the poll cadence EnsureRunning uses while
 // waiting for a freshly spawned driver to answer the ping handshake.
 const (
-	xctestDefaultBuildTimeoutMs  int64 = 120_000
+	xctestDefaultBuildTimeoutMs  int64 = 300_000
 	xctestDefaultLaunchTimeoutMs int64 = 90_000
 	xctestPollIntervalMs         int64 = 500
+	// xctestBuildLockPollMs is the pause between attempts to take the
+	// shared build lock while another launch holds it.
+	xctestBuildLockPollMs int64 = 250
+)
+
+// Progress messages the launcher reports through LaunchConfig.Progress.
+const (
+	XctestProgressBuilding = "building runner"
+	XctestProgressStarting = "starting runner"
 )
 
 // Launch retry policy. The host port is chosen by probing for a free
@@ -154,7 +176,9 @@ type LaunchConfig struct {
 	// to the standard Atomyx driver testing target when empty.
 	OnlyTestingTarget string
 	// BuildTimeoutMs bounds a single "xcodebuild build-for-testing"
-	// invocation. Defaults to 120000 (120s) when zero.
+	// invocation, excluding the wait for the shared build lock. Defaults
+	// to 300000 (300s) when zero, because a fresh machine compiles the
+	// Swift runner from scratch.
 	BuildTimeoutMs int64
 	// LaunchTimeoutMs bounds the wait for the spawned driver to start
 	// answering the ping handshake. Defaults to 90000 (90s) when zero.
@@ -171,6 +195,36 @@ type LaunchConfig struct {
 	// Warn receives a one-line warning when a runner is adopted without
 	// a launch identifier. Nil discards it.
 	Warn func(message string)
+	// RunnerPort is the port the runner binds inside its own network
+	// namespace. Zero means the host port for a simulator, which shares
+	// the host loopback, and the fixed device-side port 22087 for a
+	// physical device, which an iproxy tunnel maps the host port onto.
+	RunnerPort int
+	// AfterSpawn runs after the runner process has started and before
+	// the wait for its ping answer, on every launch attempt. It starts
+	// whatever the runner needs to be reachable on the host port, such
+	// as the USB tunnel to a physical device, and returns the function
+	// that tears that down. A non-nil error fails the attempt and stops
+	// the runner. The returned stop function, when non-nil, runs after
+	// the runner has been stopped, on a failed attempt and on kill alike.
+	AfterSpawn func(ctx context.Context, spawned SpawnedRunner) (stop func(), err error)
+	// Progress receives XctestProgressBuilding when a build is about to
+	// run and XctestProgressStarting before the runner launch. Nil
+	// discards it.
+	Progress func(message string)
+}
+
+// SpawnedRunner identifies a runner process the launcher has started
+// and not yet confirmed ready.
+type SpawnedRunner struct {
+	// HostPort is the host port the launcher will probe for the ping
+	// answer.
+	HostPort int
+	// RunnerPort is the port the runner binds in its own namespace.
+	RunnerPort int
+	// Pid is the process id of the xcodebuild process, which leads its
+	// own process group.
+	Pid int
 }
 
 // scheme returns c.Scheme, falling back to the standard Atomyx driver
@@ -314,20 +368,109 @@ func (l *XctestLauncher) EnsureRunning(ctx context.Context) (kill func() error, 
 		}
 	}
 
+	if _, err := l.signOverrides(); err != nil {
+		return noopKill, err
+	}
+
 	buildConfig := xctestConfigSimulator
 	if l.cfg.Kind == KindDevice {
 		buildConfig = xctestConfigDevice
 	}
-	runnerApp := filepath.Join(l.cfg.ProjectDir, "build", "Build", "Products", buildConfig, l.cfg.runnerAppName())
-	derivedDataPath := filepath.Join(l.cfg.ProjectDir, "build")
+	buildDir := filepath.Join(l.cfg.ProjectDir, "build")
+	runnerApp := filepath.Join(buildDir, "Build", "Products", buildConfig, l.cfg.runnerAppName())
 
-	if l.needsBuild(runnerApp) {
-		if err := l.build(ctx, xcodeprojPath, derivedDataPath); err != nil {
-			return noopKill, err
-		}
+	if err := l.ensureBuilt(ctx, xcodeprojPath, buildDir, runnerApp); err != nil {
+		return noopKill, err
+	}
+	xctestrun, err := l.findXctestrun(buildDir)
+	if err != nil {
+		return noopKill, err
 	}
 
-	return l.launchWithRetry(ctx, xcodeprojPath, derivedDataPath)
+	l.progress(XctestProgressStarting)
+	return l.launchWithRetry(ctx, xctestrun, filepath.Join(buildDir, xctestRunDirPrefix+l.cfg.UDID))
+}
+
+func (l *XctestLauncher) progress(message string) {
+	if l.cfg.Progress != nil {
+		l.cfg.Progress(message)
+	}
+}
+
+// ensureBuilt builds the runner into buildDir when it is missing or
+// stale. The shared build directory is serialized by a lock on
+// buildDir/.build.lock, and the decision to build is taken only after
+// the lock is held, so launches that start together build exactly once
+// and never race on the same derived data. A launch that waited on the
+// lock finds the product the holder built and skips the build.
+func (l *XctestLauncher) ensureBuilt(ctx context.Context, xcodeprojPath, buildDir, runnerApp string) error {
+	if err := os.MkdirAll(buildDir, 0o755); err != nil {
+		return fmt.Errorf("iosdriver: create the build directory: %w", err)
+	}
+	release, err := acquireBuildLock(ctx, l.clock, filepath.Join(buildDir, xctestBuildLockName))
+	if err != nil {
+		return err
+	}
+	defer release()
+	if !l.needsBuild(runnerApp) {
+		return nil
+	}
+	l.progress(XctestProgressBuilding)
+	if err := l.build(ctx, xcodeprojPath, buildDir); err != nil {
+		return err
+	}
+	// A build that finds nothing to recompile leaves the product's
+	// modification time alone, so sources touched without a content
+	// change would keep the product looking stale and every later launch
+	// would rebuild. Stamping the product records that the build has
+	// seen those sources. A failure to stamp only costs one redundant
+	// build on the next launch, so it is not reported.
+	now := time.Now()
+	_ = os.Chtimes(runnerApp, now, now)
+	return nil
+}
+
+// findXctestrun returns the newest .xctestrun file the build wrote for
+// this launch's platform. Every target runs from that one file, with
+// its own derived data path, so no target writes into the shared build
+// directory.
+func (l *XctestLauncher) findXctestrun(buildDir string) (string, error) {
+	sdk := xctestSDKSimulator
+	if l.cfg.Kind == KindDevice {
+		sdk = xctestSDKDevice
+	}
+	productsDir := filepath.Join(buildDir, "Build", "Products")
+	prefix := l.cfg.scheme() + "_" + sdk
+	entries, err := os.ReadDir(productsDir)
+	if err != nil {
+		return "", &XctestLauncherError{
+			Code:    XctestErrBuildFailed,
+			Message: fmt.Sprintf("the runner build left no products under %s: %v. Run `cd %s && make setup` to diagnose.", productsDir, err, l.cfg.ProjectDir),
+		}
+	}
+	var best string
+	var bestTime time.Time
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasPrefix(name, prefix) || !strings.HasSuffix(name, xctestrunSuffix) {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		if best == "" || info.ModTime().After(bestTime) || (info.ModTime().Equal(bestTime) && name > best) {
+			best, bestTime = name, info.ModTime()
+		}
+	}
+	if best == "" {
+		return "", &XctestLauncherError{
+			Code: XctestErrBuildFailed,
+			Message: fmt.Sprintf("the runner build wrote no %s*%s file under %s. Run `cd %s && make setup` to diagnose.",
+				prefix, xctestrunSuffix, productsDir, l.cfg.ProjectDir),
+		}
+	}
+	return filepath.Join(productsDir, best), nil
 }
 
 // launchWithRetry spawns the runner and waits for it. With an
@@ -337,7 +480,7 @@ func (l *XctestLauncher) EnsureRunning(ctx context.Context) (kill func() error, 
 // retried until XctestMaxLaunchAttempts attempts have run. Without an
 // allocator the port is fixed, so a retry could not change the outcome
 // and the first failure is returned.
-func (l *XctestLauncher) launchWithRetry(ctx context.Context, xcodeprojPath, derivedDataPath string) (func() error, error) {
+func (l *XctestLauncher) launchWithRetry(ctx context.Context, xctestrun, runDerived string) (func() error, error) {
 	for attempt := 1; ; attempt++ {
 		port := l.cfg.Port
 		if l.cfg.AllocatePort != nil {
@@ -349,11 +492,8 @@ func (l *XctestLauncher) launchWithRetry(ctx context.Context, xcodeprojPath, der
 		}
 		l.port = port
 
-		args, err := l.spawnArgs(xcodeprojPath, derivedDataPath)
-		if err != nil {
-			return noopKill, err
-		}
-		kill, err := l.spawnAndWait(ctx, port, args)
+		args := l.spawnArgs(xctestrun, runDerived)
+		kill, err := l.spawnAndWait(ctx, port, runDerived, args)
 		if err == nil {
 			return kill, nil
 		}
@@ -366,6 +506,10 @@ func (l *XctestLauncher) launchWithRetry(ctx context.Context, xcodeprojPath, der
 // isPortConflictFailure reports whether err means the launch lost the
 // race for its host port.
 func isPortConflictFailure(err error) bool {
+	var tunnelErr *IproxyError
+	if errors.As(err, &tunnelErr) {
+		return tunnelErr.Code == IproxyErrBindConflict
+	}
 	var launchErr *XctestLauncherError
 	if !errors.As(err, &launchErr) {
 		return false
@@ -522,13 +666,11 @@ func (l *XctestLauncher) signOverrides() ([]string, error) {
 	}
 }
 
-// buildArgs and spawnArgs share every flag up to the command verb and
-// the presence of -only-testing on the spawn side. process.Runner
-// carries no working-directory concept the way execFile's cwd option
-// does, so xcodeprojPath and derivedDataPath are absolute paths
-// rooted at cfg.ProjectDir rather than the cwd-relative
-// "AtomyxDriver.xcodeproj" and "./build" a subprocess spawned with
-// cwd set to the project directory would otherwise resolve.
+// process.Runner carries no working-directory concept the way
+// execFile's cwd option does, so every path handed to xcodebuild is
+// absolute and rooted at cfg.ProjectDir rather than the cwd-relative
+// "AtomyxDriver.xcodeproj" and "./build" a subprocess spawned with cwd
+// set to the project directory would otherwise resolve.
 
 func (l *XctestLauncher) buildArgs(xcodeprojPath, derivedDataPath string) ([]string, error) {
 	signs, err := l.signOverrides()
@@ -545,20 +687,19 @@ func (l *XctestLauncher) buildArgs(xcodeprojPath, derivedDataPath string) ([]str
 	return append(args, signs...), nil
 }
 
-func (l *XctestLauncher) spawnArgs(xcodeprojPath, derivedDataPath string) ([]string, error) {
-	signs, err := l.signOverrides()
-	if err != nil {
-		return nil, err
-	}
-	args := []string{
+// spawnArgs runs the already built products from the shared build
+// directory through xctestrun, with this target's own derived data path
+// and result bundle, so concurrent targets never write to the same
+// location.
+func (l *XctestLauncher) spawnArgs(xctestrun, runDerived string) []string {
+	return []string{
 		"test-without-building",
-		"-project", xcodeprojPath,
-		"-scheme", l.cfg.scheme(),
+		"-xctestrun", xctestrun,
 		"-destination", l.destination(),
-		"-derivedDataPath", derivedDataPath,
+		"-derivedDataPath", runDerived,
+		"-resultBundlePath", filepath.Join(runDerived, xctestResultBundleName),
 		"-only-testing:" + l.cfg.onlyTestingTarget(),
 	}
-	return append(args, signs...), nil
 }
 
 // build runs "xcodebuild build-for-testing" through the injected
@@ -632,50 +773,85 @@ func tailString(s string, n int) string {
 // the spawned process before returning, so a caller never observes
 // success without a live driver behind it.
 //
+// The launch environment travels on the context, because xcodebuild
+// forwards only TEST_RUNNER_ variables taken from its own environment.
+// When LaunchConfig.AfterSpawn is set it runs once the process has
+// started and before the ping wait.
+//
 // On success, the returned kill function kills the process group and
-// blocks until the process has exited, so a caller that calls kill
-// can rely on the xcodebuild process (and the XCUITest runner tree it
-// owns) being gone once kill returns. It is safe to call more than
-// once.
+// blocks until the process has exited, then runs the AfterSpawn stop
+// function, so a caller that calls kill can rely on the xcodebuild
+// process (and the XCUITest runner tree it owns) being gone once kill
+// returns. It is safe to call more than once.
 //
 // The process is started on a context detached from ctx: the spawned
 // driver must keep running past this call returning, and past ctx
 // being canceled, until the returned kill function stops it
 // explicitly.
-func (l *XctestLauncher) spawnAndWait(ctx context.Context, port int, args []string) (func() error, error) {
-	name, argv := l.spawnCommand(port, args)
-	proc, startErr := l.background.Start(context.WithoutCancel(ctx), name, argv...)
+func (l *XctestLauncher) spawnAndWait(ctx context.Context, port int, runDerived string, args []string) (func() error, error) {
+	if err := os.RemoveAll(filepath.Join(runDerived, xctestResultBundleName)); err != nil {
+		return noopKill, fmt.Errorf("iosdriver: clear the previous result bundle: %w", err)
+	}
+	if err := os.MkdirAll(runDerived, 0o755); err != nil {
+		return noopKill, fmt.Errorf("iosdriver: create the runner derived data directory: %w", err)
+	}
+	runnerPort := l.runnerPort(port)
+	startCtx := process.WithEnv(context.WithoutCancel(ctx), l.runnerEnv(runnerPort)...)
+	proc, startErr := l.background.Start(startCtx, "xcodebuild", args...)
 	if startErr != nil {
 		return noopKill, classifySpawnExit(process.BackgroundResult{}, startErr)
 	}
-	exited, stop := superviseBackground(proc, classifySpawnExit)
+	exited, stopRunner := superviseBackground(proc, classifySpawnExit)
+
+	teardown := stopRunner
+	if l.cfg.AfterSpawn != nil {
+		stopHook, err := l.cfg.AfterSpawn(ctx, SpawnedRunner{HostPort: port, RunnerPort: runnerPort, Pid: proc.Pid()})
+		if err != nil {
+			stopRunner()
+			return noopKill, err
+		}
+		if stopHook != nil {
+			teardown = func() {
+				stopRunner()
+				stopHook()
+			}
+		}
+	}
+	teardown = onceFunc(teardown)
 
 	if err := l.waitForReadyOrExit(ctx, port, exited); err != nil {
-		stop()
+		teardown()
 		return noopKill, err
 	}
 	return func() error {
-		stop()
+		teardown()
 		return nil
 	}, nil
 }
 
-// envCommand runs the command that follows its VAR=value operands
-// with those variables added to the environment. xcodebuild only
-// forwards TEST_RUNNER_ variables taken from its own environment, and
-// a VAR=value operand on its command line is ignored, so the launch
-// environment has to reach the process through its environment.
-const envCommand = "env"
+func onceFunc(f func()) func() {
+	var once sync.Once
+	return func() { once.Do(f) }
+}
 
-// runnerEnv returns the TEST_RUNNER_ variables for a launch whose
-// runner must be reachable on port. A device runner always listens on
-// deviceRunnerPort inside the device, and iproxy maps the host port
-// onto it, so only a simulator runner binds the host port itself.
-func (l *XctestLauncher) runnerEnv(port int) []string {
-	runnerPort := port
-	if l.cfg.Kind == KindDevice {
-		runnerPort = deviceRunnerPort
+// runnerPort returns the port the runner binds in its own namespace. A
+// device runner always listens on deviceRunnerPort inside the device,
+// and iproxy maps the host port onto it, so only a simulator runner
+// binds the host port itself.
+func (l *XctestLauncher) runnerPort(hostPort int) int {
+	switch {
+	case l.cfg.RunnerPort != 0:
+		return l.cfg.RunnerPort
+	case l.cfg.Kind == KindDevice:
+		return deviceRunnerPort
+	default:
+		return hostPort
 	}
+}
+
+// runnerEnv returns the TEST_RUNNER_ variables for a launch. xcodebuild
+// forwards each of them to the runner without the prefix.
+func (l *XctestLauncher) runnerEnv(runnerPort int) []string {
 	env := []string{fmt.Sprintf("%s=%d", xctestEnvPort, runnerPort)}
 	if l.cfg.RunnerID != "" {
 		env = append(env, xctestEnvRunnerID+"="+l.cfg.RunnerID)
@@ -684,17 +860,6 @@ func (l *XctestLauncher) runnerEnv(port int) []string {
 		env = append(env, xctestEnvTargetUDID+"="+l.cfg.UDID)
 	}
 	return env
-}
-
-// spawnCommand returns the executable and argv that start the runner
-// with its launch environment applied.
-func (l *XctestLauncher) spawnCommand(port int, args []string) (string, []string) {
-	env := l.runnerEnv(port)
-	argv := make([]string, 0, len(env)+1+len(args))
-	argv = append(argv, env...)
-	argv = append(argv, "xcodebuild")
-	argv = append(argv, args...)
-	return envCommand, argv
 }
 
 // waitForReadyOrExit polls the ping handshake on port every
@@ -728,23 +893,11 @@ func (l *XctestLauncher) waitForReadyOrExit(ctx context.Context, port int, exite
 	}
 }
 
-// Exit statuses env reports when it cannot run the command it was
-// given: 127 when the command is not found, 126 when it is not
-// executable.
-const (
-	envExitCommandNotFound = 127
-	envExitNotExecutable   = 126
-)
-
 // classifySpawnExit turns a spawned "xcodebuild test-without-building"
 // process outcome, once it has exited or failed to start before the driver became
 // reachable, into a named XctestLauncherError.
 func classifySpawnExit(result process.BackgroundResult, runErr error) error {
-	missing := runErr != nil && errors.Is(runErr, exec.ErrNotFound)
-	if result.ExitCode == envExitCommandNotFound || result.ExitCode == envExitNotExecutable {
-		missing = true
-	}
-	if missing {
+	if runErr != nil && errors.Is(runErr, exec.ErrNotFound) {
 		return &XctestLauncherError{Code: XctestErrNoXcode, Message: "xcodebuild not found. Install Xcode from the App Store."}
 	}
 	stderr := strings.TrimSpace(result.Stderr)

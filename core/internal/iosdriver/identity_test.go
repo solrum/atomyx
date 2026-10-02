@@ -25,7 +25,7 @@ func TestExpectedRunner_Verify(t *testing.T) {
 		{"simulator, same simulator, no runner id is unmanaged", sim, iosdriver.RunnerIdentity{SimulatorUDID: "SIM-1"}, iosdriver.IdentityUnmanaged},
 		{"simulator udid compares case-insensitively", sim, iosdriver.RunnerIdentity{SimulatorUDID: "sim-1"}, iosdriver.IdentityUnmanaged},
 		{"simulator, other simulator", sim, iosdriver.RunnerIdentity{SimulatorUDID: "SIM-2"}, iosdriver.IdentityMismatch},
-		{"simulator, legacy runner reporting nothing", sim, iosdriver.RunnerIdentity{}, iosdriver.IdentityMismatch},
+		{"simulator, legacy runner reporting nothing", sim, iosdriver.RunnerIdentity{}, iosdriver.IdentityLegacy},
 		{"simulator, runner with an id but no runner id requested", sim, iosdriver.RunnerIdentity{SimulatorUDID: "SIM-1", RunnerID: "x"}, iosdriver.IdentityMatch},
 		{"simulator, matching runner id", simManaged, iosdriver.RunnerIdentity{SimulatorUDID: "SIM-1", RunnerID: "r-1"}, iosdriver.IdentityMatch},
 		{"simulator, different runner id", simManaged, iosdriver.RunnerIdentity{SimulatorUDID: "SIM-1", RunnerID: "r-2"}, iosdriver.IdentityMismatch},
@@ -33,7 +33,7 @@ func TestExpectedRunner_Verify(t *testing.T) {
 		{"simulator, matching runner id on the wrong simulator", simManaged, iosdriver.RunnerIdentity{SimulatorUDID: "SIM-2", RunnerID: "r-1"}, iosdriver.IdentityMismatch},
 		{"device, matching target udid", dev, iosdriver.RunnerIdentity{TargetUDID: "DEV-1"}, iosdriver.IdentityMatch},
 		{"device, other target udid", dev, iosdriver.RunnerIdentity{TargetUDID: "DEV-2"}, iosdriver.IdentityMismatch},
-		{"device, reporting neither", dev, iosdriver.RunnerIdentity{}, iosdriver.IdentityMismatch},
+		{"device, reporting neither", dev, iosdriver.RunnerIdentity{}, iosdriver.IdentityLegacy},
 		{"device, matching runner id", devManaged, iosdriver.RunnerIdentity{RunnerID: "r-1"}, iosdriver.IdentityMatch},
 		{"device, different runner id", devManaged, iosdriver.RunnerIdentity{RunnerID: "r-2", TargetUDID: "DEV-1"}, iosdriver.IdentityMismatch},
 		{"device, matching runner id with another target udid", devManaged, iosdriver.RunnerIdentity{RunnerID: "r-1", TargetUDID: "DEV-2"}, iosdriver.IdentityMismatch},
@@ -44,7 +44,7 @@ func TestExpectedRunner_Verify(t *testing.T) {
 			if verdict != tc.more {
 				t.Fatalf("Verify() = %v (%q), want %v", verdict, reason, tc.more)
 			}
-			if verdict == iosdriver.IdentityMismatch && reason == "" {
+			if verdict != iosdriver.IdentityMatch && verdict != iosdriver.IdentityUnmanaged && reason == "" {
 				t.Fatal("a mismatch must carry a reason")
 			}
 		})

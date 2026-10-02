@@ -13,6 +13,9 @@ import (
 type FakeBackgroundInvocation struct {
 	Name string
 	Args []string
+	// Env is the additional environment the call's context carried
+	// through WithEnv, or nil when it carried none.
+	Env []string
 }
 
 // FakeBackgroundProcess is the BackgroundProcess a FakeBackground
@@ -29,6 +32,7 @@ type FakeBackgroundProcess struct {
 	buf    bytes.Buffer
 	closed bool
 
+	pid      int
 	killed   bool
 	exited   bool
 	exitCode int
@@ -106,6 +110,20 @@ func (p *FakeBackgroundProcess) Wait() (BackgroundResult, error) {
 	return result, nil
 }
 
+// SetPid sets the process id Pid reports.
+func (p *FakeBackgroundProcess) SetPid(pid int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.pid = pid
+}
+
+// Pid reports the process id set through SetPid, or zero.
+func (p *FakeBackgroundProcess) Pid() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.pid
+}
+
 // Killed reports whether Kill has been called.
 func (p *FakeBackgroundProcess) Killed() bool {
 	p.mu.Lock()
@@ -174,7 +192,7 @@ func (f *FakeBackground) Start(ctx context.Context, name string, args ...string)
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.invocations = append(f.invocations, FakeBackgroundInvocation{Name: name, Args: append([]string(nil), args...)})
+	f.invocations = append(f.invocations, FakeBackgroundInvocation{Name: name, Args: append([]string(nil), args...), Env: append([]string(nil), EnvFrom(ctx)...)})
 	if len(f.queue) == 0 {
 		if f.DefaultErr != nil {
 			return nil, f.DefaultErr

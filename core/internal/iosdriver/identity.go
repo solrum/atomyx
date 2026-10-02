@@ -55,6 +55,10 @@ const (
 	// IdentityMismatch means the runner is a different runner, or
 	// reported nothing that proves otherwise.
 	IdentityMismatch
+	// IdentityLegacy means the runner answers but reports none of the
+	// identity fields, so it was built before launch identities
+	// existed. Refused like a mismatch, with a rebuild as the remedy.
+	IdentityLegacy
 )
 
 // Verify compares got against the expected runner and returns the
@@ -83,8 +87,7 @@ func (e ExpectedRunner) verifySimulator(got RunnerIdentity) (IdentityVerdict, st
 		return IdentityMatch, ""
 	}
 	if got.SimulatorUDID == "" {
-		return IdentityMismatch, "the runner reports no simulator identity, so it cannot be confirmed as simulator " +
-			e.UDID + "; rebuild the runner and start it again"
+		return IdentityLegacy, "the runner reports no simulator identity, so it cannot be confirmed as simulator " + e.UDID
 	}
 	if got.RunnerID == "" {
 		return IdentityUnmanaged, ""
@@ -103,8 +106,7 @@ func (e ExpectedRunner) verifyDevice(got RunnerIdentity) (IdentityVerdict, strin
 		return IdentityMatch, ""
 	}
 	if got.TargetUDID == "" {
-		return IdentityMismatch, "the runner reports no target device, so it cannot be confirmed as device " +
-			e.UDID + "; rebuild the runner and start it again"
+		return IdentityLegacy, "the runner reports no target device, so it cannot be confirmed as device " + e.UDID
 	}
 	return IdentityMatch, ""
 }
@@ -157,9 +159,19 @@ type RunnerIdentityError struct {
 	Port   int
 	Expect ExpectedRunner
 	Reason string
+	// Legacy is true when the runner reports no identity at all, so the
+	// fix is to rebuild it instead of choosing another port.
+	Legacy bool
 }
 
 func (e *RunnerIdentityError) Error() string {
+	if e.Legacy {
+		return fmt.Sprintf(
+			"the runner on 127.0.0.1:%d predates launch identities: %s. Stop it, rebuild the runner "+
+				"(cd platforms/ios-agent && make build), and start it again",
+			e.Port, e.Reason,
+		)
+	}
 	return fmt.Sprintf(
 		"a runner on 127.0.0.1:%d answers for a different target: %s. Stop it or choose another port before connecting to %s",
 		e.Port, e.Reason, e.Expect.UDID,
@@ -176,8 +188,8 @@ func CheckRunnerIdentity(ctx context.Context, port int, timeout time.Duration, w
 		return false, false, nil
 	}
 	verdict, reason := want.Verify(got)
-	if verdict == IdentityMismatch {
-		return true, false, &RunnerIdentityError{Port: port, Expect: want, Reason: reason}
+	if verdict == IdentityMismatch || verdict == IdentityLegacy {
+		return true, false, &RunnerIdentityError{Port: port, Expect: want, Reason: reason, Legacy: verdict == IdentityLegacy}
 	}
 	return true, verdict == IdentityUnmanaged, nil
 }
