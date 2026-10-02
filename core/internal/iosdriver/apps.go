@@ -107,11 +107,14 @@ type devicectlAppsResponse struct {
 }
 
 // fetchDeviceApps runs "devicectl device info apps" and parses its
-// app list. A command or decode failure propagates rather than
+// app list. devicectl lists only developer-installed apps unless told
+// to include default apps, so --include-default-apps is required for
+// system and App Store apps such as com.apple.Preferences to appear,
+// and for installation checks to see them. A command or decode failure propagates rather than
 // collapsing into an empty result, so a caller can distinguish
 // "confirmed empty result" from "the query itself failed".
 func (d *IosDriver) fetchDeviceApps(ctx context.Context) ([]driver.InstalledApp, error) {
-	result, err := d.proc.Run(ctx, "xcrun", "devicectl", "device", "info", "apps", "--device", d.opts.UDID, "--json-output", "-")
+	result, err := d.proc.Run(ctx, "xcrun", "devicectl", "device", "info", "apps", "--device", d.opts.UDID, "--include-default-apps", "--json-output", "-")
 	if err != nil {
 		return nil, err
 	}

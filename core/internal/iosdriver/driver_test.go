@@ -1032,7 +1032,7 @@ func TestIosDriver_ListApps_Simulator_RunsListappsThroughShell(t *testing.T) {
 func TestIosDriver_ListApps_Device_RunsDevicectlWithExactArgs(t *testing.T) {
 	runner := process.NewFake()
 	runner.Stub(
-		process.ExactMatch("xcrun", "devicectl", "device", "info", "apps", "--device", "DEV-1", "--json-output", "-"),
+		process.ExactMatch("xcrun", "devicectl", "device", "info", "apps", "--device", "DEV-1", "--include-default-apps", "--json-output", "-"),
 		process.Result{Stdout: `{"result":{"apps":[{"bundleIdentifier":"dev.atomyx.app","name":"Atomyx"}]}}`},
 		nil,
 	)
@@ -1154,7 +1154,7 @@ func TestIosDriver_IsAppInstalled_Simulator_GenuineFailurePropagates(t *testing.
 func TestIosDriver_IsAppInstalled_Device_UsesAppList(t *testing.T) {
 	runner := process.NewFake()
 	runner.Stub(
-		process.ExactMatch("xcrun", "devicectl", "device", "info", "apps", "--device", "DEV-1", "--json-output", "-"),
+		process.ExactMatch("xcrun", "devicectl", "device", "info", "apps", "--device", "DEV-1", "--include-default-apps", "--json-output", "-"),
 		process.Result{Stdout: `{"result":{"apps":[{"bundleIdentifier":"dev.atomyx.app","name":"Atomyx"}]}}`},
 		nil,
 	)
@@ -1174,6 +1174,24 @@ func TestIosDriver_IsAppInstalled_Device_UsesAppList(t *testing.T) {
 	}
 	if installed {
 		t.Fatal("IsAppInstalled() = true, want false")
+	}
+}
+
+func TestIosDriver_IsAppInstalled_Device_SeesSystemApps(t *testing.T) {
+	runner := process.NewFake()
+	runner.Stub(
+		process.ExactMatch("xcrun", "devicectl", "device", "info", "apps", "--device", "DEV-1", "--include-default-apps", "--json-output", "-"),
+		process.Result{Stdout: `{"result":{"apps":[{"bundleIdentifier":"dev.atomyx.driver.host.xctrunner","name":"Runner"},{"bundleIdentifier":"com.apple.Preferences","name":"Settings"}]}}`},
+		nil,
+	)
+	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{Background: process.NewFakeBackground(), UDID: "DEV-1", Kind: iosdriver.KindDevice})
+
+	installed, err := d.IsAppInstalled(context.Background(), "com.apple.Preferences")
+	if err != nil {
+		t.Fatalf("IsAppInstalled() error = %v", err)
+	}
+	if !installed {
+		t.Fatal("IsAppInstalled(com.apple.Preferences) = false, want true for a system app")
 	}
 }
 

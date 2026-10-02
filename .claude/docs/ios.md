@@ -274,6 +274,13 @@ misses iOS search UIs. `interactiveIosRoles` in
 `core/internal/iosdriver/normalize.go` includes `searchField`
 alongside `textField` and `secureTextField`.
 
+**A physical device app listing must include default apps.**
+`devicectl device info apps` lists only developer-installed apps
+unless `--include-default-apps` is passed. `fetchDeviceApps` in
+`core/internal/iosdriver/apps.go` passes it, so `ListApps` and
+`IsAppInstalled` see system apps such as `com.apple.Preferences`, and
+`launchApp` does not report them as not installed.
+
 ## Limitations
 
 - **USB tether only** for physical devices. `iproxy` uses usbmux, and
