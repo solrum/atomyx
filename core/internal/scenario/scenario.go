@@ -136,6 +136,9 @@ type ScenarioRunnerDeps struct {
 	// OnScenarioEvent, when non-nil, is invoked for every scenario-level
 	// lifecycle event this ScenarioRunner emits.
 	OnScenarioEvent func(ScenarioEvent)
+	// ChildArtifacts, when non-nil, supplies each child script's
+	// artifacts and enables failure evidence capture for it.
+	ChildArtifacts ArtifactsFactory
 }
 
 // emit invokes the configured OnScenarioEvent hook with event, doing
@@ -227,7 +230,7 @@ func (r *ScenarioRunner) Run(ctx context.Context, def *script.ScenarioDefinition
 		r.emit(ScenarioEvent{Type: ScriptStarted, ScriptIndex: i, ScriptPath: scriptPath})
 
 		scriptStart := r.deps.Clock.NowMs()
-		status, result, errMsg := r.runOne(ctx, scriptPath, childEnv)
+		status, result, errMsg := r.runOne(ctx, i, scriptPath, childEnv)
 		durationMs := r.deps.Clock.NowMs() - scriptStart
 
 		var failedAtStep *int
@@ -300,7 +303,7 @@ func (r *ScenarioRunner) Run(ctx context.Context, def *script.ScenarioDefinition
 // rather than returned as a Go error, so Run's per-script loop can
 // record it, decide whether to keep going, and move to the next
 // script exactly as it would for a script that ran and failed.
-func (r *ScenarioRunner) runOne(ctx context.Context, scriptPath string, childEnv map[string]string) (ScriptRunStatus, *runner.ScriptResult, *string) {
+func (r *ScenarioRunner) runOne(ctx context.Context, scriptIndex int, scriptPath string, childEnv map[string]string) (ScriptRunStatus, *runner.ScriptResult, *string) {
 	yaml, err := r.deps.LoadScript(scriptPath)
 	if err != nil {
 		msg := err.Error()
@@ -312,6 +315,9 @@ func (r *ScenarioRunner) runOne(ctx context.Context, scriptPath string, childEnv
 		return StatusErrored, nil, &msg
 	}
 
+	artifacts, failureCapture := r.deps.ChildArtifacts.childEvidence(
+		ChildTarget{EntryIndex: NoPosition, ScriptIndex: scriptIndex, ScriptPath: scriptPath},
+		r.deps.Orchestra, r.deps.Clock, r.deps.Logger)
 	childRunner := runner.NewScriptRunner(runner.ScriptRunnerDeps{
 		Orchestra:             r.deps.Orchestra,
 		Clock:                 r.deps.Clock,
@@ -324,6 +330,8 @@ func (r *ScenarioRunner) runOne(ctx context.Context, scriptPath string, childEnv
 		ClearDataOnFresh:      r.deps.ClearDataOnFresh,
 		AppArtifact:           r.deps.AppArtifact,
 		PreconditionsOverride: r.deps.PreconditionsOverride,
+		Artifacts:             artifacts,
+		FailureCapture:        failureCapture,
 	})
 
 	result, err := childRunner.Run(ctx, def)

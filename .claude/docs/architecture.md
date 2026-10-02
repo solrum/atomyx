@@ -444,6 +444,16 @@ Contract:
   the injected clock, keeps what finished, and records a `truncated`
   note in the log. A run aborted with `RunAbortDeviceLost` captures
   nothing, and a capture never changes the step result or the outcome.
+  `scenario.ScenarioRunnerDeps.ChildArtifacts` and
+  `scenario.SuiteRunnerDeps.ChildArtifacts` take a
+  `scenario.ArtifactsFactory`, called once per child script with a
+  `scenario.ChildTarget` (suite entry position and path, scenario child
+  position and path, `scenario.NoPosition` where a level is absent). The
+  host returns that child's screenshot collector and evidence writer, so
+  screenshots reach `artifacts/` when they are taken. The CLI factory
+  derives each scope with the same `report` scope functions the report
+  writer uses and numbers files across the whole run, so live file names
+  equal the names the report links.
 - **Compatibility.** Readers accept `schemaVersion` values up to their
   own and ignore unknown fields. Writers never reshape a field within
   a major version.

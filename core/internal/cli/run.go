@@ -159,6 +159,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 			LoadScript:            fsScenarioScriptLoader(filepath.Dir(absPath)),
 			ExternalEnv:           externalEnv,
 			PreconditionsOverride: preconditionsOverride,
+			ChildArtifacts:        newArtifactSequence(runfolder.ArtifactsDir(record.Dir())).forTarget,
 		})
 		result, err := scenarioRunner.Run(runCtx, scenarioDef)
 		finishedAt := time.Now()

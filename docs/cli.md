@@ -147,6 +147,15 @@ directory receives three files for that step, where `NNN` is the step's
 - `step-NNN-log.jsonl`, one JSON object per event of the failed step,
   followed by a note object for each artifact that could not be captured.
 
+A scenario or suite run writes the same three files for each script that
+fails, with the script's place in the run as a name prefix, for example
+`1-c1-yml-step-002-failure.png` for the second script of a scenario.
+The prefix is the script's scope, made of its position and its path,
+lowercased and reduced to letters, digits, and hyphens, so two scripts
+never share a name. A scenario or suite also writes each screenshot into
+`artifacts/` the moment it is taken, under the same name the report
+links.
+
 The capture is bounded at 5 seconds. When the bound is reached, the
 files that finished are kept and the log ends with a `truncated` note
 naming what is missing. A run that stops because the device became

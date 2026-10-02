@@ -162,6 +162,7 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 		Commands:         runner.DefaultCommands(),
 		CreateLoadScript: fsScenarioScriptLoader,
 		ExternalEnv:      externalEnv,
+		ChildArtifacts:   newArtifactSequence(runfolder.ArtifactsDir(record.Dir())).forTarget,
 	})
 
 	result, err := suiteRunner.Run(runCtx, entries, &scenario.SuiteRunOptions{

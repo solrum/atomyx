@@ -93,3 +93,69 @@ func TestRunScriptPassingRunWritesNoFailureBundle(t *testing.T) {
 		}
 	}
 }
+
+func runWithFactory(t *testing.T, flags map[string]FlagValue, suitePositional *string, isSuite bool) string {
+	t.Helper()
+	reportDir := t.TempDir()
+	flags["--report-dir"] = reportDir
+	var stdout, stderr bytes.Buffer
+	deps := Deps{
+		Probe:   device.NewStaticProbe(nil),
+		Factory: screenshotMockFactory{},
+		Stdout:  &stdout,
+		Stderr:  &stderr,
+	}
+	if isSuite {
+		RunSuite(context.Background(), deps, flags, suitePositional)
+	} else {
+		RunScript(context.Background(), deps, flags)
+	}
+	return runfolder.ArtifactsDir(singleRunDir(t, reportDir))
+}
+
+func TestRunScriptScenarioWritesScreenshotsAndFailureEvidencePerChild(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "c0.yml", "- screenshot: a\n")
+	writeFile(t, dir, "c1.yml", "- screenshot: a\n- assertExpr: { expr: '1 == 2' }\n")
+	writeFile(t, dir, "c2.yml", "- screenshot: a\n")
+	writeFile(t, dir, "scenario.yml", "name: S\nscripts:\n  - c0.yml\n  - c1.yml\n  - c2.yml\n")
+
+	artifacts := runWithFactory(t, map[string]FlagValue{"--file": filepath.Join(dir, "scenario.yml")}, nil, false)
+
+	got := strings.Join(artifactNames(t, artifacts), ",")
+	want := strings.Join([]string{
+		"01-0-c0-yml-a.png",
+		"02-1-c1-yml-a.png",
+		"1-c1-yml-step-002-failure.png",
+		"1-c1-yml-step-002-log.jsonl",
+		"1-c1-yml-step-002-tree.json",
+	}, ",")
+	if got != want {
+		t.Fatalf("artifacts = %s, want %s", got, want)
+	}
+}
+
+func TestRunSuiteWritesScreenshotsAndFailureEvidencePerEntry(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	writeFile(t, dir, "a.yml", "- screenshot: a\n")
+	writeFile(t, dir, "b.yml", "- assertExpr: { expr: '1 == 2' }\n")
+
+	artifacts := runWithFactory(t, map[string]FlagValue{"--glob": []string{"*.yml"}}, nil, true)
+
+	var screenshots, evidence []string
+	for _, name := range artifactNames(t, artifacts) {
+		if strings.HasPrefix(name, "01-0-") {
+			screenshots = append(screenshots, name)
+		}
+		if strings.HasPrefix(name, "1-") && strings.Contains(name, "-step-001-") {
+			evidence = append(evidence, name)
+		}
+	}
+	if len(screenshots) != 1 {
+		t.Fatalf("screenshots = %v in %v", screenshots, artifactNames(t, artifacts))
+	}
+	if len(evidence) != 3 {
+		t.Fatalf("evidence = %v in %v", evidence, artifactNames(t, artifacts))
+	}
+}

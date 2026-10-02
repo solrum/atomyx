@@ -82,6 +82,10 @@ type SuiteRunnerDeps struct {
 	LaunchNoReset    *bool
 	ClearDataOnFresh bool
 	AppArtifact      *string
+	// ChildArtifacts, when non-nil, supplies the artifacts of every
+	// script the suite runs, directly or through a scenario entry, and
+	// enables failure evidence capture for them.
+	ChildArtifacts ArtifactsFactory
 }
 
 // SuiteRunOptions configures one SuiteRunner.Run call.
@@ -175,7 +179,7 @@ func (r *SuiteRunner) Run(ctx context.Context, entries []SuiteEntry, options *Su
 	startedAt := r.deps.Clock.NowMs()
 	results := make([]SuiteEntryResult, 0, len(entries))
 
-	for _, entry := range entries {
+	for index, entry := range entries {
 		if err := ctx.Err(); err != nil {
 			return SuiteResult{}, err
 		}
@@ -183,7 +187,7 @@ func (r *SuiteRunner) Run(ctx context.Context, entries []SuiteEntry, options *Su
 		// own scripts, so it must launch its own app rather than
 		// inherit whatever the previous entry already launched.
 		r.deps.Orchestra.ResetLaunchedApps()
-		results = append(results, r.runEntry(ctx, entry, options))
+		results = append(results, r.runEntry(ctx, index, entry, options))
 	}
 
 	passed := 0
@@ -229,7 +233,7 @@ func (r *SuiteRunner) Run(ctx context.Context, entries []SuiteEntry, options *Su
 // whatever the previous entry's traffic left behind. A load, parse,
 // or dispatch failure is reported as a "failed" entry with Error set,
 // never propagated to Run.
-func (r *SuiteRunner) runEntry(ctx context.Context, entry SuiteEntry, options *SuiteRunOptions) SuiteEntryResult {
+func (r *SuiteRunner) runEntry(ctx context.Context, index int, entry SuiteEntry, options *SuiteRunOptions) SuiteEntryResult {
 	entryStart := r.deps.Clock.NowMs()
 	kind := KindScript
 	if script.IsScenarioYaml(entry.Content) {
@@ -245,7 +249,7 @@ func (r *SuiteRunner) runEntry(ctx context.Context, entry SuiteEntry, options *S
 	var errMsg *string
 
 	if kind == KindScenario {
-		result, err := r.runScenarioEntry(ctx, entry, options)
+		result, err := r.runScenarioEntry(ctx, index, entry, options)
 		if err != nil {
 			msg := err.Error()
 			errMsg = &msg
@@ -254,7 +258,7 @@ func (r *SuiteRunner) runEntry(ctx context.Context, entry SuiteEntry, options *S
 			status = statusFor(result.Ok)
 		}
 	} else {
-		result, err := r.runScriptEntry(ctx, entry, options)
+		result, err := r.runScriptEntry(ctx, index, entry, options)
 		if err != nil {
 			msg := err.Error()
 			errMsg = &msg
@@ -286,7 +290,7 @@ func statusFor(ok bool) SuiteEntryStatus {
 	return EntryFailed
 }
 
-func (r *SuiteRunner) runScriptEntry(ctx context.Context, entry SuiteEntry, options *SuiteRunOptions) (runner.ScriptResult, error) {
+func (r *SuiteRunner) runScriptEntry(ctx context.Context, index int, entry SuiteEntry, options *SuiteRunOptions) (runner.ScriptResult, error) {
 	def, err := script.ParseScript(entry.Content, r.deps.ExternalEnv)
 	if err != nil {
 		return runner.ScriptResult{}, err
@@ -297,6 +301,9 @@ func (r *SuiteRunner) runScriptEntry(ctx context.Context, entry SuiteEntry, opti
 		override = options.ResolvePreconditions(nil)
 	}
 
+	artifacts, failureCapture := r.deps.ChildArtifacts.childEvidence(
+		ChildTarget{EntryIndex: index, EntryPath: entry.Path, ScriptIndex: NoPosition},
+		r.deps.Orchestra, r.deps.Clock, r.deps.Logger)
 	childRunner := runner.NewScriptRunner(runner.ScriptRunnerDeps{
 		Orchestra:             r.deps.Orchestra,
 		Clock:                 r.deps.Clock,
@@ -308,11 +315,13 @@ func (r *SuiteRunner) runScriptEntry(ctx context.Context, entry SuiteEntry, opti
 		ClearDataOnFresh:      r.deps.ClearDataOnFresh,
 		AppArtifact:           r.deps.AppArtifact,
 		PreconditionsOverride: override,
+		Artifacts:             artifacts,
+		FailureCapture:        failureCapture,
 	})
 	return childRunner.Run(ctx, def)
 }
 
-func (r *SuiteRunner) runScenarioEntry(ctx context.Context, entry SuiteEntry, options *SuiteRunOptions) (ScenarioResult, error) {
+func (r *SuiteRunner) runScenarioEntry(ctx context.Context, index int, entry SuiteEntry, options *SuiteRunOptions) (ScenarioResult, error) {
 	if r.deps.CreateLoadScript == nil {
 		return ScenarioResult{}, fmt.Errorf(
 			"entry %q is a scenario, but no createLoadScript was configured to resolve its child scripts", entry.Path)
@@ -341,6 +350,7 @@ func (r *SuiteRunner) runScenarioEntry(ctx context.Context, entry SuiteEntry, op
 		ClearDataOnFresh:      r.deps.ClearDataOnFresh,
 		AppArtifact:           r.deps.AppArtifact,
 		PreconditionsOverride: override,
+		ChildArtifacts:        r.deps.ChildArtifacts.forEntry(index, entry.Path),
 	})
 	return scenarioRunner.Run(ctx, def)
 }
