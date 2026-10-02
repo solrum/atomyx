@@ -509,7 +509,39 @@ build on the `.Built(` and `.Orchestra(` accessors, on
 - **Routes.** A feature contributes a `RouteGroup`, a function from the
   controller to `[]Route`, through `Config.Groups`. The server rejects
   a duplicate route, a path outside `/` and `/api/`, and a missing
-  method or handler, so adding an endpoint never edits a switch.
+  method or handler, so adding an endpoint never edits a switch. A
+  route declares `Operator`, true for an action taken on behalf of the
+  person at the page. Only operator routes count as activity for the
+  idle release, so polling never keeps a device held.
+- **Read routes.** `ReadRoutes` serves what the session already holds
+  and never calls the device, except for the one operator action.
+  - `GET /api/v1/session` returns the device, the holder and the
+    holder state as JSON.
+  - `GET /api/v1/tree` returns `{epoch, revision, tree,
+    screenshotRevision, scale, paired, highlightable}`. The tree is the
+    raw masked tree, and `revision` identifies it. `scale`, `paired`
+    and `highlightable` are decided by the session, and the page only
+    draws what they say. It answers `404` with code `no_tree` before the
+    first capture.
+  - `GET /api/v1/screenshot` returns the image bytes with the content
+    type read from the bytes and the headers `X-Atomyx-Epoch`,
+    `X-Atomyx-Revision`, `X-Atomyx-Scale`, `X-Atomyx-Paired` and
+    `X-Atomyx-Highlightable`. It answers `404` with code
+    `no_screenshot` before the first capture.
+  - `GET /api/v1/events` streams newline-delimited JSON, flushed per
+    line, for a page that reads it with `fetch`. Each line is
+    `{kind, epoch, revision, stable}` with `kind` one of `tree`,
+    `screenshot`, `screen_size`, `dropped` or `closed`, and it carries
+    no payload, so the page reads the value from the routes above. The
+    stream ends when the client disconnects or the server closes, and
+    after a final `dropped` or `closed` line when the session says so.
+  - `POST /api/v1/tree/fresh` is an operator action. It asks the
+    session for a matched tree and screenshot and returns the tree
+    response. It answers `409` with code `HOLDER_BUSY` while a tool call
+    or another fresh capture is running.
+  - Every failing `/api/` response has the body
+    `{"error": {"code", "message", "remedy"}}`. A closed session is
+    `410` with code `session_closed`.
 
 ## Run folder contract
 

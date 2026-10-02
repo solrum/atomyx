@@ -129,9 +129,9 @@ const (
 // the session's own state, set by its owner through SetRunning and
 // SetIdle, so it is the same with or without a lease.
 type Info struct {
-	Device device.Descriptor
-	Holder lease.Holder
-	State  HolderState
+	Device device.Descriptor `json:"device"`
+	Holder lease.Holder      `json:"holder"`
+	State  HolderState       `json:"state"`
 }
 
 // Viewer reads what a session has captured. It never calls the device,

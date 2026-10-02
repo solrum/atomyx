@@ -41,6 +41,11 @@ type Route struct {
 	Method  string
 	Path    string
 	Handler http.Handler
+	// Operator marks a route that acts on behalf of the person at the
+	// page, such as asking the holder for a fresh capture. A route that
+	// only reads what the session already holds leaves it false, so
+	// polling the page never counts as operator activity.
+	Operator bool
 }
 
 // RouteGroup builds the routes of one feature over the controller the
@@ -229,7 +234,7 @@ func (s *Server) handleAuth(w http.ResponseWriter, r *http.Request) {
 }
 
 func writeError(w http.ResponseWriter, status int, code, message string) {
-	writeJSON(w, status, map[string]map[string]string{"error": {"code": code, "message": message}})
+	writeCoded(w, status, code, message, "")
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
