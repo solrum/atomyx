@@ -15,6 +15,7 @@ import (
 	mockdriver "dev.atomyx/internal/driver/mock"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
+	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/session"
 	"dev.atomyx/internal/session/sessiontest"
 	"dev.atomyx/internal/storage"
@@ -92,14 +93,13 @@ func (f *lifecycleFactory) driver(i int) *lifecycleDriver {
 }
 
 type lifecycleFixture struct {
-	t        *testing.T
-	clk      *clock.ManualClock
-	leases   *sessiontest.Leases
-	factory  *lifecycleFactory
-	runStore *storage.RunStore
-	store    storage.Storage
-	runs     *runTracker
-	devices  *DeviceSession
+	t       *testing.T
+	clk     *clock.ManualClock
+	leases  *sessiontest.Leases
+	factory *lifecycleFactory
+	root    string
+	runs    *runSession
+	devices *DeviceSession
 }
 
 func newLifecycleFixture(t *testing.T) *lifecycleFixture {
@@ -110,9 +110,15 @@ func newLifecycleFixture(t *testing.T) *lifecycleFixture {
 	}
 	f := &lifecycleFixture{
 		t: t, clk: clock.NewManualClock(0), leases: leases,
-		factory: newLifecycleFactory(), runStore: storage.NewRunStore(), store: storage.NewInMemoryStorage(),
+		factory: newLifecycleFactory(), root: t.TempDir(),
 	}
-	f.runs = &runTracker{runs: f.runStore, storage: f.store, clock: f.clk, logger: logging.NoopLogger{}}
+	runStore := storage.NewRunStore()
+	f.runs = newRunSession(runSessionDeps{
+		Store:   runStore,
+		Catalog: testRunCatalog(storage.NewInMemoryStorage(), f.root, runStore),
+		Starter: testRunStarter(f.root),
+		Logger:  logging.NoopLogger{},
+	})
 	f.devices = f.newDevices("atomyx-mcp", f.factory)
 	t.Cleanup(f.devices.Close)
 	return f
@@ -312,7 +318,7 @@ func TestDeviceSession_AnOpenRunKeepsTheDeviceUntilTheOpenRunTimeout(t *testing.
 	if err := f.devices.BeginCall("start_run"); err != nil {
 		t.Fatal(err)
 	}
-	f.runStore.Start(storage.StartOptions{Name: "smoke"})
+	f.startRun()
 	f.devices.EndCall()
 	f.clk.AwaitSleepers(1)
 
@@ -336,25 +342,36 @@ func TestDeviceSession_AnOpenRunKeepsTheDeviceUntilTheOpenRunTimeout(t *testing.
 	f.clk.Advance(1)
 	f.awaitRelease(f.devices)
 
-	if f.runStore.Current() != nil {
+	if f.runs.OpenRunID() != "" {
 		t.Fatal("the open run is still open after the open-run timeout")
 	}
-	persisted, ok := f.runsPersisted()
-	if !ok || persisted.Status != storage.RunStatusCancelled {
-		t.Fatalf("persisted run = %+v (%v), want it closed as cancelled", persisted, ok)
+	meta := f.onlyRun()
+	if meta.Outcome != runfolder.OutcomeCancelled || meta.Result != runfolder.ResultCancelled {
+		t.Fatalf("closed run = %s/%s, want result cancelled with outcome cancelled", meta.Result, meta.Outcome)
+	}
+	if runfolder.NewLockLiveness(f.root).IsLive(meta.RunID) {
+		t.Fatal("the closed run still holds its lock")
 	}
 }
 
-func (f *lifecycleFixture) runsPersisted() (storage.PersistedRun, bool) {
-	keys, err := f.store.List("runs/")
-	if err != nil || len(keys) == 0 {
-		return storage.PersistedRun{}, false
+// startRun opens a run the way start_run does, with no device named.
+func (f *lifecycleFixture) startRun() startedRun {
+	f.t.Helper()
+	started, err := f.runs.Start("smoke", nil, nil)
+	if err != nil {
+		f.t.Fatal(err)
 	}
-	var run storage.PersistedRun
-	if found, err := f.store.Load(keys[0], &run); err != nil || !found {
-		f.t.Fatalf("load %s: found=%v err=%v", keys[0], found, err)
+	return started
+}
+
+// onlyRun returns the meta of the one run folder under the root.
+func (f *lifecycleFixture) onlyRun() runfolder.Meta {
+	f.t.Helper()
+	metas, _, err := runfolder.NewReader(f.root).List()
+	if err != nil || len(metas) != 1 {
+		f.t.Fatalf("run folders = %d (%v), want exactly one", len(metas), err)
 	}
-	return run, true
+	return metas[0]
 }
 
 func TestDeviceSession_EveryCallOnTheOpenRunRestartsTheOpenRunTimeout(t *testing.T) {
@@ -362,7 +379,7 @@ func TestDeviceSession_EveryCallOnTheOpenRunRestartsTheOpenRunTimeout(t *testing
 	if err := f.selectDevice(f.devices); err != nil {
 		t.Fatal(err)
 	}
-	f.runStore.Start(storage.StartOptions{Name: "smoke"})
+	f.startRun()
 	if err := f.devices.BeginCall("tap"); err != nil {
 		t.Fatal(err)
 	}
@@ -388,7 +405,7 @@ func TestDeviceSession_AfterTheOpenRunTimeoutTheRunScopedToolsReportRunExpired(t
 	if err := f.selectDevice(f.devices); err != nil {
 		t.Fatal(err)
 	}
-	started := f.runStore.Start(storage.StartOptions{Name: "smoke"})
+	started := f.startRun()
 	if err := f.devices.BeginCall("start_run"); err != nil {
 		t.Fatal(err)
 	}
@@ -435,7 +452,7 @@ func TestDeviceSession_ALostLeaseMovesTheSessionToLostAndTheNextCallRecovers(t *
 	if err := f.selectDevice(f.devices); err != nil {
 		t.Fatal(err)
 	}
-	f.runStore.Start(storage.StartOptions{Name: "smoke"})
+	f.startRun()
 
 	lockPath := f.leases.LockPathFor("android", "A")
 	replacement := filepath.Join(filepath.Dir(lockPath), "replacement")
@@ -459,8 +476,15 @@ func TestDeviceSession_ALostLeaseMovesTheSessionToLostAndTheNextCallRecovers(t *
 	if got := f.state(f.devices); got != holderLost || f.devices.Current() != nil {
 		t.Fatalf("state = %s current = %v, want lost with no device bound", got, f.devices.Current())
 	}
-	if f.runStore.Current() != nil {
+	if f.runs.OpenRunID() != "" {
 		t.Fatal("the run in flight stayed open after the device was lost")
+	}
+	meta := f.onlyRun()
+	if meta.Outcome != runfolder.OutcomeDeviceLost || meta.Result != runfolder.ResultCancelled {
+		t.Fatalf("lost-device run = %s/%s, want result cancelled with outcome deviceLost", meta.Result, meta.Outcome)
+	}
+	if runfolder.NewLockLiveness(f.root).IsLive(meta.RunID) {
+		t.Fatal("the lost-device run still holds its lock")
 	}
 	if _, err := f.devices.Ensure(context.Background()); codeOfErr(err) != diag.CodeDeviceReleasedHeld {
 		t.Fatalf("Ensure() error = %v, want DEVICE_RELEASED_HELD while the lock is held elsewhere", err)

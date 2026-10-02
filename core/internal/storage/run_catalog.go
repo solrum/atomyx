@@ -68,6 +68,15 @@ func NewRunCatalog(store Storage, root string, live runfolder.Liveness) *RunCata
 	return c
 }
 
+// NewRunLiveness returns the Liveness a process that writes runs
+// through runs and reads the run folders under root should give its
+// catalog. A run is live when runs holds it open in this process, or
+// when any process holds the lock of its run folder, so a run written
+// by another process, such as a CLI run, reads as running.
+func NewRunLiveness(runs *RunStore, root string) runfolder.Liveness {
+	return runfolder.AnyLive(runfolder.LivenessFunc(runs.IsLive), runfolder.NewLockLiveness(root))
+}
+
 // Get returns the run with the given id, preferring the versioned
 // folder, and reports false with a nil error when neither form exists.
 // A run that exists only in a damaged form returns a *DamagedRunError.

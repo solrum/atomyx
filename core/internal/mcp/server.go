@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"errors"
 
 	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/device"
@@ -19,15 +20,15 @@ type Info struct {
 }
 
 // ServerDeps are the services NewServer wires into every tool
-// handler. Probe and Factory are required: they back list_devices and
-// select_device respectively. Storage, RunStore, Runs, Clock, and
-// Logger default to a file-backed store rooted per
-// storage.NewFileStorage's own precedence, a fresh in-memory RunStore,
-// a catalog over Storage that serves flat run records alone and treats
-// the RunStore's active run as the only live one, the system clock, and
-// a no-op logger when left zero-valued. A composition root that has a
-// versioned run directory builds Runs itself, with that directory and a
-// Liveness that covers every writer it knows of.
+// handler. Probe, Factory, Storage, Runs, and RunStarter are required.
+// Probe backs list_devices, Factory backs select_device, Storage holds
+// bug reports and case studies, and Runs reads every stored run. Runs
+// is built by the composition root over the run directory with a
+// runfolder.Liveness that covers every writer it knows of, so a run
+// another process is writing lists as running. RunStarter creates the
+// run folders of new runs under that same directory. RunStore, Clock,
+// and Logger default to a fresh in-memory RunStore, the system clock,
+// and a no-op logger when left zero-valued.
 //
 // Session carries the identity resolver, lease manager and orphan reaper
 // device selection goes through, and a composition root sets all three.
@@ -40,7 +41,9 @@ type ServerDeps struct {
 	Storage  storage.Storage
 	RunStore *storage.RunStore
 	Runs     *storage.RunCatalog
-	Clock    orchestra.Clock
+	// RunStarter creates the run folder of each run the server starts.
+	RunStarter RunStarter
+	Clock      orchestra.Clock
 	// TimerClock drives tool call budgets, the device acquisition
 	// budget and the idle timers. It defaults to the system clock, and
 	// only a test that controls time injects another.
@@ -52,8 +55,12 @@ type ServerDeps struct {
 
 // NewServer constructs the Atomyx MCP server and registers its tool
 // surface. The returned server is not yet connected to a transport;
-// pass it to Serve to run it over stdio.
-func NewServer(info Info, deps ServerDeps) *Server {
+// pass it to Serve to run it over stdio. It returns an error when a
+// required dependency is missing.
+func NewServer(info Info, deps ServerDeps) (*Server, error) {
+	if deps.Runs == nil || deps.RunStarter == nil {
+		return nil, errors.New("mcp: ServerDeps needs Runs and RunStarter")
+	}
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    info.Name,
 		Version: info.Version,
@@ -76,25 +83,23 @@ func NewServer(info Info, deps ServerDeps) *Server {
 		runStore = storage.NewRunStore()
 	}
 
-	runs := deps.Runs
-	if runs == nil {
-		runs = storage.NewRunCatalog(deps.Storage, "", runStore)
-	}
-
-	tracker := &runTracker{runs: runStore, storage: deps.Storage, clock: clk, logger: logger}
+	runSession := newRunSession(runSessionDeps{
+		Store: runStore, Catalog: deps.Runs, Starter: deps.RunStarter, Logger: logger,
+	})
 	devices := NewDeviceSession(DeviceSessionDeps{
 		Factory: deps.Factory, Probe: deps.Probe, Runners: deps.Runners, Clock: clk, TimerClock: timers, Logger: logger,
-		Session: deps.Session, Timeouts: deps.Timeouts, Runs: tracker,
+		Session: deps.Session, Timeouts: deps.Timeouts, Runs: runSession,
 	})
 	traits := newToolTraits()
 	tc := &ToolContext{
-		Session:  devices,
-		Traits:   traits,
-		Logger:   logger,
-		Storage:  deps.Storage,
-		Runs:     runs,
-		RunStore: runStore,
-		Clock:    clk,
+		Session:    devices,
+		Traits:     traits,
+		Logger:     logger,
+		Storage:    deps.Storage,
+		Runs:       deps.Runs,
+		RunSession: runSession,
+		RunStore:   runStore,
+		Clock:      clk,
 	}
 
 	// Single choke point for every tools/call request: value-constraint
@@ -148,7 +153,7 @@ func NewServer(info Info, deps ServerDeps) *Server {
 
 	registerRunScriptTool(server, tc)
 
-	return &Server{Server: server, session: devices}
+	return &Server{Server: server, session: devices}, nil
 }
 
 // Server is the Atomyx MCP server together with the device session its

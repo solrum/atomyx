@@ -11,8 +11,8 @@ import (
 	"dev.atomyx/internal/storage"
 )
 
-func newCloseTestServer(factory device.Factory) *Server {
-	return NewServer(Info{Name: "atomyx-test", Version: "0.0.0-test"}, ServerDeps{
+func newCloseTestServer(t *testing.T, factory device.Factory) *Server {
+	return mustNewServer(t, ServerDeps{
 		Probe:   device.NewStaticProbe(),
 		Factory: factory,
 		Storage: storage.NewInMemoryStorage(),
@@ -25,7 +25,7 @@ func androidInput() SelectDeviceInput {
 
 func TestServerCloseDisconnectsTheActiveDevice(t *testing.T) {
 	drv := mockdriver.New()
-	server := newCloseTestServer(singleMockDriverFactory{driver: drv})
+	server := newCloseTestServer(t, singleMockDriverFactory{driver: drv})
 	if _, err := server.session.Select(context.Background(), androidInput()); err != nil {
 		t.Fatalf("Select: %v", err)
 	}
@@ -61,7 +61,7 @@ func (f gatedFactory) Build(ctx context.Context, desc device.Descriptor) (device
 func TestServerCloseDuringSelectReleasesTheLateDriver(t *testing.T) {
 	drv := mockdriver.New()
 	factory := gatedFactory{driver: drv, started: make(chan struct{}), release: make(chan struct{})}
-	server := newCloseTestServer(factory)
+	server := newCloseTestServer(t, factory)
 
 	selectErr := make(chan error, 1)
 	go func() {

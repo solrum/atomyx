@@ -9,8 +9,6 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-const forceClosedPredecessorSummary = "force-closed by subsequent start_run, because the agent forgot finish_run"
-
 var startRunInputSchema = jsObject(map[string]any{
 	"name":   jsStringDesc("Human description of the run."),
 	"source": jsString(),
@@ -33,14 +31,15 @@ type startRunResult struct {
 }
 
 // registerStartRunTool adds the start_run tool: begins a new test
-// run, force-closing and persisting any previously-active run first.
+// run in its own run folder, force-closing any previously-active run
+// first.
 func registerStartRunTool(server *mcp.Server, tc *ToolContext) {
 	server.AddTool(&mcp.Tool{
 		Name: "start_run",
 		Description: "Start a new test run. Call this BEFORE driving the device so bug reports " +
 			"and case studies can be attached to a named run. Any previously-active run " +
-			"is implicitly force-closed as 'error' and its record is persisted to " +
-			"runs/<id> so the lost run's trail isn't dropped. The returned " +
+			"is implicitly force-closed with outcome 'error' and its run folder is " +
+			"finalized, so the lost run's trail isn't dropped. The returned " +
 			"`erroredPredecessor` field carries the old run id when this happens.",
 		InputSchema: startRunInputSchema,
 	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -52,22 +51,16 @@ func registerStartRunTool(server *mcp.Server, tc *ToolContext) {
 			return invalidArgumentsResult("start_run", err), nil
 		}
 
-		started := tc.RunStore.Start(storage.StartOptions{Name: args.Name, Source: args.Source})
+		started, err := tc.RunSession.Start(args.Name, args.Source, tc.Session.SelectedDescriptor())
+		if err != nil {
+			return errorResult(err), nil
+		}
 		run := started.Run
 
 		var erroredPredecessorID *string
-		if predecessor := started.ErroredPredecessor; predecessor != nil {
-			summary := forceClosedPredecessorSummary
-			persisted := storage.NewPersistedRun(predecessor, &summary, tc.Clock.NowMs())
-			if err := tc.Storage.Save(storage.RunKey(predecessor.ID), persisted); err != nil {
-				return errorResult(err), nil
-			}
+		if predecessor := started.Superseded; predecessor != nil {
 			id := predecessor.ID
 			erroredPredecessorID = &id
-			tc.Logger.Warn("run.force_closed_predecessor", logging.LogContext{
-				"id":       predecessor.ID,
-				"newRunId": run.ID,
-			})
 		}
 
 		tc.Logger.Info("run.started", logging.LogContext{"id": run.ID, "name": run.Name})
@@ -104,13 +97,13 @@ type finishRunResult struct {
 }
 
 // registerFinishRunTool adds the finish_run tool: closes the active
-// run with a verdict and persists the finished record.
+// run with a verdict and finalizes its run folder.
 func registerFinishRunTool(server *mcp.Server, tc *ToolContext) {
 	server.AddTool(&mcp.Tool{
 		Name: "finish_run",
 		Description: "Finish the currently-active test run with a verdict and optional summary. " +
-			"Persists the run record to storage (key: runs/<id>) so it can be read back " +
-			"or exported to a reporter. Returns { ok, id, status, actionCount, findingsCount, durationMs }.",
+			"Finalizes the run's folder, with outcome passed, failed, or error to match " +
+			"the status, so it can be read back with get_run. Returns { ok, id, status, actionCount, findingsCount, durationMs }.",
 		InputSchema: finishRunInputSchema,
 	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		if err := validateToolArguments(finishRunSchema, req.Params.Arguments); err != nil {
@@ -120,23 +113,20 @@ func registerFinishRunTool(server *mcp.Server, tc *ToolContext) {
 		if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
 			return invalidArgumentsResult("finish_run", err), nil
 		}
-		status := storage.RunStatusPassed
+		status := ""
 		if args.Status != nil {
-			status = storage.RunStatus(*args.Status)
+			status = *args.Status
 		}
 
-		run := tc.RunStore.Finish(status)
+		finished := tc.RunSession.Finish(status, args.Summary)
+		run := finished.Run
 		if run == nil {
 			return jsonToolResult(map[string]any{"ok": false, "reason": "no active run to finish"})
-		}
-		persisted := storage.NewPersistedRun(run, args.Summary, tc.Clock.NowMs())
-		if err := tc.Storage.Save(storage.RunKey(run.ID), persisted); err != nil {
-			return errorResult(err), nil
 		}
 		tc.Logger.Info("run.finished", logging.LogContext{
 			"id":       run.ID,
 			"status":   string(run.Status),
-			"duration": persisted.DurationMs,
+			"duration": finished.DurationMs,
 		})
 		return jsonToolResult(finishRunResult{
 			Ok:            true,
@@ -144,7 +134,7 @@ func registerFinishRunTool(server *mcp.Server, tc *ToolContext) {
 			Status:        run.Status,
 			ActionCount:   run.ActionCount,
 			FindingsCount: len(run.Findings),
-			DurationMs:    persisted.DurationMs,
+			DurationMs:    finished.DurationMs,
 		})
 	})
 }

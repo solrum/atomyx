@@ -31,7 +31,12 @@ func TestPersistedRunRoundTripsThroughFileStorage(t *testing.T) {
 	finished := runStore.Finish(RunStatusPassed)
 
 	summary := "looked good"
-	persisted := NewPersistedRun(finished, &summary, *finished.FinishedAt)
+	persisted := PersistedRun{
+		ID: finished.ID, Name: finished.Name, Source: finished.Source, Status: finished.Status,
+		StartedAt: finished.StartedAt, FinishedAt: finished.FinishedAt,
+		DurationMs: *finished.FinishedAt - finished.StartedAt, ActionCount: finished.ActionCount,
+		Findings: finished.Findings, Summary: &summary,
+	}
 	if err := fileStore.Save(RunKey(finished.ID), persisted); err != nil {
 		t.Fatalf("Save: %v", err)
 	}

@@ -192,7 +192,7 @@
     }
   },
   "finish_run": {
-    "description": "Finish the currently-active test run with a verdict and optional summary. Persists the run record to storage (key: runs/\u003cid\u003e) so it can be read back or exported to a reporter. Returns { ok, id, status, actionCount, findingsCount, durationMs }.",
+    "description": "Finish the currently-active test run with a verdict and optional summary. Finalizes the run's folder, with outcome passed, failed, or error to match the status, so it can be read back with get_run. Returns { ok, id, status, actionCount, findingsCount, durationMs }.",
     "inputSchema": {
       "properties": {
         "status": {
@@ -627,7 +627,7 @@
     }
   },
   "start_run": {
-    "description": "Start a new test run. Call this BEFORE driving the device so bug reports and case studies can be attached to a named run. Any previously-active run is implicitly force-closed as 'error' and its record is persisted to runs/\u003cid\u003e so the lost run's trail isn't dropped. The returned `erroredPredecessor` field carries the old run id when this happens.",
+    "description": "Start a new test run. Call this BEFORE driving the device so bug reports and case studies can be attached to a named run. Any previously-active run is implicitly force-closed with outcome 'error' and its run folder is finalized, so the lost run's trail isn't dropped. The returned `erroredPredecessor` field carries the old run id when this happens.",
     "inputSchema": {
       "properties": {
         "name": {

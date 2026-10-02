@@ -25,11 +25,14 @@ type ToolContext struct {
 	// Logger is the structured logging sink every handler and the
 	// run_script command registry write through.
 	Logger logging.Logger
-	// Storage is the persistence port for bug reports, case studies,
-	// and finished run records.
+	// Storage is the persistence port for bug reports and case
+	// studies.
 	Storage storage.Storage
 	// Runs reads persisted runs from every stored form and deletes them.
 	Runs *storage.RunCatalog
+	// RunSession creates, finalizes, and edits the MCP runs written to
+	// run folders.
+	RunSession *runSession
 	// RunStore tracks the single in-flight test run.
 	RunStore *storage.RunStore
 	// Clock is the time source for handlers that poll or measure

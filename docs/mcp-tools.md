@@ -869,10 +869,13 @@ the expected loop for any testing session that should leave a
 reviewable trail behind it.
 
 Run records persist to disk so they survive process restarts and can
-be read back later. The default location is a `runs` folder under
-`~/.atomyx`, and the root directory can be overridden through an
-environment variable read at startup. Each run is one file named after
-its id.
+be read back later. The default location is `~/.atomyx`, and the
+root directory can be overridden through an environment variable read
+at startup. Each run started by start_run or run_script is its own
+run folder under the root, named after its id, with a `meta.json` that
+carries `result` and `outcome`, and an `artifacts` folder that holds
+the screenshots taken during the run. Runs written by earlier versions
+as single files are still listed and read.
 
 ### start_run
 Begins a new active run.
@@ -888,14 +891,14 @@ again.
 | source | string | no | `"unknown"` | Where the run originated. |
 
 **Behavior**
-- If a run is already active, it is force-closed with a status of
-  error before the new run starts, so its trail is not silently
-  dropped. The force-closed record is persisted immediately, with a
-  summary noting it was closed automatically because finish_run was
-  never called.
-- The new run's id encodes its start time and a per-process sequence
-  number, so it is unique even across runs started in the same
-  millisecond.
+- If a run is already active, it is force-closed with outcome error
+  before the new run starts, so its trail is not silently dropped. Its
+  run folder is finalized immediately, with a summary noting it was
+  closed automatically because finish_run was never called.
+- The new run's id has the form `<yyyymmdd-hhmmss>-<label>-<4 hex>`.
+  The label is the selected device's name, or its id when it has no
+  name, and `mcp` when no device is selected yet. It is unique even
+  across runs started in the same second.
 - Only one run is active at a time. There is no nested or parallel
   run support.
 
@@ -919,7 +922,7 @@ again.
 ```
 
 ### finish_run
-Closes the active run with a verdict and persists it.
+Closes the active run with a verdict and finalizes its run folder.
 
 **Use when:** the testing session is complete and a final status is
 known. Use update_run_summary afterward if a summary needs to be added
@@ -934,9 +937,15 @@ or changed once more is learned.
 **Behavior**
 - Closes whichever run is currently active. There is no id parameter,
   because only one run can be active at a time.
-- Persists the run record to disk immediately, including every bug
-  finding recorded against it during the session.
+- Finalizes the run folder immediately, including every bug finding
+  recorded against it during the session. The status becomes the run's
+  outcome: `passed` gives outcome `passed`, `failed` gives `failed`,
+  and `error` gives `error`.
 - Computes the run's duration from its start time to the finish time.
+- A run the server closes on its own is finalized too. A lost device
+  closes it with result `cancelled` and outcome `deviceLost`, and the
+  open-run idle timeout closes it with result `cancelled` and outcome
+  `cancelled`.
 
 **Returns**
 - `ok`: false when no run was active to finish, true otherwise.

@@ -14,6 +14,7 @@ import (
 	"dev.atomyx/internal/device"
 	atomcp "dev.atomyx/internal/mcp"
 	"dev.atomyx/internal/orchestra"
+	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/storage"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -37,14 +38,24 @@ var mcpConformanceEpoch = time.Date(2026, time.September, 15, 12, 0, 0, 0, time.
 // session to it over an in-memory transport.
 func newGoMcpClientSession(t *testing.T, ctx context.Context, program *McpDriverProgram) (*mcp.ClientSession, func()) {
 	t.Helper()
-	server := atomcp.NewServer(atomcp.Info{Name: "atomyx-conformance", Version: "0.0.0-test"}, atomcp.ServerDeps{
+	root := t.TempDir()
+	store := storage.NewInMemoryStorage()
+	runStore := storage.NewRunStore()
+	server, err := atomcp.NewServer(atomcp.Info{Name: "atomyx-conformance", Version: "0.0.0-test"}, atomcp.ServerDeps{
 		Probe: device.NewStaticProbe([]device.Descriptor{
 			{ID: "mock-device-2", Platform: device.PlatformIOS, Kind: device.KindSimulator},
 		}),
-		Factory: &mcpScriptedMockFactory{program: program},
-		Storage: storage.NewInMemoryStorage(),
-		Clock:   orchestra.NewFakeClock(mcpConformanceEpoch.UnixMilli()),
+		Factory:  &mcpScriptedMockFactory{program: program},
+		Storage:  store,
+		RunStore: runStore,
+		Runs:     storage.NewRunCatalog(store, root, storage.NewRunLiveness(runStore, root)),
+		RunStarter: runfolder.NewStarter(root,
+			func() time.Time { return mcpConformanceEpoch }, &mcpSuffixReader{}),
+		Clock: orchestra.NewFakeClock(mcpConformanceEpoch.UnixMilli()),
 	})
+	if err != nil {
+		t.Fatalf("Go mcp NewServer: %v", err)
+	}
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 	serverSession, err := server.Connect(ctx, serverTransport, nil)
 	if err != nil {
@@ -59,6 +70,18 @@ func newGoMcpClientSession(t *testing.T, ctx context.Context, program *McpDriver
 		_ = clientSession.Close()
 		_ = serverSession.Close()
 	}
+}
+
+// mcpSuffixReader yields an increasing byte sequence, so the run ids
+// the server mints are the same on every replay.
+type mcpSuffixReader struct{ n byte }
+
+func (r *mcpSuffixReader) Read(p []byte) (int, error) {
+	for i := range p {
+		r.n++
+		p[i] = r.n
+	}
+	return len(p), nil
 }
 
 // mcpToolSchema is the tools/list shape this differential compares:

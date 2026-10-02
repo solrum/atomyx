@@ -48,7 +48,7 @@ type recordedPhase struct {
 func progressClient(t *testing.T, got chan<- recordedPhase) (*mcp.ClientSession, context.Context) {
 	t.Helper()
 	ctx := context.Background()
-	server := NewServer(Info{Name: "atomyx-test", Version: "0.0.0-test"}, ServerDeps{
+	server := mustNewServer(t, ServerDeps{
 		Probe: device.NewStaticProbe(), Factory: device.NewMockDriverFactory(), Storage: storage.NewInMemoryStorage(),
 	})
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()

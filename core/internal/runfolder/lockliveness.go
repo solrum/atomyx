@@ -40,6 +40,12 @@ func (l *LockLiveness) IsLive(runID string) bool {
 	return false
 }
 
+// LivenessFunc adapts a function to a Liveness.
+type LivenessFunc func(runID string) bool
+
+// IsLive calls f.
+func (f LivenessFunc) IsLive(runID string) bool { return f(runID) }
+
 type anyLive []Liveness
 
 func (a anyLive) IsLive(runID string) bool {

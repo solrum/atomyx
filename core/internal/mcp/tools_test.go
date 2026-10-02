@@ -43,7 +43,7 @@ func testServer(t *testing.T, deps ServerDeps) (*mcp.ClientSession, context.Cont
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	t.Cleanup(cancel)
 
-	server := NewServer(Info{Name: "atomyx-test", Version: "0.0.0-test"}, deps)
+	server := mustNewServer(t, deps)
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 
 	serverSession, err := server.Connect(ctx, serverTransport, nil)

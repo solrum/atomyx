@@ -5,10 +5,12 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"dev.atomyx/cmd/internal/runnerprovision"
 	"dev.atomyx/cmd/internal/sessionwire"
@@ -17,6 +19,7 @@ import (
 	"dev.atomyx/internal/mcp"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/process"
+	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/shutdown"
 	"dev.atomyx/internal/storage"
 	"dev.atomyx/internal/version"
@@ -80,11 +83,14 @@ func run() int {
 		return 1
 	}
 
-	// The catalog reads versioned run folders from the same directory
-	// the store resolved, and an unfinished run counts as running only
-	// while this process holds it as the active run.
+	// Run folders and the catalog share the directory the store
+	// resolved. An unfinished run counts as running while this process
+	// holds it as the active run, and while any process on the machine
+	// holds the lock of its run folder.
+	runRoot := store.Root()
 	runStore := storage.NewRunStore()
-	runs := storage.NewRunCatalog(store, store.Root(), runStore)
+	runs := storage.NewRunCatalog(store, runRoot, storage.NewRunLiveness(runStore, runRoot))
+	runStarter := runfolder.NewStarter(runRoot, time.Now, rand.Reader)
 
 	sessionDeps, err := sessionwire.Deps(procRunner, clock, logger, binaryName, "mcp")
 	if err != nil {
@@ -93,18 +99,23 @@ func run() int {
 	}
 	sessionDeps.Preparer = provisioner
 
-	server := mcp.NewServer(mcp.Info{Name: serverName, Version: serverVersion}, mcp.ServerDeps{
-		Probe:    probe,
-		Runners:  device.PingRunnerIdentifier{},
-		Factory:  factory,
-		Storage:  store,
-		RunStore: runStore,
-		Runs:     runs,
-		Clock:    clock,
-		Logger:   logger,
-		Session:  sessionDeps,
-		Timeouts: sessionwire.ResolveTimeouts(sessionwire.LoadConfigBestEffort(logger), os.Getenv, logger),
+	server, err := mcp.NewServer(mcp.Info{Name: serverName, Version: serverVersion}, mcp.ServerDeps{
+		Probe:      probe,
+		Runners:    device.PingRunnerIdentifier{},
+		Factory:    factory,
+		Storage:    store,
+		RunStore:   runStore,
+		Runs:       runs,
+		RunStarter: runStarter,
+		Clock:      clock,
+		Logger:     logger,
+		Session:    sessionDeps,
+		Timeouts:   sessionwire.ResolveTimeouts(sessionwire.LoadConfigBestEffort(logger), os.Getenv, logger),
 	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "atomyx-mcp: %v\n", err)
+		return 1
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

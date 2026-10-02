@@ -217,7 +217,7 @@ func registerUpdateRunSummaryTool(server *mcp.Server, tc *ToolContext) {
 		if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
 			return invalidArgumentsResult("update_run_summary", err), nil
 		}
-		ok, err := tc.Runs.SetSummary(args.ID, args.Summary)
+		ok, err := tc.RunSession.SetSummary(args.ID, args.Summary)
 		if err != nil {
 			return summaryUpdateErrorResult(args.ID, err), nil
 		}

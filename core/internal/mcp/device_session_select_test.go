@@ -39,7 +39,7 @@ func TestConcurrentSelectsRunOneAfterAnotherAndTheLaterOneWins(t *testing.T) {
 		started: make(chan struct{}),
 		release: make(chan struct{}),
 	}
-	session := newCloseTestServer(factory).session
+	session := newCloseTestServer(t, factory).session
 
 	firstDone := make(chan error, 1)
 	go func() {
@@ -78,7 +78,7 @@ func TestConcurrentSelectsRunOneAfterAnotherAndTheLaterOneWins(t *testing.T) {
 
 func TestSelectOnAClosedSessionBuildsNothing(t *testing.T) {
 	factory := &sequencedFactory{drivers: []*mockdriver.Driver{mockdriver.New()}}
-	session := newCloseTestServer(factory).session
+	session := newCloseTestServer(t, factory).session
 	session.Close()
 
 	if _, err := session.Select(context.Background(), androidInput()); !errors.Is(err, errSessionClosed) {

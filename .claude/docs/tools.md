@@ -20,7 +20,7 @@ Every tool is registered in `core/internal/mcp/server.go`'s
 `NewServer`. A tool handler validates its arguments against a JSON
 Schema, then calls exactly one layer beneath it: `Orchestra` for
 device actions, `DeviceSession` for connection state,
-`storage.RunStore` or `storage.Storage` for run and bug records, or
+`storage.RunStore`, the run session, or `storage.Storage` for run and bug records, or
 `runner.ScriptRunner` for `run_script`. No handler reaches around
 that layer to call a `Driver` method directly. `ToolContext` (in
 `core/internal/mcp/tool_context.go`) has no `Driver` field, so the
@@ -50,8 +50,8 @@ type system enforces it.
 | **Wait** | | | | |
 | `wait_for_element` | `core/internal/mcp/wait_for_element_tool.go` | `selector`, `timeoutMs`, `pollIntervalMs` | element details on success, or `{found:false, reason, elapsedMs, polls}` on timeout | `Orchestra.WaitFor` |
 | **Run lifecycle and reporting** | | | | |
-| `start_run` | `core/internal/mcp/run_lifecycle_tool.go` | `name`, `source` | `{ok, id, name, source, startedAt, erroredPredecessor?}` | `storage.RunStore.Start` |
-| `finish_run` | `core/internal/mcp/run_lifecycle_tool.go` | `status` (`passed`, `failed`, `error`), `summary` | the finished run record | `storage.RunStore.Finish` |
+| `start_run` | `core/internal/mcp/run_lifecycle_tool.go` | `name`, `source` | `{ok, id, name, source, startedAt, erroredPredecessor?}` | `runSession.Start`, which creates the run folder and opens the in-memory run |
+| `finish_run` | `core/internal/mcp/run_lifecycle_tool.go` | `status` (`passed`, `failed`, `error`), `summary` | the finished run record | `runSession.Finish`, which finalizes the run folder |
 | `report_bug` | `core/internal/mcp/report_bug_tool.go` | `title`, `description`, `captureScreenshot` | `{ok, id, runId, screenshotPath?}` | `storage.RunStore.RecordBug`, plus `Orchestra.Screenshot` when requested |
 | **Run and bug queries** | | | | |
 | `list_runs` | `core/internal/mcp/run_read_tool.go` | `status`, `limit`, `offset` | paginated run summaries, each with `result` and `outcome` (absent while running), plus `totalMatching` and `skipped` | `storage.RunCatalog.List` |
@@ -71,15 +71,44 @@ Run verdicts in `list_runs` and `get_run` depend on liveness. A run
 with no completion time and a live writer has status `running` and no
 `result` or `outcome`. A run with no completion time and no live writer
 has status `cancelled`, result `cancelled`, and outcome `interrupted`.
-`NewServer` takes the catalog through `ServerDeps.Runs`, built by the
-composition root with the run directory and a `runfolder.Liveness`. The
-MCP server uses its `RunStore`, so only its own active run is live. A
+`NewServer` requires the catalog through `ServerDeps.Runs` and the run
+folder creator through `ServerDeps.RunStarter`, and returns an error
+when either is missing. `cmd/atomyx-mcp` builds the catalog over the
+storage root with `runfolder.AnyLive` of its `RunStore` and
+`runfolder.LockLiveness`, so a run another process holds a lock on, such
+as a CLI run, lists as running. A
 `list_runs` call also reports `skipped`, the count of stored runs that
 could not be read, which `totalMatching` excludes. `update_run_summary`
 edits runs that carry a summary field, which are the runs written by
 `start_run` and `run_script` and runs stored as flat records. A run written
 by the CLI has none, and a run whose writer is another live process is
 not editable until it finishes, so both return `RUN_READ_ONLY`.
+
+`start_run` creates a run folder of kind `mcp` through `runfolder.Starter`
+at the storage root. The folder id is labeled with the selected
+device's name, then its id, and with `mcp` when no device is selected.
+`finish_run` finalizes the folder, and the status the caller gives maps
+to an outcome as follows:
+
+| `finish_run` status | Outcome | Result |
+|---|---|---|
+| `passed` (the default) | `passed` | `passed` |
+| `failed` | `failed` | `failed` |
+| `error` | `error` | `failed` |
+
+A run the server closes itself takes these outcomes, and each
+finalization releases the run folder lock:
+
+| Cause | Outcome | Result |
+|---|---|---|
+| The device was lost | `deviceLost` | `cancelled` |
+| The open-run idle timeout elapsed | `cancelled` | `cancelled` |
+| A later `start_run` found the run open | `error` | `failed` |
+
+The idle timeout is `cancelled` and not `interrupted` because the
+server closes that run deliberately and the next call on it reports
+`RUN_EXPIRED`. `interrupted` is what a run reads as when its writer
+vanished without recording an end.
 
 Tools are registered in `core/internal/mcp/server.go`'s `NewServer`
 in a fixed, explicit order grouped by concern (matching the grouping
@@ -91,7 +120,7 @@ above). Registration is never auto-discovered, so adding a file under
 
 - **`ToolContext`** (`core/internal/mcp/tool_context.go`): the
   dependency bundle every handler closes over: `Session`
-  (`*DeviceSession`), `Traits`, `Logger`, `Storage`, `RunStore`, and `Clock`. A
+  (`*DeviceSession`), `Traits`, `Logger`, `Storage`, `Runs`, `RunSession`, `RunStore`, and `Clock`. A
   handler reads only the fields its own logic needs. There is no
   `Driver` field, so a handler cannot bypass `Orchestra`.
 - **`orchestraOrFail`** (`core/internal/mcp/tool_context.go`):
@@ -153,9 +182,11 @@ above). Registration is never auto-discovered, so adding a file under
   preparing, launching and connected through it, connected only after
   the session is installed, as MCP progress notifications, so a handler never emits progress itself. A call with
   no token reports nothing.
-- **Run tracker** (`core/internal/mcp/run_tracker.go`): lets the
-  `DeviceSession` see the open run and close it when the open-run
-  idle timeout or a lost lease ends the session's ownership.
+- **Run session** (`core/internal/mcp/run_session.go`): owns the open
+  run and its run folder. The run tools call it to start, finish, and
+  edit runs, and the `DeviceSession` uses it to see the open run and to
+  close it when the open-run idle timeout or a lost lease ends the
+  session's ownership.
 
 ## Composition inside the MCP server
 

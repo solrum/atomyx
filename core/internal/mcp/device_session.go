@@ -12,8 +12,8 @@ import (
 	"dev.atomyx/internal/driver"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
+	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/session"
-	"dev.atomyx/internal/storage"
 )
 
 // SelectKind is the device kind select_device reports back once a
@@ -105,7 +105,7 @@ type DeviceSessionDeps struct {
 	Logger     logging.Logger
 	Session    session.Deps
 	Timeouts   session.Timeouts
-	Runs       *runTracker
+	Runs       *runSession
 }
 
 // holderState is where the session stands in the holder state machine
@@ -199,7 +199,7 @@ type DeviceSession struct {
 	logger     logging.Logger
 	deps       session.Deps
 	timeouts   session.Timeouts
-	runs       *runTracker
+	runs       *runSession
 }
 
 // errSessionClosed is returned by Select once the session has been
@@ -266,6 +266,19 @@ func (s *DeviceSession) Current() *ActiveDevice {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.active
+}
+
+// SelectedDescriptor returns the descriptor of the selected device, or
+// nil when none was ever selected. A released or lost device keeps its
+// descriptor.
+func (s *DeviceSession) SelectedDescriptor() *device.Descriptor {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.remembered == nil {
+		return nil
+	}
+	desc := s.remembered.desc
+	return &desc
 }
 
 // Select acquires the device named by input through session.Open and
@@ -677,7 +690,7 @@ func (s *DeviceSession) onTimer(gen uint64, kind timerKind) {
 	s.mu.Unlock()
 
 	if kind == timerOpenRun && s.runs != nil {
-		id := s.runs.CloseOpenRun(storage.RunStatusCancelled,
+		id := s.runs.CloseOpenRun(runfolder.OutcomeCancelled,
 			"closed because the session sat idle past the open-run idle timeout and released the device")
 		if id != "" {
 			s.mu.Lock()
@@ -727,7 +740,7 @@ func (s *DeviceSession) watchLost(sess *session.Session) {
 	s.mu.Unlock()
 
 	if s.runs != nil {
-		s.runs.CloseOpenRun(storage.RunStatusError, "closed because the device was lost")
+		s.runs.CloseOpenRun(runfolder.OutcomeDeviceLost, "closed because the device was lost")
 	}
 	s.closeAndRemember(sess, remembered, "session.lost")
 }

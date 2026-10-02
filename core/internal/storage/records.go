@@ -3,7 +3,7 @@ package storage
 import "dev.atomyx/internal/runfolder"
 
 const (
-	// RunKeyPrefix namespaces the flat run records of the legacy form in
+	// RunKeyPrefix namespaces the flat run records in
 	// Storage.
 	RunKeyPrefix = runfolder.LegacyRecordKeyPrefix
 	// BugKeyPrefix namespaces persisted bug records in Storage.
@@ -18,9 +18,10 @@ func RunKey(id string) string { return RunKeyPrefix + id }
 // key at BugKey(id) + "/screenshot".
 func BugKey(id string) string { return BugKeyPrefix + id }
 
-// PersistedRun is the on-disk shape of a run record: RunRecord plus
-// the fields computed at persistence time (DurationMs) and the
-// caller-supplied Summary. It is what RunKey(id) holds in Storage.
+// PersistedRun is the on-disk shape of a flat run record: RunRecord
+// plus DurationMs and Summary. It is what RunKey(id) holds in Storage.
+// Nothing writes new ones, and LegacyRunReader reads the ones that
+// exist.
 type PersistedRun struct {
 	ID          string         `json:"id"`
 	Name        string         `json:"name"`
@@ -32,30 +33,6 @@ type PersistedRun struct {
 	ActionCount int            `json:"actionCount"`
 	Findings    []RunBugReport `json:"findings"`
 	Summary     *string        `json:"summary,omitempty"`
-}
-
-// NewPersistedRun builds the on-disk record for a finished (or
-// force-errored) run. finishedAtFallback is used to compute
-// DurationMs when run.FinishedAt is nil, matching the fallback to the
-// current time a caller applies when persisting a run whose
-// FinishedAt has not been set yet.
-func NewPersistedRun(run *RunRecord, summary *string, finishedAtFallback int64) PersistedRun {
-	finishedAt := finishedAtFallback
-	if run.FinishedAt != nil {
-		finishedAt = *run.FinishedAt
-	}
-	return PersistedRun{
-		ID:          run.ID,
-		Name:        run.Name,
-		Source:      run.Source,
-		Status:      run.Status,
-		StartedAt:   run.StartedAt,
-		FinishedAt:  run.FinishedAt,
-		DurationMs:  finishedAt - run.StartedAt,
-		ActionCount: run.ActionCount,
-		Findings:    run.Findings,
-		Summary:     summary,
-	}
 }
 
 // PersistedBug is the on-disk shape of a bug record, saved separately
