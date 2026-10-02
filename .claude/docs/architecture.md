@@ -35,6 +35,7 @@ flowchart TB
         wire["wire (shared types)"]
         diag["diag (error codes)"]
         clock["clock"]
+        lease["lease (per-device flock)"]
         logging["logging"]
         transport["transport (HTTP + TCP clients)"]
         process["process (adb/xcrun execution)"]
@@ -55,6 +56,8 @@ flowchart TB
     cli["cli (atomyx binary)"]
     sidecar["sidecar (JSON-RPC bridge)"]
 
+    diag --> lease
+    clock --> lease
     wire --> driver
     transport --> driver
     driver --> androiddriver
@@ -220,6 +223,67 @@ commands (`init`, `update-skills`) that install the bundled skill and
 agent markdown files from `core/internal/skills` into a consumer
 project.
 
+## Device lease and identity
+
+`core/internal/lease` gives each physical device at most one driving
+Atomyx process. A lease is an exclusive `flock` on a per-device lock
+file in a per-user runtime directory. The kernel owns liveness: the
+flock sits on an open descriptor for the process lifetime and
+disappears when the process exits for any reason, so a crashed holder
+never leaves a stale lock.
+
+Contract:
+
+- **Key.** The first 16 hex characters of the SHA-256 of
+  `<platform>:<hardwareId>`. The files are `<key>.lock` and
+  `<key>.sock`.
+- **Runtime directory.** On Linux, `$XDG_RUNTIME_DIR/atomyx`. Elsewhere,
+  a `run` subdirectory of the user cache directory. The per-user
+  fallback `/tmp/atomyx-<uid>` replaces that choice when it is unset,
+  when a socket path under it would exceed 104 bytes, or when its
+  filesystem is not local (on macOS, not mounted with `MNT_LOCAL`). The
+  directory is created with mode 0700, must be a real directory (not a
+  symlink) owned by the current user, and otherwise the error is an
+  `UnsafeDirError`.
+- **Conflict.** `Acquire` retries a contended flock for about 200
+  milliseconds, then returns a `HeldError` carrying `DEVICE_HELD` and
+  the holder's display metadata. `DEVICE_BUSY` stays reserved for a
+  foreign, non-Atomyx automation session, and the two codes never mean
+  the same thing. `DEVICE_RELEASED_HELD` (an agent session that gave up
+  its device and finds it held) and `RUN_EXPIRED` (a tool call on a run
+  closed by the open-run idle timeout) are the other two codes the
+  lease design defines, built by `diag.NewDeviceReleasedHeld` and
+  `diag.NewRunExpired`.
+- **Replacement check.** After the flock succeeds, the descriptor is
+  compared with a fresh `stat` of the path, and a mismatch restarts the
+  acquire a bounded number of times. `Lease.Recheck` repeats the
+  comparison for a long-lived holder, and `Lease.Watch` runs it every
+  `InodeRecheckPeriod` (5 seconds). A failed re-acquire returns an error
+  wrapping `ErrLost`.
+- **Lock file.** It is never unlinked. It carries the holder's
+  `{pid, command, role, runId, socket, startedAt, idleSince}` for
+  display only, and nothing reads that metadata to make a control
+  decision.
+- **Probe.** `Manager.Probe` takes the same real flock and releases it
+  immediately. It never creates the lock file and never writes holder
+  metadata.
+
+Canonical identity lives in `core/internal/device/identity.go`.
+`IdentityResolver.Resolve` runs before any agent connect, through
+queries with no side effect on the device:
+
+- Android: `ro.serialno` read through adb, so one phone reached over USB
+  and over Wi-Fi maps to one lease. When `ro.serialno` is empty or a
+  known generic value, the identity is the AVD name from
+  `ro.boot.qemu.avd_name` joined with the adb serial. An unauthorized,
+  offline or unavailable device returns a `DeviceStateError` instead of
+  an empty serial.
+- iOS: the UDID from the descriptor.
+
+`lease` may depend only on `diag` and the common leaves. It does not
+import `device`, so the caller resolves the identity first and passes
+the key down.
+
 ## Dependency direction and its enforcement
 
 Dependency direction across every package under `core/internal/` is
@@ -237,6 +301,7 @@ The shape the config encodes:
   everything, directly mirroring the "leaf package" language in their
   own doc comments.
 - **`transport`** may depend only on `wire` and `diag`.
+- **`lease`** may depend only on `diag` and the common leaves.
 - **`driver`** may depend only on `wire` and `transport`. The three
   concrete implementers (`androiddriver`, `iosdriver`,
   `iossimdriver`) may depend on `driver`, `transport`, `process`, and

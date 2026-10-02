@@ -78,10 +78,10 @@ check-schema:
 	bash scripts/check-schema-fresh.sh
 
 # The full local gate for the core module: format, build, vet, the
-# layer-import gate, the lint gate, the comment gate, the schema
-# freshness gate, and the race-enabled test suite, in that order, each
-# one failing the target the moment it fails. go-arch-lint and
-# golangci-lint must already be on PATH (see CONTRIBUTING.md for the
+# layer-import gate, the lint gate, the comment gate, the raw-open
+# gate, the schema freshness gate, and the race-enabled test suite, in
+# that order, each one failing the target the moment it fails.
+# go-arch-lint and golangci-lint must already be on PATH (see CONTRIBUTING.md for the
 # install commands); golangci-lint must be v2.13.2, the version this
 # module's .golangci.yml is authored and verified against, because a
 # different version can load the config differently or reject it.
@@ -99,6 +99,8 @@ check:
 	golangci-lint run ./...
 	@echo "Comment gate ..."
 	bash scripts/check-comments.sh
+	@echo "Raw syscall.Open gate ..."
+	bash scripts/check-no-raw-syscall-open.sh
 	@echo "Schema freshness gate ..."
 	bash scripts/check-schema-fresh.sh
 	@echo "Test ..."

@@ -124,6 +124,37 @@ corresponding area. For the high-level map see
   fails with `HOST_PORT_IN_USE`, not `DEVICE_BUSY`, which is reserved
   for a foreign automation session.
 
+## Device lease
+
+- **Acquire the lease before any agent connect.** Resolve the device's
+  canonical identity first (`device.IdentityResolver.Resolve`), take the
+  lease, and only then forward ports or launch a runner. Connecting
+  first disturbs a live holder's forward or runner.
+- **Key on the hardware identity, never on the transport string.** The
+  Wi-Fi serial `<ip>:<port>` and the USB serial of the same phone must
+  map to one lease, which is why identity reads `ro.serialno`.
+- **Never unlink a lock file.** It is created once and reused. Replacing
+  it is exactly what the descriptor-versus-path comparison detects, so
+  removing and recreating it defeats that check. Only a socket may be
+  unlinked, and only by the process holding its flock.
+- **Never open a lease file with a raw `syscall.Open` or `unix.Open`.**
+  Use `os.OpenFile` so close-on-exec applies, because a leaked lease
+  descriptor in a spawned child keeps the device held after the owner
+  exits. `core/scripts/check-no-raw-syscall-open.sh` fails the build on
+  a raw open outside `core/internal/lease`.
+- **Never conflate `DEVICE_HELD` with `DEVICE_BUSY`.** `DEVICE_HELD`
+  means another Atomyx process holds the lease. `DEVICE_BUSY` is
+  reserved for a foreign, non-Atomyx automation session found driving
+  the device. The remedies differ, so a handler that returns the wrong
+  one points the operator at the wrong fix.
+- **A probe never writes.** `atomyx devices` and `doctor --bundle` use
+  `Manager.Probe`, which takes and releases the real flock but never
+  creates the lock file or writes holder metadata. Only the process that
+  keeps the flock for its session owns that write.
+- **Lock file contents are display only.** Liveness comes from the
+  flock, never from the pid or command in the file, because a dead
+  holder's metadata can linger until the next acquirer overwrites it.
+
 ## Tool layer (cross-platform)
 
 - **Never branch on the session's platform inside a tool handler.**

@@ -47,6 +47,17 @@ const (
 	// CodeDeviceBusy means a pre-run check found another automation
 	// session already driving the target device.
 	CodeDeviceBusy = "DEVICE_BUSY"
+	// CodeDeviceHeld means another Atomyx process already holds the
+	// lease for the target device. It is distinct from CodeDeviceBusy,
+	// which is reserved for a foreign, non-Atomyx automation session.
+	CodeDeviceHeld = "DEVICE_HELD"
+	// CodeDeviceReleasedHeld means a session that gave up its device
+	// lease, or lost it, needs the device again and another process now
+	// holds the lease.
+	CodeDeviceReleasedHeld = "DEVICE_RELEASED_HELD"
+	// CodeRunExpired means a tool call targeted a run that was closed
+	// because it sat idle past the open-run idle timeout.
+	CodeRunExpired = "RUN_EXPIRED"
 	// CodeHostPortInUse means the host-side port a device's adb
 	// forward needs is already forwarded to a different device, so the
 	// forward cannot be created without severing that other device.

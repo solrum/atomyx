@@ -78,6 +78,7 @@ atomyx/
 | `core/internal/driver/mock` | An in-memory Driver implementation for tests. |
 | `iosdriver` | Implements the Driver port over the Swift XCUITest runner's line-delimited JSON TCP protocol. |
 | `iossimdriver` | Implements the Driver port over the iOS Simulator's direct-HID input path. |
+| `lease` | Gives each physical device at most one driving process through a per-device flock, and probes it without writing. |
 | `logging` | The structured logging port every layer writes through, so the host chooses the destination. |
 | `mcp` | Builds the Atomyx MCP server: server construction, tool registration, and the tool handlers themselves. |
 | `netcapture` | The concrete network-capture adapters a script run observes HTTP traffic through. |
@@ -100,9 +101,11 @@ atomyx/
 
 Dev tooling `make -C core check` runs (see
 [`development.md`](./development.md) for the exact commands):
-`core/scripts/check-comments.sh` (the comment-style gate) and
-`core/scripts/check-schema-fresh.sh` (the schema-freshness gate),
-plus their allowlist files.
+`core/scripts/check-comments.sh` (the comment-style gate),
+`core/scripts/check-no-raw-syscall-open.sh` (rejects a bare
+`syscall.Open(` or `unix.Open(` outside `core/internal/lease`), and
+`core/scripts/check-schema-fresh.sh` (the schema-freshness gate), plus
+their allowlist files.
 
 ## `platforms/`
 
