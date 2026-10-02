@@ -60,6 +60,13 @@ type AgentProvisioner interface {
 	// or the spawned process outlives the caller with nothing left able
 	// to stop it.
 	EnsureIOSAgent(ctx context.Context, udid string, kind IosAgentKind) (port int, kill func() error, err error)
+	// EnsureIOSAgentWatched behaves like EnsureIOSAgent and also reports
+	// the agent ending on its own. When the driver process, or the USB
+	// tunnel of a physical device, exits after the agent answered ready
+	// and before kill ran, the provisioner first ends whatever remains
+	// through kill, then calls onLost once with a *ProcessExitError. A
+	// call to kill is never reported. A nil onLost watches nothing.
+	EnsureIOSAgentWatched(ctx context.Context, udid string, kind IosAgentKind, onLost func(error)) (port int, kill func() error, err error)
 	EnsureAndroidAgent(ctx context.Context, serial string) error
 }
 
@@ -295,12 +302,39 @@ func (p *DriverProvisioner) releasePorts(ports ...int) {
 // the reserved port. It runs its work once however many times it is
 // called.
 func (p *DriverProvisioner) EnsureIOSAgent(ctx context.Context, udid string, kind IosAgentKind) (int, func() error, error) {
+	return p.EnsureIOSAgentWatched(ctx, udid, kind, nil)
+}
+
+// EnsureIOSAgentWatched implements AgentProvisioner.
+func (p *DriverProvisioner) EnsureIOSAgentWatched(ctx context.Context, udid string, kind IosAgentKind, onLost func(error)) (int, func() error, error) {
+	// A process can exit right after the launch settles, before this call
+	// has built its kill function, so a loss waits on settled for it. A
+	// launch that failed leaves ended nil, and its caller already has
+	// the failure, so nothing is reported.
+	var ended func() error
+	settled := make(chan struct{})
+	defer close(settled)
+	lostHook := func(component LostComponent) func(error) {
+		if onLost == nil {
+			return nil
+		}
+		return func(verdict error) {
+			<-settled
+			if ended == nil {
+				return
+			}
+			_ = ended()
+			onLost(&ProcessExitError{Component: component, Cause: verdict})
+		}
+	}
+
 	cfg := p.iosLaunchConfig(udid, kind)
+	cfg.OnRunnerExit = lostHook(LostRunner)
 	if !p.deps.FixedIosPort {
 		cfg.RunnerID = p.newRunnerID()
 		cfg.AllocatePort = p.reservePort
 		cfg.ReleasePort = func(port int) { p.releasePorts(port) }
-		cfg.AfterSpawn = p.afterSpawn(udid, kind, cfg.RunnerID)
+		cfg.AfterSpawn = p.afterSpawn(udid, kind, cfg.RunnerID, lostHook(LostTunnel))
 	}
 
 	launcher := iosdriver.NewXctestLauncher(p.runner, p.background, p.clock, cfg)
@@ -309,6 +343,7 @@ func (p *DriverProvisioner) EnsureIOSAgent(ctx context.Context, udid string, kin
 		return 0, kill, err
 	}
 	if p.deps.FixedIosPort {
+		ended = kill
 		return launcher.Port(), kill, nil
 	}
 	port := launcher.Port()
@@ -317,6 +352,7 @@ func (p *DriverProvisioner) EnsureIOSAgent(ctx context.Context, udid string, kin
 		p.releasePorts(port)
 		return err
 	})
+	ended = stop
 	return port, stop, nil
 }
 
@@ -382,7 +418,7 @@ func (p *DriverProvisioner) iosLaunchConfig(udid string, kind IosAgentKind) iosd
 // exists and before it is probed: it records the runner for crash
 // recovery, then for a physical device starts the USB tunnel the probe
 // needs. The stop function it returns removes both.
-func (p *DriverProvisioner) afterSpawn(udid string, kind IosAgentKind, runnerID string) func(context.Context, iosdriver.SpawnedRunner) (func(), error) {
+func (p *DriverProvisioner) afterSpawn(udid string, kind IosAgentKind, runnerID string, onTunnelExit func(error)) func(context.Context, iosdriver.SpawnedRunner) (func(), error) {
 	return func(ctx context.Context, spawned iosdriver.SpawnedRunner) (func(), error) {
 		statePath, state, err := p.recordRunner(udid, kind, runnerID, spawned)
 		if err != nil {
@@ -397,7 +433,7 @@ func (p *DriverProvisioner) afterSpawn(udid string, kind IosAgentKind, runnerID 
 			return removeRecord, nil
 		}
 		stopTunnel, tunnelPid, err := iosdriver.StartTunnel(ctx, p.background, p.clock, iosdriver.TunnelConfig{
-			UDID: udid, HostPort: spawned.HostPort, RunnerID: runnerID,
+			UDID: udid, HostPort: spawned.HostPort, RunnerID: runnerID, OnExit: onTunnelExit,
 		})
 		if err != nil {
 			removeRecord()
@@ -505,6 +541,8 @@ type FakeProvisioner struct {
 	iosCalls      []FakeIOSCall
 	androidCalls  []string
 	iosKillCounts map[string]int
+	iosLost       map[string]func(error)
+	iosKills      map[string]func() error
 	iosPorts      map[string]int
 
 	// gate, when non-nil, is waited on before every call returns. A
@@ -522,6 +560,8 @@ func NewFakeProvisioner() *FakeProvisioner {
 		iosResult:     make(map[string]error),
 		androidResult: make(map[string]error),
 		iosKillCounts: make(map[string]int),
+		iosLost:       make(map[string]func(error)),
+		iosKills:      make(map[string]func() error),
 		iosPorts:      make(map[string]int),
 	}
 }
@@ -576,11 +616,20 @@ func (f *FakeProvisioner) AndroidCalls() []string {
 	return append([]string(nil), f.androidCalls...)
 }
 
-// EnsureIOSAgent implements AgentProvisioner. The returned kill
-// records its own invocation count against udid, retrievable via
+// EnsureIOSAgent implements AgentProvisioner. It watches nothing. The
+// returned kill records its own invocation count against udid, retrievable via
 // IOSKillCount, so a test can assert a teardown path actually
 // stopped the simulated driver process instead of leaking it.
 func (f *FakeProvisioner) EnsureIOSAgent(ctx context.Context, udid string, kind IosAgentKind) (int, func() error, error) {
+	return f.EnsureIOSAgentWatched(ctx, udid, kind, nil)
+}
+
+// EnsureIOSAgentWatched implements AgentProvisioner. FireLost reports a
+// loss through the onLost of the latest call for the same udid.
+func (f *FakeProvisioner) EnsureIOSAgentWatched(ctx context.Context, udid string, kind IosAgentKind, onLost func(error)) (int, func() error, error) {
+	f.mu.Lock()
+	f.iosLost[udid] = onLost
+	f.mu.Unlock()
 	f.mu.Lock()
 	f.iosCalls = append(f.iosCalls, FakeIOSCall{UDID: udid, Kind: kind})
 	gate := f.gate
@@ -598,13 +647,35 @@ func (f *FakeProvisioner) EnsureIOSAgent(ctx context.Context, udid string, kind 
 			return 0, func() error { return nil }, ctx.Err()
 		}
 	}
+	var once sync.Once
 	kill := func() error {
-		f.mu.Lock()
-		f.iosKillCounts[udid]++
-		f.mu.Unlock()
+		once.Do(func() {
+			f.mu.Lock()
+			f.iosKillCounts[udid]++
+			f.mu.Unlock()
+		})
 		return nil
 	}
+	f.mu.Lock()
+	f.iosKills[udid] = kill
+	f.mu.Unlock()
 	return port, kill, err
+}
+
+// FireLost simulates the provisioned runner of udid exiting on its own.
+// Like the real provisioner it ends the agent through kill first, then
+// reports a *ProcessExitError wrapping cause through the onLost of the
+// latest EnsureIOSAgentWatched call. It does nothing when no call
+// installed an onLost.
+func (f *FakeProvisioner) FireLost(udid string, cause error) {
+	f.mu.Lock()
+	onLost, kill := f.iosLost[udid], f.iosKills[udid]
+	f.mu.Unlock()
+	if onLost == nil {
+		return
+	}
+	_ = kill()
+	onLost(&ProcessExitError{Component: LostRunner, Cause: cause})
 }
 
 // IOSKillCount reports how many times the kill function returned by

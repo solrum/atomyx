@@ -3,6 +3,7 @@ package iosdriver
 import (
 	"io"
 	"sync"
+	"sync/atomic"
 
 	"dev.atomyx/internal/process"
 )
@@ -43,4 +44,22 @@ func superviseBackground(
 		})
 	}
 	return out, stop
+}
+
+// notifyOnExit reports the verdict of a supervised process that ends on
+// its own after it was confirmed running. The owner sets stopping before
+// its teardown kills the process, so a deliberate stop is never
+// reported. A nil notify watches nothing.
+func notifyOnExit(exited <-chan error, stopping *atomic.Bool, notify func(error)) {
+	if notify == nil {
+		return
+	}
+	go reportExit(exited, stopping, notify)
+}
+
+func reportExit(exited <-chan error, stopping *atomic.Bool, notify func(error)) {
+	verdict := <-exited
+	if !stopping.Load() {
+		notify(verdict)
+	}
 }

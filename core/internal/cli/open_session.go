@@ -67,7 +67,7 @@ func (d *deviceSession) reportLost(stderr io.Writer) bool {
 	if err == nil {
 		return false
 	}
-	_, _ = fmt.Fprintf(stderr, "error: the device lease was lost during the command, so it was stopped: %s\n", err)
+	_, _ = fmt.Fprintf(stderr, "error: the device was lost during the command, so it was stopped: %s\n", err)
 	return true
 }
 

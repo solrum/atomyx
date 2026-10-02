@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -17,6 +18,13 @@ import (
 // finish inside the shared shutdown grace period.
 var ErrDisconnectTimeout = errors.New("device disconnect did not finish in time")
 
+// ErrDeviceLost is wrapped by every cause LostErr reports, so a caller
+// that holds only a cancellation cause can tell a lost device from a
+// user stop. The wrapped cause names what ended the session: the lease
+// (lease.ErrLost) or a process the control plane depends on
+// (*device.ProcessExitError).
+var ErrDeviceLost = errors.New("device lost")
+
 // Session is a device a process owns: the lease, the connected driver
 // with its Orchestra, and the watcher guarding the lease. Obtain one
 // through Open and end it with Close.
@@ -28,7 +36,7 @@ type Session struct {
 	built    device.Built
 
 	watchCancel context.CancelFunc
-	watchDone   chan struct{}
+	watchers    sync.WaitGroup
 
 	lostOnce sync.Once
 	lost     chan struct{}
@@ -46,22 +54,25 @@ type Session struct {
 func newSession(ctx context.Context, deps Deps, desc device.Descriptor, identity device.Identity, held *lease.Lease, built device.Built) *Session {
 	s := &Session{
 		deps: deps, desc: desc, identity: identity, lease: held, built: built,
-		lost:      make(chan struct{}),
-		closed:    make(chan struct{}),
-		watchDone: make(chan struct{}),
+		lost:   make(chan struct{}),
+		closed: make(chan struct{}),
 	}
 	// The watcher outlives the Open call that started it, so it keeps
 	// ctx's values but not its cancellation.
 	watchCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	s.watchCancel = cancel
-	if held == nil {
-		close(s.watchDone)
-		return s
+	if held != nil {
+		s.watchers.Go(func() { held.Watch(watchCtx, s.markLost) })
 	}
-	go func() {
-		defer close(s.watchDone)
-		held.Watch(watchCtx, s.markLost)
-	}()
+	if built.Lost != nil {
+		s.watchers.Go(func() {
+			select {
+			case cause := <-built.Lost:
+				s.markLost(cause)
+			case <-watchCtx.Done():
+			}
+		})
+	}
 	return s
 }
 
@@ -78,8 +89,8 @@ func (s *Session) Built() device.Built { return s.built }
 func (s *Session) Orchestra() *orchestra.Orchestra { return s.built.Orchestra }
 
 // Lost is closed when the session lost the device without choosing to:
-// the lease file was replaced under it and re-acquiring failed. The
-// owner decides what to do, normally by ending the run in flight and
+// the lease file was replaced under it and re-acquiring failed, or a
+// process the control plane depends on exited on its own. The owner decides what to do, normally by ending the run in flight and
 // closing the session.
 func (s *Session) Lost() <-chan struct{} { return s.lost }
 
@@ -88,6 +99,7 @@ func (s *Session) Lost() <-chan struct{} { return s.lost }
 func (s *Session) Closed() <-chan struct{} { return s.closed }
 
 // LostErr reports why the session was lost, or nil while it is held.
+// A non-nil result wraps ErrDeviceLost.
 func (s *Session) LostErr() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -96,10 +108,11 @@ func (s *Session) LostErr() error {
 
 func (s *Session) markLost(err error) {
 	s.lostOnce.Do(func() {
+		wrapped := fmt.Errorf("%w: %w", ErrDeviceLost, err)
 		s.mu.Lock()
-		s.lostErr = err
+		s.lostErr = wrapped
 		s.mu.Unlock()
-		s.deps.Logger.Warn("lost the device lease", logging.LogContext{"id": s.desc.ID, "error": err.Error()})
+		s.deps.Logger.Warn("lost the device", logging.LogContext{"id": s.desc.ID, "error": err.Error()})
 		close(s.lost)
 	})
 }
@@ -169,7 +182,7 @@ func (s *Session) updateHolder(mutate func(*lease.Holder)) error {
 func (s *Session) Close() error {
 	s.closeOnce.Do(func() {
 		s.watchCancel()
-		<-s.watchDone
+		s.watchers.Wait()
 
 		state := s.liveLaunchState()
 		s.mu.Lock()

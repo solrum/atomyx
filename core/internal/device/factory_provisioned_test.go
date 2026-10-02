@@ -183,3 +183,29 @@ func TestDriverFactory_CreateDriver_DescriptorWithoutAnIDIsNotProvisioned(t *tes
 		t.Fatalf("provisioner calls = %+v, want none because no target is named", calls)
 	}
 }
+
+func TestDriverFactory_Build_Provisioned_ReportsTheRunnerLossThroughBuiltLost(t *testing.T) {
+	port := serveIdentityOn(t, `"simulatorUdid":"SIM-1"`)
+	prov := NewFakeProvisioner()
+	prov.SetIOSPort("SIM-1", port)
+	f := NewDriverFactory(DriverFactoryDeps{Runner: process.NewFake(), Background: process.NewFakeBackground(), Provisioner: prov})
+
+	built, err := f.Build(context.Background(), Descriptor{ID: "SIM-1", Platform: PlatformIOS, Kind: KindSimulator})
+	if err != nil {
+		t.Fatalf("Build() error = %v", err)
+	}
+
+	prov.FireLost("SIM-1", errors.New("exit status 1"))
+
+	var exit *ProcessExitError
+	if cause := <-built.Lost; !errors.As(cause, &exit) || exit.Component != LostRunner {
+		t.Fatalf("Built.Lost delivered %v, want a runner *ProcessExitError", cause)
+	}
+	if got := prov.IOSKillCount("SIM-1"); got != 1 {
+		t.Fatalf("kill count after the loss = %d, want 1", got)
+	}
+	_ = built.Driver.Disconnect()
+	if got := prov.IOSKillCount("SIM-1"); got != 1 {
+		t.Fatalf("kill count after Disconnect = %d, want the kill path to run once", got)
+	}
+}

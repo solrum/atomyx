@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"dev.atomyx/internal/clock"
@@ -215,6 +216,10 @@ type LaunchConfig struct {
 	// the runner. The returned stop function, when non-nil, runs after
 	// the runner has been stopped, on a failed attempt and on kill alike.
 	AfterSpawn func(ctx context.Context, spawned SpawnedRunner) (stop func(), err error)
+	// OnRunnerExit receives the verdict when the runner process exits on
+	// its own after it answered ready, once per launch. A stop through the
+	// returned kill function is not reported. Nil watches nothing.
+	OnRunnerExit func(verdict error)
 	// Progress receives XctestProgressBuilding when a build is about to
 	// run and XctestProgressStarting before the runner launch. Nil
 	// discards it.
@@ -857,12 +862,18 @@ func (l *XctestLauncher) spawnAndWait(ctx context.Context, port int, runDerived 
 			}
 		}
 	}
-	teardown = onceFunc(teardown)
+	var stopping atomic.Bool
+	stopAll := teardown
+	teardown = onceFunc(func() {
+		stopping.Store(true)
+		stopAll()
+	})
 
 	if err := l.waitForReadyOrExit(ctx, port, exited); err != nil {
 		teardown()
 		return noopKill, err
 	}
+	notifyOnExit(exited, &stopping, l.cfg.OnRunnerExit)
 	return func() error {
 		teardown()
 		return nil

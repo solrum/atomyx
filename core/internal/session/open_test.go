@@ -72,6 +72,7 @@ type recordingFactory struct {
 	drivers []*recordingDriver
 	ctxs    []context.Context
 	script  func(*recordingDriver)
+	lost    <-chan error
 }
 
 func (f *recordingFactory) Build(ctx context.Context, _ device.Descriptor) (device.Built, error) {
@@ -92,7 +93,7 @@ func (f *recordingFactory) Build(ctx context.Context, _ device.Descriptor) (devi
 	f.mu.Lock()
 	f.drivers = append(f.drivers, drv)
 	f.mu.Unlock()
-	return device.Built{Driver: drv, Orchestra: orchestra.New(orchestra.OrchestraDeps{Driver: drv, Clock: orchestra.SystemClock{}})}, nil
+	return device.Built{Driver: drv, Orchestra: orchestra.New(orchestra.OrchestraDeps{Driver: drv, Clock: orchestra.SystemClock{}}), Lost: f.lost}, nil
 }
 
 func (f *recordingFactory) buildCount() int {
@@ -553,7 +554,60 @@ func TestSession_AReplacedLockFileThatCannotBeReacquiredMovesTheSessionToLost(t 
 	}
 	<-s.Lost()
 
-	if err := s.LostErr(); !errors.Is(err, lease.ErrLost) {
-		t.Fatalf("LostErr() = %v, want lease.ErrLost", err)
+	if err := s.LostErr(); !errors.Is(err, lease.ErrLost) || !errors.Is(err, session.ErrDeviceLost) {
+		t.Fatalf("LostErr() = %v, want lease.ErrLost wrapped in session.ErrDeviceLost", err)
+	}
+}
+
+func TestSession_AProcessExitReportedByTheFactoryMovesTheSessionToLost(t *testing.T) {
+	events := &eventLog{}
+	lost := make(chan error, 1)
+	factory := &recordingFactory{events: events, lost: lost}
+	m := newManager(t, clock.SystemClock{})
+	s, err := session.Open(context.Background(), baseDeps(t, factory, m), session.Request{Descriptor: iosDesc("A")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-s.Lost():
+		t.Fatal("the session reports lost before the runner exited")
+	default:
+	}
+
+	lost <- &device.ProcessExitError{Component: device.LostRunner}
+	<-s.Lost()
+
+	err = s.LostErr()
+	var exit *device.ProcessExitError
+	if !errors.Is(err, session.ErrDeviceLost) || !errors.As(err, &exit) || exit.Component != device.LostRunner {
+		t.Fatalf("LostErr() = %v, want session.ErrDeviceLost wrapping the runner exit", err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	if got := events.snapshot(); len(got) != 1 || got[0] != "disconnect" {
+		t.Fatalf("events = %v, want the driver disconnected once", got)
+	}
+	status, _ := m.Probe(context.Background(), lease.KeyFor("ios", "A"))
+	if status.Held {
+		t.Fatal("the lease is still held after a lost session closed")
+	}
+}
+
+func TestSession_ClosingBeforeAnyLossLeavesTheRunnerWatcherStopped(t *testing.T) {
+	lost := make(chan error, 1)
+	factory := &recordingFactory{events: &eventLog{}, lost: lost}
+	s, err := session.Open(context.Background(), baseDeps(t, factory, newManager(t, clock.SystemClock{})), session.Request{Descriptor: iosDesc("A")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	lost <- &device.ProcessExitError{Component: device.LostRunner}
+	select {
+	case <-s.Lost():
+		t.Fatal("a closed session reported a loss")
+	default:
 	}
 }

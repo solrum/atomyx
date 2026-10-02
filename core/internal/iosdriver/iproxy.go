@@ -7,6 +7,7 @@ import (
 	"net"
 	"os/exec"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"dev.atomyx/internal/clock"
@@ -81,6 +82,10 @@ type TunnelConfig struct {
 	// Warn receives a one-line warning when an existing runner is
 	// adopted without a launch identifier. Nil discards it.
 	Warn func(message string)
+	// OnExit receives the verdict when the tunnel process exits on its own
+	// after it became reachable. A stop through the returned stop function
+	// is not reported. Nil watches nothing.
+	OnExit func(verdict error)
 }
 
 // StartTunnel starts the USB tunnel for a physical device by running
@@ -163,7 +168,12 @@ func StartTunnel(ctx context.Context, bg process.BackgroundRunner, clk clock.Clo
 	)
 	switch outcome {
 	case process.ReadinessReady:
-		return stopProc, proc.Pid(), nil
+		var stopping atomic.Bool
+		notifyOnExit(exited, &stopping, cfg.OnExit)
+		return func() {
+			stopping.Store(true)
+			stopProc()
+		}, proc.Pid(), nil
 	case process.ReadinessExited:
 		stopProc()
 		return nil, 0, err

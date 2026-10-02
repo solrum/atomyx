@@ -3,6 +3,7 @@ package iosdriver
 import (
 	"errors"
 	"io"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -81,4 +82,34 @@ func TestNewXctestLauncherPanicsWithoutABackgroundRunner(t *testing.T) {
 		}
 	}()
 	NewXctestLauncher(process.NewFake(), nil, nil, LaunchConfig{})
+}
+
+func TestReportExitNotifiesAnExitNobodyAskedFor(t *testing.T) {
+	exited := make(chan error, 1)
+	cause := errors.New("runner exited")
+	exited <- cause
+	var stopping atomic.Bool
+	var got error
+	reportExit(exited, &stopping, func(verdict error) { got = verdict })
+	if !errors.Is(got, cause) {
+		t.Fatalf("notified verdict = %v, want %v", got, cause)
+	}
+}
+
+func TestReportExitStaysSilentForADeliberateStop(t *testing.T) {
+	exited := make(chan error, 1)
+	exited <- errors.New("killed")
+	var stopping atomic.Bool
+	stopping.Store(true)
+	reportExit(exited, &stopping, func(error) { t.Error("a deliberate stop was reported as a loss") })
+}
+
+func TestNotifyOnExitWithoutACallbackWatchesNothing(t *testing.T) {
+	exited := make(chan error, 1)
+	exited <- errors.New("exit")
+	var stopping atomic.Bool
+	notifyOnExit(exited, &stopping, nil)
+	if len(exited) != 1 {
+		t.Fatal("a nil callback consumed the exit verdict")
+	}
 }

@@ -37,6 +37,11 @@ const simHidOptInEnv = "ATOMYX_SIM_HID"
 type Built struct {
 	Driver    driver.Driver
 	Orchestra *orchestra.Orchestra
+	// Lost receives one *ProcessExitError when a process the driver's
+	// control plane depends on exits on its own while the driver is
+	// connected. A Factory whose platform has no such observable signal
+	// leaves it nil, and a nil channel never delivers.
+	Lost <-chan error
 }
 
 // Factory maps a Descriptor to a live Built pair.
@@ -114,7 +119,13 @@ var _ Factory = (*DriverFactory)(nil)
 
 // Build implements Factory.
 func (f *DriverFactory) Build(ctx context.Context, desc Descriptor) (Built, error) {
-	drv, err := f.createDriver(ctx, desc)
+	lost := make(chan error, 1)
+	drv, err := f.createDriverWatched(ctx, desc, func(cause error) {
+		select {
+		case lost <- cause:
+		default:
+		}
+	})
 	if err != nil {
 		return Built{}, err
 	}
@@ -129,6 +140,7 @@ func (f *DriverFactory) Build(ctx context.Context, desc Descriptor) (Built, erro
 	return Built{
 		Driver:    drv,
 		Orchestra: orchestra.New(orchestra.OrchestraDeps{Driver: drv, Clock: f.clock, Logger: f.logger}),
+		Lost:      lost,
 	}, nil
 }
 
@@ -146,6 +158,13 @@ func (f *DriverFactory) Build(ctx context.Context, desc Descriptor) (Built, erro
 // A device target, or a simulator target that never qualifies for the
 // direct-HID path, always gets the XCUITest path.
 func (f *DriverFactory) createDriver(ctx context.Context, desc Descriptor) (driver.Driver, error) {
+	return f.createDriverWatched(ctx, desc, nil)
+}
+
+// createDriverWatched is createDriver with onLost wired to the loss
+// signal of a provisioned iOS runner. A platform without an observable
+// signal ignores it.
+func (f *DriverFactory) createDriverWatched(ctx context.Context, desc Descriptor, onLost func(error)) (driver.Driver, error) {
 	if desc.Platform == PlatformAndroid {
 		return androiddriver.New(nil, f.runner, androiddriver.Options{
 			Serial:           desc.ID,
@@ -175,7 +194,7 @@ func (f *DriverFactory) createDriver(ctx context.Context, desc Descriptor) (driv
 	// without a port is provisioned.
 	stopRunner := func() {}
 	if f.provisioner != nil && desc.Port == 0 && desc.ID != "" {
-		provisioned, kill, err := f.provisioner.EnsureIOSAgent(ctx, desc.ID, agentKind)
+		provisioned, kill, err := f.provisioner.EnsureIOSAgentWatched(ctx, desc.ID, agentKind, onLost)
 		if err != nil {
 			if kill != nil {
 				_ = kill()
