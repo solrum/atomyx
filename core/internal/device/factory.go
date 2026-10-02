@@ -49,6 +49,38 @@ type Factory interface {
 	Build(ctx context.Context, desc Descriptor) (Built, error)
 }
 
+// DriverWrap decorates a freshly created driver. It must forward every
+// call to the driver it receives.
+type DriverWrap func(driver.Driver) driver.Driver
+
+// WrappingFactory is a Factory that applies a DriverWrap before it
+// builds the Orchestra, so the Orchestra and Built.Driver both use the
+// wrapped driver. WithDriverWrap returns a new Factory and leaves the
+// receiver unchanged. Wraps accumulate, and the one added last is the
+// outermost.
+type WrappingFactory interface {
+	Factory
+	WithDriverWrap(wrap DriverWrap) Factory
+}
+
+func chainWrap(inner, outer DriverWrap) DriverWrap {
+	switch {
+	case outer == nil:
+		return inner
+	case inner == nil:
+		return outer
+	default:
+		return func(d driver.Driver) driver.Driver { return outer(inner(d)) }
+	}
+}
+
+func applyWrap(wrap DriverWrap, d driver.Driver) driver.Driver {
+	if wrap == nil {
+		return d
+	}
+	return wrap(d)
+}
+
 // DriverFactoryDeps configures a DriverFactory. A nil Clock defaults
 // to orchestra.SystemClock{}. A nil SimHid disables the direct-HID
 // path entirely regardless of ATOMYX_SIM_HID, matching a caller that
@@ -77,6 +109,10 @@ type DriverFactoryDeps struct {
 	// Disconnect. A nil Provisioner leaves the factory dialing the fixed
 	// control port, which a caller that runs its own runner relies on.
 	Provisioner AgentProvisioner
+	// WrapDriver decorates every driver the factory creates, before it
+	// connects and before the Orchestra is built over it. Nil leaves
+	// the driver unwrapped.
+	WrapDriver DriverWrap
 }
 
 // DriverFactory picks the concrete driver family for a device's
@@ -93,6 +129,7 @@ type DriverFactory struct {
 	logger     logging.Logger
 
 	provisioner AgentProvisioner
+	wrap        DriverWrap
 }
 
 // NewDriverFactory constructs a DriverFactory from deps.
@@ -111,11 +148,18 @@ func NewDriverFactory(deps DriverFactoryDeps) *DriverFactory {
 	}
 	return &DriverFactory{
 		runner: deps.Runner, background: background, clock: clock, simHid: deps.SimHid, logger: logger,
-		provisioner: deps.Provisioner,
+		provisioner: deps.Provisioner, wrap: deps.WrapDriver,
 	}
 }
 
-var _ Factory = (*DriverFactory)(nil)
+var _ WrappingFactory = (*DriverFactory)(nil)
+
+// WithDriverWrap implements WrappingFactory.
+func (f *DriverFactory) WithDriverWrap(wrap DriverWrap) Factory {
+	wrapped := *f
+	wrapped.wrap = chainWrap(f.wrap, wrap)
+	return &wrapped
+}
 
 // Build implements Factory.
 func (f *DriverFactory) Build(ctx context.Context, desc Descriptor) (Built, error) {
@@ -129,6 +173,7 @@ func (f *DriverFactory) Build(ctx context.Context, desc Descriptor) (Built, erro
 	if err != nil {
 		return Built{}, err
 	}
+	drv = applyWrap(f.wrap, drv)
 	if err := drv.Connect(ctx); err != nil {
 		// Connect can fail after it has already started a long-lived
 		// child, such as the USB tunnel, and the caller never receives
@@ -246,6 +291,7 @@ func (f *DriverFactory) createDriverWatched(ctx context.Context, desc Descriptor
 // network access.
 type MockDriverFactory struct {
 	clock orchestra.Clock
+	wrap  DriverWrap
 }
 
 // NewMockDriverFactory constructs a MockDriverFactory whose Orchestra
@@ -273,13 +319,20 @@ func NewMockDriverFactoryWithDeps(deps MockDriverFactoryDeps) *MockDriverFactory
 	return &MockDriverFactory{clock: clock}
 }
 
-var _ Factory = (*MockDriverFactory)(nil)
+var _ WrappingFactory = (*MockDriverFactory)(nil)
+
+// WithDriverWrap implements WrappingFactory.
+func (f *MockDriverFactory) WithDriverWrap(wrap DriverWrap) Factory {
+	wrapped := *f
+	wrapped.wrap = chainWrap(f.wrap, wrap)
+	return &wrapped
+}
 
 // Build implements Factory. The Descriptor is accepted for interface
 // parity with DriverFactory but otherwise ignored. The mock driver
 // carries no platform-specific behavior.
 func (f *MockDriverFactory) Build(ctx context.Context, _ Descriptor) (Built, error) {
-	drv := mock.New()
+	drv := applyWrap(f.wrap, mock.New())
 	if err := drv.Connect(ctx); err != nil {
 		return Built{}, err
 	}

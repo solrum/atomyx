@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"dev.atomyx/internal/device"
+	"dev.atomyx/internal/driver"
 	"dev.atomyx/internal/lease"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
@@ -136,7 +137,7 @@ func (s *Session) LaunchState() LaunchState {
 }
 
 func (s *Session) liveLaunchState() LaunchState {
-	carrier, ok := s.built.Driver.(launchedAppCarrier)
+	carrier, ok := driver.As[launchedAppCarrier](s.built.Driver)
 	if !ok {
 		return LaunchState{}
 	}

@@ -17,6 +17,7 @@ import (
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/session"
+	"dev.atomyx/internal/wire"
 )
 
 // recordingDriver wraps the in-memory driver with the launched-app
@@ -609,5 +610,25 @@ func TestSession_ClosingBeforeAnyLossLeavesTheRunnerWatcherStopped(t *testing.T)
 	case <-s.Lost():
 		t.Fatal("a closed session reported a loss")
 	default:
+	}
+}
+
+func TestOpen_BuildsEveryDriverInsideAnObservingDecorator(t *testing.T) {
+	s, err := session.Open(context.Background(), session.Deps{Factory: device.NewMockDriverFactory()}, session.Request{Descriptor: device.Descriptor{ID: "d1", Platform: device.PlatformAndroid}})
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer func() { _ = s.Close() }()
+
+	observed, ok := s.Built().Driver.(session.ObservedDriver)
+	if !ok {
+		t.Fatalf("Built().Driver is %T, want an observing decorator", s.Built().Driver)
+	}
+	before := observed.Epoch()
+	if err := s.Orchestra().TapAt(context.Background(), wire.Point{X: 3, Y: 4}); err != nil {
+		t.Fatalf("TapAt() error = %v", err)
+	}
+	if observed.Epoch() == before {
+		t.Fatal("an Orchestra action did not advance the epoch, so the Orchestra bypasses the decorator")
 	}
 }

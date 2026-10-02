@@ -334,7 +334,20 @@ for a host that does not need to split them.
    open.
 4. Builds the driver through `device.Factory`, with the device tagged on
    the context through `logging.WithDevice` so every log line from the
-   driver carries `deviceId` and `hardwareId`.
+   driver carries `deviceId` and `hardwareId`. A factory that implements
+   `device.WrappingFactory` builds the driver inside an observing
+   decorator, `session.NewObservingDriver`, before it builds the
+   Orchestra. Built.Driver, the Orchestra, the runner, the MCP tool
+   handlers and failure capture all therefore act through it. The
+   decorator forwards every call unchanged, advances an action epoch on
+   every mutating call (gestures, taps, swipes, streaming touch phases,
+   text and key input, and app launch, stop, kill, install, uninstall
+   and data clear), and reports each successful tree, screenshot and
+   screen size to a `session.Observer` together with the epoch active
+   when the capture began. It forwards `driver.StreamingTouchCapable`
+   and the launched-app accessors exactly when the wrapped driver has
+   them, and exposes `Unwrap()`. A caller that asserts an optional
+   interface uses `driver.As`, which looks through decorators.
 5. Offers the previous driver's launched-app state to the new driver.
    The iOS drivers apply it only when the runner they reached reports the
    same launch id as the one that launched the app. When the new driver

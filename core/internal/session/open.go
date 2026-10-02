@@ -10,6 +10,7 @@ import (
 	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/diag"
+	"dev.atomyx/internal/driver"
 	"dev.atomyx/internal/lease"
 	"dev.atomyx/internal/logging"
 )
@@ -86,6 +87,19 @@ type launchedAppCarrier interface {
 	RestoreLaunchedApp(ctx context.Context, bundleID, fromRunnerID string) error
 }
 
+// observingFactory makes factory build every driver inside an observing
+// decorator, so the Orchestra, the runner, the tool handlers and failure
+// capture all act through it. A factory that cannot wrap is used as is.
+func observingFactory(factory device.Factory) device.Factory {
+	wrapping, ok := factory.(device.WrappingFactory)
+	if !ok {
+		return factory
+	}
+	return wrapping.WithDriverWrap(func(d driver.Driver) driver.Driver {
+		return NewObservingDriver(d, nil)
+	})
+}
+
 // Open takes ownership of the device named by req.
 //
 // It resolves the canonical identity, acquires the device lease, ends
@@ -121,7 +135,7 @@ func Open(ctx context.Context, deps Deps, req Request) (*Session, error) {
 	}
 
 	ctx = logging.WithDevice(ctx, logging.DeviceTag{DeviceID: desc.ID, HardwareID: identity.HardwareID})
-	built, err := deps.Factory.Build(ctx, desc)
+	built, err := observingFactory(deps.Factory).Build(ctx, desc)
 	if err != nil {
 		if held != nil {
 			_ = held.Release()
@@ -130,7 +144,7 @@ func Open(ctx context.Context, deps Deps, req Request) (*Session, error) {
 	}
 	relaunched := false
 	if req.Restore != nil {
-		if carrier, ok := built.Driver.(launchedAppCarrier); ok {
+		if carrier, ok := driver.As[launchedAppCarrier](built.Driver); ok {
 			if err := carrier.RestoreLaunchedApp(ctx, req.Restore.BundleID, req.Restore.RunnerID); err != nil {
 				deps.Logger.Warn("could not restore the launched app after re-acquiring the device", logging.LogContext{"id": desc.ID, "error": err.Error()})
 			} else {

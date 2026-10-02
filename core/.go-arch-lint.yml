@@ -299,6 +299,7 @@ deps:
       - shutdown
       - session
       - drivermock
+      - drivertest
   sessiontest:
     mayDependOn:
       - lease

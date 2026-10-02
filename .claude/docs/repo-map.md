@@ -94,7 +94,7 @@ atomyx/
 | `scenario` | Runs ordered groups of scripts and ordered sets of scripts or scenarios against a shared Orchestra. |
 | `script` | Owns the test-script schema, parser, and expression engine. |
 | `core/internal/script/expression` | Implements the test-script expression language: tokenizing, parsing, and evaluating. |
-| `session` | Opens a device for one process: a lease-free prepare phase that builds the runner, then identity, lease, orphaned runner and tunnel reaping, then the driver, and the owner's lifecycle of the result. |
+| `session` | Opens a device for one process: a lease-free prepare phase that builds the runner, then identity, lease, orphaned runner and tunnel reaping, then the driver inside an observing decorator that counts mutating calls and reports captures, and the owner's lifecycle of the result. |
 | `core/internal/session/sessiontest` | Test-only helpers for a session host, such as a lease manager over a throwaway directory. Only `_test.go` files import it. |
 | `sidecar` | Implements the host-side control process: a JSON-RPC bridge, method dispatcher, session, and event bus. |
 | `skills` | Embeds and copies the Atomyx skill and agent markdown files a consumer project installs. |

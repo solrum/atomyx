@@ -150,8 +150,8 @@ change altered a previously-frozen contract.
 
 ### Adding a new Driver capability
 
-Touches all four implementers, so budget for four adapter changes
-plus the port itself:
+Touches all four implementers and the observing decorator, so budget
+for five adapter changes plus the port itself:
 
 1. Add the method (or the new `Capabilities` flag) to
    `core/internal/driver/driver.go` or
@@ -177,6 +177,13 @@ plus the port itself:
 7. Compose any higher-level behavior (selector interaction, retry) in
    `core/internal/orchestra/orchestra.go`, never inside the Driver
    implementers themselves.
+8. Add the method to the observing decorator in
+   `core/internal/session/observing_driver.go`, advancing the action
+   epoch with `defer o.mutate()()` when the method changes the device or
+   the app, and classify it in `driverMethodClasses` in
+   `core/internal/session/observing_driver_test.go`. The classification
+   test fails until every port method is listed, and the epoch test
+   fails when a mutating method forgets to advance the epoch.
 
 ## Native agent build and test
 

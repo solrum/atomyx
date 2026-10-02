@@ -22,8 +22,7 @@ type StreamingTouchCapable interface {
 // AsStreamingTouchCapable reports whether d also implements
 // StreamingTouchCapable, letting a caller route streaming touch
 // events through the port package rather than depending on any
-// concrete driver implementation.
+// concrete driver implementation. It sees through a decorator.
 func AsStreamingTouchCapable(d Driver) (StreamingTouchCapable, bool) {
-	s, ok := d.(StreamingTouchCapable)
-	return s, ok
+	return As[StreamingTouchCapable](d)
 }
