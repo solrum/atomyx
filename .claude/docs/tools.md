@@ -1,3 +1,5 @@
+| The server stopped | `cancelled` | `cancelled` |
+| A later `start_run` found the run open | `error` | `failed` |
 # Atomyx: MCP tool reference
 
 ## Purpose
@@ -110,6 +112,17 @@ The idle timeout is `cancelled` and not `interrupted` because the
 server closes that run deliberately and the next call on it reports
 `RUN_EXPIRED`. `interrupted` is what a run reads as when its writer
 vanished without recording an end.
+
+Every way of ending the open run (`finish_run`, a superseding `start_run`,
+the idle timeout, device loss, server stop) first cancels the scripts
+`run_script` is executing inside it and waits for them to return, so
+`runSession` never finalizes a run under a writing script. `finish_run`
+waits as long as its call allows and then returns an error with the run
+still open. A server-initiated close waits at most 5 seconds. A
+`finish_run` whose run folder cannot be finalized returns a tool error,
+and the run reads as interrupted. When several scripts run in one run,
+the meta `totalSteps` and `failedAtStep` come from the script that ended
+last. A summary the agent set is kept by every server-initiated close.
 
 Tools are registered in `core/internal/mcp/server.go`'s `NewServer`
 in a fixed, explicit order grouped by concern (matching the grouping

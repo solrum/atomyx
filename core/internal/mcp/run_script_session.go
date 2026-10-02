@@ -18,41 +18,70 @@ const (
 	artifactFileMode = 0o644
 )
 
-// scriptTarget is where one script execution reports. RunID correlates
-// its log lines with the run folder, and Artifacts writes each
-// screenshot into that folder's artifacts directory as it is taken.
+// scriptTarget is where one script execution reports. Ctx ends when the
+// caller gives up or when the run is finalized, and the execution must
+// run under it. RunID correlates its log lines with the run folder, and
+// Artifacts writes each screenshot into that folder's artifacts
+// directory as it is taken.
 type scriptTarget struct {
+	Ctx       context.Context
 	RunID     string
 	Artifacts runner.ScriptArtifacts
 }
 
 // RunScript executes a script inside a run folder. When a run is open,
 // the script writes into it and no second run is created, and the run
-// stays open afterwards. Otherwise the script is its own run of kind
+// stays open afterwards. Ending that run cancels the script and waits
+// for it to return, and the step counts of the script are written into
+// the run meta when it ends. Otherwise the script is its own run of kind
 // mcp, labeled with name, finalized when exec returns:
 //
 //   - the script passed: passed
 //   - the script failed a step: failed
 //   - the script aborted because the device was lost: deviceLost
 //   - ctx was canceled before the script passed: cancelled
+//   - the server stopped before the script passed: cancelled
 //   - exec returned an error: error
 //
-// exec builds the runner from the target and runs it.
+// exec builds the runner from the target and runs it under the target's
+// context.
 func (s *runSession) RunScript(
 	ctx context.Context, name string, dev *device.Descriptor,
 	exec func(scriptTarget) (runner.ScriptResult, error),
 ) (runner.ScriptResult, error) {
 	s.mu.Lock()
-	open, counter := s.writer, s.artifacts
-	s.mu.Unlock()
-	if open != nil {
-		dir, err := open.ArtifactsDir()
-		if err != nil {
-			return runner.ScriptResult{}, err
-		}
-		return exec(scriptTarget{RunID: open.ID(), Artifacts: newScriptArtifacts(dir, counter, s.logger)})
+	if open := s.writer; open != nil {
+		counter := s.artifacts
+		runCtx, end := s.flight.begin(ctx)
+		s.mu.Unlock()
+		defer end()
+		return s.runInOpenRun(runCtx, open, counter, exec)
 	}
+	runCtx, end := s.bare.begin(ctx)
+	s.mu.Unlock()
+	defer end()
+	return s.runAsOwnRun(runCtx, name, dev, exec)
+}
 
+func (s *runSession) runInOpenRun(
+	ctx context.Context, open *runfolder.Writer, counter *artifactCounter,
+	exec func(scriptTarget) (runner.ScriptResult, error),
+) (runner.ScriptResult, error) {
+	dir, err := open.ArtifactsDir()
+	if err != nil {
+		return runner.ScriptResult{}, err
+	}
+	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: open.ID(), Artifacts: newScriptArtifacts(dir, counter, s.logger)})
+	if execErr == nil {
+		s.recordScriptTotals(open, result)
+	}
+	return result, execErr
+}
+
+func (s *runSession) runAsOwnRun(
+	ctx context.Context, name string, dev *device.Descriptor,
+	exec func(scriptTarget) (runner.ScriptResult, error),
+) (runner.ScriptResult, error) {
 	meta := mcpRunMeta(name, nil, dev)
 	meta.ScriptName = name
 	meta.MCP.Source = scriptRunSource
@@ -65,7 +94,7 @@ func (s *runSession) RunScript(
 	if err != nil {
 		return runner.ScriptResult{}, err
 	}
-	result, execErr := exec(scriptTarget{RunID: w.ID(), Artifacts: newScriptArtifacts(dir, &artifactCounter{}, s.logger)})
+	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: w.ID(), Artifacts: newScriptArtifacts(dir, &artifactCounter{}, s.logger)})
 	finalizeErr := w.Finalize(scriptOutcome(ctx, result, execErr), func(m *runfolder.Meta) {
 		m.TotalSteps = result.TotalSteps
 		m.FailedAtStep = result.FailedAtStep

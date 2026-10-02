@@ -359,7 +359,7 @@ func TestDeviceSession_AnOpenRunKeepsTheDeviceUntilTheOpenRunTimeout(t *testing.
 // startRun opens a run the way start_run does, with no device named.
 func (f *lifecycleFixture) startRun() startedRun {
 	f.t.Helper()
-	started, err := f.runs.Start("smoke", nil, nil)
+	started, err := f.runs.Start(context.Background(), "smoke", nil, nil)
 	if err != nil {
 		f.t.Fatal(err)
 	}
@@ -567,5 +567,26 @@ func TestSelectDeviceTool_ADeviceAnotherProcessHoldsReportsDeviceHeld(t *testing
 	}
 	if reason, _ := decoded["reason"].(string); !strings.Contains(reason, "atomyx-mcp") {
 		t.Fatalf("reason = %q, want it to name the holder", reason)
+	}
+}
+
+func TestDeviceSession_CloseFinalizesTheOpenRunAsCancelled(t *testing.T) {
+	f := newLifecycleFixture(t)
+	if err := f.selectDevice(f.devices); err != nil {
+		t.Fatal(err)
+	}
+	f.startRun()
+
+	f.devices.Close()
+
+	if f.runs.OpenRunID() != "" {
+		t.Fatal("Close left the run open")
+	}
+	meta := f.onlyRun()
+	if meta.Outcome != runfolder.OutcomeCancelled || meta.CompletedAt == nil {
+		t.Fatalf("closed run = %+v, want a cancelled run", meta)
+	}
+	if runfolder.NewLockLiveness(f.root).IsLive(meta.RunID) {
+		t.Fatal("the closed run still holds its lock")
 	}
 }

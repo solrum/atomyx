@@ -51,7 +51,7 @@ func registerStartRunTool(server *mcp.Server, tc *ToolContext) {
 			return invalidArgumentsResult("start_run", err), nil
 		}
 
-		started, err := tc.RunSession.Start(args.Name, args.Source, tc.Session.SelectedDescriptor())
+		started, err := tc.RunSession.Start(ctx, args.Name, args.Source, tc.Session.SelectedDescriptor())
 		if err != nil {
 			return errorResult(err), nil
 		}
@@ -103,7 +103,11 @@ func registerFinishRunTool(server *mcp.Server, tc *ToolContext) {
 		Name: "finish_run",
 		Description: "Finish the currently-active test run with a verdict and optional summary. " +
 			"Finalizes the run's folder, with outcome passed, failed, or error to match " +
-			"the status, so it can be read back with get_run. Returns { ok, id, status, actionCount, findingsCount, durationMs }.",
+			"the status, so it can be read back with get_run. Scripts still running " +
+			"in the run are cancelled first. Returns { ok, id, status, actionCount, " +
+			"findingsCount, durationMs }, or a tool error when the run folder cannot " +
+			"be finalized or a script does not return in time, and in that last case " +
+			"the run stays open.",
 		InputSchema: finishRunInputSchema,
 	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		if err := validateToolArguments(finishRunSchema, req.Params.Arguments); err != nil {
@@ -118,7 +122,10 @@ func registerFinishRunTool(server *mcp.Server, tc *ToolContext) {
 			status = *args.Status
 		}
 
-		finished := tc.RunSession.Finish(status, args.Summary)
+		finished, err := tc.RunSession.Finish(ctx, status, args.Summary)
+		if err != nil {
+			return errorResult(err), nil
+		}
 		run := finished.Run
 		if run == nil {
 			return jsonToolResult(map[string]any{"ok": false, "reason": "no active run to finish"})

@@ -777,15 +777,19 @@ func (s *DeviceSession) CheckHealth(ctx context.Context) orchestra.HealthReport 
 	}
 }
 
-// Close disconnects the active driver and makes every later Select
-// release what it builds and fail, so a selection that was still
-// launching when the server stopped cannot leave a child running.
+// Close finalizes the open run as cancelled, cancels the scripts that
+// are their own run, disconnects the active driver, and makes every
+// later Select release what it builds and fail, so a selection that was
+// still launching when the server stopped cannot leave a child running.
 // It is idempotent.
 func (s *DeviceSession) Close() {
 	s.mu.Lock()
 	s.closed = true
 	s.mu.Unlock()
 	s.cancelLife(errSessionClosed)
+	if s.runs != nil {
+		s.runs.Close()
+	}
 	_ = s.Disconnect(context.Background())
 }
 

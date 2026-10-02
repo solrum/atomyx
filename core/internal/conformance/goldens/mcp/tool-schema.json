@@ -192,7 +192,7 @@
     }
   },
   "finish_run": {
-    "description": "Finish the currently-active test run with a verdict and optional summary. Finalizes the run's folder, with outcome passed, failed, or error to match the status, so it can be read back with get_run. Returns { ok, id, status, actionCount, findingsCount, durationMs }.",
+    "description": "Finish the currently-active test run with a verdict and optional summary. Finalizes the run's folder, with outcome passed, failed, or error to match the status, so it can be read back with get_run. Scripts still running in the run are cancelled first. Returns { ok, id, status, actionCount, findingsCount, durationMs }, or a tool error when the run folder cannot be finalized or a script does not return in time, and in that last case the run stays open.",
     "inputSchema": {
       "properties": {
         "status": {

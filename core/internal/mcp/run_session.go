@@ -1,19 +1,30 @@
 package mcp
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/runfolder"
+	"dev.atomyx/internal/runner"
 	"dev.atomyx/internal/storage"
 )
 
-const forceClosedPredecessorSummary = "force-closed by subsequent start_run, because the agent forgot finish_run"
+const (
+	forceClosedPredecessorSummary = "force-closed by subsequent start_run, because the agent forgot finish_run"
+	shutdownSummary               = "closed because the server stopped"
+
+	// runDrainTimeout bounds how long a close the server starts itself
+	// waits for the scripts of a run to return before it finalizes the
+	// run anyway.
+	runDrainTimeout = 5 * time.Second
+)
 
 // RunStarter creates the run folder of a new run. *runfolder.Starter
 // satisfies it.
@@ -37,22 +48,39 @@ type RunStarter interface {
 //
 //   - the device was lost: deviceLost
 //   - the open-run idle timeout elapsed: cancelled
+//   - the server stopped: cancelled
 //   - a later start_run found it still open: error
 //
 // The idle timeout is cancelled and not interrupted because the server
 // closes the run deliberately and records it, while interrupted is what
 // a run reads as when its writer vanished without recording anything.
+//
+// Scripts run inside the open run are tracked while they execute. Every
+// way of ending the open run cancels them and waits for them to return
+// before the run is finalized, so a script never writes into a
+// finalized run. A finish_run waits only as long as its caller allows
+// and leaves the run open when that runs out. A close the server starts
+// itself waits at most drainTimeout and then finalizes anyway. Scripts
+// that are their own run are tracked apart and are ended only when the
+// server stops.
+//
+// The TotalSteps and FailedAtStep of the run meta describe the script
+// that ended last, so a later script replaces the counts of an earlier
+// one.
 type runSession struct {
-	store   *storage.RunStore
-	catalog *storage.RunCatalog
-	starter RunStarter
-	root    string
-	clock   orchestra.Clock
-	logger  logging.Logger
+	store        *storage.RunStore
+	catalog      *storage.RunCatalog
+	starter      RunStarter
+	root         string
+	clock        orchestra.Clock
+	logger       logging.Logger
+	drainTimeout time.Duration
+	bare         *scriptFlight
 
 	mu        sync.Mutex
 	writer    *runfolder.Writer
 	artifacts *artifactCounter
+	flight    *scriptFlight
 }
 
 type runSessionDeps struct {
@@ -68,6 +96,7 @@ func newRunSession(deps runSessionDeps) *runSession {
 	return &runSession{
 		store: deps.Store, catalog: deps.Catalog, starter: deps.Starter,
 		root: deps.Root, clock: deps.Clock, logger: deps.Logger, artifacts: &artifactCounter{},
+		drainTimeout: runDrainTimeout, bare: newScriptFlight(), flight: newScriptFlight(),
 	}
 }
 
@@ -95,9 +124,10 @@ func (s *runSession) OpenRunID() string {
 
 // Start opens a new run in its own run folder. The folder id is labeled
 // with the selected device's name, or with a neutral label when no
-// device is selected. A run still open is finalized as an error first.
-// When the folder cannot be created, the open run is left as it was.
-func (s *runSession) Start(name string, source *string, dev *device.Descriptor) (startedRun, error) {
+// device is selected. A run still open is finalized as an error first,
+// after its scripts return or ctx ends. When the folder cannot be
+// created, the open run is left as it was.
+func (s *runSession) Start(ctx context.Context, name string, source *string, dev *device.Descriptor) (startedRun, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -107,46 +137,70 @@ func (s *runSession) Start(name string, source *string, dev *device.Descriptor) 
 	}
 	started := s.store.Start(storage.StartOptions{ID: writer.ID(), Name: name, Source: source})
 	if predecessor := started.ErroredPredecessor; predecessor != nil {
-		summary := forceClosedPredecessorSummary
-		s.finalizeLocked(s.writer, predecessor, runfolder.OutcomeError, &summary)
+		s.drainLocked(ctx)
+		_ = s.finalizeLocked(s.writer, predecessor, runfolder.OutcomeError, nil, forceClosedPredecessorSummary)
 		s.logger.Warn("run.force_closed_predecessor", logging.LogContext{
 			"id": predecessor.ID, "newRunId": started.Run.ID,
 		})
 	}
-	s.writer, s.artifacts = writer, &artifactCounter{}
+	s.writer, s.artifacts, s.flight = writer, &artifactCounter{}, newScriptFlight()
 	return startedRun{Run: started.Run, Superseded: started.ErroredPredecessor}, nil
 }
 
 // Finish closes the open run with the outcome of status, which is
-// passed, failed, or error and defaults to passed when empty. It returns
-// a nil run when none is open.
-func (s *runSession) Finish(status string, summary *string) finishedRun {
+// passed, failed, or error and defaults to passed when empty. It cancels
+// the scripts running in the run and waits for them to return first. It
+// returns a nil run when none is open. It returns an error and leaves
+// the run open when ctx ends before the scripts return. It returns the
+// closed run together with an error when the run folder could not be
+// finalized, because the run then reads as interrupted.
+func (s *runSession) Finish(ctx context.Context, status string, summary *string) (finishedRun, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.store.Current() == nil {
+		return finishedRun{}, nil
+	}
+	if err := s.flight.cancelAndWait(ctx); err != nil {
+		return finishedRun{}, fmt.Errorf("the run still has a script executing, so it was not finished: %w", err)
+	}
 	outcome := outcomeOfFinishStatus(status)
 	run := s.store.Finish(legacyStatusOf(outcome))
-	if run == nil {
-		return finishedRun{}
-	}
-	s.finalizeLocked(s.writer, run, outcome, summary)
+	err := s.finalizeLocked(s.writer, run, outcome, summary, "")
 	s.writer = nil
-	return finishedRun{Run: run, DurationMs: durationOf(run)}
+	return finishedRun{Run: run, DurationMs: durationOf(run)}, err
 }
 
-// CloseOpenRun finalizes the open run with outcome and summary on the
-// agent's behalf, and returns the closed run's id. It returns an empty
-// id when no run was open.
-func (s *runSession) CloseOpenRun(outcome runfolder.Outcome, summary string) string {
+// CloseOpenRun finalizes the open run with outcome on the server's
+// behalf, and returns the closed run's id. It returns an empty id when
+// no run was open. fallbackSummary becomes the summary only when the
+// agent has not set one. A failure to finalize is logged.
+func (s *runSession) CloseOpenRun(outcome runfolder.Outcome, fallbackSummary string) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	run := s.store.Finish(legacyStatusOf(outcome))
-	if run == nil {
+	if s.store.Current() == nil {
 		return ""
 	}
-	s.finalizeLocked(s.writer, run, outcome, &summary)
+	ctx, cancel := context.WithTimeout(context.Background(), s.drainTimeout)
+	defer cancel()
+	s.drainLocked(ctx)
+	run := s.store.Finish(legacyStatusOf(outcome))
+	_ = s.finalizeLocked(s.writer, run, outcome, nil, fallbackSummary)
 	s.writer = nil
 	s.logger.Info("run.closed_by_session", logging.LogContext{"id": run.ID, "outcome": string(outcome)})
 	return run.ID
+}
+
+// Close ends everything the session owns when the server stops. The
+// open run is finalized as cancelled, and every script that is its own
+// run is cancelled and given until drainTimeout to finalize that run.
+// Closing again is a no-op.
+func (s *runSession) Close() {
+	s.CloseOpenRun(runfolder.OutcomeCancelled, shutdownSummary)
+	ctx, cancel := context.WithTimeout(context.Background(), s.drainTimeout)
+	defer cancel()
+	if err := s.bare.cancelAndWait(ctx); err != nil {
+		s.logger.Warn("run.script_drain_incomplete", logging.LogContext{"error": err.Error()})
+	}
 }
 
 // SaveScreenshot writes an image into the open run's artifacts
@@ -189,25 +243,58 @@ func (s *runSession) SetSummary(id, summary string) (bool, error) {
 	return s.catalog.SetSummary(id, summary)
 }
 
-// finalizeLocked records the end of run in its folder. A folder that
-// cannot be finalized is closed so its lock is released, and the
-// failure is logged because the in-memory run is already closed.
-func (s *runSession) finalizeLocked(w *runfolder.Writer, run *storage.RunRecord, outcome runfolder.Outcome, summary *string) {
+// drainLocked cancels the scripts running in the open run and waits for
+// them until ctx ends. An incomplete wait is logged, because a close
+// the server decides on cannot be held back by a script that ignores
+// cancellation.
+func (s *runSession) drainLocked(ctx context.Context) {
+	if err := s.flight.cancelAndWait(ctx); err != nil {
+		s.logger.Warn("run.script_drain_incomplete", logging.LogContext{"error": err.Error()})
+	}
+}
+
+// recordScriptTotals writes the step counts of a script that just ended
+// into the meta of the run it ran in.
+func (s *runSession) recordScriptTotals(w *runfolder.Writer, result runner.ScriptResult) {
+	err := w.Update(func(m *runfolder.Meta) {
+		m.TotalSteps = result.TotalSteps
+		m.FailedAtStep = result.FailedAtStep
+	})
+	if err != nil {
+		s.logger.Warn("run.script_totals_failed", logging.LogContext{"id": w.ID(), "error": err.Error()})
+	}
+}
+
+// finalizeLocked records the end of run in its folder. summary replaces
+// the stored summary when not nil, and fallbackSummary fills it only
+// when none is stored, so a summary the agent wrote is never replaced
+// by one the server composed. A folder that cannot be finalized is
+// closed so its lock is released, and the failure is logged and
+// returned, because the in-memory run is already closed and the folder
+// reads as interrupted.
+func (s *runSession) finalizeLocked(w *runfolder.Writer, run *storage.RunRecord, outcome runfolder.Outcome, summary *string, fallbackSummary string) error {
 	if w == nil {
-		return
+		return nil
 	}
 	err := w.Finalize(outcome, func(m *runfolder.Meta) {
 		info := mcpInfoOf(run)
-		info.Summary = summary
-		if summary == nil && m.MCP != nil {
+		if m.MCP != nil {
 			info.Summary = m.MCP.Summary
+		}
+		if summary != nil {
+			info.Summary = summary
+		}
+		if fallbackSummary != "" && (info.Summary == nil || *info.Summary == "") {
+			info.Summary = &fallbackSummary
 		}
 		m.MCP = &info
 	})
 	if err != nil {
 		s.logger.Warn("run.finalize_failed", logging.LogContext{"id": run.ID, "error": err.Error()})
 		_ = w.Close()
+		return fmt.Errorf("run %s was closed but its run folder could not be finalized, so it reads as interrupted: %w", run.ID, err)
 	}
+	return nil
 }
 
 func withSummary(info *runfolder.MCPInfo, summary string) *runfolder.MCPInfo {

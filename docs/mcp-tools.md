@@ -816,7 +816,7 @@ Execute a YAML test script against the currently bound device, one step at a tim
 **Behavior**
 - Requires a device already bound with select_device. With no device bound, the call fails immediately without parsing the script.
 - The script is parsed and validated before anything runs. A structurally invalid script (an unrecognized command, a malformed step, a failed validation rule) fails the call before any step executes.
-- Inside a run opened by start_run, the script writes into that run, so its screenshots land in the run's `artifacts` folder and no second run is created. The run stays open afterwards.
+- Inside a run opened by start_run, the script writes into that run, so its screenshots land in the run's `artifacts` folder and no second run is created. The run stays open afterwards. The run meta then records the script's `totalSteps` and `failedAtStep`, and when several scripts run in one run the script that ended last sets them. Calling finish_run or start_run, or stopping the server, while the script runs cancels it and waits for it to return before the run is finalized.
 - With no run open, the call is its own run of kind `mcp`, labeled with the script's name. The run is finalized when the script ends, with outcome `passed` when every step passed, `failed` when a step failed, `deviceLost` when the device went unreachable, `cancelled` when the call was canceled, and `error` when the script could not run to a result. Read it back with list_runs and get_run.
 - Preconditions and required flows declared in the script, if any, are evaluated before the script's own steps. A failed precondition or a failed required flow is reported as a single synthetic step at index 0 (with command "preconditions" or "requires") and stops the run before any of the script's own steps execute.
 - If the script declares `proxy: required` and this call carries no proxy argument (and none is otherwise configured), the run is refused before any step executes: ok is false, steps is empty, totalSteps still reports the script's full declared count, and the top level abort object names the code `PROXY_REQUIRED`, an operator-facing message, and a remedy naming the `proxy` argument. See yml-script-reference.md's Proxy Setup section for how to configure capture per platform.
@@ -949,6 +949,12 @@ or changed once more is learned.
   closes it with result `cancelled` and outcome `deviceLost`, and the
   open-run idle timeout closes it with result `cancelled` and outcome
   `cancelled`.
+- Stopping the server finalizes the open run with result `cancelled` and
+  outcome `cancelled`, with its findings written. A summary you set with
+  update_run_summary is kept, and a closing summary the server composes
+  fills only an empty one.
+- Scripts still running inside the run are cancelled and awaited before
+  the folder is finalized, so a script never writes into a finished run.
 
 **Returns**
 - `ok`: false when no run was active to finish, true otherwise.
@@ -961,6 +967,12 @@ or changed once more is learned.
 - `ok: false` with no active run means finish_run was called with
   nothing open. Call start_run first, or check whether a previous
   finish_run already closed it.
+- A tool error naming the run means the run folder could not be
+  finalized. The run is closed in memory but reads as interrupted, so
+  check the storage directory, then read it with get_run.
+- A tool error saying a script is still executing means a script in the
+  run did not return before the call gave up. The run stays open, so call
+  finish_run again.
 
 **Example**
 ```json

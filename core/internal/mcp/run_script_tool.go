@@ -166,7 +166,7 @@ func registerRunScriptTool(server *mcp.Server, tc *ToolContext) {
 					Commands:       runner.DefaultCommands(),
 					NetworkCapture: networkCapture,
 					Artifacts:      target.Artifacts,
-				}).Run(ctx, def)
+				}).Run(target.Ctx, def)
 			})
 		if err != nil {
 			return errorResult(err), nil

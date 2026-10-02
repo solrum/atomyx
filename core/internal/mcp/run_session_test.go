@@ -227,7 +227,7 @@ func TestGetRunReadsAFlatRecordAndAnMCPRunFolder(t *testing.T) {
 
 func requireRunBusy(t *testing.T, got map[string]any, id string) {
 	t.Helper()
-	if got["code"] != "RUN_BUSY" || !strings.Contains(got["message"].(string), id) || got["remedy"] == "" {
+	if got["code"] != "RUN_BUSY" || !strings.Contains(got["message"].(string), id) || got["hint"] == "" {
 		t.Fatalf("got %v, want RUN_BUSY naming %s with a remedy", got, id)
 	}
 }
@@ -259,5 +259,19 @@ func TestRunsHeldByAnotherWriterAreBusyForDeleteAndSummaryUpdate(t *testing.T) {
 	requireRunBusy(t, r.call("update_run_summary", map[string]any{"id": w.ID(), "summary": "x"}), w.ID())
 	if _, err := os.Stat(w.Dir()); err != nil {
 		t.Fatalf("held run folder was removed: %v", err)
+	}
+}
+
+func TestFinishRunReportsAFolderThatCannotBeFinalizedAsAToolError(t *testing.T) {
+	r := newRunServer(t)
+	id := r.call("start_run", map[string]any{"name": "smoke"})["id"].(string)
+	if err := os.RemoveAll(runfolder.RunDir(r.root, id)); err != nil {
+		t.Fatal(err)
+	}
+
+	got := r.call("finish_run", map[string]any{})
+
+	if got["ok"] == true || got["code"] == nil || !strings.Contains(got["message"].(string), id) {
+		t.Fatalf("finish_run = %v, want a tool error naming the run", got)
 	}
 }
