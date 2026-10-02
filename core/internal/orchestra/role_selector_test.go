@@ -79,9 +79,17 @@ func TestEmptySelectorIsRejectedInsteadOfMatchingTheRoot(t *testing.T) {
 	d := mock.New()
 	d.StageHierarchy(signInScreen())
 	o, _ := newTestOrchestra(d)
-	ctx := context.Background()
-	empty := Selector{Enabled: boolPtr(false)}
+	for name, empty := range map[string]Selector{
+		"false state flag": {Enabled: boolPtr(false)},
+		"nth only":         {Nth: intPtr(0)},
+	} {
+		assertEmptySelectorRejected(t, name, o, empty)
+	}
+}
 
+func assertEmptySelectorRejected(t *testing.T, label string, o *Orchestra, empty Selector) {
+	t.Helper()
+	ctx := context.Background()
 	calls := map[string]func() error{
 		"Find":    func() error { _, err := o.Find(ctx, empty); return err },
 		"FindOne": func() error { _, err := o.FindOne(ctx, empty); return err },
@@ -99,10 +107,10 @@ func TestEmptySelectorIsRejectedInsteadOfMatchingTheRoot(t *testing.T) {
 		var emptyErr *EmptySelectorError
 		err := call()
 		if !errors.As(err, &emptyErr) {
-			t.Fatalf("%s error = %v, want *EmptySelectorError", name, err)
+			t.Fatalf("%s %s error = %v, want *EmptySelectorError", label, name, err)
 		}
 		if emptyErr.Code() != diag.CodeInvalidArgument {
-			t.Fatalf("%s code = %q, want %q", name, emptyErr.Code(), diag.CodeInvalidArgument)
+			t.Fatalf("%s %s code = %q, want %q", label, name, emptyErr.Code(), diag.CodeInvalidArgument)
 		}
 	}
 }
@@ -113,7 +121,6 @@ func TestSelectorIsEmpty(t *testing.T) {
 	}
 	for name, s := range map[string]Selector{
 		"role":      {Role: strPtr("button")},
-		"nth":       {Nth: intPtr(0)},
 		"text":      {Text: lit("a")},
 		"enabled":   {Enabled: boolPtr(true)},
 		"clickable": {Clickable: boolPtr(true)},
@@ -122,5 +129,8 @@ func TestSelectorIsEmpty(t *testing.T) {
 		if s.IsEmpty() {
 			t.Fatalf("%s selector must not be empty", name)
 		}
+	}
+	if !(Selector{Nth: intPtr(0)}).IsEmpty() {
+		t.Fatal("a selector with only nth must be empty")
 	}
 }

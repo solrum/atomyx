@@ -49,11 +49,12 @@ func (s Selector) HasContent() bool {
 }
 
 // IsEmpty reports whether s places no constraint on any element: no
-// content field, no role, no true state flag, and no position. Such a
-// selector would match the whole tree, so the root node would resolve
-// as if it were the caller's target.
+// content field, no role, and no true state flag. A position (nth)
+// does not count, because it only picks among matches. A selector
+// with nothing else would match the whole tree, so the root node
+// would resolve as if it were the caller's target.
 func (s Selector) IsEmpty() bool {
-	return !s.HasContent() && s.Role == nil && s.Nth == nil &&
+	return !s.HasContent() && s.Role == nil &&
 		!isTrue(s.Enabled) && !isTrue(s.Clickable) && !isTrue(s.Focused)
 }
 

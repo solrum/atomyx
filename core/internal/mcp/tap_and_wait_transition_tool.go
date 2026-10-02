@@ -194,5 +194,17 @@ func decodeTapAndWaitTransitionArgs(raw json.RawMessage) (tapAndWaitTransitionAr
 			fmt.Errorf("must provide waitForAbsent, waitForAppear, or both"),
 		)
 	}
+	waits := [...]struct {
+		field string
+		sel   *orchestra.Selector
+	}{{"waitForAbsent", args.WaitForAbsent}, {"waitForAppear", args.WaitForAppear}}
+	for _, w := range waits {
+		if w.sel == nil {
+			continue
+		}
+		if err := orchestra.RequireNonEmpty(*w.sel); err != nil {
+			return tapAndWaitTransitionArgs{}, errorResult(fmt.Errorf("invalid arguments for tap_and_wait_transition, %s: %w", w.field, err))
+		}
+	}
 	return args, nil
 }

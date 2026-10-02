@@ -173,6 +173,40 @@ func TestTapAndWaitTransitionExtendsDeadlineWhileLoadingPersists(t *testing.T) {
 	}
 }
 
+func TestTapAndWaitTransitionRejectsAnEmptyWaitSelectorBeforeTapping(t *testing.T) {
+	for name, args := range map[string]map[string]any{
+		"empty waitForAppear": {"waitForAppear": map[string]any{}},
+		"empty waitForAbsent": {"waitForAbsent": map[string]any{}},
+		"nth-only wait":       {"waitForAppear": map[string]any{"nth": float64(0)}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			drv := mockdriver.New()
+			drv.StageHierarchy(wire.TreeNodeWire{
+				Attributes: map[string]string{"role": "container"},
+				Children:   []wire.TreeNodeWire{loginButtonNode()},
+			})
+			cs, ctx := testServer(t, ServerDeps{
+				Probe:   device.NewStaticProbe(),
+				Factory: clockedMockDriverFactory{driver: drv, clock: orchestra.NewFakeClock(0)},
+				Storage: storage.NewInMemoryStorage(),
+			})
+			selectMockDevice(t, cs, ctx)
+			args["selector"] = map[string]any{"id": "login-button"}
+
+			result, decoded := callTool(t, cs, ctx, "tap_and_wait_transition", args)
+
+			if !result.IsError || decoded["code"] != "INVALID_ARGUMENT" {
+				t.Fatalf("result = %v, want an INVALID_ARGUMENT error", decoded)
+			}
+			for _, c := range drv.Calls {
+				if c.Method == "Tap" {
+					t.Fatal("driver recorded a Tap for a request that was rejected")
+				}
+			}
+		})
+	}
+}
+
 func TestTapAndWaitTransitionFlagsASecureAppearedElementWithoutItsText(t *testing.T) {
 	password := map[string]string{
 		"role": "text-field", "id": "pw", "label": "Password", "text": "hunter2", "secure": "true", "bounds": "0,200,100,250",

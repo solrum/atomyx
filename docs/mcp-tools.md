@@ -127,8 +127,12 @@ The working alternative is a regex that matches the prefix:
 
 `find_element` takes the selector fields at the top level of its
 arguments, while `tap`, `input_text`, and `wait_for_element` take them
-under a `selector` key. A selector that sets no field is rejected with
-an `INVALID_ARGUMENT` error instead of matching the whole screen.
+under a `selector` key. A selector takes `id`, `text`, `label`, `hint`,
+`value`, `role`, `enabled`, `clickable`, `focused` and `nth`. One that
+sets no content field, no role and no true state flag is rejected with an `INVALID_ARGUMENT` error
+instead of matching the whole screen, because `nth` only picks among
+matches. Keys a selector does not take are ignored, so a misspelled or
+misplaced key leaves it empty.
 
 When no stable selector exists for an element, pass coordinates as
 `x` and `y` to `tap` or `input_text` instead of a selector. Take them
@@ -529,8 +533,8 @@ instead when no screen transition is expected.
 | Name | Type | Required | Default | Meaning |
 |---|---|---|---|---|
 | selector | object | yes | none | Element selector to tap. |
-| waitForAbsent | object | conditionally | none | Selector expected to stop matching after the tap (the old screen's anchor). At least one of waitForAbsent or waitForAppear is required. |
-| waitForAppear | object | conditionally | none | Selector expected to start matching after the tap (the new screen's anchor). At least one of waitForAbsent or waitForAppear is required. |
+| waitForAbsent | object | conditionally | none | Selector expected to stop matching after the tap (the old screen's anchor). At least one of waitForAbsent or waitForAppear is required. A selector that sets no field is rejected before the tap. |
+| waitForAppear | object | conditionally | none | Selector expected to start matching after the tap (the new screen's anchor). At least one of waitForAbsent or waitForAppear is required. A selector that sets no field is rejected before the tap. |
 | timeoutMs | number | no | 10000 | Soft deadline in milliseconds. When a loading indicator or element motion is observed at this deadline, the wait extends once, up to maxTimeoutMs. |
 | maxTimeoutMs | number | no | 60000 | Hard deadline in milliseconds. No extension exceeds this. |
 | intervalMs | number | no | 300 | Delay between hierarchy polls, in milliseconds. |
