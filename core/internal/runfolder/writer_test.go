@@ -359,3 +359,51 @@ func TestSetSummaryRewritesAFinishedRunAndRefusesLiveOrSummarylessRuns(t *testin
 		t.Fatalf("script run: ok=%v err=%v", ok, err)
 	}
 }
+
+func TestStartPublishesTheLockFileOnlyOnceItIsLocked(t *testing.T) {
+	root := t.TempDir()
+	var stages []lockBuildStage
+	lockBuildHook = func(stage lockBuildStage, dir string) {
+		stages = append(stages, stage)
+		if _, err := os.Stat(LockPath(dir)); !os.IsNotExist(err) {
+			t.Errorf("stage %d: run.lock visible before it is locked: %v", stage, err)
+		}
+		id := filepath.Base(dir)
+		if NewLockLiveness(root).IsLive(id) {
+			t.Errorf("stage %d: starting run reported live", stage)
+		}
+		if _, err := os.Stat(LockPath(dir)); !os.IsNotExist(err) {
+			t.Errorf("stage %d: probe created run.lock: %v", stage, err)
+		}
+	}
+	t.Cleanup(func() { lockBuildHook = nil })
+
+	w := startOne(t, root)
+
+	if len(stages) != 2 || stages[0] != lockStageCreated || stages[1] != lockStageLocked {
+		t.Fatalf("hook stages = %v", stages)
+	}
+	if !NewLockLiveness(root).IsLive(w.ID()) {
+		t.Fatal("started run is not live")
+	}
+	for _, name := range dirNames(t, w.Dir()) {
+		if strings.HasSuffix(name, ".tmp") {
+			t.Fatalf("temporary file left behind: %s", name)
+		}
+	}
+}
+
+func TestLockLivenessSeesAWriterOfTheSameProcess(t *testing.T) {
+	root := t.TempDir()
+	w := startOne(t, root)
+	live := NewLockLiveness(root)
+	if !live.IsLive(w.ID()) {
+		t.Fatal("writer in the same process not reported live")
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if live.IsLive(w.ID()) {
+		t.Fatal("closed writer still reported live")
+	}
+}

@@ -22,7 +22,6 @@ const (
 
 	dirMode  = 0o755
 	fileMode = 0o644
-	lockMode = 0o600
 )
 
 // ErrFinalized reports use of a Writer after Finalize.
@@ -89,14 +88,8 @@ func openWriter(dir, id string, at time.Time, now func() time.Time, base Meta) (
 	meta.StartedAt = at.UnixMilli()
 	meta.CompletedAt, meta.Result, meta.Outcome = nil, "", ""
 
-	lock, err := os.OpenFile(LockPath(dir), os.O_RDWR|os.O_CREATE|os.O_EXCL, lockMode)
-	if err == nil {
-		err = flock.TryExclusive(lock)
-	}
+	lock, err := publishLockedFile(dir)
 	if err != nil {
-		if lock != nil {
-			_ = lock.Close()
-		}
 		_ = os.RemoveAll(dir)
 		return nil, fmt.Errorf("locking run folder: %w", err)
 	}
@@ -107,6 +100,51 @@ func openWriter(dir, id string, at time.Time, now func() time.Time, base Meta) (
 		return nil, err
 	}
 	return w, nil
+}
+
+// lockBuildHook, when not nil, runs inside publishLockedFile after the
+// lock file is created and again after it is locked, each time before
+// it is published as run.lock. It exists so a test can probe the run
+// folder at those instants.
+var lockBuildHook func(stage lockBuildStage, dir string)
+
+type lockBuildStage int
+
+const (
+	lockStageCreated lockBuildStage = iota
+	lockStageLocked
+)
+
+// publishLockedFile creates the lock file under a temporary name, locks
+// it, and only then renames it to run.lock. The lock belongs to the
+// open file, so it survives the rename, and every run.lock another
+// process can open is already locked. A probe therefore never takes the
+// lock of a run that is starting, and never finds an unlocked file that
+// would report the run as not live.
+func publishLockedFile(dir string) (*os.File, error) {
+	f, err := os.CreateTemp(dir, LockFileName+".*.tmp")
+	if err != nil {
+		return nil, err
+	}
+	tmp := f.Name()
+	fail := func(err error) (*os.File, error) {
+		_ = f.Close()
+		_ = os.Remove(tmp)
+		return nil, err
+	}
+	if lockBuildHook != nil {
+		lockBuildHook(lockStageCreated, dir)
+	}
+	if err := flock.TryExclusive(f); err != nil {
+		return fail(err)
+	}
+	if lockBuildHook != nil {
+		lockBuildHook(lockStageLocked, dir)
+	}
+	if err := os.Rename(tmp, LockPath(dir)); err != nil {
+		return fail(err)
+	}
+	return f, nil
 }
 
 // Writer owns one live run folder. It is safe for concurrent use.

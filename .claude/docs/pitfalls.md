@@ -251,6 +251,14 @@ corresponding area. For the high-level map see
   and drops the real lock but never creates the file. A run with no
   `completedAt` and no lock reads as interrupted, so a writer that
   skips `Finalize` is reported as interrupted even on a clean exit.
+- **Create and lock `run.lock` under a temporary name, then rename it.**
+  `Starter.Start` creates `run.lock.<random>.tmp` inside the run folder,
+  takes the flock, and renames it to `run.lock`, so any `run.lock` a probe
+  can open is already locked. Creating `run.lock` first and locking it
+  afterwards leaves a gap where a probe takes the lock and `Start` fails,
+  or finds an unlocked file and reports the starting run as not live. A
+  probe treats a missing `run.lock` as not live. `meta.json` is written
+  only after the lock is in place.
 - **Finalize once, and only through `Finalize`.** `meta.json` is
   replaced through a temporary file and a rename, so never write it in
   place. `Finalize` fixes the verdict from the outcome, and a second
