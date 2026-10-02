@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os/exec"
 	"strconv"
@@ -224,66 +225,102 @@ func TestIosDriver_Connect_Simulator_ConnectsAndPingsWithoutIproxy(t *testing.T)
 	}
 }
 
-// tunnelRunner is a process.Runner test double modeling iproxy's
-// long-running USB tunnel process. Run parses the host port out of
-// its "<port>:<port>" mapping argument, waits readyDelay (modeling
-// the tunnel coming up), opens a real listener on that port so a
-// canConnectTCP probe against it succeeds, then blocks until ctx is
-// canceled and closes the listener before returning ctx.Err(). When
-// exitErr is set, Run returns it immediately instead, without ever
-// opening a listener, modeling iproxy dying on launch. stopped, when
-// set, is closed once Run returns, for any reason.
-type tunnelRunner struct {
+// tunnelBackground is a process.BackgroundRunner test double modeling
+// iproxy's long-running USB tunnel process. Start parses the host
+// port out of its "<port>:<port>" mapping argument and returns a live
+// process whose body waits readyDelay (modeling the tunnel coming
+// up), opens a real listener on that port so a canConnectTCP probe
+// against it succeeds, then blocks until Kill and closes the listener
+// before exiting. When exitErr is set, the process instead exits
+// immediately with that error without ever opening a listener,
+// modeling iproxy dying on launch. When startErr is set, Start itself
+// fails, modeling a missing binary. stopped, when set, is closed once
+// the process body returns, for any reason.
+type tunnelBackground struct {
 	readyDelay time.Duration
 	exitErr    error
+	startErr   error
 	stopped    chan struct{}
 
 	mu          sync.Mutex
 	invocations []process.Invocation
 }
 
-func (r *tunnelRunner) Run(ctx context.Context, name string, args ...string) (process.Result, error) {
+func (r *tunnelBackground) Start(ctx context.Context, name string, args ...string) (process.BackgroundProcess, error) {
 	r.mu.Lock()
 	r.invocations = append(r.invocations, process.Invocation{Name: name, Args: append([]string(nil), args...)})
 	r.mu.Unlock()
-	if r.stopped != nil {
-		defer close(r.stopped)
+	if r.startErr != nil {
+		return nil, r.startErr
 	}
 
+	ctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	pr, pw := io.Pipe()
+	proc := &tunnelProcess{cancel: cancel, stdout: pr, done: make(chan struct{})}
+	go func() {
+		defer close(proc.done)
+		defer func() { _ = pw.Close() }()
+		if r.stopped != nil {
+			defer close(r.stopped)
+		}
+		proc.err = r.serve(ctx, args)
+	}()
+	return proc, nil
+}
+
+func (r *tunnelBackground) serve(ctx context.Context, args []string) error {
 	if r.exitErr != nil {
-		return process.Result{}, r.exitErr
+		return r.exitErr
 	}
-
 	port, err := strconv.Atoi(strings.SplitN(args[0], ":", 2)[0])
 	if err != nil {
-		return process.Result{}, fmt.Errorf("tunnelRunner: parse port mapping %q: %w", args[0], err)
+		return fmt.Errorf("tunnelBackground: parse port mapping %q: %w", args[0], err)
 	}
-
 	if r.readyDelay > 0 {
 		select {
 		case <-time.After(r.readyDelay):
 		case <-ctx.Done():
-			return process.Result{}, ctx.Err()
+			return ctx.Err()
 		}
 	}
-
 	listener, err := new(net.ListenConfig).Listen(ctx, "tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
-		return process.Result{}, err
+		return err
 	}
 	defer func() { _ = listener.Close() }()
-
 	<-ctx.Done()
-	return process.Result{}, ctx.Err()
+	return ctx.Err()
 }
 
-func (r *tunnelRunner) Invocations() []process.Invocation {
+func (r *tunnelBackground) Invocations() []process.Invocation {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return append([]process.Invocation(nil), r.invocations...)
 }
 
-var _ process.Runner = (*tunnelRunner)(nil)
+var _ process.BackgroundRunner = (*tunnelBackground)(nil)
+
+type tunnelProcess struct {
+	cancel   context.CancelFunc
+	stdout   *io.PipeReader
+	done     chan struct{}
+	err      error
+	exitCode int
+	stderr   string
+}
+
+func (p *tunnelProcess) Stdout() io.Reader { return p.stdout }
+
+func (p *tunnelProcess) Wait() (process.BackgroundResult, error) {
+	<-p.done
+	return process.BackgroundResult{ExitCode: p.exitCode, Stderr: p.stderr}, p.err
+}
+
+func (p *tunnelProcess) Kill() error {
+	p.cancel()
+	<-p.done
+	return nil
+}
 
 // freeTCPPort returns a host port with no listener bound at test
 // start, for a test that wants to hand iosdriver.Options a port
@@ -351,8 +388,9 @@ func TestIosDriver_Connect_Device_LaunchesIproxyWithExactArgsAndWaitsForReadines
 	conn.Respond("ping", func(map[string]any) (map[string]any, error) {
 		return map[string]any{"capabilities": map[string]any{"canMultiPointer": true, "canPressure": true}}, nil
 	})
-	runner := &tunnelRunner{}
-	d := iosdriver.New(conn, runner, iosdriver.Options{UDID: "DEV-1", Kind: iosdriver.KindDevice, Port: port})
+	bg := &tunnelBackground{}
+	runner := process.NewFake()
+	d := iosdriver.New(conn, runner, iosdriver.Options{UDID: "DEV-1", Kind: iosdriver.KindDevice, Port: port, Background: bg})
 
 	if err := d.Connect(context.Background()); err != nil {
 		t.Fatalf("Connect() error = %v", err)
@@ -361,9 +399,12 @@ func TestIosDriver_Connect_Device_LaunchesIproxyWithExactArgsAndWaitsForReadines
 		t.Fatal("IsConnected() = false after Connect")
 	}
 
-	invocations := runner.Invocations()
+	if len(runner.Invocations()) != 0 {
+		t.Fatalf("Runner.Run invocations = %+v, want none: iproxy is long-lived and must not go through Run", runner.Invocations())
+	}
+	invocations := bg.Invocations()
 	if len(invocations) != 1 {
-		t.Fatalf("runner invocations = %+v, want exactly one iproxy launch", invocations)
+		t.Fatalf("background starts = %+v, want exactly one iproxy launch", invocations)
 	}
 	want := process.Invocation{Name: "iproxy", Args: []string{fmt.Sprintf("%d:%d", port, port), "-u", "DEV-1"}}
 	if invocations[0].Name != want.Name || !equalArgs(invocations[0].Args, want.Args) {
@@ -382,8 +423,9 @@ func TestIosDriver_Connect_Device_WaitsForTunnelToBecomeReadyAfterDelay(t *testi
 		return map[string]any{"capabilities": map[string]any{}}, nil
 	})
 	const readyDelay = 300 * time.Millisecond
-	runner := &tunnelRunner{readyDelay: readyDelay}
-	d := iosdriver.New(conn, runner, iosdriver.Options{UDID: "DEV-1", Kind: iosdriver.KindDevice, Port: port})
+	bg := &tunnelBackground{readyDelay: readyDelay}
+	runner := process.NewFake()
+	d := iosdriver.New(conn, runner, iosdriver.Options{UDID: "DEV-1", Kind: iosdriver.KindDevice, Port: port, Background: bg})
 
 	start := time.Now()
 	if err := d.Connect(context.Background()); err != nil {
@@ -401,11 +443,12 @@ func TestIosDriver_Connect_Device_WaitsForTunnelToBecomeReadyAfterDelay(t *testi
 	}
 }
 
-func TestIosDriver_Disconnect_CancelsRunningIproxy(t *testing.T) {
+func TestIosDriver_Disconnect_KillsRunningIproxy(t *testing.T) {
 	port := freeTCPPort(t)
 	stopped := make(chan struct{})
-	runner := &tunnelRunner{stopped: stopped}
-	d := iosdriver.New(newDefaultFakeConn(), runner, iosdriver.Options{UDID: "DEV-1", Kind: iosdriver.KindDevice, Port: port})
+	bg := &tunnelBackground{stopped: stopped}
+	runner := process.NewFake()
+	d := iosdriver.New(newDefaultFakeConn(), runner, iosdriver.Options{UDID: "DEV-1", Kind: iosdriver.KindDevice, Port: port, Background: bg})
 
 	if err := d.Connect(context.Background()); err != nil {
 		t.Fatalf("Connect() error = %v", err)
@@ -413,7 +456,7 @@ func TestIosDriver_Disconnect_CancelsRunningIproxy(t *testing.T) {
 
 	select {
 	case <-stopped:
-		t.Fatal("iproxy Run returned before Disconnect canceled it")
+		t.Fatal("iproxy process exited before Disconnect killed it")
 	default:
 	}
 
@@ -424,14 +467,15 @@ func TestIosDriver_Disconnect_CancelsRunningIproxy(t *testing.T) {
 	select {
 	case <-stopped:
 	case <-time.After(2 * time.Second):
-		t.Fatal("iproxy Run did not return after Disconnect canceled its context")
+		t.Fatal("iproxy process did not exit after Disconnect")
 	}
 }
 
 func TestIosDriver_Connect_Device_IproxyExitFailureSurfacesNamedSpawnExitError(t *testing.T) {
 	port := freeTCPPort(t)
-	runner := &tunnelRunner{exitErr: errors.New("iproxy: no device found with udid DEV-1")}
-	d := iosdriver.New(newDefaultFakeConn(), runner, iosdriver.Options{UDID: "DEV-1", Kind: iosdriver.KindDevice, Port: port})
+	bg := &tunnelBackground{exitErr: errors.New("iproxy: no device found with udid DEV-1")}
+	runner := process.NewFake()
+	d := iosdriver.New(newDefaultFakeConn(), runner, iosdriver.Options{UDID: "DEV-1", Kind: iosdriver.KindDevice, Port: port, Background: bg})
 
 	err := d.Connect(context.Background())
 	var iproxyErr *iosdriver.IproxyError
@@ -448,8 +492,9 @@ func TestIosDriver_Connect_Device_IproxyExitFailureSurfacesNamedSpawnExitError(t
 
 func TestIosDriver_Connect_Device_IproxyNotInstalledSurfacesNamedError(t *testing.T) {
 	port := freeTCPPort(t)
-	runner := &tunnelRunner{exitErr: &exec.Error{Name: "iproxy", Err: exec.ErrNotFound}}
-	d := iosdriver.New(newDefaultFakeConn(), runner, iosdriver.Options{UDID: "DEV-1", Kind: iosdriver.KindDevice, Port: port})
+	bg := &tunnelBackground{startErr: &exec.Error{Name: "iproxy", Err: exec.ErrNotFound}}
+	runner := process.NewFake()
+	d := iosdriver.New(newDefaultFakeConn(), runner, iosdriver.Options{UDID: "DEV-1", Kind: iosdriver.KindDevice, Port: port, Background: bg})
 
 	err := d.Connect(context.Background())
 	var iproxyErr *iosdriver.IproxyError
@@ -468,9 +513,10 @@ func TestIosDriver_Connect_Device_IproxyNotInstalledSurfacesNamedError(t *testin
 // reaching the tunnel-up deadline.
 func TestIosDriver_Connect_Device_IproxyTunnelTimeout_DrivenByFakeClock(t *testing.T) {
 	port := freeTCPPort(t)
-	runner := &tunnelRunner{readyDelay: time.Hour}
+	bg := &tunnelBackground{readyDelay: time.Hour}
+	runner := process.NewFake()
 	d := iosdriver.New(newDefaultFakeConn(), runner, iosdriver.Options{
-		UDID: "DEV-1", Kind: iosdriver.KindDevice, Port: port, Clock: &fakeClock{},
+		UDID: "DEV-1", Kind: iosdriver.KindDevice, Port: port, Clock: &fakeClock{}, Background: bg,
 	})
 
 	err := d.Connect(context.Background())
@@ -491,12 +537,13 @@ func TestIosDriver_Connect_Device_ReusesExistingAtomyxTunnelWithoutSpawning(t *t
 	defer cleanup()
 
 	runner := process.NewFake()
-	d := iosdriver.New(newDefaultFakeConn(), runner, iosdriver.Options{UDID: "DEV-1", Kind: iosdriver.KindDevice, Port: port})
+	bg := process.NewFakeBackground()
+	d := iosdriver.New(newDefaultFakeConn(), runner, iosdriver.Options{UDID: "DEV-1", Kind: iosdriver.KindDevice, Port: port, Background: bg})
 
 	if err := d.Connect(context.Background()); err != nil {
 		t.Fatalf("Connect() error = %v", err)
 	}
-	if len(runner.Invocations()) != 0 {
+	if len(runner.Invocations()) != 0 || len(bg.Invocations()) != 0 {
 		t.Fatalf("invocations = %+v, want no iproxy spawn when an existing tunnel answers the ping handshake", runner.Invocations())
 	}
 	if err := d.Disconnect(); err != nil {
@@ -509,7 +556,8 @@ func TestIosDriver_Connect_Device_ForeignListenerRefusesWithBindConflict(t *test
 	defer cleanup()
 
 	runner := process.NewFake()
-	d := iosdriver.New(newDefaultFakeConn(), runner, iosdriver.Options{UDID: "DEV-1", Kind: iosdriver.KindDevice, Port: port})
+	bg := process.NewFakeBackground()
+	d := iosdriver.New(newDefaultFakeConn(), runner, iosdriver.Options{UDID: "DEV-1", Kind: iosdriver.KindDevice, Port: port, Background: bg})
 
 	err := d.Connect(context.Background())
 	var iproxyErr *iosdriver.IproxyError
@@ -520,7 +568,7 @@ func TestIosDriver_Connect_Device_ForeignListenerRefusesWithBindConflict(t *test
 		t.Fatalf("IproxyError.Code = %q, want %q", iproxyErr.Code, iosdriver.IproxyErrBindConflict)
 	}
 	if len(runner.Invocations()) != 0 {
-		t.Fatalf("invocations = %+v, want no iproxy spawn when the port is held by a foreign listener", runner.Invocations())
+		t.Fatalf("invocations = %+v, want no iproxy spawn when the port is held by a foreign listener", bg.Invocations())
 	}
 }
 

@@ -60,7 +60,12 @@ type AgentProvisioner interface {
 // ATOMYX_ANDROID_APK) when left empty, so a caller that wants the
 // production default need not resolve them itself.
 type DriverProvisionerDeps struct {
-	Runner         process.Runner
+	Runner process.Runner
+	// Background starts the long-lived "xcodebuild
+	// test-without-building" process the XCUITest launcher
+	// supervises. A nil Background defaults to
+	// process.NewExecBackground().
+	Background     process.BackgroundRunner
 	Clock          orchestra.Clock
 	IosProjectDir  string
 	IosDevTeam     string
@@ -80,9 +85,10 @@ type DriverProvisionerDeps struct {
 // EnsureRunning. It holds no per-device state of its own. Dedup and
 // status tracking belong to the caller.
 type DriverProvisioner struct {
-	runner process.Runner
-	clock  orchestra.Clock
-	deps   DriverProvisionerDeps
+	runner     process.Runner
+	background process.BackgroundRunner
+	clock      orchestra.Clock
+	deps       DriverProvisionerDeps
 }
 
 // NewDriverProvisioner constructs a DriverProvisioner from deps.
@@ -91,7 +97,11 @@ func NewDriverProvisioner(deps DriverProvisionerDeps) *DriverProvisioner {
 	if clock == nil {
 		clock = orchestra.SystemClock{}
 	}
-	return &DriverProvisioner{runner: deps.Runner, clock: clock, deps: deps}
+	background := deps.Background
+	if background == nil {
+		background = process.NewExecBackground()
+	}
+	return &DriverProvisioner{runner: deps.Runner, background: background, clock: clock, deps: deps}
 }
 
 var _ AgentProvisioner = (*DriverProvisioner)(nil)
@@ -167,7 +177,7 @@ func (p *DriverProvisioner) EnsureIOSAgent(ctx context.Context, udid string, kin
 	if devTeam == "" {
 		devTeam = os.Getenv("ATOMYX_DEV_TEAM")
 	}
-	launcher := iosdriver.NewXctestLauncher(p.runner, p.clock, iosdriver.LaunchConfig{
+	launcher := iosdriver.NewXctestLauncher(p.runner, p.background, p.clock, iosdriver.LaunchConfig{
 		ProjectDir:        projectDir,
 		Port:              iosControlPort,
 		Kind:              driverKind,

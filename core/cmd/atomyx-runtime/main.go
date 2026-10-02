@@ -52,6 +52,7 @@ func versionLine() string {
 // after run itself has returned and every defer inside it has fired.
 func run() int {
 	procRunner := process.NewExec()
+	background := process.NewExecBackground()
 	clock := orchestra.SystemClock{}
 	logger := logging.FromEnv()
 	probe := device.NewCompositeProbe(
@@ -59,9 +60,9 @@ func run() int {
 		device.NewAndroidAdbProbe(procRunner),
 		device.NewIosProbe(procRunner),
 	)
-	simHid := device.NewSimHidManager(process.NewExecBackground())
-	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Clock: clock, SimHid: simHid, Logger: logger})
-	provisioner := device.NewDriverProvisioner(device.DriverProvisionerDeps{Runner: procRunner, Clock: clock})
+	simHid := device.NewSimHidManager(background)
+	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Background: background, Clock: clock, SimHid: simHid, Logger: logger})
+	provisioner := device.NewDriverProvisioner(device.DriverProvisionerDeps{Runner: procRunner, Background: background, Clock: clock})
 
 	dispatcher := sidecar.NewDispatcher()
 	events := sidecar.NewEventBus()

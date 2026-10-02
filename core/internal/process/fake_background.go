@@ -3,6 +3,7 @@ package process
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"sync"
 )
@@ -31,6 +32,7 @@ type FakeBackgroundProcess struct {
 	killed   bool
 	exited   bool
 	exitCode int
+	stderr   string
 }
 
 // NewFakeBackgroundProcess constructs a FakeBackgroundProcess with
@@ -54,8 +56,16 @@ func (p *FakeBackgroundProcess) Write(data []byte) (int, error) {
 // stdout so a blocked reader observes EOF once the already-buffered
 // output is drained.
 func (p *FakeBackgroundProcess) Exit(exitCode int) {
+	p.ExitWithStderr(exitCode, "")
+}
+
+// ExitWithStderr simulates the process exiting with exitCode after
+// writing stderr to its standard error, which Wait reports through
+// BackgroundResult.Stderr.
+func (p *FakeBackgroundProcess) ExitWithStderr(exitCode int, stderr string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.stderr = stderr
 	p.closed = true
 	p.exited = true
 	p.exitCode = exitCode
@@ -89,7 +99,11 @@ func (p *FakeBackgroundProcess) Wait() (BackgroundResult, error) {
 	for !p.exited {
 		p.cond.Wait()
 	}
-	return BackgroundResult{ExitCode: p.exitCode}, nil
+	result := BackgroundResult{ExitCode: p.exitCode, Stderr: p.stderr}
+	if p.exitCode != 0 {
+		return result, fmt.Errorf("exit status %d", p.exitCode)
+	}
+	return result, nil
 }
 
 // Killed reports whether Kill has been called.

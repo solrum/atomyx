@@ -126,7 +126,9 @@ make serve   # runs the driver, blocks the terminal
 `iosdriver.XctestLauncher` (`core/internal/iosdriver/xctest_launcher.go`)
 is reuse-first: when a driver is already answering `ping` on the
 target port, it skips `xcodebuild` entirely. Otherwise it spawns
-`xcodebuild test-without-building` as a child process.
+`xcodebuild test-without-building` as a background child process
+(`process.BackgroundRunner`), which stays up until the launcher's kill
+function stops it.
 
 **Physical device**:
 
@@ -154,8 +156,9 @@ working directory. `ATOMYX_DEV_TEAM` supplies the signing team the
 same way `device.env` does for a manual `make` invocation.
 
 `IosDriver.Connect` (`core/internal/iosdriver/driver.go`) on a
-physical device first launches an `iproxy` USB tunnel and waits for
-it to become reachable before dialing. On a simulator it dials
+physical device first launches an `iproxy` USB tunnel as a background child process
+and waits for it to become reachable before dialing. `Disconnect` stops
+the tunnel. On a simulator it dials
 `127.0.0.1:22087` directly, because the simulator shares the host's
 network namespace.
 

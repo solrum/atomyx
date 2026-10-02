@@ -357,6 +357,15 @@ first.
   `IosDriver.Connect` (`core/internal/iosdriver/iproxy.go`), only for a
   device target. A device UDID being selected does not by itself
   guarantee either piece was already running.
+- **Long-lived child processes go through `BackgroundRunner`, never
+  `Runner.Run`.** `iproxy` and the XCUITest runner
+  (`xcodebuild test-without-building`) are started with
+  `process.BackgroundRunner` (`core/internal/process/background.go`),
+  because `Runner.Run` applies a 10 minute fallback timeout to any
+  deadline-less context and would kill them mid-session. The driver and
+  the launcher drain the child's stdout, stop it by killing its process
+  group through the `BackgroundProcess` handle, and receive the runner
+  by constructor injection from the composition roots.
 - **`make serve-device` uses `test-without-building` and does not
   rebuild the Swift driver.** After changing any Swift source under
   `platforms/ios-agent/Tests/`, run `make build-device` (or

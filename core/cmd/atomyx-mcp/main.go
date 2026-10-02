@@ -57,6 +57,7 @@ func versionLine() string {
 // after run itself has returned and every defer inside it has fired.
 func run() int {
 	procRunner := process.NewExec()
+	background := process.NewExecBackground()
 	clock := orchestra.SystemClock{}
 	logger := logging.FromEnv()
 	probe := device.NewCompositeProbe(
@@ -64,7 +65,7 @@ func run() int {
 		device.NewAndroidAdbProbe(procRunner),
 		device.NewIosProbe(procRunner),
 	)
-	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Clock: clock, Logger: logger})
+	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Background: background, Clock: clock, Logger: logger})
 
 	// storage.NewFileStorage resolves its root as opts.Root, then the
 	// ATOMYX_STORAGE_DIR environment variable, then "~/.atomyx". An

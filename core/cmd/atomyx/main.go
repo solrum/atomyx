@@ -17,6 +17,7 @@ import (
 
 func main() {
 	procRunner := process.NewExec()
+	background := process.NewExecBackground()
 	clock := orchestra.SystemClock{}
 	logger := logging.FromEnv()
 	// list-devices renders devices for a human to read, so it scans
@@ -30,7 +31,7 @@ func main() {
 		device.NewAndroidAdbProbe(procRunner),
 		device.NewIosBootedSimulatorProbe(procRunner),
 	)
-	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Clock: clock, Logger: logger})
+	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Background: background, Clock: clock, Logger: logger})
 
 	deps := cli.Deps{
 		Probe:   probe,

@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"dev.atomyx/internal/clock"
@@ -171,16 +170,22 @@ func (c LaunchConfig) onlyTestingTarget() string {
 // composes that on top of EnsureRunning and the kill function it
 // returns.
 type XctestLauncher struct {
-	proc  process.Runner
-	clock clock.Clock
-	cfg   LaunchConfig
+	proc       process.Runner
+	background process.BackgroundRunner
+	clock      clock.Clock
+	cfg        LaunchConfig
 }
 
-// NewXctestLauncher constructs an XctestLauncher. proc and clock are
-// injected so a test can substitute a process.Fake and a fake Clock
-// for both the xcodebuild invocations and the poll timing, without a
-// real Xcode toolchain or device.
-func NewXctestLauncher(proc process.Runner, clock clock.Clock, cfg LaunchConfig) *XctestLauncher {
+// NewXctestLauncher constructs an XctestLauncher. proc, background,
+// and clock are injected so a test can substitute fakes for the
+// bounded "build-for-testing" invocation, the long-lived
+// "test-without-building" process, and the poll timing, without a
+// real Xcode toolchain or device. A nil background defaults to
+// process.NewExecBackground().
+func NewXctestLauncher(proc process.Runner, background process.BackgroundRunner, clock clock.Clock, cfg LaunchConfig) *XctestLauncher {
+	if background == nil {
+		background = process.NewExecBackground()
+	}
 	if cfg.Port == 0 {
 		cfg.Port = defaultIosPort
 	}
@@ -190,7 +195,7 @@ func NewXctestLauncher(proc process.Runner, clock clock.Clock, cfg LaunchConfig)
 	if cfg.LaunchTimeoutMs == 0 {
 		cfg.LaunchTimeoutMs = xctestDefaultLaunchTimeoutMs
 	}
-	return &XctestLauncher{proc: proc, clock: clock, cfg: cfg}
+	return &XctestLauncher{proc: proc, background: background, clock: clock, cfg: cfg}
 }
 
 // noopKill is the kill function EnsureRunning returns whenever it
@@ -468,77 +473,58 @@ func tailString(s string, n int) string {
 	return s[len(s)-n:]
 }
 
-// spawnAndWait runs "xcodebuild test-without-building" through the
-// injected Runner on its own goroutine, since it is a long-running
-// process rather than a command that completes, and does not return
-// until the driver answers the ping handshake or one of the
-// XctestLauncherErrorCode failure modes is confirmed instead. Failing
-// to become ready cancels the spawned process before returning, so a
-// caller never observes success without a live driver behind it.
+// spawnAndWait starts "xcodebuild test-without-building" through the
+// injected BackgroundRunner, since it is a long-running process
+// rather than a command that completes (Runner.Run would kill it at
+// its fallback timeout), and does not return until the driver answers
+// the ping handshake or one of the XctestLauncherErrorCode failure
+// modes is confirmed instead. Failing to become ready kills the
+// spawned process before returning, so a caller never observes
+// success without a live driver behind it.
 //
-// On success, the returned kill function cancels runCtx and blocks
-// until the goroutine above has observed the process exit, so a
-// caller that calls kill can rely on the xcodebuild process (and the
-// XCUITest runner tree it owns) being gone once kill returns. It is
-// wrapped in sync.Once so a caller that invokes kill more than once
-// does not block forever the second time on a channel the first call
-// already drained.
+// On success, the returned kill function kills the process group and
+// blocks until the process has exited, so a caller that calls kill
+// can rely on the xcodebuild process (and the XCUITest runner tree it
+// owns) being gone once kill returns. It is safe to call more than
+// once.
 //
-// runCtx is deliberately rooted at context.Background() instead of
-// ctx: the spawned driver process must keep running past this call
-// returning, and past ctx being canceled, until the returned kill
-// function stops it explicitly.
-//
-//nolint:contextcheck // see the comment above
+// The process is started on a context detached from ctx: the spawned
+// driver must keep running past this call returning, and past ctx
+// being canceled, until the returned kill function stops it
+// explicitly.
 func (l *XctestLauncher) spawnAndWait(ctx context.Context, args []string) (func() error, error) {
-	runCtx, cancel := context.WithCancel(context.Background())
-	exited := make(chan error, 1)
-	go func() {
-		result, runErr := l.proc.Run(runCtx, "xcodebuild", args...)
-		exited <- classifySpawnExit(result, runErr)
-	}()
+	proc, startErr := l.background.Start(context.WithoutCancel(ctx), "xcodebuild", args...)
+	if startErr != nil {
+		return noopKill, classifySpawnExit(process.BackgroundResult{}, startErr)
+	}
+	exited, stop := superviseBackground(proc, classifySpawnExit)
 
-	exitedAlready, err := l.waitForReadyOrExit(ctx, exited)
-	if err != nil {
-		cancel()
-		// exited is a single-send buffered channel: once
-		// waitForReadyOrExit has received from it, no further value
-		// will ever arrive, so draining it again here would block
-		// forever.
-		if !exitedAlready {
-			<-exited
-		}
+	if err := l.waitForReadyOrExit(ctx, exited); err != nil {
+		stop()
 		return noopKill, err
 	}
-	var once sync.Once
-	kill := func() error {
-		once.Do(func() {
-			cancel()
-			<-exited
-		})
+	return func() error {
+		stop()
 		return nil
-	}
-	return kill, nil
+	}, nil
 }
 
 // waitForReadyOrExit polls the ping handshake on cfg.Port every
 // xctestPollIntervalMs, racing that poll against the spawned process
 // exiting early and against ctx being canceled, until cfg.LaunchTimeoutMs
-// elapses on the injected Clock. exitedAlready reports whether exited
-// was the channel that resolved the wait, so the caller knows not to
-// receive from it again.
-func (l *XctestLauncher) waitForReadyOrExit(ctx context.Context, exited <-chan error) (exitedAlready bool, err error) {
+// elapses on the injected Clock.
+func (l *XctestLauncher) waitForReadyOrExit(ctx context.Context, exited <-chan error) error {
 	probe := func() (bool, error) {
 		return probeIproxyPing(ctx, l.cfg.Port, iproxyPingProbeTimeout), nil
 	}
 	outcome, err := process.AwaitReady(ctx, l.clock, probe, exited, xctestPollIntervalMs, l.cfg.LaunchTimeoutMs)
 	switch outcome {
 	case process.ReadinessReady:
-		return false, nil
+		return nil
 	case process.ReadinessExited:
-		return true, err
+		return err
 	case process.ReadinessTimeout:
-		return false, &XctestLauncherError{
+		return &XctestLauncherError{
 			Code: XctestErrLaunchTimeout,
 			Message: fmt.Sprintf(
 				"XCUITest driver did not start listening on port %d within %ds. Check Xcode console for errors.",
@@ -546,14 +532,14 @@ func (l *XctestLauncher) waitForReadyOrExit(ctx context.Context, exited <-chan e
 			),
 		}
 	default: // process.ReadinessCtxDone
-		return false, err
+		return err
 	}
 }
 
 // classifySpawnExit turns a spawned "xcodebuild test-without-building"
-// invocation's result, once it has exited before the driver became
+// process outcome, once it has exited or failed to start before the driver became
 // reachable, into a named XctestLauncherError.
-func classifySpawnExit(result process.Result, runErr error) error {
+func classifySpawnExit(result process.BackgroundResult, runErr error) error {
 	if runErr != nil && errors.Is(runErr, exec.ErrNotFound) {
 		return &XctestLauncherError{Code: XctestErrNoXcode, Message: "xcodebuild not found. Install Xcode from the App Store."}
 	}
