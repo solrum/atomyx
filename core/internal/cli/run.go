@@ -220,6 +220,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		FlowLoader:            fsFlowLoader{},
 		PreconditionsOverride: preconditionsOverride,
 		NetworkCapture:        networkCapture,
+		Artifacts:             newLiveArtifacts(runfolder.ArtifactsDir(record.Dir())),
 	})
 	result, err := scriptRunner.Run(runCtx, def)
 	finishedAt := time.Now()

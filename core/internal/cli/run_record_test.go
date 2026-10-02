@@ -305,3 +305,28 @@ func TestStopSignalDuringBlockedStepFinalizesRunFolderAsCancelled(t *testing.T) 
 		}
 	}
 }
+
+func TestScriptScreenshotLandsInArtifactsBeforeTheRunEnds(t *testing.T) {
+	root := t.TempDir()
+	scriptPath := writeScript(t, "flow.yml", "- screenshot: home\n- sleep: 60000\n")
+	var stdout, stderr bytes.Buffer
+	deps := mockDeps(&stdout, &stderr)
+	stepClock := clock.NewManualClock(0)
+	deps.Clock = stepClock
+
+	ctx, cancel := context.WithCancelCause(context.Background())
+	defer cancel(nil)
+	codes := make(chan int, 1)
+	go func() {
+		codes <- RunContext(ctx, []string{"run", "--file", scriptPath, "--report-dir", root}, deps)
+	}()
+
+	stepClock.AwaitSleepers(1)
+	shots, err := os.ReadDir(runfolder.ArtifactsDir(singleRunDir(t, root)))
+	if err != nil || len(shots) != 1 || !strings.HasPrefix(shots[0].Name(), "01-home.") {
+		t.Errorf("artifacts while the run is blocked = %v, err %v, want the 01-home screenshot", shots, err)
+	}
+
+	cancel(shutdown.InterruptCause(syscall.SIGINT))
+	<-codes
+}
