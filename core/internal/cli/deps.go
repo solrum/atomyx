@@ -6,6 +6,7 @@ import (
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
+	"dev.atomyx/internal/session"
 )
 
 // Deps are the dependencies Run needs to execute a command. A caller
@@ -31,6 +32,11 @@ type Deps struct {
 	// wants in a test that reads output some other way.
 	Stdout io.Writer
 	Stderr io.Writer
+	// Session carries the device arbitration dependencies: the lease
+	// manager, the identity resolver and the orphan reaper. Its Factory
+	// is always Deps.Factory. A zero value disables exclusion, which
+	// only a test wants.
+	Session session.Deps
 	// Debug, when true, appends a stack trace to an unhandled error
 	// reported on Stderr, matching ATOMYX_DEBUG=1.
 	Debug bool

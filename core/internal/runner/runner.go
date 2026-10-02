@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"runtime/debug"
@@ -506,6 +507,10 @@ func (r *ScriptRunner) contextFor(ctx context.Context, rs *runState, stepIndex i
 func (r *ScriptRunner) execute(cmd CommandDefinition, step script.ScriptStep, ctx *CommandContext) (result CommandResult) {
 	defer func() {
 		if rec := recover(); rec != nil {
+			if canceled, err := cancellationPanic(rec, ctx.Context); canceled {
+				result = CommandResult{Ok: false, Detail: strPtr(fmt.Sprintf("Interrupted: %v", err))}
+				return
+			}
 			r.deps.Logger.Error("command handler panicked", nil, logging.LogContext{
 				"command": step.StepCommand(),
 				"panic":   fmt.Sprintf("%v", rec),
@@ -519,6 +524,21 @@ func (r *ScriptRunner) execute(cmd CommandDefinition, step script.ScriptStep, ct
 		}
 	}()
 	return cmd.Execute(step, ctx)
+}
+
+// cancellationPanic reports whether rec is the context error a command
+// handler raised because the run's own context ended, which is how a
+// handler unwinds from a wait that the caller interrupted. That is an
+// expected stop, not a handler bug, so it is not logged as a panic.
+func cancellationPanic(rec any, runCtx context.Context) (bool, error) {
+	err, isErr := rec.(error)
+	if !isErr || runCtx == nil || runCtx.Err() == nil {
+		return false, nil
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return true, err
+	}
+	return false, nil
 }
 
 // runNestedSteps executes steps in rs's shared variables and

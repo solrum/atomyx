@@ -189,6 +189,10 @@ corresponding area. For the high-level map see
   the tool call budget, and the idle timers use `ServerDeps.TimerClock`,
   not the orchestra clock. A test clock whose sleeps return at once would
   otherwise expire every timer immediately.
+- **A cancellation panic in a command handler is not a bug.** A handler
+  unwinds from an interrupted wait by panicking with the context error.
+  The runner recovers it as an interrupted step without an error log, and
+  only a panic while the run's context is still live is logged.
 
 ## Tool layer (cross-platform)
 

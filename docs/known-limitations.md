@@ -21,6 +21,9 @@ current code or docs.
 - [Typing can fail on the iOS Simulator when a field never reports focus or a keyboard](#typing-can-fail-on-the-ios-simulator-when-a-field-never-reports-focus-or-a-keyboard)
 - [A misplaced otherwise in a handle step is silently ignored](#a-misplaced-otherwise-in-a-handle-step-is-silently-ignored)
 - [A focus-timeout error omits the field name for role-only selectors](#a-focus-timeout-error-omits-the-field-name-for-role-only-selectors)
+- [A killed command on a physical iPhone can leave its USB tunnel running](#a-killed-command-on-a-physical-iphone-can-leave-its-usb-tunnel-running)
+- [The CLI needs signing settings in the environment to drive a physical iPhone](#the-cli-needs-signing-settings-in-the-environment-to-drive-a-physical-iphone)
+- [An iOS run without --device is not provisioned](#an-ios-run-without---device-is-not-provisioned)
 
 ## Obscurement check can flag a dialog's backdrop as blocking the dialog's own button
 
@@ -157,3 +160,52 @@ generic wording.
 **Workaround**: add a `label` or `text` value to the selector when
 the target element has one, so the error names the field that failed
 to take focus.
+
+## A killed command on a physical iPhone can leave its USB tunnel running
+
+**Symptom**: after `kill -9` of an `atomyx` or `atomyx-mcp` process that
+was driving a physical iPhone, an `iproxy` process keeps running. The
+orphaned test runner is ended by the next command for that device, but
+the tunnel is not.
+
+**Where**: iOS physical devices, after an uncatchable kill of the host
+process. A normal exit, Ctrl-C, or SIGTERM stops the tunnel.
+
+**Why**: the tunnel runs in its own process group and the runner record
+names only the runner's process group, so the next command has no
+record of the tunnel to end.
+
+**Workaround**: list leftovers with `pgrep -fl iproxy` and stop the
+ones you no longer need with `kill <pid>`. A leftover tunnel does not
+block the next command, which uses a different host port.
+
+## The CLI needs signing settings in the environment to drive a physical iPhone
+
+**Symptom**: `atomyx driver run --device <udid>` against a physical
+iPhone fails with `AGENT_UNREACHABLE` and a message naming
+`ATOMYX_DEV_TEAM`, even though `platforms/ios-agent/device.env` holds
+the team.
+
+**Where**: `atomyx` and `atomyx-mcp` on a physical iOS device.
+
+**Why**: only `make` reads `device.env`. The binaries read the signing
+settings from the environment, and the project config has no key for
+them.
+
+**Workaround**: export `ATOMYX_DEV_TEAM` before the command, and also
+`ATOMYX_IOS_DRIVER_DIR` when the binary does not sit inside the
+checkout. See `getting-started.md`.
+
+## An iOS run without --device is not provisioned
+
+**Symptom**: `atomyx driver run --platform ios` with no `--device`
+does not launch a runner. It dials the default runner port, 22087, and
+fails with an unreachable agent when nothing serves there.
+
+**Where**: iOS, `run`, `suite`, and `doctor` without `--device`.
+
+**Why**: a launched runner is keyed on a device udid, and no udid
+means nothing to key it on.
+
+**Workaround**: pass `--device <udid>`, or start a runner yourself
+with `make serve` before the command.

@@ -39,9 +39,9 @@ func (d *recordingDriver) Disconnect() error {
 
 func (d *recordingDriver) LaunchedApp() (string, string) { return d.bundleID, d.runnerID }
 
-func (d *recordingDriver) RestoreLaunchedApp(bundleID, fromRunnerID string) bool {
+func (d *recordingDriver) RestoreLaunchedApp(_ context.Context, bundleID, fromRunnerID string) error {
 	d.restoredBundle, d.restoredRunner = bundleID, fromRunnerID
-	return true
+	return nil
 }
 
 type eventLog struct {

@@ -31,14 +31,16 @@ atomyx <module> <command> [flags]
 |---|---|
 | `atomyx driver run` | Runs a single YML test script against a device. |
 | `atomyx driver suite` | Runs a named suite or an ad-hoc selection of flows. |
+| `atomyx driver doctor` | Checks that a device is reachable and healthy. |
 | `atomyx driver list-devices` | Lists Android, iOS simulator, and iOS physical devices. |
 | `atomyx driver version` | Prints the driver module's version. |
 | `atomyx skills init` | Copies the bundled skill and agent files into a project. |
 | `atomyx skills update-skills` | Updates an existing skills install to the bundled version. |
 
-Three shortcuts skip the `driver` module name: `atomyx run`, `atomyx
-suite`, and `atomyx devices` map to `atomyx driver run`, `atomyx
-driver suite`, and `atomyx driver list-devices`. Two shortcuts skip
+Four shortcuts skip the `driver` module name: `atomyx run`, `atomyx
+suite`, `atomyx doctor`, and `atomyx devices` map to `atomyx driver
+run`, `atomyx driver suite`, `atomyx driver doctor`, and `atomyx driver
+list-devices`. Two shortcuts skip
 the `skills` module name: `atomyx init` and `atomyx update-skills`.
 
 The CLI ships exactly two modules: `driver` and `skills`. The MCP
@@ -50,6 +52,7 @@ launches directly instead of going through the `atomyx` binary.
 ```
 atomyx driver run [flags]
 atomyx driver suite [name] [flags]
+atomyx driver doctor [flags]
 atomyx driver list-devices [flags]
 atomyx driver version
 atomyx driver help
@@ -172,6 +175,61 @@ command was misused, `130` when SIGINT interrupted the suite, and `143`
 when SIGTERM did. An interrupted suite prints `interrupted` and still
 writes the partial report.
 
+## driver doctor
+
+Connects to a device and reports whether it answers a bounded liveness
+check. It never runs a flow and never touches app state.
+
+Usage:
+
+```
+atomyx driver doctor [flags]
+```
+
+Flags:
+
+| Flag | Meaning | Default | Repeatable |
+|---|---|---|---|
+| `--platform <ios\|android>` | Target platform. | `android` | no |
+| `--device <id>` | Device identifier, as reported by `atomyx driver list-devices`. | none | no |
+| `--json` | Outputs the report as JSON instead of text. | off | no |
+| `--help`, `-h` | Prints this command's usage and exits. | off | no |
+
+When another Atomyx process holds the device, doctor does not probe it.
+It prints the holder and that health was not checked, and exits `0`,
+because the holder proves something is driving the device. The `--json`
+output then carries `held: true`, `healthChecked: false`, and a
+`holder` object with `pid`, `command`, `role`, `state`, and `runId`
+when known. For a free device, `--json` carries `held: false` and
+`healthChecked: true` next to the health fields.
+
+Exit codes: `0` when the device is healthy or held by another process,
+`1` when it could not be reached or is unhealthy, `2` when the command
+was misused.
+
+## Device ownership
+
+`run`, `suite`, and `doctor` take exclusive ownership of the device for
+the length of the command. Only one Atomyx process, whether this CLI or
+an `atomyx-mcp` server, can drive a device at a time.
+
+- A second command against a device that is already owned fails with
+  code `DEVICE_HELD`. The message names the holder's process id,
+  command, and state. Stop that process or wait for it to finish, then
+  run the command again.
+- Ownership is released when the command ends, including on an
+  interrupt.
+- If a command crashes or is killed with `kill -9`, the next command
+  for an iOS device ends the runner process the crashed command left
+  behind, then continues.
+- If the device lease is lost while a run is in progress, the run is
+  stopped and the command reports it.
+
+A run on iOS without `--device` has no device identity to key ownership
+or a runner on. It is not provisioned by the CLI and dials the default
+runner port, 22087, so it only works against a runner that was started
+separately. Pass `--device` for an automatically launched runner.
+
 ## driver list-devices
 
 Enumerates devices Atomyx can currently see: Android devices and
@@ -267,6 +325,7 @@ atomyx skills update-skills
 |---|---|
 | `atomyx run [flags]` | `atomyx driver run [flags]` |
 | `atomyx suite [name] [flags]` | `atomyx driver suite [name] [flags]` |
+| `atomyx doctor [flags]` | `atomyx driver doctor [flags]` |
 | `atomyx devices [flags]` | `atomyx driver list-devices [flags]` |
 | `atomyx init [flags]` | `atomyx skills init [flags]` |
 | `atomyx update-skills [flags]` | `atomyx skills update-skills [flags]` |

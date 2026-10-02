@@ -4,11 +4,13 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"dev.atomyx/cmd/internal/runnerprovision"
+	"dev.atomyx/cmd/internal/sessionwire"
 	"dev.atomyx/internal/cli"
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/logging"
@@ -38,6 +40,12 @@ func main() {
 	provisioner := runnerprovision.New(procRunner, background, clock, logger)
 	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Background: background, Clock: clock, Logger: logger, Provisioner: provisioner})
 
+	sessionDeps, err := sessionwire.Deps(procRunner, clock, logger, "", "cli")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "atomyx: %v\n", err)
+		os.Exit(1)
+	}
+
 	deps := cli.Deps{
 		Probe:   probe,
 		Factory: factory,
@@ -45,6 +53,7 @@ func main() {
 		Logger:  logger,
 		Stdout:  os.Stdout,
 		Stderr:  os.Stderr,
+		Session: sessionDeps,
 		Debug:   os.Getenv("ATOMYX_DEBUG") == "1",
 	}
 

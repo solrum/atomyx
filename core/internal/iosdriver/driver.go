@@ -225,19 +225,30 @@ func (d *IosDriver) LaunchedApp() (bundleID, runnerID string) {
 	return d.lastLaunchedBundleID, d.connectedRunnerID
 }
 
-// RestoreLaunchedApp seeds the launch-tracked bundle id from an earlier
-// driver, and reports whether it did. It applies the value only when
-// the runner this driver connected to is the same runner instance that
-// launched the app, which it confirms by the runner's launch
-// identifier: a runner that reports none, or a different one, proves
-// nothing about the app, so the tracked state stays empty and the next
-// launch dispatches normally.
-func (d *IosDriver) RestoreLaunchedApp(bundleID, fromRunnerID string) bool {
-	if bundleID == "" || fromRunnerID == "" || d.connectedRunnerID != fromRunnerID {
-		return false
+// RestoreLaunchedApp makes this driver target the app an earlier driver
+// had in front, so a tool call that needs an app works again without
+// the caller launching it.
+//
+// When the runner this driver connected to is the same instance that
+// launched the app, which the runner's launch identifier confirms, the
+// runner already targets it and only the tracked bundle id is seeded.
+// Any other runner, including one that reports no identifier, has no
+// target app, because a runner can query only an app it launched
+// itself, so the app is launched through this runner. That launch does
+// not reset an instance the runner already tracks, but a runner that
+// tracks none starts the app fresh, which discards in-memory app state.
+//
+// An empty bundleID restores nothing and reports no error.
+func (d *IosDriver) RestoreLaunchedApp(ctx context.Context, bundleID, fromRunnerID string) error {
+	if bundleID == "" {
+		return nil
 	}
-	d.lastLaunchedBundleID = bundleID
-	return true
+	if fromRunnerID != "" && d.connectedRunnerID == fromRunnerID {
+		d.lastLaunchedBundleID = bundleID
+		return nil
+	}
+	noReset := true
+	return d.LaunchApp(ctx, bundleID, driver.LaunchArgs{NoReset: &noReset})
 }
 
 // Disconnect closes the transport, stops the iproxy tunnel if one was

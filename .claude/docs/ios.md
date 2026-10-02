@@ -163,7 +163,11 @@ explicit option, then `ATOMYX_IOS_DRIVER_DIR`, then an upward search
 for a `platforms/ios-agent` directory from the running binary and the
 working directory. Device builds read their signing settings from
 the environment, mirroring `device.env` for a manual `make`
-invocation:
+invocation. The `atomyx` binary and `atomyx-mcp` do not read
+`platforms/ios-agent/device.env`, and the project config has no key for
+the signing team, so driving a physical iPhone from the CLI needs these
+variables exported in the shell, with `ATOMYX_IOS_DRIVER_DIR` set when
+the binary does not sit inside the checkout:
 
 - `ATOMYX_DEV_TEAM` supplies the signing team and is required.
 - `ATOMYX_CODE_SIGN_STYLE` is `Automatic` (the default when unset) or
@@ -179,7 +183,11 @@ udid up in the device probe (`device.ResolveDescriptor` in
 `core/internal/device/resolve.go`, scanning booted simulators through
 `xcrun simctl` and paired devices through `idevice_id -l`). A udid the
 scan does not find fails with `DEVICE_NOT_FOUND` and a remedy. Without
-`--device`, an iOS run targets the booted simulator.
+`--device`, an iOS run has no udid to launch or key a runner on, so the
+CLI does not provision one and dials the default runner port, 22087. That
+is safe because the driver refuses a runner whose ping reports a target
+udid, and it only works against a runner started separately, for example
+with `make serve`. Pass `--device` to have the CLI launch its own runner.
 
 `IosDriver.Connect` (`core/internal/iosdriver/driver.go`) on a
 physical device first launches an `iproxy` USB tunnel as a background child process
@@ -198,6 +206,9 @@ the simulator shares the host's network namespace.
 dialing the fixed port of the runner its own `ensureIosAgent` service
 launched. That service builds its provisioner with `FixedIosPort`, so it
 adopts a runner on `22087`, starts no tunnel, and writes no runner record.
+`FixedIosPort` is a mode flag on the provisioner. A port policy injected
+through the provisioner's dependencies is the cleaner shape if a third
+mode appears.
 
 For an iOS descriptor that has an id and no port of its own, `Build` calls
 `EnsureIOSAgent(ctx, udid, kind)`, which returns `(port, kill, err)`, and

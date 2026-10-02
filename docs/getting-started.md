@@ -107,8 +107,12 @@ in its own terminal. From another terminal, confirm the driver is
 reachable:
 
 ```bash
-atomyx doctor --platform ios --device <UDID>
+atomyx doctor --platform ios
 ```
+
+Without `--device`, the command dials the runner you are serving on its
+default port. With `--device <UDID>`, the CLI starts a runner of its
+own instead, see step 5.
 
 Stop the driver with Ctrl-C in the terminal running
 `make ready-ios-sim`. Stopping only the `make` process itself, for
@@ -136,8 +140,12 @@ while the driver serves. Leave it running in its own terminal, then
 confirm readiness the same way:
 
 ```bash
-atomyx doctor --platform ios --device <UDID>
+atomyx doctor --platform ios
 ```
+
+Without `--device`, the command dials the runner you are serving on its
+default port. With `--device <UDID>`, the CLI starts a runner of its
+own instead, see step 5.
 
 Stop it with Ctrl-C in that terminal, the same way as the simulator.
 
@@ -182,6 +190,30 @@ atomyx run --file test.yml --platform android --device <serial>
 
 `<serial>` comes from `atomyx devices` or `adb devices`. For iOS use
 `--platform ios --device <UDID>`.
+
+For iOS with `--device`, `atomyx` starts the driver itself and stops it
+when the command ends, so you do not need `make ready-ios-sim` or
+`make ready-ios` for it. Without `--device` it does not start one and
+dials the default port, 22087, where a driver you serve yourself must be
+listening. The first launch on a machine compiles the driver, which can
+take several minutes, and progress lines are written to stderr.
+
+Driving a physical iPhone this way needs signing settings in the
+environment, because the `atomyx` binary does not read
+`platforms/ios-agent/device.env`:
+
+```bash
+export ATOMYX_DEV_TEAM=<your Apple development team id>
+export ATOMYX_IOS_DRIVER_DIR=/absolute/path/to/atomyx/platforms/ios-agent
+```
+
+`ATOMYX_IOS_DRIVER_DIR` is needed only when the binary does not run from
+inside the checkout. The same variables apply to `atomyx-mcp`.
+
+Only one Atomyx process can drive a device at a time. A second command
+against a device that is already in use fails with `DEVICE_HELD` and names
+the process holding it. `atomyx doctor` reports the holder and exits `0`
+instead of failing. See [`cli.md`](./cli.md) for the details.
 
 To check that a device is reachable and healthy without running a
 script, use `atomyx doctor --platform android --device <serial>`.

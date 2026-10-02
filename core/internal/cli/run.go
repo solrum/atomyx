@@ -98,15 +98,15 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
-	built, err := deps.Factory.Build(ctx, desc)
+	opened, err := openDevice(ctx, deps, "atomyx run", desc)
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
-	// Disconnect is best-effort cleanup: by the time this runs, the
-	// command has already produced its report and exit code, so a
-	// failure to tear down the device connection has nothing left to
-	// report to.
-	defer func() { _ = built.Driver.Disconnect() }()
+	defer opened.Close() //nolint:contextcheck // teardown is bounded by its own grace timer, not by a call context
+	built := opened.Built()
+	runCtx, cancelRun := context.WithCancelCause(ctx)
+	defer cancelRun(nil)
+	opened.cancelOnLost(cancelRun)
 
 	captureConfig := parseCaptureFlag(proxyFlag)
 	networkCapture, err := netcapture.New(captureConfig)
@@ -151,8 +151,11 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 			ExternalEnv:           externalEnv,
 			PreconditionsOverride: preconditionsOverride,
 		})
-		result, err := scenarioRunner.Run(ctx, scenarioDef)
+		result, err := scenarioRunner.Run(runCtx, scenarioDef)
 		finishedAt := time.Now()
+		if opened.reportLost(stderr) {
+			return 1
+		}
 		if err != nil {
 			return reportUncaught(ctx, stderr, deps.Debug, err)
 		}
@@ -195,8 +198,11 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		PreconditionsOverride: preconditionsOverride,
 		NetworkCapture:        networkCapture,
 	})
-	result, err := scriptRunner.Run(ctx, def)
+	result, err := scriptRunner.Run(runCtx, def)
 	finishedAt := time.Now()
+	if opened.reportLost(stderr) {
+		return 1
+	}
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}

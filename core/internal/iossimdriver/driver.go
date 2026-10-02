@@ -333,8 +333,8 @@ func (d *IosSimDriver) LaunchedApp() (bundleID, runnerID string) {
 	return d.delegate.LaunchedApp()
 }
 
-// RestoreLaunchedApp seeds the underlying runner driver's tracked app
-// when the connected runner is the same instance that launched it.
-func (d *IosSimDriver) RestoreLaunchedApp(bundleID, fromRunnerID string) bool {
-	return d.delegate.RestoreLaunchedApp(bundleID, fromRunnerID)
+// RestoreLaunchedApp makes the underlying runner driver target the app
+// an earlier driver had in front. See IosDriver.RestoreLaunchedApp.
+func (d *IosSimDriver) RestoreLaunchedApp(ctx context.Context, bundleID, fromRunnerID string) error {
+	return d.delegate.RestoreLaunchedApp(ctx, bundleID, fromRunnerID)
 }

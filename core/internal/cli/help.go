@@ -120,7 +120,8 @@ EXAMPLES
 		_, _ = io.WriteString(w, `atomyx driver doctor
   Connect to a device and report its health: whether the connection
   succeeded and whether it answers a bounded liveness check. Does not
-  run a flow or touch app state.
+  run a flow or touch app state. A device that another Atomyx process
+  holds is reported with its holder and is not probed.
 
 USAGE
   atomyx driver doctor [flags]
@@ -139,7 +140,7 @@ EXAMPLES
   atomyx driver doctor --json
 
 EXIT CODES
-  0    the device is reachable and healthy
+  0    the device is reachable and healthy, or held by another process
   1    the connection could not be established, or the device is
        reachable but unhealthy
   2    the command was misused

@@ -9,6 +9,7 @@ import (
 	"dev.atomyx/internal/driver"
 	"dev.atomyx/internal/driver/mock"
 	"dev.atomyx/internal/orchestra"
+	"dev.atomyx/internal/script"
 	"dev.atomyx/internal/wire"
 )
 
@@ -499,4 +500,60 @@ func TestSleepCommand_AdvancesFakeClock(t *testing.T) {
 	if after := tr.clock.NowMs(); after-before != 500 {
 		t.Fatalf("got clock advance %dms, want 500ms", after-before)
 	}
+}
+
+// TestSleepCommand_InterruptedByCancellationIsNotLoggedAsAPanic proves a
+// run interrupted during a sleep step ends that step as interrupted and
+// writes no "command handler panicked" entry, because the interruption
+// is the operator's own stop and not a handler bug.
+func TestSleepCommand_InterruptedByCancellationIsNotLoggedAsAPanic(t *testing.T) {
+	tr := newTestRunner()
+	logger := newCapturingLogger()
+	tr.runner.deps.Logger = logger
+	tr.runner.stepLog = logger
+	runCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	result := tr.runner.execute(SleepCommand{}, &script.SleepStep{Command: script.CommandSleep, Ms: 1000}, &CommandContext{
+		Context: runCtx, Orchestra: tr.orch, Clock: tr.clock, Logger: logger,
+	})
+
+	if result.Ok || result.Detail == nil || !strings.HasPrefix(*result.Detail, "Interrupted: ") {
+		t.Fatalf("result = %+v, want a failed step whose detail starts with Interrupted", result)
+	}
+	for _, e := range append(*logger.errors, *logger.debugs...) {
+		if e.msg == "command handler panicked" {
+			t.Fatalf("logged a panic entry for a canceled sleep: %+v", e)
+		}
+	}
+}
+
+// TestExecute_ACancellationErrorFromALiveContextStillCountsAsAPanic keeps
+// the recovery honest: a handler that panics with a context error while
+// the run's context is still live has a bug, and is still logged.
+func TestExecute_ACancellationErrorFromALiveContextStillCountsAsAPanic(t *testing.T) {
+	tr := newTestRunner(cancelPanicCommand{})
+	logger := newCapturingLogger()
+	tr.runner.deps.Logger = logger
+	tr.runner.stepLog = logger
+
+	result := run(t, tr, "appId: com.test\n---\n- back\n")
+
+	if result.Ok || !strings.HasPrefix(detail(lastStep(t, result)), "Exception: ") {
+		t.Fatalf("result = %s, want an Exception step", debugSteps(result.Steps))
+	}
+	logged := false
+	for _, e := range *logger.errors {
+		logged = logged || e.msg == "command handler panicked"
+	}
+	if !logged {
+		t.Fatal("no panic entry was logged for a handler bug")
+	}
+}
+
+type cancelPanicCommand struct{}
+
+func (cancelPanicCommand) Command() string { return script.CommandBack }
+func (cancelPanicCommand) Execute(script.ScriptStep, *CommandContext) CommandResult {
+	panic(context.Canceled)
 }

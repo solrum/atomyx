@@ -80,7 +80,7 @@ type LaunchState struct {
 // launched. The iOS drivers implement it.
 type launchedAppCarrier interface {
 	LaunchedApp() (bundleID, runnerID string)
-	RestoreLaunchedApp(bundleID, fromRunnerID string) bool
+	RestoreLaunchedApp(ctx context.Context, bundleID, fromRunnerID string) error
 }
 
 // Open takes ownership of the device named by req.
@@ -127,7 +127,9 @@ func Open(ctx context.Context, deps Deps, req Request) (*Session, error) {
 	}
 	if req.Restore != nil {
 		if carrier, ok := built.Driver.(launchedAppCarrier); ok {
-			carrier.RestoreLaunchedApp(req.Restore.BundleID, req.Restore.RunnerID)
+			if err := carrier.RestoreLaunchedApp(ctx, req.Restore.BundleID, req.Restore.RunnerID); err != nil {
+				deps.Logger.Warn("could not restore the launched app after re-acquiring the device", logging.LogContext{"id": desc.ID, "error": err.Error()})
+			}
 		}
 	}
 	return newSession(ctx, deps, desc, identity, held, built), nil

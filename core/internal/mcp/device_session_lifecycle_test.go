@@ -46,9 +46,9 @@ func (d *lifecycleDriver) Disconnect() error {
 
 func (d *lifecycleDriver) LaunchedApp() (string, string) { return d.bundleID, d.runnerID }
 
-func (d *lifecycleDriver) RestoreLaunchedApp(bundleID, fromRunnerID string) bool {
+func (d *lifecycleDriver) RestoreLaunchedApp(_ context.Context, bundleID, fromRunnerID string) error {
 	d.restoredBundle, d.restoredRunner = bundleID, fromRunnerID
-	return true
+	return nil
 }
 
 // lifecycleFactory builds lifecycleDrivers and records them.

@@ -209,6 +209,7 @@ A session owns its device for as long as it is selected and active, and gives it
 - With no tool call in flight and no run open, the device is released after the MCP idle timeout, 10 minutes by default. Configure it with `session.mcpIdleTimeoutMs` or the `ATOMYX_MCP_IDLE_TIMEOUT_MS` environment variable.
 - With a run open and no tool call in flight, the device is released after the open-run idle timeout, 10 minutes by default and configured with `session.openRunIdleTimeoutMs`. The open run is closed with status cancelled.
 - A released device is remembered. The next tool call that needs a device takes it again without a new select_device call, and the call runs outside its tool budget like select_device does.
+- On iOS, taking the device again starts a new driver, and a driver can query only an app it launched itself. So the app that was in front is launched again, which discards its unsaved in-memory state. Screens and data the app persists are unaffected.
 - If another process took the device in the meantime, the call fails with DEVICE_RELEASED_HELD. Retry shortly, and ask the operator to release the device if it keeps failing.
 - After the open-run idle timeout closed a run, finish_run and report_bug fail with RUN_EXPIRED until start_run is called. The first tool that needs a device after the expiry also fails once with RUN_EXPIRED so the agent learns the run is gone. Start a new run and repeat the lost work.
 - disconnect_device releases the device and forgets it, so nothing is taken again until select_device is called.
