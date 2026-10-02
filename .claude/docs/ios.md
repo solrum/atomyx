@@ -152,8 +152,17 @@ On the Go side, `DriverProvisioner.EnsureIOSAgent` in
 `core/internal/device` resolves the project directory from an
 explicit option, then `ATOMYX_IOS_DRIVER_DIR`, then an upward search
 for a `platforms/ios-agent` directory from the running binary and the
-working directory. `ATOMYX_DEV_TEAM` supplies the signing team the
-same way `device.env` does for a manual `make` invocation.
+working directory. Device builds read their signing settings from
+the environment, mirroring `device.env` for a manual `make`
+invocation:
+
+- `ATOMYX_DEV_TEAM` supplies the signing team and is required.
+- `ATOMYX_CODE_SIGN_STYLE` is `Automatic` (the default when unset) or
+  `Manual`.
+- `ATOMYX_PROVISIONING_PROFILE_SPECIFIER` names the provisioning
+  profile and is required when the style is `Manual`. A `Manual`
+  style without it fails with a signing error before `xcodebuild`
+  runs.
 
 `IosDriver.Connect` (`core/internal/iosdriver/driver.go`) on a
 physical device first launches an `iproxy` USB tunnel as a background child process

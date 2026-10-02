@@ -54,10 +54,12 @@ type AgentProvisioner interface {
 }
 
 // DriverProvisionerDeps configures a DriverProvisioner. A nil Clock
-// defaults to orchestra.SystemClock{}. IosProjectDir, IosDevTeam, and
-// AndroidAPKPath fall back to the same environment variables the
-// TypeScript sidecar reads (ATOMYX_IOS_DRIVER_DIR, ATOMYX_DEV_TEAM,
-// ATOMYX_ANDROID_APK) when left empty, so a caller that wants the
+// defaults to orchestra.SystemClock{}. IosProjectDir, IosDevTeam,
+// IosCodeSignStyle, IosProvisioningProfile, and AndroidAPKPath fall
+// back to environment variables (ATOMYX_IOS_DRIVER_DIR,
+// ATOMYX_DEV_TEAM, ATOMYX_CODE_SIGN_STYLE,
+// ATOMYX_PROVISIONING_PROFILE_SPECIFIER, ATOMYX_ANDROID_APK) when
+// left empty, so a caller that wants the
 // production default need not resolve them itself.
 type DriverProvisionerDeps struct {
 	Runner process.Runner
@@ -65,11 +67,15 @@ type DriverProvisionerDeps struct {
 	// test-without-building" process the XCUITest launcher
 	// supervises. It is required: NewDriverProvisioner panics when it
 	// is nil.
-	Background     process.BackgroundRunner
-	Clock          orchestra.Clock
-	IosProjectDir  string
-	IosDevTeam     string
-	AndroidAPKPath string
+	Background    process.BackgroundRunner
+	Clock         orchestra.Clock
+	IosProjectDir string
+	IosDevTeam    string
+	// IosCodeSignStyle is Automatic or Manual and IosProvisioningProfile
+	// names the profile a Manual device build signs with.
+	IosCodeSignStyle       string
+	IosProvisioningProfile string
+	AndroidAPKPath         string
 	// IosScheme, IosProjectFile, IosRunnerApp, and IosOnlyTesting
 	// override the corresponding Xcode project identifiers the
 	// XCUITest launcher builds and spawns against. Each defaults to
@@ -177,16 +183,26 @@ func (p *DriverProvisioner) EnsureIOSAgent(ctx context.Context, udid string, kin
 	if devTeam == "" {
 		devTeam = os.Getenv("ATOMYX_DEV_TEAM")
 	}
+	signStyle := p.deps.IosCodeSignStyle
+	if signStyle == "" {
+		signStyle = os.Getenv("ATOMYX_CODE_SIGN_STYLE")
+	}
+	profile := p.deps.IosProvisioningProfile
+	if profile == "" {
+		profile = os.Getenv("ATOMYX_PROVISIONING_PROFILE_SPECIFIER")
+	}
 	launcher := iosdriver.NewXctestLauncher(p.runner, p.background, p.clock, iosdriver.LaunchConfig{
-		ProjectDir:        projectDir,
-		Port:              iosControlPort,
-		Kind:              driverKind,
-		UDID:              udid,
-		DevTeam:           devTeam,
-		Scheme:            p.deps.IosScheme,
-		ProjectFileName:   p.deps.IosProjectFile,
-		RunnerAppName:     p.deps.IosRunnerApp,
-		OnlyTestingTarget: p.deps.IosOnlyTesting,
+		ProjectDir:                   projectDir,
+		Port:                         iosControlPort,
+		Kind:                         driverKind,
+		UDID:                         udid,
+		DevTeam:                      devTeam,
+		CodeSignStyle:                signStyle,
+		ProvisioningProfileSpecifier: profile,
+		Scheme:                       p.deps.IosScheme,
+		ProjectFileName:              p.deps.IosProjectFile,
+		RunnerAppName:                p.deps.IosRunnerApp,
+		OnlyTestingTarget:            p.deps.IosOnlyTesting,
 	})
 	return launcher.EnsureRunning(ctx)
 }

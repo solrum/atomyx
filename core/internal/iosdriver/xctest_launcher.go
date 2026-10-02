@@ -106,6 +106,17 @@ type LaunchConfig struct {
 	// resolves any ATOMYX_DEV_TEAM environment fallback before
 	// constructing this config.
 	DevTeam string
+	// CodeSignStyle is the xcodebuild CODE_SIGN_STYLE for a physical
+	// device build, either "Automatic" or "Manual". Empty means
+	// Automatic. The caller resolves any ATOMYX_CODE_SIGN_STYLE
+	// environment fallback before constructing this config.
+	CodeSignStyle string
+	// ProvisioningProfileSpecifier names the provisioning profile used
+	// for a Manual signing device build. Required when CodeSignStyle is
+	// Manual and ignored otherwise. The caller resolves any
+	// ATOMYX_PROVISIONING_PROFILE_SPECIFIER environment fallback before
+	// constructing this config.
+	ProvisioningProfileSpecifier string
 	// RunnerAppName is the compiled XCUITest runner product's file
 	// name under the build output directory. Defaults to the standard
 	// Atomyx driver runner app name when empty.
@@ -341,12 +352,18 @@ func (l *XctestLauncher) destination() string {
 	return fmt.Sprintf("platform=iOS Simulator,id=%s", l.cfg.UDID)
 }
 
+const (
+	codeSignStyleAutomatic = "Automatic"
+	codeSignStyleManual    = "Manual"
+)
+
 // signOverrides builds the xcodebuild signing-setting overrides. A
 // simulator build zeroes every signing setting, because the
 // .xcodeproj may have been generated with physical-device signing
 // baked in and the simulator does not use provisioning profiles at
-// all. A physical device requires cfg.DevTeam; without it, no build
-// or spawn command is ever constructed.
+// all. A physical device requires cfg.DevTeam, and a Manual signing
+// style also requires cfg.ProvisioningProfileSpecifier. Without them,
+// no build or spawn command is ever constructed.
 func (l *XctestLauncher) signOverrides() ([]string, error) {
 	if l.cfg.Kind != KindDevice {
 		return []string{
@@ -364,12 +381,36 @@ func (l *XctestLauncher) signOverrides() ([]string, error) {
 			Message: "devTeam is required for physical device builds. Set ATOMYX_DEV_TEAM env var or pass devTeam option.",
 		}
 	}
-	return []string{
-		"CODE_SIGN_STYLE=Automatic",
+	style := l.cfg.CodeSignStyle
+	if style == "" {
+		style = codeSignStyleAutomatic
+	}
+	overrides := []string{
+		"CODE_SIGN_STYLE=" + style,
 		"CODE_SIGNING_REQUIRED=YES",
 		"CODE_SIGNING_ALLOWED=YES",
 		fmt.Sprintf("DEVELOPMENT_TEAM=%s", l.cfg.DevTeam),
-	}, nil
+	}
+	switch style {
+	case codeSignStyleAutomatic:
+		return overrides, nil
+	case codeSignStyleManual:
+		if l.cfg.ProvisioningProfileSpecifier == "" {
+			return nil, &XctestLauncherError{
+				Code: XctestErrSigning,
+				Message: "Manual code signing requires a provisioning profile. " +
+					"Set ATOMYX_PROVISIONING_PROFILE_SPECIFIER to the profile name, " +
+					"or set ATOMYX_CODE_SIGN_STYLE=Automatic.",
+			}
+		}
+		return append(overrides, "PROVISIONING_PROFILE_SPECIFIER="+l.cfg.ProvisioningProfileSpecifier), nil
+	default:
+		return nil, &XctestLauncherError{
+			Code: XctestErrSigning,
+			Message: fmt.Sprintf(
+				"Unsupported code signing style %q. Set ATOMYX_CODE_SIGN_STYLE to Automatic or Manual.", style),
+		}
+	}
 }
 
 // buildArgs and spawnArgs share every flag up to the command verb and

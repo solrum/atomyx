@@ -524,6 +524,71 @@ func TestXctestLauncher_EnsureRunning_PhysicalDeviceWithoutDevTeam_ReturnsSignin
 	}
 }
 
+func TestXctestLauncher_EnsureRunning_PhysicalDevice_ManualSigningPassesProfile(t *testing.T) {
+	projectDir, _ := newTestProjectDir(t)
+	port := freeTCPPort(t)
+	runner := &fakeXcodebuildRunner{port: port, spawnReady: true}
+	l := iosdriver.NewXctestLauncher(runner, runner, &fakeClock{}, iosdriver.LaunchConfig{
+		ProjectDir:                   projectDir,
+		Port:                         port,
+		Kind:                         iosdriver.KindDevice,
+		UDID:                         "DEV-1",
+		DevTeam:                      "TEAM123",
+		CodeSignStyle:                "Manual",
+		ProvisioningProfileSpecifier: "match Development *",
+	})
+
+	if _, err := l.EnsureRunning(context.Background()); err != nil {
+		t.Fatalf("EnsureRunning() error = %v", err)
+	}
+
+	manual := []string{
+		"CODE_SIGN_STYLE=Manual",
+		"CODE_SIGNING_REQUIRED=YES",
+		"CODE_SIGNING_ALLOWED=YES",
+		"DEVELOPMENT_TEAM=TEAM123",
+		"PROVISIONING_PROFILE_SPECIFIER=match Development *",
+	}
+	invocations := runner.Invocations()
+	if len(invocations) != 2 {
+		t.Fatalf("invocations = %+v, want one build then one spawn", invocations)
+	}
+	wantBuild := substituteProjectPaths(wantBuildArgs("platform=iOS,id=DEV-1", manual...), projectDir)
+	if !equalArgs(invocations[0].Args, wantBuild) {
+		t.Fatalf("build args = %+v, want %v", invocations[0].Args, wantBuild)
+	}
+	wantSpawn := substituteProjectPaths(wantSpawnArgs("platform=iOS,id=DEV-1", manual...), projectDir)
+	if !equalArgs(invocations[1].Args, wantSpawn) {
+		t.Fatalf("spawn args = %+v, want %v", invocations[1].Args, wantSpawn)
+	}
+}
+
+func TestXctestLauncher_EnsureRunning_PhysicalDevice_ManualSigningWithoutProfile_ReturnsSigningError(t *testing.T) {
+	projectDir, _ := newTestProjectDir(t)
+	port := freeTCPPort(t)
+	runner := &fakeXcodebuildRunner{port: port, spawnReady: true}
+	l := iosdriver.NewXctestLauncher(runner, runner, &fakeClock{}, iosdriver.LaunchConfig{
+		ProjectDir:    projectDir,
+		Port:          port,
+		Kind:          iosdriver.KindDevice,
+		UDID:          "DEV-1",
+		DevTeam:       "TEAM123",
+		CodeSignStyle: "Manual",
+	})
+
+	_, err := l.EnsureRunning(context.Background())
+	var launchErr *iosdriver.XctestLauncherError
+	if !errors.As(err, &launchErr) || launchErr.Code != iosdriver.XctestErrSigning {
+		t.Fatalf("EnsureRunning() error = %v, want an XctestErrSigning launcher error", err)
+	}
+	if !strings.Contains(launchErr.Message, "ATOMYX_PROVISIONING_PROFILE_SPECIFIER") {
+		t.Fatalf("Message = %q, want the remedy naming the profile setting", launchErr.Message)
+	}
+	if len(runner.Invocations()) != 0 {
+		t.Fatalf("invocations = %+v, want no xcodebuild call", runner.Invocations())
+	}
+}
+
 func TestXctestLauncher_EnsureRunning_SkipsBuildWhenRunnerAppIsFresh(t *testing.T) {
 	projectDir, pbxproj := newTestProjectDir(t)
 	if err := os.Chtimes(pbxproj, time.Now().Add(-time.Hour), time.Now().Add(-time.Hour)); err != nil {
