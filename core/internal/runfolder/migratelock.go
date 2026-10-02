@@ -47,8 +47,14 @@ func LockMigration(root string, onWait func()) (*MigrationLock, error) {
 
 // ShareMigration takes the migration lock in shared form without
 // waiting. Any number of editors hold it together, and it is refused
-// with ErrMigrationInProgress while a migration holds the lock.
+// with ErrMigrationInProgress while a migration holds the lock. A root
+// with no runs directory has nothing to migrate and no migration can be
+// running, so ShareMigration creates nothing there and returns a lock
+// that holds nothing.
 func ShareMigration(root string) (*MigrationLock, error) {
+	if _, err := os.Stat(RunsDir(root)); errors.Is(err, os.ErrNotExist) {
+		return &MigrationLock{}, nil
+	}
 	f, err := openMigrateLock(root)
 	if err != nil {
 		return nil, err

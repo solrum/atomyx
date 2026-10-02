@@ -2,6 +2,7 @@ package storage
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -145,7 +146,7 @@ func TestMigrateRunsMovesEveryRecordIntoAFolderAndLosesNoField(t *testing.T) {
 	saveAll(t, store, records)
 	writeVersionedRun(t, root, "20260101-000000-script-aaaa", 9_000, true)
 
-	report, err := MigrateRuns(store, root)
+	report, err := MigrateRuns(store, root, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +164,7 @@ func TestMigrateRunsMovesEveryRecordIntoAFolderAndLosesNoField(t *testing.T) {
 	}
 
 	before := snapshotTree(t, root)
-	again, err := MigrateRuns(store, root)
+	again, err := MigrateRuns(store, root, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +190,7 @@ func TestMigrateRunsLeavesDamagedRecordsAndConflictsInPlace(t *testing.T) {
 	saveLegacy(t, store, PersistedRun{ID: "clash", Name: "from record", Status: RunStatusPassed, StartedAt: 4})
 	writeVersionedRun(t, root, "clash", 99, true)
 
-	report, err := MigrateRuns(store, root)
+	report, err := MigrateRuns(store, root, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,7 +243,7 @@ func TestMigrateRunsResumesAfterACrashBetweenTheFolderAndTheDelete(t *testing.T)
 	}
 
 	crashing := &failingDeleteStore{Storage: store, failKey: RunKey("run-failed")}
-	if _, err := MigrateRuns(crashing, root); err == nil {
+	if _, err := MigrateRuns(crashing, root, nil); err == nil {
 		t.Fatal("the injected failure was swallowed")
 	}
 	if ok, _ := store.Load(RunKey("run-failed"), &PersistedRun{}); !ok {
@@ -252,7 +253,7 @@ func TestMigrateRunsResumesAfterACrashBetweenTheFolderAndTheDelete(t *testing.T)
 		t.Fatal("the folder was not written before the failure")
 	}
 
-	report, err := MigrateRuns(store, root)
+	report, err := MigrateRuns(store, root, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +312,7 @@ func TestEditsDuringAMigrationAreRefusedSoNothingIsLostOrResurrected(t *testing.
 		_, setErr = catalog.SetSummary("run-passed", "edited mid-migration")
 		_, deleteErr = catalog.Delete("run-error")
 	}
-	if _, err := MigrateRuns(hooked, root); err != nil {
+	if _, err := MigrateRuns(hooked, root, nil); err != nil {
 		t.Fatal(err)
 	}
 	if !errors.Is(setErr, ErrMigrationInProgress) || !errors.Is(deleteErr, ErrMigrationInProgress) {
@@ -334,7 +335,7 @@ func TestEditsDuringAMigrationAreRefusedSoNothingIsLostOrResurrected(t *testing.
 	if _, ok, _ := catalog.Get("run-error"); ok {
 		t.Fatal("a deleted run came back")
 	}
-	again, err := MigrateRuns(store, root)
+	again, err := MigrateRuns(store, root, nil)
 	if err != nil || len(again.Migrated) != 0 {
 		t.Fatalf("a later migration found work: %+v %v", again, err)
 	}
@@ -365,5 +366,73 @@ func TestEditsAreRefusedWhileTheMigrationLockIsHeld(t *testing.T) {
 	}
 	if ok, _ := store.Load(RunKey("r"), &PersistedRun{}); !ok {
 		t.Fatal("a refused delete removed the record")
+	}
+}
+
+func TestMigrateRunsReportsAFolderThatFailsReadBackAndContinues(t *testing.T) {
+	root, store := newMigrationRoot(t)
+	saveLegacy(t, store, PersistedRun{ID: "a-bad", Status: RunStatusPassed, StartedAt: 1})
+	saveLegacy(t, store, PersistedRun{ID: "b-good", Status: RunStatusPassed, StartedAt: 2})
+	mismatch := func(root string, meta runfolder.Meta) (runfolder.ImportOutcome, error) {
+		if meta.RunID == "a-bad" {
+			return 0, fmt.Errorf("verifying run folder: %w: differs", runfolder.ErrImportMismatch)
+		}
+		return runfolder.ImportRun(root, meta)
+	}
+
+	report, err := migrateRuns(store, root, nil, mismatch)
+	if err != nil {
+		t.Fatalf("a read-back mismatch stopped the pass: %v", err)
+	}
+	if !reflect.DeepEqual(report.Migrated, []string{"b-good"}) {
+		t.Fatalf("migrated = %v", report.Migrated)
+	}
+	if len(report.Damaged) != 1 || report.Damaged[0].ID != "a-bad" || report.Damaged[0].Reason == "" || report.Clean() {
+		t.Fatalf("damaged = %+v", report.Damaged)
+	}
+	if ok, _ := store.Load(RunKey("a-bad"), &PersistedRun{}); !ok {
+		t.Fatal("the original of the mismatched record was removed")
+	}
+}
+
+func TestMigrateRunsDeletesAStaleOriginalWhoseFolderWasEditedAfterACrash(t *testing.T) {
+	root, store := newMigrationRoot(t)
+	saveAll(t, store, legacyFixtures())
+	catalog := NewRunCatalog(store, root, nil)
+
+	crashing := &failingDeleteStore{Storage: store, failKey: RunKey("run-passed")}
+	if _, err := MigrateRuns(crashing, root, nil); err == nil {
+		t.Fatal("the injected failure was swallowed")
+	}
+	if ok, err := catalog.SetSummary("run-passed", "edited after the crash"); err != nil || !ok {
+		t.Fatalf("SetSummary = %v %v", ok, err)
+	}
+
+	report, err := MigrateRuns(store, root, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !contains(report.AlreadyMigrated, "run-passed") || !report.Clean() {
+		t.Fatalf("report = %+v", report)
+	}
+	if ok, _ := store.Load(RunKey("run-passed"), &PersistedRun{}); ok {
+		t.Fatal("the stale original survived")
+	}
+	meta, ok, err := catalog.Get("run-passed")
+	if err != nil || !ok || meta.MCP.Summary == nil || *meta.MCP.Summary != "edited after the crash" {
+		t.Fatalf("the edit was lost: %+v %v %v", meta, ok, err)
+	}
+}
+
+func TestSharingTheMigrationLockCreatesNoRunsDirectory(t *testing.T) {
+	_, store := newMigrationRoot(t)
+	bare := t.TempDir()
+	unlock, err := NewRunCatalog(store, bare, nil).shareMigration()
+	if err != nil {
+		t.Fatal(err)
+	}
+	unlock()
+	if _, err := os.Stat(runfolder.RunsDir(bare)); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("shareMigration created the runs directory: %v", err)
 	}
 }

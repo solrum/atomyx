@@ -23,13 +23,17 @@ type MigrationIssue struct {
 // sorted. A root with no flat records produces the zero report.
 //
 //   - Migrated holds the records whose folder this call created.
-//   - AlreadyMigrated holds the records whose folder already held an
-//     identical meta, which is what an interrupted earlier call leaves.
-//     Their original is removed now.
-//   - Conflicts holds the records whose id names a folder with a
-//     different meta. Both are left untouched.
-//   - Damaged holds the records that could not be read or mapped. They
-//     are left untouched.
+//   - AlreadyMigrated holds the records whose folder already exists
+//     because an earlier call imported this record into it, whether or
+//     not the folder was edited since, or because it holds an identical
+//     meta. That is what an interrupted earlier call leaves. The
+//     original is stale, so it is removed now.
+//   - Conflicts holds the records whose id names a folder that was not
+//     imported from that record and holds a different meta. Both are
+//     left untouched.
+//   - Damaged holds the records that could not be read or mapped, and
+//     the records whose new folder did not read back equal to the
+//     record. They are left untouched and the new folder is removed.
 //   - ScratchRemoved counts the scratch folders an interrupted earlier
 //     call left and this call deleted.
 type MigrationReport struct {
@@ -52,25 +56,35 @@ func (r MigrationReport) Clean() bool {
 // flat record is left.
 //
 // The whole call holds the migration lock exclusively. It waits for an
-// editor that holds the shared form, and a delete or summary update
-// that starts meanwhile is refused with ErrMigrationInProgress.
+// editor that holds the shared form, calling onWait once first when it
+// has to wait, and a delete or summary update that starts meanwhile is
+// refused with ErrMigrationInProgress. A nil onWait is allowed.
 //
 // Each record is processed on its own. Its meta is built with the same
 // mapping the compatibility reader uses and the legacy id stays the
-// folder name. The folder is written through runfolder.ImportRun, which
-// reads it back and compares it with the source, and only then is the
-// original deleted. A crash between those two steps leaves a verified
-// folder and the original, and the next call finds the folder already
-// matching, so it only deletes the original. A record that cannot be
-// read or mapped, and a record whose id names a different folder, are
-// reported and left in place.
+// folder name. The meta also names the record it came from in its
+// ImportedFrom field. The folder is written through runfolder.ImportRun,
+// which reads it back and compares it with the source, and only then is
+// the original deleted. A crash between those two steps leaves a
+// verified folder and the original, and the next call finds a folder
+// that names this record as its source, so it only deletes the
+// original, even when the folder was edited in between. A record that
+// cannot be read or mapped, a record whose folder fails the read-back,
+// and a record whose id names a folder from another source are reported
+// and left in place, and the pass continues with the next record.
 //
 // An error means the call stopped early because storage failed, for
 // example a delete that was refused. The report holds what was done up
 // to that point, and a later call finishes the rest.
-func MigrateRuns(store Storage, root string) (MigrationReport, error) {
+func MigrateRuns(store Storage, root string, onWait func()) (MigrationReport, error) {
+	return migrateRuns(store, root, onWait, runfolder.ImportRun)
+}
+
+type importFunc func(root string, meta runfolder.Meta) (runfolder.ImportOutcome, error)
+
+func migrateRuns(store Storage, root string, onWait func(), importRun importFunc) (MigrationReport, error) {
 	var report MigrationReport
-	lock, err := runfolder.LockMigration(root, nil)
+	lock, err := runfolder.LockMigration(root, onWait)
 	if err != nil {
 		return report, err
 	}
@@ -86,14 +100,14 @@ func MigrateRuns(store Storage, root string) (MigrationReport, error) {
 	}
 	for _, key := range keys {
 		id := strings.TrimPrefix(key, RunKeyPrefix)
-		if err := migrateOne(store, root, id, &report); err != nil {
+		if err := migrateOne(store, root, id, importRun, &report); err != nil {
 			return report, fmt.Errorf("migrating run %s: %w", id, err)
 		}
 	}
 	return report, nil
 }
 
-func migrateOne(store Storage, root, id string, report *MigrationReport) error {
+func migrateOne(store Storage, root, id string, importRun importFunc, report *MigrationReport) error {
 	if !runfolder.ValidRunID(id) {
 		report.Damaged = append(report.Damaged, MigrationIssue{ID: id, Reason: "the record name is not a bare run id"})
 		return nil
@@ -112,9 +126,14 @@ func migrateOne(store Storage, root, id string, report *MigrationReport) error {
 		report.Damaged = append(report.Damaged, MigrationIssue{ID: id, Reason: err.Error()})
 		return nil
 	}
-	outcome, err := runfolder.ImportRun(root, meta)
+	meta.ImportedFrom = id
+	outcome, err := importRun(root, meta)
 	if errors.Is(err, runfolder.ErrImportConflict) {
 		report.Conflicts = append(report.Conflicts, MigrationIssue{ID: id, Reason: err.Error()})
+		return nil
+	}
+	if errors.Is(err, runfolder.ErrImportMismatch) {
+		report.Damaged = append(report.Damaged, MigrationIssue{ID: id, Reason: err.Error()})
 		return nil
 	}
 	if err != nil {

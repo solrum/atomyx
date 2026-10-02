@@ -58,7 +58,7 @@ func migrateRuns(ctx context.Context, deps Deps, flags map[string]FlagValue) int
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
-	report, err := storage.MigrateRuns(store, root)
+	report, err := storage.MigrateRuns(store, root, nil)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "error: run migration stopped early: %v\n", err)
 		_, _ = fmt.Fprintf(stderr, "Run the command again to finish. Records already moved stay moved.\n")
