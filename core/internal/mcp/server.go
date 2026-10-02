@@ -76,8 +76,10 @@ func NewServer(info Info, deps ServerDeps) *Server {
 		Factory: deps.Factory, Probe: deps.Probe, Runners: deps.Runners, Clock: clk, TimerClock: timers, Logger: logger,
 		Session: deps.Session, Timeouts: deps.Timeouts, Runs: tracker,
 	})
+	traits := newToolTraits()
 	tc := &ToolContext{
 		Session:  devices,
+		Traits:   traits,
 		Logger:   logger,
 		Storage:  deps.Storage,
 		RunStore: runStore,
@@ -89,7 +91,7 @@ func NewServer(info Info, deps ServerDeps) *Server {
 	// bookkeeping apply uniformly to all registered tools without each
 	// tool's handler knowing about any of them. Registered before any AddTool call so it is in place for
 	// every tool the loop below adds.
-	server.AddReceivingMiddleware(newToolCallMiddleware(logger, timers, devices))
+	server.AddReceivingMiddleware(newToolCallMiddleware(logger, timers, devices, traits))
 
 	// Registration order matches DEFAULT_TOOLS in
 	// packages/mcp/src/tools/index.ts: device + app lifecycle first,
@@ -98,7 +100,7 @@ func NewServer(info Info, deps ServerDeps) *Server {
 	// then script execution. check_health has no TypeScript
 	// counterpart; it is registered here, alongside the other
 	// device-session tools it reports on.
-	registerListDevicesTool(server, deps.Probe)
+	registerListDevicesTool(server, traits, deps.Probe)
 	registerSelectDeviceTool(server, tc)
 	registerDisconnectDeviceTool(server, tc)
 	registerCheckHealthTool(server, tc)

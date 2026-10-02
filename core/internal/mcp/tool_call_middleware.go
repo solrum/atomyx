@@ -145,7 +145,7 @@ func resolveToolTimeoutBudget(rawArgs json.RawMessage) (budgetMs float64, declar
 }
 
 // newToolCallMiddleware builds the single choke point every tools/call
-// request passes through, applying three behaviors uniformly to every
+// request passes through, applying four behaviors uniformly to every
 // registered tool without touching each tool's own handler:
 //
 //  1. Value-constraint validation the published (deliberately loose)
@@ -161,8 +161,11 @@ func resolveToolTimeoutBudget(rawArgs json.RawMessage) (budgetMs float64, declar
 //  3. The session bookkeeping that bounds how long a device stays held:
 //     the call is reported to sess when it starts and when it ends, and
 //     a call on a run the open-run idle timeout closed is refused with
-//     RUN_EXPIRED.
-func newToolCallMiddleware(logger logging.Logger, clk clock.Clock, sess *DeviceSession) mcp.Middleware {
+//     RUN_EXPIRED. A tool registered as observe-only is not reported,
+//     because it is not session activity.
+//  4. The notices raised while the call ran, such as an app relaunch on
+//     a re-acquire, are appended to its result.
+func newToolCallMiddleware(logger logging.Logger, clk clock.Clock, sess *DeviceSession, traits *toolTraits) mcp.Middleware {
 	return func(next mcp.MethodHandler) mcp.MethodHandler {
 		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
 			if method != toolCallMethod {
@@ -177,18 +180,24 @@ func newToolCallMiddleware(logger logging.Logger, clk clock.Clock, sess *DeviceS
 				return invalidArgumentsResult(params.Name, verr), nil
 			}
 
-			if err := sess.BeginCall(params.Name); err != nil {
-				return errorResult(err), nil
+			if !traits.isObserveOnly(params.Name) {
+				if err := sess.BeginCall(params.Name); err != nil {
+					return errorResult(err), nil
+				}
+				defer sess.EndCall() //nolint:contextcheck // idle timers outlive any call, so they take no call context
 			}
-			defer sess.EndCall() //nolint:contextcheck // idle timers outlive any call, so they take no call context
 
 			budgetMs, declaredBudgetMs := resolveToolTimeoutBudget(params.Arguments)
 			callCtx, stop := newBudgetContext(ctx, clk, int64(budgetMs))
 			defer stop()
 
 			startedAt := clk.NowMs()
-			result, err := next(withProgress(callCtx, req, params), method, req)
+			noticeCtx, notices := withCallNotices(withProgress(callCtx, req, params))
+			result, err := next(noticeCtx, method, req)
 			if !errors.Is(callCtx.Err(), context.DeadlineExceeded) {
+				if toolResult, ok := result.(*mcp.CallToolResult); ok {
+					notices.attachTo(toolResult)
+				}
 				return result, err
 			}
 

@@ -16,7 +16,7 @@ type acquirePhase struct {
 const acquirePhaseCount = 3
 
 var (
-	phaseBuilding  = acquirePhase{step: 1, message: "Preparing the device runner, building it when it is missing or stale"}
+	phaseBuilding  = acquirePhase{step: 1, message: "Preparing the device"}
 	phaseLaunching = acquirePhase{step: 2, message: "Launching the device runner"}
 	phaseConnected = acquirePhase{step: 3, message: "Device connected"}
 )

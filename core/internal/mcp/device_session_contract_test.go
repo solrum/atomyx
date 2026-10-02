@@ -82,7 +82,6 @@ func TestSelectFailureKeepsCurrentDevice(t *testing.T) {
 }
 
 func TestReacquireReportsAppRelaunch(t *testing.T) {
-	t.Skip("removed by the relaunch notice step")
 	f := newLifecycleFixture(t)
 	f.factory.onBuild = func(_ context.Context, d *lifecycleDriver) {
 		if d.factory.builds() == 0 {
@@ -105,7 +104,7 @@ func TestReacquireReportsAppRelaunch(t *testing.T) {
 
 	result, _ := callTool(t, cs, ctx, "get_ui_tree", map[string]any{})
 
-	if text := strings.ToLower(textOf(t, result)); !strings.Contains(text, "relaunch") {
+	if text := strings.ToLower(allTextOf(result)); !strings.Contains(text, "relaunch") {
 		t.Fatalf("get_ui_tree after a re-acquire = %s, want a notice that the app was relaunched", text)
 	}
 }

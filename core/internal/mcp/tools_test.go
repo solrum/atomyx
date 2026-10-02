@@ -703,3 +703,16 @@ func TestInvalidArgumentsReportSchemaViolation(t *testing.T) {
 		t.Fatal("input_text without text: expected isError true")
 	}
 }
+
+// allTextOf joins every text block of result, so a test sees the notices
+// the middleware appends after the tool's own content.
+func allTextOf(result *mcp.CallToolResult) string {
+	var b strings.Builder
+	for _, c := range result.Content {
+		if text, ok := c.(*mcp.TextContent); ok {
+			b.WriteString(text.Text)
+			b.WriteString("\n")
+		}
+	}
+	return b.String()
+}

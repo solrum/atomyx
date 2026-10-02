@@ -36,6 +36,8 @@ type Session struct {
 	lostErr  error
 	saved    *LaunchState
 
+	relaunched bool
+
 	closeOnce sync.Once
 	closeErr  error
 	closed    chan struct{}
@@ -101,6 +103,11 @@ func (s *Session) markLost(err error) {
 		close(s.lost)
 	})
 }
+
+// Relaunched reports that opening this session launched the app of an
+// earlier session afresh on a new runner, so the app's in-memory state is
+// gone.
+func (s *Session) Relaunched() bool { return s.relaunched }
 
 // LaunchState reports the launched-app state of the session's driver,
 // or the state captured when the session was closed. The zero value

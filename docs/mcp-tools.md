@@ -187,7 +187,7 @@ Bind the session to one device so every other device-driving tool operates on it
 - Acquiring the device does not count against the 30 second tool call budget. It runs in two phases, each with its own budget. The worst case is 300 seconds for the first phase and then 120 seconds for the second.
   - First the iOS runner is built when it is missing or stale. This also covers waiting for another Atomyx process that is building it, and no device ownership is held meanwhile. The build has a timeout of 300 seconds by default. When it elapses the call fails with code RUNNER_BUILD_TIMEOUT.
   - Then the device is acquired. Acquisition has its own budget of 120 seconds by default, which excludes the build. When it is exhausted the call fails with code TOOL_TIMEOUT. Configure it with `session.deviceAcquireTimeoutMs` in the project config or the `ATOMYX_DEVICE_ACQUIRE_TIMEOUT_MS` environment variable. The environment variable wins.
-- When the call carries a progress token, the server sends three progress notifications as the device comes up, with progress 1, 2 and 3 of a total of 3. They announce in order that the runner is being prepared, building it when needed, that it is launching, and that the device is connected. Without a progress token no notifications are sent.
+- When the call carries a progress token, the server sends three progress notifications as the device comes up, with progress 1, 2 and 3 of a total of 3. They announce in order that the device is being prepared, that the runner is launching, and that the device is connected. The connected notification is sent only after the device is installed in the session. Without a progress token no notifications are sent.
 - A bound device is released automatically when the session sits idle. See Device ownership and idle release.
 
 **Returns**
@@ -214,6 +214,7 @@ A session owns its device for as long as it is selected and active, and gives it
 - With a run open and no tool call in flight, the device is released after the open-run idle timeout, 10 minutes by default and configured with `session.openRunIdleTimeoutMs`. The open run is closed with status cancelled.
 - A released device is remembered. The next tool call that needs a device takes it again without a new select_device call, and the call runs outside its tool budget like select_device does.
 - On iOS, taking the device again starts a new driver, and a driver can query only an app it launched itself. So the app that was in front is launched again, which discards its unsaved in-memory state. Screens and data the app persists are unaffected.
+- When taking the device again relaunched the app, the result of the call that triggered it carries one extra text content block after the tool's own content. It states that the app was relaunched on a new runner and that its in-memory state was lost. The tool's own content is unchanged, so a client that reads only the first content block sees the same result as before.
 - If another process took the device in the meantime, the call fails with DEVICE_RELEASED_HELD. Retry shortly, and ask the operator to release the device if it keeps failing.
 - After the open-run idle timeout closed a run, finish_run and report_bug fail with RUN_EXPIRED until start_run is called. The first tool that needs a device after the expiry also fails once with RUN_EXPIRED so the agent learns the run is gone. Start a new run and repeat the lost work.
 - disconnect_device releases the device and forgets it, so nothing is taken again until select_device is called.
@@ -254,6 +255,7 @@ None
 
 **Behavior**
 - Never runs a flow, never touches app state, and never changes what device is bound.
+- Calling it is not session activity. It does not restart the idle timer or move a held idle device to running, so state reports idle for a held device that no other call is using, and polling it never keeps a device from its idle release. list_devices and disconnect_device behave the same way.
 - A device released by an idle timeout, or lost, is not taken again and not probed. The report names the state instead, so the check never acquires a device or waits for a runner build.
 - The liveness probe is bounded by a fixed five-second timeout, separate from and shorter than the overall per-call time budget.
 - An unresponsive device is a normal, successful check outcome, not a tool failure. This tool only reports isError:true when the check itself could not be attempted at all.

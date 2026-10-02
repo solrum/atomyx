@@ -17,11 +17,11 @@ var checkHealthSchema = compileToolSchema("check_health", checkHealthInputSchema
 // check, so this tool reports isError:true only when the check
 // itself could not run.
 func registerCheckHealthTool(server *mcp.Server, tc *ToolContext) {
-	server.AddTool(&mcp.Tool{
+	addObserveOnlyTool(server, tc.Traits, &mcp.Tool{
 		Name: "check_health",
 		Description: "Report whether a device is currently bound to this session and, " +
 			"when one is, whether it answers a quick liveness check. Returns " +
-			"selected and healthy booleans, plus a code and remedy when unhealthy. " +
+			"selected and healthy booleans, a state (unselected, idle, running, released or lost), plus a code and remedy when unhealthy. " +
 			"Does not run a flow or change app state. Call this to diagnose a " +
 			"stalled session before retrying an action, instead of guessing from " +
 			"a timed-out call.",

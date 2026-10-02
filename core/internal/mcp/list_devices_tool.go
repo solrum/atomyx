@@ -34,8 +34,8 @@ type listDevicesResult struct {
 
 // registerListDevicesTool adds the list_devices tool: enumerates
 // connected devices across every supported platform via probe.
-func registerListDevicesTool(server *mcp.Server, probe device.Probe) {
-	server.AddTool(&mcp.Tool{
+func registerListDevicesTool(server *mcp.Server, traits *toolTraits, probe device.Probe) {
+	addObserveOnlyTool(server, traits, &mcp.Tool{
 		Name: "list_devices",
 		Description: "Enumerate connected devices across all supported platforms. Returns " +
 			"a flat list with { platform, id, name, state, kind } entries. Use " +

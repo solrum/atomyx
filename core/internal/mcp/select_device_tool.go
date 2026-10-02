@@ -99,7 +99,7 @@ type wasActiveWire struct {
 // down the active driver and leaves the session idle. Idempotent, since
 // calling it with no active device still reports ok:true.
 func registerDisconnectDeviceTool(server *mcp.Server, tc *ToolContext) {
-	server.AddTool(&mcp.Tool{
+	addObserveOnlyTool(server, tc.Traits, &mcp.Tool{
 		Name: "disconnect_device",
 		Description: "Disconnect the currently-active device and leave the session idle. " +
 			"Subsequent tool calls that need a device will fail until " +

@@ -20,6 +20,8 @@ type ToolContext struct {
 	// mid-session select_device call is observed immediately and a
 	// device the session released is taken again.
 	Session *DeviceSession
+	// Traits holds what tools declared about themselves at registration.
+	Traits *toolTraits
 	// Logger is the structured logging sink every handler and the
 	// run_script command registry write through.
 	Logger logging.Logger

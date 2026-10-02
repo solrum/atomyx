@@ -108,7 +108,14 @@ above). Registration is never auto-discovered, so adding a file under
   implements its own top-level timeout.
   It also reports every call start and end to the `DeviceSession`,
   which drives the idle timers and refuses a call on an expired run
-  with `RUN_EXPIRED`.
+  with `RUN_EXPIRED`. A tool registered through `addObserveOnlyTool`
+  (`core/internal/mcp/tool_traits.go`) is not reported, so it neither
+  marks the device running nor restarts the idle timer. `check_health`,
+  `list_devices` and `disconnect_device` register this way.
+  The middleware also appends the notices raised during a call
+  (`core/internal/mcp/call_notices.go`) as extra text content blocks
+  after the tool's own content. `DeviceSession.Ensure` raises one when a
+  re-acquire relaunched the app, so no handler formats it.
 - **Tool budget** (`core/internal/mcp/tool_budget.go`): the context a
   call runs under. It is clock-driven and can be paused.
   `pauseToolBudget(ctx)` stops the budget for the rest of a device
@@ -124,7 +131,7 @@ above). Registration is never auto-discovered, so adding a file under
 - **Acquisition progress** (`core/internal/mcp/device_progress.go`): the
   tool call middleware puts a phase reporter on the call context when
   the request carries a progress token. `DeviceSession` reports
-  building, launching and connected through it as MCP progress
+  preparing, launching and connected through it, connected only after the session is installed, as MCP progress
   notifications, so a handler never emits progress itself. A call with
   no token reports nothing.
 - **Run tracker** (`core/internal/mcp/run_tracker.go`): lets the

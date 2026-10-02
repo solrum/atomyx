@@ -404,6 +404,9 @@ func (s *DeviceSession) reacquire(ctx context.Context, prepared *rememberedDevic
 	s.logger.Info("session.device_reacquired", logging.LogContext{
 		"platform": string(active.Platform), "id": active.ID,
 	})
+	if sess.Relaunched() {
+		addNotice(ctx, appRelaunchedNotice)
+	}
 	return active, false, nil
 }
 
@@ -427,12 +430,17 @@ func (s *DeviceSession) prepare(ctx context.Context, desc device.Descriptor) err
 }
 
 // open opens the prepared device within the acquisition timeout. Phases
-// are reported to the calling client. The caller holds acquireMu.
+// are reported to the calling client, except the connected phase, which
+// install reports once the session is installed. The caller holds acquireMu.
 func (s *DeviceSession) open(ctx context.Context, req session.Request) (*session.Session, error) {
 	sess, err := session.OpenWithinBudget(ctx, s.deps, req, session.Acquisition{
 		BudgetMs: s.timeouts.DeviceAcquireMs,
 		Clock:    s.timers,
-		Progress: func(p session.Phase) { reportPhase(ctx, acquirePhaseFor(p)) },
+		Progress: func(p session.Phase) {
+			if p != session.PhaseConnected {
+				reportPhase(ctx, acquirePhaseFor(p))
+			}
+		},
 	})
 	return sess, canceledOr(ctx, err)
 }
@@ -489,6 +497,7 @@ func (s *DeviceSession) install(ctx context.Context, sess *session.Session, plat
 	s.mu.Unlock()
 	s.releasePrevious(displaced) //nolint:contextcheck // teardown is bounded by its own grace timer, not by a call context
 	go s.watchLost(sess)         //nolint:contextcheck // teardown is bounded by its own grace timer, not by a call context
+	reportPhase(ctx, phaseConnected)
 	return active, nil
 }
 

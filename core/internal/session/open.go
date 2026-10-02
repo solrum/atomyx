@@ -128,14 +128,31 @@ func Open(ctx context.Context, deps Deps, req Request) (*Session, error) {
 		}
 		return nil, err
 	}
+	relaunched := false
 	if req.Restore != nil {
 		if carrier, ok := built.Driver.(launchedAppCarrier); ok {
 			if err := carrier.RestoreLaunchedApp(ctx, req.Restore.BundleID, req.Restore.RunnerID); err != nil {
 				deps.Logger.Warn("could not restore the launched app after re-acquiring the device", logging.LogContext{"id": desc.ID, "error": err.Error()})
+			} else {
+				relaunched = relaunchedApp(carrier, *req.Restore)
 			}
 		}
 	}
-	return newSession(ctx, deps, desc, identity, held, built), nil
+	s := newSession(ctx, deps, desc, identity, held, built)
+	s.relaunched = relaunched
+	return s, nil
+}
+
+// relaunchedApp reports whether restoring state launched its app afresh.
+// A driver that connected to the runner instance that launched the app
+// only resumes tracking it. Any other runner has to launch the app, which
+// discards the app's in-memory state.
+func relaunchedApp(carrier launchedAppCarrier, restore LaunchState) bool {
+	if restore.BundleID == "" {
+		return false
+	}
+	_, connectedRunnerID := carrier.LaunchedApp()
+	return restore.RunnerID == "" || connectedRunnerID != restore.RunnerID
 }
 
 func (d Deps) withDefaults() Deps {
