@@ -20,10 +20,14 @@ type Info struct {
 
 // ServerDeps are the services NewServer wires into every tool
 // handler. Probe and Factory are required: they back list_devices and
-// select_device respectively. Storage, RunStore, Clock, and Logger
-// default to a file-backed store rooted per storage.NewFileStorage's
-// own precedence, a fresh in-memory RunStore, the system clock, and a
-// no-op logger when left zero-valued.
+// select_device respectively. Storage, RunStore, Runs, Clock, and
+// Logger default to a file-backed store rooted per
+// storage.NewFileStorage's own precedence, a fresh in-memory RunStore,
+// a catalog over Storage that serves flat run records alone and treats
+// the RunStore's active run as the only live one, the system clock, and
+// a no-op logger when left zero-valued. A composition root that has a
+// versioned run directory builds Runs itself, with that directory and a
+// Liveness that covers every writer it knows of.
 //
 // Session carries the identity resolver, lease manager and orphan reaper
 // device selection goes through, and a composition root sets all three.
@@ -35,6 +39,7 @@ type ServerDeps struct {
 	Factory  device.Factory
 	Storage  storage.Storage
 	RunStore *storage.RunStore
+	Runs     *storage.RunCatalog
 	Clock    orchestra.Clock
 	// TimerClock drives tool call budgets, the device acquisition
 	// budget and the idle timers. It defaults to the system clock, and
@@ -71,6 +76,11 @@ func NewServer(info Info, deps ServerDeps) *Server {
 		runStore = storage.NewRunStore()
 	}
 
+	runs := deps.Runs
+	if runs == nil {
+		runs = storage.NewRunCatalog(deps.Storage, "", runStore)
+	}
+
 	tracker := &runTracker{runs: runStore, storage: deps.Storage, clock: clk, logger: logger}
 	devices := NewDeviceSession(DeviceSessionDeps{
 		Factory: deps.Factory, Probe: deps.Probe, Runners: deps.Runners, Clock: clk, TimerClock: timers, Logger: logger,
@@ -82,7 +92,7 @@ func NewServer(info Info, deps ServerDeps) *Server {
 		Traits:   traits,
 		Logger:   logger,
 		Storage:  deps.Storage,
-		Runs:     storage.NewRunCatalog(deps.Storage),
+		Runs:     runs,
 		RunStore: runStore,
 		Clock:    clk,
 	}

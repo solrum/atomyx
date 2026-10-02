@@ -1,5 +1,5 @@
 {
-  "count": 3,
+  "count": 7,
   "nextOffset": null,
   "offset": 0,
   "ok": true,
@@ -23,12 +23,51 @@
       "findingsCount": 0,
       "finishedAt": 1789000004000,
       "id": "run-1789000000000-1",
-      "name": "legacy run",
+      "name": "legacy passed",
       "outcome": "passed",
       "result": "passed",
       "source": "exploratory",
       "startedAt": 1789000000000,
       "status": "passed"
+    },
+    {
+      "actionCount": 3,
+      "durationMs": 4000,
+      "findingsCount": 0,
+      "finishedAt": 1789000004000,
+      "id": "run-1788500000000-1",
+      "name": "legacy failed",
+      "outcome": "failed",
+      "result": "failed",
+      "source": "exploratory",
+      "startedAt": 1788500000000,
+      "status": "failed"
+    },
+    {
+      "actionCount": 3,
+      "durationMs": 4000,
+      "findingsCount": 0,
+      "finishedAt": 1789000004000,
+      "id": "run-1788400000000-1",
+      "name": "legacy error",
+      "outcome": "error",
+      "result": "failed",
+      "source": "exploratory",
+      "startedAt": 1788400000000,
+      "status": "error"
+    },
+    {
+      "actionCount": 3,
+      "durationMs": 4000,
+      "findingsCount": 0,
+      "finishedAt": 1789000004000,
+      "id": "run-1788300000000-1",
+      "name": "legacy cancelled",
+      "outcome": "cancelled",
+      "result": "cancelled",
+      "source": "exploratory",
+      "startedAt": 1788300000000,
+      "status": "cancelled"
     },
     {
       "actionCount": 0,
@@ -40,10 +79,21 @@
       "result": "cancelled",
       "source": "exploratory",
       "startedAt": 1788000000000,
+      "status": "cancelled"
+    },
+    {
+      "actionCount": 0,
+      "durationMs": 0,
+      "findingsCount": 0,
+      "id": "run-1787000000000-1",
+      "name": "live run",
+      "source": "exploratory",
+      "startedAt": 1787000000000,
       "status": "running"
     }
   ],
-  "totalMatching": 3
+  "skipped": 0,
+  "totalMatching": 7
 }
 {
   "ok": true,
@@ -81,6 +131,19 @@
     "result": "cancelled",
     "source": "exploratory",
     "startedAt": 1788000000000,
+    "status": "cancelled"
+  }
+}
+{
+  "ok": true,
+  "run": {
+    "actionCount": 0,
+    "durationMs": 0,
+    "findings": [],
+    "id": "run-1787000000000-1",
+    "name": "live run",
+    "source": "exploratory",
+    "startedAt": 1787000000000,
     "status": "running"
   }
 }

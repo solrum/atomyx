@@ -3,7 +3,6 @@ package runfolder
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -21,7 +20,7 @@ func writeMeta(t *testing.T, root, id, body string) {
 	}
 }
 
-func TestReaderGetNormalizesAnUnfinishedRun(t *testing.T) {
+func TestReaderGetClearsTheVerdictOfAnUnfinishedRun(t *testing.T) {
 	root := t.TempDir()
 	writeMeta(t, root, "r1", `{"schemaVersion":1,"runId":"r1","kind":"mcp","startedAt":5,"result":"passed","outcome":"passed"}`)
 
@@ -29,7 +28,7 @@ func TestReaderGetNormalizesAnUnfinishedRun(t *testing.T) {
 	if err != nil || !ok {
 		t.Fatalf("Get: ok %v err %v", ok, err)
 	}
-	if meta.Result != ResultCancelled || meta.Outcome != OutcomeInterrupted || meta.CompletedAt != nil {
+	if meta.Result != "" || meta.Outcome != "" || meta.CompletedAt != nil {
 		t.Fatalf("unfinished run: got result %q outcome %q", meta.Result, meta.Outcome)
 	}
 }
@@ -54,6 +53,7 @@ func TestReaderGetRejectsContractViolations(t *testing.T) {
 		"unknown outcome":     `{"schemaVersion":1,"runId":"r1","startedAt":1,"completedAt":2,"outcome":"exploded"}`,
 		"completed no result": `{"schemaVersion":1,"runId":"r1","startedAt":1,"completedAt":2}`,
 		"not json":            `{`,
+		"foreign run id":      `{"schemaVersion":1,"runId":"other","startedAt":1}`,
 	}
 	for name, body := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -87,9 +87,9 @@ func TestReaderListSkipsFoldersWithoutMetaAndReportsDamagedOnes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	metas, err := NewReader(root).List()
-	if err == nil || !strings.Contains(err.Error(), "damaged") {
-		t.Fatalf("List error: got %v, want one naming the damaged run", err)
+	metas, skipped, err := NewReader(root).List()
+	if err != nil || len(skipped) != 1 || skipped[0].ID != "damaged" {
+		t.Fatalf("List: got skipped %+v err %v, want the damaged run alone", skipped, err)
 	}
 	if len(metas) != 2 || metas[0].RunID != "a-run" || metas[1].RunID != "b-run" {
 		t.Fatalf("List: got %+v, want a-run then b-run", metas)
@@ -97,9 +97,9 @@ func TestReaderListSkipsFoldersWithoutMetaAndReportsDamagedOnes(t *testing.T) {
 }
 
 func TestReaderListOfAnEmptyRootIsEmpty(t *testing.T) {
-	metas, err := NewReader(t.TempDir()).List()
-	if err != nil || len(metas) != 0 {
-		t.Fatalf("got %v, %v", metas, err)
+	metas, skipped, err := NewReader(t.TempDir()).List()
+	if err != nil || len(metas) != 0 || len(skipped) != 0 {
+		t.Fatalf("got %v, %v, %v", metas, skipped, err)
 	}
 }
 

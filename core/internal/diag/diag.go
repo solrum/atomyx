@@ -102,6 +102,12 @@ const (
 	// CodeToolTimeout, which bounds a call, and from the device
 	// acquisition budget, which excludes the build.
 	CodeRunnerBuildTimeout = "RUNNER_BUILD_TIMEOUT"
+	// CodeRunUnreadable means a run exists in storage but its record
+	// is damaged and cannot be read.
+	CodeRunUnreadable = "RUN_UNREADABLE"
+	// CodeRunReadOnly means a write targeted a run whose stored form
+	// does not accept that write.
+	CodeRunReadOnly = "RUN_READ_ONLY"
 )
 
 // Coded is implemented by an error that carries a stable code and an

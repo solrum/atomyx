@@ -7,10 +7,10 @@ import (
 )
 
 // RemoveRun deletes the run folder with the given id under root and
-// reports whether one existed. A folder that vanishes while it is being removed counts
-// as already removed.
+// reports whether one existed. A folder that vanishes while it is being
+// removed counts as already removed.
 func RemoveRun(root, id string) (bool, error) {
-	if !validRunID(id) {
+	if !ValidRunID(id) {
 		return false, nil
 	}
 	dir := RunDir(root, id)

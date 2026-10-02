@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -60,7 +61,7 @@ func TestLegacyRunReaderMapsStatusesAndIgnoresNestedKeys(t *testing.T) {
 		m.MCP.ActionCount != 4 || *m.MCP.Summary != "s" || len(m.MCP.Findings) != 1 || m.MCP.DurationMs != 1_000 {
 		t.Fatalf("error record mapped to %+v", m)
 	}
-	if m := byID["r"]; m.Result != runfolder.ResultCancelled || m.Outcome != runfolder.OutcomeInterrupted || m.CompletedAt != nil {
+	if m := byID["r"]; m.Result != "" || m.Outcome != "" || m.CompletedAt != nil {
 		t.Fatalf("running record mapped to %+v", m)
 	}
 }
@@ -94,7 +95,7 @@ func TestRunCatalogPrefersVersionedAndSortsNewestFirst(t *testing.T) {
 	writeVersionedRun(t, root, "shared", 9, true)
 	writeVersionedRun(t, root, "open", 5, false)
 
-	listing, err := NewRunCatalog(fs).List()
+	listing, err := NewRunCatalog(fs, root, nil).List()
 	if err != nil || len(listing.Skipped) != 0 {
 		t.Fatalf("List: %v %v", listing.Skipped, err)
 	}
@@ -105,7 +106,7 @@ func TestRunCatalogPrefersVersionedAndSortsNewestFirst(t *testing.T) {
 	if len(ids) != 3 || ids[0] != "shared" || ids[1] != "open" || ids[2] != "old" {
 		t.Fatalf("order: got %v", ids)
 	}
-	if m, _, _ := NewRunCatalog(fs).Get("shared"); m.Outcome != runfolder.OutcomeFailed {
+	if m, _, _ := NewRunCatalog(fs, root, nil).Get("shared"); m.Outcome != runfolder.OutcomeFailed {
 		t.Fatalf("shared id resolved to %+v, want the versioned run", m)
 	}
 }
@@ -113,7 +114,7 @@ func TestRunCatalogPrefersVersionedAndSortsNewestFirst(t *testing.T) {
 func TestRunCatalogServesLegacyAloneOverAnUnrootedStore(t *testing.T) {
 	store := NewInMemoryStorage()
 	saveLegacy(t, store, PersistedRun{ID: "a", Status: RunStatusPassed})
-	c := NewRunCatalog(store)
+	c := NewRunCatalog(store, "", nil)
 	if _, ok, err := c.Get("a"); !ok || err != nil {
 		t.Fatalf("Get: %v %v", ok, err)
 	}
@@ -122,5 +123,145 @@ func TestRunCatalogServesLegacyAloneOverAnUnrootedStore(t *testing.T) {
 	}
 	if ok, err := c.Delete("a"); ok || err != nil {
 		t.Fatalf("second Delete: %v %v, want absent without error", ok, err)
+	}
+}
+
+type liveSet map[string]bool
+
+func (l liveSet) IsLive(id string) bool { return l[id] }
+
+func TestRunCatalogSettlesUnfinishedRunsByLiveness(t *testing.T) {
+	root := t.TempDir()
+	fs, _ := NewFileStorage(FileStorageOptions{Root: root})
+	saveLegacy(t, fs, PersistedRun{ID: "legacy-live", Status: RunStatusRunning, StartedAt: 1})
+	saveLegacy(t, fs, PersistedRun{ID: "legacy-dead", Status: RunStatusRunning, StartedAt: 2})
+	writeVersionedRun(t, root, "v-live", 3, false)
+	writeVersionedRun(t, root, "v-dead", 4, false)
+	c := NewRunCatalog(fs, root, liveSet{"legacy-live": true, "v-live": true})
+
+	for id, live := range map[string]bool{"legacy-live": true, "legacy-dead": false, "v-live": true, "v-dead": false} {
+		m, ok, err := c.Get(id)
+		if !ok || err != nil {
+			t.Fatalf("Get(%s): %v %v", id, ok, err)
+		}
+		if live && (m.Result != "" || m.Outcome != "") {
+			t.Errorf("%s is live, got result %q outcome %q", id, m.Result, m.Outcome)
+		}
+		if !live && (m.Result != runfolder.ResultCancelled || m.Outcome != runfolder.OutcomeInterrupted) {
+			t.Errorf("%s is not live, got result %q outcome %q", id, m.Result, m.Outcome)
+		}
+	}
+	listing, err := c.List()
+	if err != nil || len(listing.Runs) != 4 {
+		t.Fatalf("List: %v %+v", err, listing)
+	}
+	for _, m := range listing.Runs {
+		if runfolder.LegacyStatusOf(m) == "running" != (m.RunID == "legacy-live" || m.RunID == "v-live") {
+			t.Errorf("%s listed with result %q", m.RunID, m.Result)
+		}
+	}
+}
+
+func TestRunCatalogGetFallsBackFromADamagedFolderAndNamesTheRun(t *testing.T) {
+	root := t.TempDir()
+	fs, _ := NewFileStorage(FileStorageOptions{Root: root})
+	finished := int64(9)
+	writeVersionedRun(t, root, "both", 1, true)
+	writeVersionedRun(t, root, "only", 1, true)
+	for _, id := range []string{"both", "only"} {
+		if err := os.WriteFile(filepath.Join(runfolder.RunDir(root, id), runfolder.MetaFileName), []byte(`{`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	saveLegacy(t, fs, PersistedRun{ID: "both", Status: RunStatusPassed, StartedAt: 1, FinishedAt: &finished})
+	c := NewRunCatalog(fs, root, nil)
+
+	if m, ok, err := c.Get("both"); err != nil || !ok || m.Outcome != runfolder.OutcomePassed {
+		t.Fatalf("fallback: %+v %v %v", m, ok, err)
+	}
+	_, ok, err := c.Get("only")
+	var damaged *DamagedRunError
+	if ok || !errors.As(err, &damaged) || damaged.ID != "only" {
+		t.Fatalf("damaged only: ok %v err %v, want a DamagedRunError naming the run", ok, err)
+	}
+	listing, err := c.List()
+	if err != nil || len(listing.Runs) != 1 || listing.Runs[0].RunID != "both" ||
+		len(listing.Skipped) != 1 || listing.Skipped[0].ID != "only" {
+		t.Fatalf("List: runs %+v skipped %+v err %v", listing.Runs, listing.Skipped, err)
+	}
+}
+
+func TestRunCatalogRejectsARecordWhoseIdDiffersFromItsKey(t *testing.T) {
+	store := NewInMemoryStorage()
+	if err := store.Save(RunKey("a"), PersistedRun{ID: "b", Status: RunStatusPassed}); err != nil {
+		t.Fatal(err)
+	}
+	c := NewRunCatalog(store, "", nil)
+	if _, ok, err := c.Get("a"); ok || err == nil {
+		t.Fatalf("Get: ok %v err %v, want a damaged error", ok, err)
+	}
+	listing, err := c.List()
+	if err != nil || len(listing.Runs) != 0 || len(listing.Skipped) != 1 {
+		t.Fatalf("List: %+v %v", listing, err)
+	}
+}
+
+type ghostStorage struct {
+	Storage
+	ghosts []string
+}
+
+func (g ghostStorage) ListChildren(prefix string) ([]string, error) {
+	keys, err := g.Storage.ListChildren(prefix)
+	return append(keys, g.ghosts...), err
+}
+
+func TestLegacyRunListIsShallowAndSurvivesVanishingRecords(t *testing.T) {
+	root := t.TempDir()
+	fs, _ := NewFileStorage(FileStorageOptions{Root: root})
+	saveLegacy(t, fs, PersistedRun{ID: "a", Status: RunStatusPassed})
+	writeVersionedRun(t, root, "v", 1, true)
+
+	runs, skipped, err := NewLegacyRunReader(ghostStorage{fs, []string{RunKey("vanished")}}).List()
+	if err != nil || len(skipped) != 0 || len(runs) != 1 || runs[0].RunID != "a" {
+		t.Fatalf("got runs %+v skipped %+v err %v", runs, skipped, err)
+	}
+	if err := os.RemoveAll(filepath.Join(root, "runs")); err != nil {
+		t.Fatal(err)
+	}
+	if runs, skipped, err := NewLegacyRunReader(fs).List(); err != nil || len(runs) != 0 || len(skipped) != 0 {
+		t.Fatalf("missing runs directory: %+v %+v %v", runs, skipped, err)
+	}
+}
+
+func TestRunCatalogSetSummary(t *testing.T) {
+	root := t.TempDir()
+	fs, _ := NewFileStorage(FileStorageOptions{Root: root})
+	saveLegacy(t, fs, PersistedRun{ID: "a", Status: RunStatusPassed, Name: "keep"})
+	writeVersionedRun(t, root, "v", 1, true)
+	c := NewRunCatalog(fs, root, nil)
+
+	if ok, err := c.SetSummary("a", "new"); !ok || err != nil {
+		t.Fatalf("SetSummary: %v %v", ok, err)
+	}
+	var got PersistedRun
+	if _, err := fs.Load(RunKey("a"), &got); err != nil || got.Summary == nil || *got.Summary != "new" || got.Name != "keep" {
+		t.Fatalf("record after SetSummary: %+v %v", got, err)
+	}
+	if ok, err := c.SetSummary("missing", "x"); ok || err != nil {
+		t.Fatalf("missing: %v %v", ok, err)
+	}
+	if _, err := c.SetSummary("v", "x"); !errors.Is(err, ErrRunReadOnly) {
+		t.Fatalf("versioned run: got %v, want ErrRunReadOnly", err)
+	}
+	before, _ := os.ReadFile(filepath.Join(runfolder.RunDir(root, "v"), runfolder.MetaFileName))
+	for _, id := range []string{"v1/v/meta", "../x", `a\b`, ""} {
+		if _, err := c.SetSummary(id, "x"); !errors.Is(err, ErrInvalidRunID) {
+			t.Fatalf("SetSummary(%q): got %v, want ErrInvalidRunID", id, err)
+		}
+	}
+	after, _ := os.ReadFile(filepath.Join(runfolder.RunDir(root, "v"), runfolder.MetaFileName))
+	if string(before) != string(after) {
+		t.Fatal("a traversal id changed a folder meta")
 	}
 }

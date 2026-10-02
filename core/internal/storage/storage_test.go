@@ -71,3 +71,16 @@ func equalStrings(a, b []string) bool {
 	}
 	return true
 }
+
+func TestInMemoryStorageListChildrenIgnoresNestedRecords(t *testing.T) {
+	m := NewInMemoryStorage()
+	for _, key := range []string{"runs/a", "runs/b", "runs/v1/x/meta", "runsx/c"} {
+		if err := m.Save(key, 1); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := m.ListChildren("runs")
+	if err != nil || len(got) != 2 || got[0] != "runs/a" || got[1] != "runs/b" {
+		t.Fatalf("got %v %v", got, err)
+	}
+}

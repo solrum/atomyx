@@ -26,7 +26,7 @@ func NewLegacyRunReader(store Storage) *LegacyRunReader {
 // Get reads one legacy run. It reports false with a nil error when no
 // record exists for id, including an id that is not a bare record name.
 func (r *LegacyRunReader) Get(id string) (runfolder.Meta, bool, error) {
-	if !isBareRecordName(id) {
+	if !runfolder.ValidRunID(id) {
 		return runfolder.Meta{}, false, nil
 	}
 	var record PersistedRun
@@ -41,23 +41,21 @@ func (r *LegacyRunReader) Get(id string) (runfolder.Meta, bool, error) {
 	return meta, true, nil
 }
 
-// List reads every legacy run. A record that cannot be read is left out
-// of the runs and reported in skipped, so one damaged record never
-// hides the others. A failure to enumerate the records at all is
-// returned as err.
-func (r *LegacyRunReader) List() (runs []runfolder.Meta, skipped []error, err error) {
-	keys, err := r.store.List(strings.TrimSuffix(RunKeyPrefix, "/"))
+// List reads every legacy run, looking only at the records directly
+// under the runs prefix. A record that cannot be read is left out of
+// the runs and reported in skipped, so one damaged record never hides
+// the others, and a record that disappears while the listing runs is
+// ignored. A failure to enumerate the records at all is returned as err.
+func (r *LegacyRunReader) List() (runs []runfolder.Meta, skipped []runfolder.SkippedRun, err error) {
+	keys, err := r.store.ListChildren(strings.TrimSuffix(RunKeyPrefix, "/"))
 	if err != nil {
 		return nil, nil, err
 	}
 	for _, key := range keys {
 		id := strings.TrimPrefix(key, RunKeyPrefix)
-		if !isBareRecordName(id) {
-			continue
-		}
 		meta, ok, err := r.Get(id)
 		if err != nil {
-			skipped = append(skipped, fmt.Errorf("legacy run %s: %w", id, err))
+			skipped = append(skipped, runfolder.SkippedRun{ID: id, Err: err})
 			continue
 		}
 		if ok {
@@ -67,22 +65,19 @@ func (r *LegacyRunReader) List() (runs []runfolder.Meta, skipped []error, err er
 	return runs, skipped, nil
 }
 
-func isBareRecordName(id string) bool {
-	return id != "" && !strings.ContainsAny(id, `/\`)
-}
-
 // legacyMeta maps a flat record to the meta of the run folder it would
-// become. A running record never closed, so it has no completion time
-// and reads as cancelled and interrupted.
+// become. A running record has no completion time, no result, and no
+// outcome, and the catalog settles it. A record whose own id differs
+// from the key it is stored under is damaged.
 func legacyMeta(recordID string, record PersistedRun) (runfolder.Meta, error) {
 	result, outcome, ok := runfolder.FromLegacyStatus(string(record.Status))
 	if !ok {
 		return runfolder.Meta{}, errors.New("unknown status " + string(record.Status))
 	}
-	id := record.ID
-	if id == "" {
-		id = recordID
+	if record.ID != "" && record.ID != recordID {
+		return runfolder.Meta{}, fmt.Errorf("record id %q does not match its key %q", record.ID, recordID)
 	}
+	id := recordID
 	meta := runfolder.Meta{
 		SchemaVersion: runfolder.SchemaVersion,
 		RunID:         id,

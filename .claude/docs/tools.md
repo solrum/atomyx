@@ -54,9 +54,9 @@ type system enforces it.
 | `finish_run` | `core/internal/mcp/run_lifecycle_tool.go` | `status` (`passed`, `failed`, `error`), `summary` | the finished run record | `storage.RunStore.Finish` |
 | `report_bug` | `core/internal/mcp/report_bug_tool.go` | `title`, `description`, `captureScreenshot` | `{ok, id, runId, screenshotPath?}` | `storage.RunStore.RecordBug`, plus `Orchestra.Screenshot` when requested |
 | **Run and bug queries** | | | | |
-| `list_runs` | `core/internal/mcp/run_read_tool.go` | `status`, `limit`, `offset` | paginated run summaries, each with `result` and `outcome` | `storage.RunCatalog.List` |
-| `get_run` | `core/internal/mcp/run_read_tool.go` | `id` | the full run record, with `result` and `outcome` | `storage.RunCatalog.Get` |
-| `update_run_summary` | `core/internal/mcp/run_read_tool.go` | `id`, `summary` | `{ok}` | `storage.Storage.Load` then `storage.Storage.Save` |
+| `list_runs` | `core/internal/mcp/run_read_tool.go` | `status`, `limit`, `offset` | paginated run summaries, each with `result` and `outcome` (absent while running), plus `totalMatching` and `skipped` | `storage.RunCatalog.List` |
+| `get_run` | `core/internal/mcp/run_read_tool.go` | `id` | the full run record, with `result` and `outcome` (absent while running) | `storage.RunCatalog.Get` |
+| `update_run_summary` | `core/internal/mcp/run_read_tool.go` | `id`, `summary` | `{ok}`, or `RUN_READ_ONLY` for a versioned run | `storage.RunCatalog.SetSummary` |
 | `delete_run` | `core/internal/mcp/run_read_tool.go` | `id` | `{ok}` | `storage.RunCatalog.Delete` |
 | `list_bugs` | `core/internal/mcp/bug_read_tool.go` | `runId`, `limit`, `offset` | paginated bug summaries, newest first | `storage.Storage.List` |
 | `get_bug` | `core/internal/mcp/bug_read_tool.go` | `id` | the full bug record | `storage.Storage.Load` |
@@ -66,6 +66,18 @@ type system enforces it.
 | `get_case_studies` | `core/internal/mcp/case_study_tool.go` | `month`, `limit`, `offset` | paginated case-study bodies | `storage.Storage.List` then `storage.Storage.Load` |
 | **Script execution** | | | | |
 | `run_script` | `core/internal/mcp/run_script_tool.go` | `script` (YAML), `env` | structured per-step results: `{scriptName, ok, steps[], totalSteps, passedSteps, failedAtStep?, durationMs, deviceLost?}`, and each step carries its own `deviceLost?` | `script.ParseScript` then `runner.ScriptRunner.Run` |
+
+Run verdicts in `list_runs` and `get_run` depend on liveness. A run
+with no completion time and a live writer has status `running` and no
+`result` or `outcome`. A run with no completion time and no live writer
+has status `cancelled`, result `cancelled`, and outcome `interrupted`.
+`NewServer` takes the catalog through `ServerDeps.Runs`, built by the
+composition root with the run directory and a `runfolder.Liveness`. The
+MCP server uses its `RunStore`, so only its own active run is live. A
+`list_runs` call also reports `skipped`, the count of stored runs that
+could not be read, which `totalMatching` excludes. `update_run_summary`
+edits flat run records only, and a versioned run folder returns
+`RUN_READ_ONLY`.
 
 Tools are registered in `core/internal/mcp/server.go`'s `NewServer`
 in a fixed, explicit order grouped by concern (matching the grouping

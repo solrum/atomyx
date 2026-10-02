@@ -965,7 +965,7 @@ its findings.
 **Parameters**
 | Name | Type | Required | Default | Meaning |
 |---|---|---|---|---|
-| status | string, one of `passed`, `failed`, `error`, `running` | no | none | Filter to runs with this status. |
+| status | string, one of `passed`, `failed`, `error`, `cancelled`, `running` | no | none | Filter to runs with this status. |
 | limit | number | no | 20 | Maximum number of runs in this page. |
 | offset | number | no | 0 | Number of matching runs to skip. |
 
@@ -977,7 +977,11 @@ its findings.
   present in both forms is listed once, from the run folder. Runs with
   equal start times are ordered by id.
 - The status filter matches the `status` field of each summary. A run
-  that never recorded a completion has status `running`.
+  that has not completed and still has a live writer has status
+  `running`. A run that has not completed and has no live writer was
+  interrupted and has status `cancelled`.
+- A run whose stored record cannot be read is left out of the list and
+  counted in `skipped`.
 - The status filter matches persisted runs, so a currently active,
   unfinished run does not appear until finish_run persists it, unless
   a previous start_run already force-closed and persisted it.
@@ -985,8 +989,11 @@ its findings.
 **Returns**
 - `ok`: whether the call completed.
 - `count`: number of runs in this page.
-- `totalMatching`: number of runs matching the filter across every
-  page.
+- `totalMatching`: number of readable runs matching the filter across
+  every page. Runs counted in `skipped` are not included.
+- `skipped`: number of stored runs that could not be read, for example
+  a damaged run folder or a record whose id differs from its name.
+  Always present, and zero when every stored run was readable.
 - `offset`: the offset this page was requested at.
 - `nextOffset`: offset for the next page, or absent when this page
   reached the end.
@@ -998,8 +1005,10 @@ its findings.
   of `passed`, `failed`, `error`, `cancelled`, `deviceLost`, or
   `interrupted`. Every outcome belongs to exactly one result, so `error`
   belongs to `failed`, and `cancelled`, `deviceLost`, and `interrupted`
-  belong to `cancelled`. A run that never recorded a completion reports
-  result `cancelled` and outcome `interrupted`. `status` is kept for
+  belong to `cancelled`. A run that is still running has no `result`
+  and no `outcome`, and both fields are absent. A run that never
+  recorded a completion and has no live writer reports result
+  `cancelled` and outcome `interrupted`. `status` is kept for
   callers that predate `result` and `outcome`, so prefer the two newer
   fields.
 
@@ -1038,6 +1047,10 @@ id is not yet known.
 **Errors and recovery**
 - `ok: false` means the id does not exist in storage. Confirm it with
   list_runs, or check whether delete_run already deleted it.
+- Error `RUN_UNREADABLE` names the id and means the run exists but its
+  stored record is damaged. When a readable flat record exists for the
+  same id, get_run returns that record instead. Otherwise call
+  delete_run to remove the damaged record.
 
 **Example**
 ```json
@@ -1062,6 +1075,10 @@ the run is still active and has not been closed yet.
   including status, findings, and durationMs, is left untouched.
 - Works only on a persisted run, so it has no effect on a run that is
   still active. Call finish_run first.
+- Applies to runs stored as flat records. A run stored as a versioned
+  run folder is read-only here.
+- The id must be a bare run id. An id that contains a path separator is
+  rejected as an invalid argument.
 
 **Returns**
 - `ok`: false when the id is not found, true otherwise.
@@ -1070,6 +1087,9 @@ the run is still active and has not been closed yet.
 **Errors and recovery**
 - `ok: false` means the id does not exist. Confirm it with list_runs
   or get_run before retrying.
+- Error `RUN_READ_ONLY` names the run and means it is stored as a
+  versioned run folder, whose summary cannot be updated.
+- Error `INVALID_ARGUMENT` means the id is not a bare run id.
 
 **Example**
 ```json

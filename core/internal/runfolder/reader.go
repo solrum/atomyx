@@ -28,10 +28,12 @@ func NewReader(root string) *Reader {
 // meta cannot be read or violates the contract.
 //
 // The returned Meta is normalized. A meta without CompletedAt carries
-// result cancelled and outcome interrupted, whatever the file says,
-// and a completed meta that names only an Outcome gains its Result.
+// no Result and no Outcome, whatever the file says, so the caller
+// settles it through Meta.Settle. A completed meta that names only an
+// Outcome gains its Result. A meta whose runId differs from its folder
+// name is damaged.
 func (r *Reader) Get(id string) (Meta, bool, error) {
-	if !validRunID(id) {
+	if !ValidRunID(id) {
 		return Meta{}, false, nil
 	}
 	body, err := os.ReadFile(filepath.Join(RunDir(r.root, id), MetaFileName))
@@ -48,28 +50,43 @@ func (r *Reader) Get(id string) (Meta, bool, error) {
 	return meta, true, nil
 }
 
+// Has reports whether a run folder with the given id holds a meta.json,
+// readable or not.
+func (r *Reader) Has(id string) bool {
+	if !ValidRunID(id) {
+		return false
+	}
+	_, err := os.Stat(filepath.Join(RunDir(r.root, id), MetaFileName))
+	return err == nil
+}
+
+// SkippedRun names a run record that could not be read and the reason.
+type SkippedRun struct {
+	ID  string
+	Err error
+}
+
 // List reads the meta of every run folder, sorted by run id. A folder
-// that holds no meta.json is not a run and is skipped. A folder whose
-// meta cannot be read is left out of the result and reported in the
-// returned error, which joins one error per such folder, so a single
-// damaged run never hides the others.
-func (r *Reader) List() ([]Meta, error) {
+// that holds no meta.json is not a run and is ignored, and so is a
+// folder that vanishes while the listing runs. A folder whose meta
+// cannot be read is left out of the result and reported in skipped, so
+// a single damaged run never hides the others. An error is returned
+// only when the run directory itself cannot be listed.
+func (r *Reader) List() (metas []Meta, skipped []SkippedRun, err error) {
 	entries, err := os.ReadDir(VersionedRunsDir(r.root))
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return nil, nil
+			return nil, nil, nil
 		}
-		return nil, err
+		return nil, nil, err
 	}
-	var metas []Meta
-	var skipped []error
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
 		meta, ok, err := r.Get(entry.Name())
 		if err != nil {
-			skipped = append(skipped, fmt.Errorf("run %s: %w", entry.Name(), err))
+			skipped = append(skipped, SkippedRun{ID: entry.Name(), Err: err})
 			continue
 		}
 		if ok {
@@ -77,12 +94,12 @@ func (r *Reader) List() ([]Meta, error) {
 		}
 	}
 	sort.Slice(metas, func(i, j int) bool { return metas[i].RunID < metas[j].RunID })
-	return metas, errors.Join(skipped...)
+	return metas, skipped, nil
 }
 
-// validRunID rejects ids that could name a path outside the run
-// directory.
-func validRunID(id string) bool {
+// ValidRunID reports whether id is a bare run id, one that names a
+// single path element and so cannot reach outside the run directory.
+func ValidRunID(id string) bool {
 	return id != "" && id != "." && id != ".." && !strings.ContainsAny(id, `/\`) && !strings.ContainsRune(id, 0)
 }
 
@@ -97,9 +114,11 @@ func decodeMeta(folderID string, body []byte) (Meta, error) {
 	if meta.RunID == "" {
 		meta.RunID = folderID
 	}
+	if meta.RunID != folderID {
+		return Meta{}, fmt.Errorf("%s runId %q does not match its folder %q", MetaFileName, meta.RunID, folderID)
+	}
 	if meta.CompletedAt == nil {
-		meta.Result = ResultCancelled
-		meta.Outcome = OutcomeInterrupted
+		meta.Result, meta.Outcome = "", ""
 		return meta, nil
 	}
 	if meta.Outcome != "" {

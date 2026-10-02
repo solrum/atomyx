@@ -177,3 +177,18 @@ func TestRunStoreBugIDsAreDeterministicWithinARun(t *testing.T) {
 		t.Fatalf("second.ID: got %q, want %q", second.ID, want)
 	}
 }
+
+func TestRunStoreIsLiveOnlyForTheActiveRun(t *testing.T) {
+	store := NewRunStoreWithClock(&fakeClock{})
+	if store.IsLive("anything") {
+		t.Fatal("an idle store reported a live run")
+	}
+	run := store.Start(StartOptions{Name: "n"}).Run
+	if !store.IsLive(run.ID) || store.IsLive("other") {
+		t.Fatal("the active run must be the only live run")
+	}
+	store.Finish(RunStatusPassed)
+	if store.IsLive(run.ID) {
+		t.Fatal("a finished run reported live")
+	}
+}

@@ -175,6 +175,15 @@ func (r *RunStore) Current() *RunRecord {
 	return r.active
 }
 
+// IsLive reports whether runID is the active run, which is the run this
+// process is writing. It satisfies runfolder.Liveness for a catalog
+// that reads in the same process as the writer.
+func (r *RunStore) IsLive(runID string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.active != nil && r.active.ID == runID
+}
+
 // IncrementActions increments the action counter on the active run.
 // It is a no-op when no run is active.
 func (r *RunStore) IncrementActions() {

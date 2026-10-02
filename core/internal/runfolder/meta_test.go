@@ -98,7 +98,7 @@ func TestFromLegacyStatus(t *testing.T) {
 		{"failed", ResultFailed, OutcomeFailed},
 		{"error", ResultFailed, OutcomeError},
 		{"cancelled", ResultCancelled, OutcomeCancelled},
-		{"running", ResultCancelled, OutcomeInterrupted},
+		{"running", "", ""},
 	}
 	for _, c := range cases {
 		r, o, ok := FromLegacyStatus(c.status)
@@ -108,6 +108,61 @@ func TestFromLegacyStatus(t *testing.T) {
 	}
 	if _, _, ok := FromLegacyStatus("paused"); ok {
 		t.Error("unknown status mapped")
+	}
+}
+
+type fakeLiveness map[string]bool
+
+func (f fakeLiveness) IsLive(id string) bool { return f[id] }
+
+func TestLegacyStatusRoundTrips(t *testing.T) {
+	for _, status := range []string{"passed", "failed", "error", "cancelled", "running"} {
+		result, outcome, ok := FromLegacyStatus(status)
+		if !ok {
+			t.Fatalf("%s: unknown", status)
+		}
+		meta := Meta{RunID: "r", Result: result, Outcome: outcome}
+		if status != "running" {
+			done := int64(2)
+			meta.CompletedAt = &done
+		}
+		if got := LegacyStatusOf(meta.Settle(fakeLiveness{"r": true})); got != status {
+			t.Errorf("%s: round trip through a live settle gave %q", status, got)
+		}
+	}
+}
+
+func TestLegacyStatusOfCoversEveryOutcome(t *testing.T) {
+	want := map[Outcome]string{
+		OutcomePassed: "passed", OutcomeFailed: "failed", OutcomeError: "error",
+		OutcomeCancelled: "cancelled", OutcomeDeviceLost: "cancelled", OutcomeInterrupted: "cancelled",
+	}
+	for _, o := range Outcomes() {
+		result, _ := ResultOf(o)
+		done := int64(2)
+		if got := LegacyStatusOf(Meta{CompletedAt: &done, Result: result, Outcome: o}); got != want[o] {
+			t.Errorf("%s: got %q, want %q", o, got, want[o])
+		}
+	}
+}
+
+func TestSettleResolvesAnUnfinishedRunByLiveness(t *testing.T) {
+	unfinished := Meta{RunID: "r", Result: ResultPassed, Outcome: OutcomePassed}
+
+	live := unfinished.Settle(fakeLiveness{"r": true})
+	if live.Result != "" || live.Outcome != "" || LegacyStatusOf(live) != "running" {
+		t.Fatalf("live run: got %+v", live)
+	}
+	for name, l := range map[string]Liveness{"not live": fakeLiveness{}, "nil": nil} {
+		got := unfinished.Settle(l)
+		if got.Result != ResultCancelled || got.Outcome != OutcomeInterrupted || LegacyStatusOf(got) != "cancelled" {
+			t.Fatalf("%s: got %+v", name, got)
+		}
+	}
+	done := int64(9)
+	finished := Meta{RunID: "r", CompletedAt: &done, Result: ResultFailed, Outcome: OutcomeError}
+	if got := finished.Settle(fakeLiveness{"r": true}); got != finished {
+		t.Fatalf("a completed run changed: %+v", got)
 	}
 }
 

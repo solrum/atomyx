@@ -189,6 +189,27 @@ func (f *FileStorage) List(prefix string) ([]string, error) {
 	return keys, nil
 }
 
+func (f *FileStorage) ListChildren(prefix string) ([]string, error) {
+	dir := strings.TrimSuffix(prefix, "/")
+	entries, err := os.ReadDir(filepath.Join(f.root, dir))
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return []string{}, nil
+		}
+		return nil, err
+	}
+	keys := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		ext := filepath.Ext(entry.Name())
+		if entry.IsDir() || (ext != ".json" && ext != ".md") {
+			continue
+		}
+		keys = append(keys, dir+"/"+strings.TrimSuffix(entry.Name(), ext))
+	}
+	sort.Strings(keys)
+	return keys, nil
+}
+
 func (f *FileStorage) Delete(key string) error {
 	for _, ext := range [...]string{"json", "md"} {
 		if err := os.Remove(f.pathFor(key, ext)); err != nil && !errors.Is(err, fs.ErrNotExist) {

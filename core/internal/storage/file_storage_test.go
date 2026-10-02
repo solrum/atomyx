@@ -310,3 +310,22 @@ func TestFileStorageResolvesRootFromEnvThenHome(t *testing.T) {
 		t.Fatalf("root: got %q, want %q", fs.root, want)
 	}
 }
+
+func TestFileStorageListChildrenIgnoresNestedRecords(t *testing.T) {
+	fs, err := NewFileStorage(FileStorageOptions{Root: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"runs/a", "runs/b", "runs/v1/x/meta", "other/c"} {
+		if err := fs.Save(key, map[string]string{"k": key}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := fs.ListChildren("runs")
+	if err != nil || len(got) != 2 || got[0] != "runs/a" || got[1] != "runs/b" {
+		t.Fatalf("got %v %v", got, err)
+	}
+	if got, err := fs.ListChildren("absent"); err != nil || got == nil || len(got) != 0 {
+		t.Fatalf("absent prefix: %v %v", got, err)
+	}
+}

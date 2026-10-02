@@ -92,9 +92,10 @@ type MCPInfo struct {
 //
 // Result and Outcome are written only together with CompletedAt, in
 // one atomic update. A meta without CompletedAt describes a run that
-// never finished, and a reader reports it as result cancelled with
-// outcome interrupted. A legacy running record migrated into a folder
-// therefore carries no completedAt, no result, and no outcome.
+// has not finished and carries neither. Whether that run is still
+// running or was interrupted depends on its writer, which Settle
+// resolves through a Liveness. A legacy running record migrated into a
+// folder carries no completedAt, no result, and no outcome.
 //
 // Kind is script for a CLI run of one script, suite for a CLI suite or
 // scenario run, and mcp for a run driven through the MCP server. A
@@ -136,26 +137,89 @@ func ResultOf(o Outcome) (Result, bool) {
 	return "", false
 }
 
+// Legacy status strings of the flat run record and of the status field
+// that list_runs and get_run still report.
+const (
+	legacyStatusPassed    = "passed"
+	legacyStatusFailed    = "failed"
+	legacyStatusError     = "error"
+	legacyStatusCancelled = "cancelled"
+	legacyStatusRunning   = "running"
+)
+
 // FromLegacyStatus maps the status of a flat legacy run record to the
 // Result and Outcome of its run folder, and false for an unknown
-// status. A legacy running record belongs to a run that never closed,
-// so it maps to cancelled and interrupted.
+// status. A legacy running record has not completed, so it maps to an
+// empty Result and Outcome, the same shape as an unfinished meta, and
+// Meta.Settle decides whether it is still running or interrupted.
 func FromLegacyStatus(status string) (Result, Outcome, bool) {
 	var o Outcome
 	switch status {
-	case "passed":
+	case legacyStatusPassed:
 		o = OutcomePassed
-	case "failed":
+	case legacyStatusFailed:
 		o = OutcomeFailed
-	case "error":
+	case legacyStatusError:
 		o = OutcomeError
-	case "cancelled":
+	case legacyStatusCancelled:
 		o = OutcomeCancelled
-	case "running":
-		o = OutcomeInterrupted
+	case legacyStatusRunning:
+		return "", "", true
 	default:
 		return "", "", false
 	}
 	r, _ := ResultOf(o)
 	return r, o, true
+}
+
+// LegacyStatusOf is the inverse of FromLegacyStatus for a settled meta.
+// A meta without a Result is a live run and reports running. A meta
+// with a Result reports passed, failed, error, or cancelled, where
+// error is the one outcome that shares a result with failed.
+func LegacyStatusOf(m Meta) string {
+	switch m.Outcome {
+	case OutcomePassed:
+		return legacyStatusPassed
+	case OutcomeFailed:
+		return legacyStatusFailed
+	case OutcomeError:
+		return legacyStatusError
+	case OutcomeCancelled, OutcomeDeviceLost, OutcomeInterrupted:
+		return legacyStatusCancelled
+	}
+	switch m.Result {
+	case ResultPassed:
+		return legacyStatusPassed
+	case ResultFailed:
+		return legacyStatusFailed
+	case ResultCancelled:
+		return legacyStatusCancelled
+	}
+	return legacyStatusRunning
+}
+
+// Liveness reports whether a run still has a live writer. A run with a
+// live writer is running, and a run without one that never completed
+// was interrupted. Implementations answer from whatever signal they
+// hold, such as the in-process active run, and a composite that
+// consults several signals satisfies the same contract.
+type Liveness interface {
+	IsLive(runID string) bool
+}
+
+// Settle resolves the verdict of a meta that has no CompletedAt. A run
+// the Liveness reports as live carries no Result and no Outcome. Any
+// other unfinished run carries result cancelled and outcome
+// interrupted. A nil Liveness reports nothing as live. A meta with a
+// CompletedAt is returned unchanged.
+func (m Meta) Settle(l Liveness) Meta {
+	if m.CompletedAt != nil {
+		return m
+	}
+	if l != nil && l.IsLive(m.RunID) {
+		m.Result, m.Outcome = "", ""
+		return m
+	}
+	m.Result, m.Outcome = ResultCancelled, OutcomeInterrupted
+	return m
 }

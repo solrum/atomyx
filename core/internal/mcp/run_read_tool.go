@@ -3,15 +3,17 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
+	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/storage"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 var listRunsInputSchema = jsObject(map[string]any{
-	"status": jsAnyOf(jsConst("passed"), jsConst("failed"), jsConst("error"), jsConst("running")),
+	"status": jsAnyOf(jsConst("passed"), jsConst("failed"), jsConst("error"), jsConst("cancelled"), jsConst("running")),
 	"limit":  jsNumber(),
 	"offset": jsNumber(),
 })
@@ -28,6 +30,7 @@ type listRunsResult struct {
 	Ok            bool             `json:"ok"`
 	Count         int              `json:"count"`
 	TotalMatching int              `json:"totalMatching"`
+	Skipped       int              `json:"skipped"`
 	Offset        int              `json:"offset"`
 	NextOffset    *int             `json:"nextOffset"`
 	Runs          []runSummaryWire `json:"runs"`
@@ -42,11 +45,14 @@ func registerListRunsTool(server *mcp.Server, tc *ToolContext) {
 		Description: "List persisted runs from storage, sorted by startedAt descending " +
 			"(most recent first). Returns summaries only. Each run carries `result` " +
 			"(passed, failed, or cancelled) and `outcome` (passed, failed, error, " +
-			"cancelled, deviceLost, or interrupted). `status` is kept for existing " +
-			"callers. Use get_run to fetch the full record including findings. " +
-			"Supports status filter and " +
-			"offset/limit pagination. The response includes `totalMatching` so " +
-			"callers can decide whether to request another page.",
+			"cancelled, deviceLost, or interrupted). A run that is still running has " +
+			"neither, and a run that never completed with no live writer is cancelled " +
+			"with outcome interrupted. `status` is kept for existing callers. Use " +
+			"get_run to fetch the full record including findings. Supports status " +
+			"filter and offset/limit pagination. The response includes " +
+			"`totalMatching`, the readable runs matching the filter, so callers can " +
+			"decide whether to request another page, and `skipped`, the number of " +
+			"stored runs that could not be read and are in neither count.",
 		InputSchema: listRunsInputSchema,
 	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		if err := validateToolArguments(listRunsSchema, req.Params.Arguments); err != nil {
@@ -70,7 +76,7 @@ func registerListRunsTool(server *mcp.Server, tc *ToolContext) {
 			return errorResult(err), nil
 		}
 		for _, skipped := range listing.Skipped {
-			tc.Logger.Warn("run.list_skipped", logging.LogContext{"error": skipped.Error()})
+			tc.Logger.Warn("run.list_skipped", logging.LogContext{"id": skipped.ID, "error": skipped.Err.Error()})
 		}
 		filtered := make([]runSummaryWire, 0, len(listing.Runs))
 		for _, m := range listing.Runs {
@@ -85,6 +91,7 @@ func registerListRunsTool(server *mcp.Server, tc *ToolContext) {
 			Ok:            true,
 			Count:         len(summaries),
 			TotalMatching: len(filtered),
+			Skipped:       len(listing.Skipped),
 			Offset:        offset,
 			NextOffset:    nextOffset(offset, len(summaries), len(filtered)),
 			Runs:          summaries,
@@ -112,8 +119,10 @@ func registerGetRunTool(server *mcp.Server, tc *ToolContext) {
 	server.AddTool(&mcp.Tool{
 		Name: "get_run",
 		Description: "Fetch a single persisted run by id. Returns the full record " +
-			"including findings, summary, `result`, and `outcome`. Use list_runs first to discover " +
-			"available ids. Returns ok:false when the id is not found.",
+			"including findings, summary, `result`, and `outcome`, which are absent while the run " +
+			"is still running. Use list_runs first to discover available ids. Returns ok:false " +
+			"when the id is not found, and error RUN_UNREADABLE naming the id when the run's " +
+			"stored record is damaged.",
 		InputSchema: getRunInputSchema,
 	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		if err := validateToolArguments(getRunSchema, req.Params.Arguments); err != nil {
@@ -125,7 +134,7 @@ func registerGetRunTool(server *mcp.Server, tc *ToolContext) {
 		}
 		meta, ok, err := tc.Runs.Get(args.ID)
 		if err != nil {
-			return errorResult(err), nil
+			return errorResult(runReadError(args.ID, err)), nil
 		}
 		if !ok {
 			return jsonToolResult(map[string]any{"ok": false, "reason": fmt.Sprintf("run not found: %s", args.ID)})
@@ -194,7 +203,9 @@ func registerUpdateRunSummaryTool(server *mcp.Server, tc *ToolContext) {
 			"the summary wasn't known at finish_run time, or to append context " +
 			"discovered by a later investigation. Only the summary field is " +
 			"mutated, while all other fields (status, findings, durationMs, …) are " +
-			"preserved. Returns ok:false when the id is not found.",
+			"preserved. Applies to runs stored as flat records. A run stored as a " +
+			"versioned run folder returns error RUN_READ_ONLY naming the run. Returns " +
+			"ok:false when the id is not found.",
 		InputSchema: updateRunSummaryInputSchema,
 	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		if err := validateToolArguments(updateRunSummarySchema, req.Params.Arguments); err != nil {
@@ -204,20 +215,45 @@ func registerUpdateRunSummaryTool(server *mcp.Server, tc *ToolContext) {
 		if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
 			return invalidArgumentsResult("update_run_summary", err), nil
 		}
-		key := storage.RunKey(args.ID)
-		var existing storage.PersistedRun
-		ok, err := tc.Storage.Load(key, &existing)
+		ok, err := tc.Runs.SetSummary(args.ID, args.Summary)
 		if err != nil {
-			return errorResult(err), nil
+			return summaryUpdateErrorResult(args.ID, err), nil
 		}
 		if !ok {
 			return jsonToolResult(map[string]any{"ok": false, "reason": fmt.Sprintf("run not found: %s", args.ID)})
 		}
-		existing.Summary = &args.Summary
-		if err := tc.Storage.Save(key, existing); err != nil {
-			return errorResult(err), nil
-		}
 		tc.Logger.Info("run.summary_updated", logging.LogContext{"id": args.ID, "length": len(args.Summary)})
 		return jsonToolResult(map[string]any{"ok": true, "id": args.ID, "summary": args.Summary})
 	})
+}
+
+// runReadError turns a catalog read failure into a coded error that
+// names the run when its stored record is damaged.
+func runReadError(id string, err error) error {
+	var damaged *storage.DamagedRunError
+	if !errors.As(err, &damaged) {
+		return err
+	}
+	return diag.New(
+		diag.CodeRunUnreadable,
+		fmt.Sprintf("run %s exists but its stored record is damaged and cannot be read", id),
+		"Call delete_run with this id to remove the damaged record, then list_runs again.",
+		err,
+	)
+}
+
+// summaryUpdateErrorResult reports why a summary update was refused.
+func summaryUpdateErrorResult(id string, err error) *mcp.CallToolResult {
+	switch {
+	case errors.Is(err, storage.ErrInvalidRunID):
+		return invalidArgumentsResult("update_run_summary", fmt.Errorf("id %q: %w", id, err))
+	case errors.Is(err, storage.ErrRunReadOnly):
+		return errorResult(diag.New(
+			diag.CodeRunReadOnly,
+			fmt.Sprintf("run %s is stored as a versioned run folder, so its summary cannot be updated", id),
+			"Read the run with get_run. Only runs stored as flat records accept a summary update.",
+			err,
+		))
+	}
+	return errorResult(err)
 }

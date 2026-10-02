@@ -110,6 +110,7 @@
               "status": "passed"
             }
           ],
+          "skipped": 0,
           "totalMatching": 1
         }
       ],

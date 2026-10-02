@@ -80,6 +80,12 @@ func run() int {
 		return 1
 	}
 
+	// The catalog reads versioned run folders from the same directory
+	// the store resolved, and an unfinished run counts as running only
+	// while this process holds it as the active run.
+	runStore := storage.NewRunStore()
+	runs := storage.NewRunCatalog(store, store.Root(), runStore)
+
 	sessionDeps, err := sessionwire.Deps(procRunner, clock, logger, binaryName, "mcp")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "atomyx-mcp: %v\n", err)
@@ -92,6 +98,8 @@ func run() int {
 		Runners:  device.PingRunnerIdentifier{},
 		Factory:  factory,
 		Storage:  store,
+		RunStore: runStore,
+		Runs:     runs,
 		Clock:    clock,
 		Logger:   logger,
 		Session:  sessionDeps,

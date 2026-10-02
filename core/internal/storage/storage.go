@@ -29,6 +29,13 @@ type Storage interface {
 	// with no matching records returns an empty, non-nil slice.
 	List(prefix string) ([]string, error)
 
+	// ListChildren returns the keys of the records stored directly
+	// under prefix, sorted lexicographically. Records nested deeper
+	// below prefix are not returned. A prefix with no records, or one
+	// that disappears while it is listed, returns an empty, non-nil
+	// slice.
+	ListChildren(prefix string) ([]string, error)
+
 	// Delete removes the record at key. Deleting a key that does not
 	// exist is a no-op, not an error.
 	Delete(key string) error
@@ -78,6 +85,20 @@ func (m *InMemoryStorage) List(prefix string) ([]string, error) {
 	keys := make([]string, 0, len(m.store))
 	for k := range m.store {
 		if prefix == "" || strings.HasPrefix(k, prefix) {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	return keys, nil
+}
+
+func (m *InMemoryStorage) ListChildren(prefix string) ([]string, error) {
+	dir := strings.TrimSuffix(prefix, "/") + "/"
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	keys := make([]string, 0, len(m.store))
+	for k := range m.store {
+		if rest, ok := strings.CutPrefix(k, dir); ok && rest != "" && !strings.Contains(rest, "/") {
 			keys = append(keys, k)
 		}
 	}
