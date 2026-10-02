@@ -12,6 +12,7 @@ import (
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/report"
 	"dev.atomyx/internal/runfolder"
+	"dev.atomyx/internal/runner"
 	"dev.atomyx/internal/shutdown"
 	"dev.atomyx/internal/version"
 )
@@ -95,6 +96,16 @@ func outcomeForResult(ok bool) runfolder.Outcome {
 		return runfolder.OutcomePassed
 	}
 	return runfolder.OutcomeFailed
+}
+
+// outcomeForScript maps a finished script run to an outcome. A run that
+// aborted because the device or agent went unreachable is deviceLost,
+// not failed, since no step of the script is at fault.
+func outcomeForScript(result runner.ScriptResult) runfolder.Outcome {
+	if result.Abort != nil && result.Abort.Reason == runner.RunAbortDeviceLost {
+		return runfolder.OutcomeDeviceLost
+	}
+	return outcomeForResult(result.Ok)
 }
 
 // end finalizes the run folder and announces its path on stderr. A

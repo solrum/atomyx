@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/runner"
+	"dev.atomyx/internal/session"
 )
 
 const (
@@ -42,6 +44,7 @@ type scriptTarget struct {
 //   - the script passed: passed
 //   - the script failed a step: failed
 //   - the script aborted because the device was lost: deviceLost
+//   - ctx was canceled because the device was lost: deviceLost
 //   - ctx was canceled before the script passed: cancelled
 //   - the server stopped before the script passed: cancelled
 //   - exec returned an error: error
@@ -117,6 +120,8 @@ func scriptOutcome(ctx context.Context, result runner.ScriptResult, execErr erro
 	switch {
 	case execErr == nil && result.Ok:
 		return runfolder.OutcomePassed
+	case errors.Is(context.Cause(ctx), session.ErrDeviceLost):
+		return runfolder.OutcomeDeviceLost
 	case ctx.Err() != nil:
 		return runfolder.OutcomeCancelled
 	case result.Abort != nil && result.Abort.Reason == runner.RunAbortDeviceLost:

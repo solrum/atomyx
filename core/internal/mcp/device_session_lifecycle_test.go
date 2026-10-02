@@ -56,6 +56,9 @@ func (d *lifecycleDriver) RestoreLaunchedApp(_ context.Context, bundleID, fromRu
 type lifecycleFactory struct {
 	disconnected chan struct{}
 	onBuild      func(ctx context.Context, d *lifecycleDriver)
+	// lost, when set, is the loss signal every built driver reports
+	// through.
+	lost chan error
 
 	mu      sync.Mutex
 	drivers []*lifecycleDriver
@@ -77,7 +80,11 @@ func (f *lifecycleFactory) Build(ctx context.Context, _ device.Descriptor) (devi
 	f.mu.Lock()
 	f.drivers = append(f.drivers, drv)
 	f.mu.Unlock()
-	return device.Built{Driver: drv, Orchestra: orchestra.New(orchestra.OrchestraDeps{Driver: drv, Clock: orchestra.SystemClock{}})}, nil
+	var lost <-chan error
+	if f.lost != nil {
+		lost = f.lost
+	}
+	return device.Built{Driver: drv, Orchestra: orchestra.New(orchestra.OrchestraDeps{Driver: drv, Clock: orchestra.SystemClock{}}), Lost: lost}, nil
 }
 
 func (f *lifecycleFactory) builds() int {

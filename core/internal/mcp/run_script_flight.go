@@ -14,7 +14,7 @@ type scriptFlight struct {
 }
 
 type flightEntry struct {
-	cancel context.CancelFunc
+	cancel context.CancelCauseFunc
 	done   chan struct{}
 }
 
@@ -23,17 +23,17 @@ func newScriptFlight() *scriptFlight {
 }
 
 // begin registers one script execution. The returned context ends when
-// parent ends or when cancelAndWait runs. The returned function must be
+// parent ends or when cancelAndWait or cancelAll runs. The returned function must be
 // called exactly once, after the execution has made its last write into
 // the run.
 func (f *scriptFlight) begin(parent context.Context) (context.Context, func()) {
-	ctx, cancel := context.WithCancel(parent)
+	ctx, cancel := context.WithCancelCause(parent)
 	entry := &flightEntry{cancel: cancel, done: make(chan struct{})}
 	f.mu.Lock()
 	f.running[entry] = struct{}{}
 	f.mu.Unlock()
 	return ctx, func() {
-		cancel()
+		cancel(nil)
 		f.mu.Lock()
 		delete(f.running, entry)
 		f.mu.Unlock()
@@ -41,18 +41,32 @@ func (f *scriptFlight) begin(parent context.Context) (context.Context, func()) {
 	}
 }
 
-// cancelAndWait cancels every registered execution and waits until each
-// has called its end function. It returns ctx's error when ctx ends
-// first, and the executions it did not wait for keep running.
-func (f *scriptFlight) cancelAndWait(ctx context.Context) error {
+// cancelAll cancels every registered execution with cause, which
+// context.Cause reports on each execution's context, and does not wait.
+// A cause that is nil reads as context.Canceled.
+func (f *scriptFlight) cancelAll(cause error) {
+	for _, entry := range f.entries() {
+		entry.cancel(cause)
+	}
+}
+
+func (f *scriptFlight) entries() []*flightEntry {
 	f.mu.Lock()
+	defer f.mu.Unlock()
 	entries := make([]*flightEntry, 0, len(f.running))
 	for entry := range f.running {
 		entries = append(entries, entry)
 	}
-	f.mu.Unlock()
+	return entries
+}
+
+// cancelAndWait cancels every registered execution and waits until each
+// has called its end function. It returns ctx's error when ctx ends
+// first, and the executions it did not wait for keep running.
+func (f *scriptFlight) cancelAndWait(ctx context.Context) error {
+	entries := f.entries()
 	for _, entry := range entries {
-		entry.cancel()
+		entry.cancel(nil)
 	}
 	for _, entry := range entries {
 		select {

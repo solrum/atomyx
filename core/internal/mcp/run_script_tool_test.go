@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/runner"
+	"dev.atomyx/internal/session"
 	"dev.atomyx/internal/storage"
 )
 
@@ -171,6 +173,8 @@ func TestScriptOutcomeMapsEveryWayAScriptCanEnd(t *testing.T) {
 	canceled, cancel := context.WithCancel(context.Background())
 	cancel()
 	lost := runner.ScriptResult{Abort: &runner.RunAbort{Reason: runner.RunAbortDeviceLost}}
+	deviceGone, cancelDeviceGone := context.WithCancelCause(context.Background())
+	cancelDeviceGone(fmt.Errorf("%w: runner exited", session.ErrDeviceLost))
 	cases := []struct {
 		name   string
 		ctx    context.Context
@@ -183,6 +187,7 @@ func TestScriptOutcomeMapsEveryWayAScriptCanEnd(t *testing.T) {
 		{"device lost", context.Background(), lost, nil, runfolder.OutcomeDeviceLost},
 		{"error", context.Background(), runner.ScriptResult{}, errors.New("boom"), runfolder.OutcomeError},
 		{"canceled", canceled, runner.ScriptResult{}, nil, runfolder.OutcomeCancelled},
+		{"canceled by a lost device", deviceGone, runner.ScriptResult{}, nil, runfolder.OutcomeDeviceLost},
 		{"canceled with error", canceled, lost, errors.New("boom"), runfolder.OutcomeCancelled},
 		{"passed before cancel", canceled, runner.ScriptResult{Ok: true}, nil, runfolder.OutcomePassed},
 	}

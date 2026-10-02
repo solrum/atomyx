@@ -172,6 +172,19 @@ func (s *runSession) Finish(ctx context.Context, status string, summary *string)
 	return finishedRun{Run: run, DurationMs: durationOf(run)}, err
 }
 
+// CancelScriptsForLostDevice cancels every script the session is
+// running, in the open run and outside it, with cause as the
+// cancellation cause, so each reports a lost device and not a user
+// stop. It does not wait: a script that is its own run finalizes that
+// run when it returns.
+func (s *runSession) CancelScriptsForLostDevice(cause error) {
+	s.mu.Lock()
+	open := s.flight
+	s.mu.Unlock()
+	open.cancelAll(cause)
+	s.bare.cancelAll(cause)
+}
+
 // CloseOpenRun finalizes the open run with outcome on the server's
 // behalf, and returns the closed run's id. It returns an empty id when
 // no run was open. fallbackSummary becomes the summary only when the

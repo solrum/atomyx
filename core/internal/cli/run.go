@@ -236,7 +236,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
-	record.setOutcome(outcomeForResult(result.Ok), scriptMeta(result.TotalSteps, result.FailedAtStep))
+	record.setOutcome(outcomeForScript(result), scriptMeta(result.TotalSteps, result.FailedAtStep))
 
 	if jsonOutput {
 		payload := toJSONScriptResult(result)

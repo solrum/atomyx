@@ -740,6 +740,7 @@ func (s *DeviceSession) watchLost(sess *session.Session) {
 	s.mu.Unlock()
 
 	if s.runs != nil {
+		s.runs.CancelScriptsForLostDevice(sess.LostErr())
 		s.runs.CloseOpenRun(runfolder.OutcomeDeviceLost, "closed because the device was lost")
 	}
 	s.closeAndRemember(sess, remembered, "session.lost")
