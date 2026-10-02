@@ -142,12 +142,19 @@ func (c *RunCatalog) List() (RunListing, error) {
 }
 
 // Delete removes the run with the given id in whichever forms exist and
-// reports whether any did. A run whose writer is still live is not
-// touched, and Delete returns ErrRunLive for it. A form that disappears while it is being
-// removed counts as already removed. When a form is removed and the
-// other fails for any reason other than being absent, Delete returns
+// reports whether any did. It holds the migration lock in shared form,
+// so while a migration runs it removes nothing and returns
+// ErrMigrationInProgress. A run whose writer is still live is not
+// touched, and Delete returns ErrRunLive for it. A form that disappears
+// while it is being removed counts as already removed. When a form is
+// removed and the other fails for any reason other than being absent, Delete returns
 // both the true result and the failure.
 func (c *RunCatalog) Delete(id string) (bool, error) {
+	unlock, err := c.shareMigration()
+	if err != nil {
+		return false, err
+	}
+	defer unlock()
 	if c.live != nil && c.live.IsLive(id) {
 		return false, ErrRunLive
 	}
@@ -193,11 +200,18 @@ func ignoreNotExist(err error) error {
 // one exists and the flat record otherwise. It returns ErrInvalidRunID
 // for an id that is not a bare run id. A versioned run with no summary
 // field returns ErrRunReadOnly, and one whose writer is still running
-// returns ErrRunLive.
+// returns ErrRunLive. It holds the migration lock in shared form, so
+// while a migration runs it changes nothing and returns
+// ErrMigrationInProgress.
 func (c *RunCatalog) SetSummary(id, summary string) (bool, error) {
 	if !runfolder.ValidRunID(id) {
 		return false, ErrInvalidRunID
 	}
+	unlock, err := c.shareMigration()
+	if err != nil {
+		return false, err
+	}
+	defer unlock()
 	if c.versioned != nil && c.versioned.Has(id) {
 		ok, err := runfolder.SetSummary(c.root, id, summary)
 		switch {
@@ -218,4 +232,21 @@ func (c *RunCatalog) SetSummary(id, summary string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// shareMigration takes the migration lock in shared form for one edit
+// and returns the function that releases it. Edits of different runs
+// share the lock, and a migration, which needs it exclusively, cannot
+// start or finish its per-record steps while one is in flight. A
+// catalog with no root has no versioned runs and nothing to migrate
+// into, so it takes no lock.
+func (c *RunCatalog) shareMigration() (func(), error) {
+	if c.root == "" {
+		return func() {}, nil
+	}
+	lock, err := runfolder.ShareMigration(c.root)
+	if err != nil {
+		return nil, err
+	}
+	return func() { _ = lock.Release() }, nil
 }

@@ -284,3 +284,31 @@ func TestNewServerRequiresARunStarterThatNamesItsRoot(t *testing.T) {
 		t.Fatal("NewServer accepted a RunStarter with no root")
 	}
 }
+
+func TestDeleteAndSummaryUpdateAskToWaitWhileARunMigrationHoldsTheLock(t *testing.T) {
+	r := newRunServer(t)
+	finished := int64(9)
+	flat := storage.PersistedRun{
+		ID: "flat", Name: "old", Status: storage.RunStatusFailed, StartedAt: 1, FinishedAt: &finished,
+		Findings: []storage.RunBugReport{},
+	}
+	if err := r.store.Save(storage.RunKey("flat"), flat); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := runfolder.LockMigration(r.root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, got := range []map[string]any{
+		r.call("delete_run", map[string]any{"id": "flat"}),
+		r.call("update_run_summary", map[string]any{"id": "flat", "summary": "x"}),
+	} {
+		if got["code"] != "RUN_BUSY" || !strings.Contains(got["message"].(string), "migration") || got["hint"] == "" {
+			t.Fatalf("got %v, want RUN_BUSY naming the migration with a remedy", got)
+		}
+	}
+	_ = lock.Release()
+	if got := r.call("delete_run", map[string]any{"id": "flat"}); got["ok"] != true {
+		t.Fatalf("delete after the migration = %v", got)
+	}
+}

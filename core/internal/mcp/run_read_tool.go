@@ -175,6 +175,9 @@ func registerDeleteRunTool(server *mcp.Server, tc *ToolContext) {
 		if errors.Is(err, storage.ErrRunLive) {
 			return errorResult(runBusyError(args.ID, "deleted", err)), nil
 		}
+		if errors.Is(err, storage.ErrMigrationInProgress) {
+			return errorResult(migrationBusyError(err)), nil
+		}
 		if err != nil {
 			return errorResult(err), nil
 		}
@@ -261,6 +264,16 @@ func runBusyError(id, action string, cause error) error {
 	)
 }
 
+// migrationBusyError reports that a run migration holds the run store.
+func migrationBusyError(cause error) error {
+	return diag.New(
+		diag.CodeRunBusy,
+		"a run migration is in progress, so runs cannot be deleted or updated yet",
+		"Wait for the migration to finish, then repeat this call.",
+		cause,
+	)
+}
+
 // summaryUpdateErrorResult reports why a summary update was refused.
 func summaryUpdateErrorResult(id string, err error) *mcp.CallToolResult {
 	switch {
@@ -275,6 +288,8 @@ func summaryUpdateErrorResult(id string, err error) *mcp.CallToolResult {
 		))
 	case errors.Is(err, storage.ErrRunLive):
 		return errorResult(runBusyError(id, "updated", err))
+	case errors.Is(err, storage.ErrMigrationInProgress):
+		return errorResult(migrationBusyError(err))
 	}
 	return errorResult(err)
 }
