@@ -233,16 +233,6 @@ func TestLockLivenessNeverCreatesALockFile(t *testing.T) {
 	}
 }
 
-func TestAnyLiveIsLiveWhenAnySignalIs(t *testing.T) {
-	yes, no := fakeLiveness{"r": true}, fakeLiveness{}
-	if !AnyLive(no, nil, yes).IsLive("r") {
-		t.Fatal("any-of missed a live signal")
-	}
-	if AnyLive(no, nil).IsLive("r") || AnyLive().IsLive("r") {
-		t.Fatal("any-of invented a live run")
-	}
-}
-
 func TestAppendLogStopsAtTheBoundAndRecordsOneMarker(t *testing.T) {
 	w := startOne(t, t.TempDir())
 	w.maxLogBytes = 20

@@ -159,7 +159,9 @@ func registerDeleteRunTool(server *mcp.Server, tc *ToolContext) {
 			"deleted, and they remain accessible via get_bug with their runId field " +
 			"pointing at the now-missing run. Use list_bugs with the runId filter " +
 			"then delete_bug to clean those up individually if desired. Returns " +
-			"ok:false when the id is not found.",
+			"ok:false when the id is not found. A run a writer still holds open, " +
+			"such as the run opened by start_run, returns error RUN_BUSY and is left " +
+			"untouched, so call finish_run first.",
 		InputSchema: deleteRunInputSchema,
 	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		if err := validateToolArguments(deleteRunSchema, req.Params.Arguments); err != nil {
@@ -170,6 +172,9 @@ func registerDeleteRunTool(server *mcp.Server, tc *ToolContext) {
 			return invalidArgumentsResult("delete_run", err), nil
 		}
 		removed, err := tc.Runs.Delete(args.ID)
+		if errors.Is(err, storage.ErrRunLive) {
+			return errorResult(runBusyError(args.ID, "deleted", err)), nil
+		}
 		if err != nil {
 			return errorResult(err), nil
 		}
@@ -205,8 +210,8 @@ func registerUpdateRunSummaryTool(server *mcp.Server, tc *ToolContext) {
 			"mutated, while all other fields (status, findings, durationMs, …) are " +
 			"preserved. Applies to runs started by start_run or run_script, whether " +
 			"open or finished. A run with no summary field, such as one written by " +
-			"the atomyx CLI, returns error RUN_READ_ONLY naming the run. A run another " +
-			"process is still writing returns the same error until it finishes. " +
+			"the atomyx CLI, returns error RUN_READ_ONLY naming the run. A run a writer " +
+			"still holds open returns error RUN_BUSY until it finishes. " +
 			"Returns ok:false when the id is not found.",
 		InputSchema: updateRunSummaryInputSchema,
 	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -244,6 +249,18 @@ func runReadError(id string, err error) error {
 	)
 }
 
+// runBusyError reports that run id cannot be changed while a writer
+// holds it open. The writer may be this server's own open run or a
+// process of its own, and the same call works once the run finishes.
+func runBusyError(id, action string, cause error) error {
+	return diag.New(
+		diag.CodeRunBusy,
+		fmt.Sprintf("run %s is still being written, so it cannot be %s yet", id, action),
+		"Call finish_run if it is the run you opened, or wait for the run to finish, then repeat this call.",
+		cause,
+	)
+}
+
 // summaryUpdateErrorResult reports why a summary update was refused.
 func summaryUpdateErrorResult(id string, err error) *mcp.CallToolResult {
 	switch {
@@ -257,12 +274,7 @@ func summaryUpdateErrorResult(id string, err error) *mcp.CallToolResult {
 			err,
 		))
 	case errors.Is(err, storage.ErrRunLive):
-		return errorResult(diag.New(
-			diag.CodeRunReadOnly,
-			fmt.Sprintf("run %s is still being written by another process, so its summary cannot be updated yet", id),
-			"Wait for that run to finish, then update its summary.",
-			err,
-		))
+		return errorResult(runBusyError(id, "updated", err))
 	}
 	return errorResult(err)
 }

@@ -108,6 +108,10 @@ const (
 	// CodeRunReadOnly means a write targeted a run whose stored form
 	// does not accept that write.
 	CodeRunReadOnly = "RUN_READ_ONLY"
+	// CodeRunBusy means a write or delete targeted a run that a writer is
+	// still holding open. The condition is temporary, so the same call
+	// succeeds once the run finishes.
+	CodeRunBusy = "RUN_BUSY"
 )
 
 // Coded is implemented by an error that carries a stable code and an

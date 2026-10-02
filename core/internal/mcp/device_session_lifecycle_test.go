@@ -115,7 +115,7 @@ func newLifecycleFixture(t *testing.T) *lifecycleFixture {
 	runStore := storage.NewRunStore()
 	f.runs = newRunSession(runSessionDeps{
 		Store:   runStore,
-		Catalog: testRunCatalog(storage.NewInMemoryStorage(), f.root, runStore),
+		Catalog: testRunCatalog(storage.NewInMemoryStorage(), f.root),
 		Starter: testRunStarter(f.root),
 		Root:    f.root,
 		Clock:   f.clk,

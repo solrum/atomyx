@@ -17,9 +17,9 @@ var ErrInvalidRunID = errors.New("run id must be a bare id without path separato
 // run folder that carries no summary, such as the run of a CLI script.
 var ErrRunReadOnly = errors.New("run is stored as a versioned run folder that has no summary field")
 
-// ErrRunLive is returned when a summary update targets a run that
-// another process is still writing.
-var ErrRunLive = errors.New("run is still being written by another process")
+// ErrRunLive is returned when a summary update or a delete targets a
+// run that a writer still holds open, in this process or another.
+var ErrRunLive = errors.New("run is still being written")
 
 // DamagedRunError reports a run whose stored record exists but cannot
 // be read. It names the run so a caller can tell which one failed.
@@ -59,6 +59,9 @@ type RunCatalog struct {
 // that holds versioned run folders, and an empty root means the catalog
 // has no versioned runs and serves flat records alone. live decides
 // which unfinished runs are still running, and nil means none are.
+// Passing runfolder.NewLockLiveness(root) covers every writer on the
+// machine, this process included, because the lock is held per open
+// file and a second open in the same process conflicts with it.
 func NewRunCatalog(store Storage, root string, live runfolder.Liveness) *RunCatalog {
 	c := &RunCatalog{legacy: NewLegacyRunReader(store), live: live}
 	if root != "" {
@@ -66,15 +69,6 @@ func NewRunCatalog(store Storage, root string, live runfolder.Liveness) *RunCata
 		c.versioned = runfolder.NewReader(root)
 	}
 	return c
-}
-
-// NewRunLiveness returns the Liveness a process that writes runs
-// through runs and reads the run folders under root should give its
-// catalog. A run is live when runs holds it open in this process, or
-// when any process holds the lock of its run folder, so a run written
-// by another process, such as a CLI run, reads as running.
-func NewRunLiveness(runs *RunStore, root string) runfolder.Liveness {
-	return runfolder.AnyLive(runfolder.LivenessFunc(runs.IsLive), runfolder.NewLockLiveness(root))
 }
 
 // Get returns the run with the given id, preferring the versioned
@@ -148,11 +142,15 @@ func (c *RunCatalog) List() (RunListing, error) {
 }
 
 // Delete removes the run with the given id in whichever forms exist and
-// reports whether any did. A form that disappears while it is being
+// reports whether any did. A run whose writer is still live is not
+// touched, and Delete returns ErrRunLive for it. A form that disappears while it is being
 // removed counts as already removed. When a form is removed and the
 // other fails for any reason other than being absent, Delete returns
 // both the true result and the failure.
 func (c *RunCatalog) Delete(id string) (bool, error) {
+	if c.live != nil && c.live.IsLive(id) {
+		return false, ErrRunLive
+	}
 	var removed bool
 	var errs []error
 	if c.versioned != nil {

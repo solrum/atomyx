@@ -56,8 +56,8 @@ type system enforces it.
 | **Run and bug queries** | | | | |
 | `list_runs` | `core/internal/mcp/run_read_tool.go` | `status`, `limit`, `offset` | paginated run summaries, each with `result` and `outcome` (absent while running), plus `totalMatching` and `skipped` | `storage.RunCatalog.List` |
 | `get_run` | `core/internal/mcp/run_read_tool.go` | `id` | the full run record, with `result` and `outcome` (absent while running) | `storage.RunCatalog.Get` |
-| `update_run_summary` | `core/internal/mcp/run_read_tool.go` | `id`, `summary` | `{ok}`, or `RUN_READ_ONLY` for a run with no summary field or one another process is still writing | `storage.RunCatalog.SetSummary` |
-| `delete_run` | `core/internal/mcp/run_read_tool.go` | `id` | `{ok}` | `storage.RunCatalog.Delete` |
+| `update_run_summary` | `core/internal/mcp/run_read_tool.go` | `id`, `summary` | `{ok}`, `RUN_READ_ONLY` for a run with no summary field, or `RUN_BUSY` for a run a writer still holds open | `storage.RunCatalog.SetSummary` |
+| `delete_run` | `core/internal/mcp/run_read_tool.go` | `id` | `{ok}`, or `RUN_BUSY` for a run a writer still holds open, which is left untouched | `storage.RunCatalog.Delete` |
 | `list_bugs` | `core/internal/mcp/bug_read_tool.go` | `runId`, `limit`, `offset` | paginated bug summaries, newest first | `storage.Storage.List` |
 | `get_bug` | `core/internal/mcp/bug_read_tool.go` | `id` | the full bug record | `storage.Storage.Load` |
 | `delete_bug` | `core/internal/mcp/bug_read_tool.go` | `id` | `{ok}`, and removes the bug record and its screenshot sub-record | `storage.Storage.Delete` |
@@ -74,15 +74,16 @@ has status `cancelled`, result `cancelled`, and outcome `interrupted`.
 `NewServer` requires the catalog through `ServerDeps.Runs` and the run
 folder creator through `ServerDeps.RunStarter`, and returns an error
 when either is missing. `cmd/atomyx-mcp` builds the catalog over the
-storage root with `runfolder.AnyLive` of its `RunStore` and
-`runfolder.LockLiveness`, so a run another process holds a lock on, such
-as a CLI run, lists as running. A
+storage root with `runfolder.LockLiveness`. The lock covers the writers
+of this process and of every other one, so a run held by a CLI run lists
+as running, and `delete_run` refuses it with `RUN_BUSY`. A
 `list_runs` call also reports `skipped`, the count of stored runs that
 could not be read, which `totalMatching` excludes. `update_run_summary`
 edits runs that carry a summary field, which are the runs written by
 `start_run` and `run_script` and runs stored as flat records. A run written
 by the CLI has none, and a run whose writer is another live process is
-not editable until it finishes, so both return `RUN_READ_ONLY`.
+not editable until it finishes and returns `RUN_BUSY`. A run with no
+summary field returns `RUN_READ_ONLY`.
 
 `start_run` creates a run folder of kind `mcp` through `runfolder.Starter`
 at the storage root. The folder id is labeled with the selected

@@ -39,32 +39,3 @@ func (l *LockLiveness) IsLive(runID string) bool {
 	_ = flock.Unlock(f)
 	return false
 }
-
-// LivenessFunc adapts a function to a Liveness.
-type LivenessFunc func(runID string) bool
-
-// IsLive calls f.
-func (f LivenessFunc) IsLive(runID string) bool { return f(runID) }
-
-type anyLive []Liveness
-
-func (a anyLive) IsLive(runID string) bool {
-	for _, l := range a {
-		if l.IsLive(runID) {
-			return true
-		}
-	}
-	return false
-}
-
-// AnyLive combines liveness signals. A run is live when any of them
-// reports it live. Nil entries are skipped.
-func AnyLive(signals ...Liveness) Liveness {
-	var kept anyLive
-	for _, s := range signals {
-		if s != nil {
-			kept = append(kept, s)
-		}
-	}
-	return kept
-}

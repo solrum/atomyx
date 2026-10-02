@@ -24,7 +24,7 @@ func TestPersistedRunRoundTripsThroughFileStorage(t *testing.T) {
 	}
 	runStore := NewRunStoreWithClock(&fakeClock{})
 
-	runStore.Start(StartOptions{Name: "login flow"})
+	runStore.Start(StartOptions{ID: "run-login", Name: "login flow"})
 	if _, err := runStore.RecordBug(RecordBugOptions{Title: "t", Description: "d"}); err != nil {
 		t.Fatalf("RecordBug: %v", err)
 	}

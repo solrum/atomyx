@@ -89,7 +89,7 @@ func run() int {
 	// holds the lock of its run folder.
 	runRoot := store.Root()
 	runStore := storage.NewRunStore()
-	runs := storage.NewRunCatalog(store, runRoot, storage.NewRunLiveness(runStore, runRoot))
+	runs := storage.NewRunCatalog(store, runRoot, runfolder.NewLockLiveness(runRoot))
 	runStarter := runfolder.NewStarter(runRoot, time.Now, rand.Reader)
 
 	sessionDeps, err := sessionwire.Deps(procRunner, clock, logger, binaryName, "mcp")

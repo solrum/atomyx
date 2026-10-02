@@ -1089,7 +1089,8 @@ the run is still active and has not been closed yet.
   into the run folder of a run started by start_run or run_script, or
   into the flat record of a run stored in the flat form.
 - A run with no summary field, such as one written by the atomyx CLI,
-  is read-only here. So is a run that another process is still writing.
+  is read-only here. A run that a writer other than this session's open
+  run still holds open is busy until it finishes.
 - The id must be a bare run id. An id that contains a path separator is
   rejected as an invalid argument.
 
@@ -1101,7 +1102,10 @@ the run is still active and has not been closed yet.
 - `ok: false` means the id does not exist. Confirm it with list_runs
   or get_run before retrying.
 - Error `RUN_READ_ONLY` names the run and means it has no summary
-  field, or that another process is still writing it.
+  field.
+- Error `RUN_BUSY` names the run and means a writer still holds it open,
+  such as a run_script run in progress or a run another process is
+  writing. Repeat the call after the run finishes.
 - Error `INVALID_ARGUMENT` means the id is not a bare run id.
 
 **Example**
@@ -1129,6 +1133,8 @@ for each of that run's bug records that also needs deleting.
 - Use list_bugs with a runId filter to find those bug records, then
   delete_bug to remove each one individually if a full cleanup is
   wanted.
+- A run a writer still holds open is never deleted. That covers the run
+  opened by start_run and a run another process is writing.
 
 **Returns**
 - `ok`: false when the id is not found, true otherwise.
@@ -1137,6 +1143,10 @@ for each of that run's bug records that also needs deleting.
 **Errors and recovery**
 - `ok: false` means the id does not exist, so there is nothing to
   delete. Confirm the id with list_runs.
+- Error `RUN_BUSY` names the run and means a writer still holds it open.
+  The run folder is left untouched. Call finish_run if it is the run you
+  opened, or wait for the other process to finish, then call delete_run
+  again.
 
 **Example**
 ```json

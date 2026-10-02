@@ -1,13 +1,11 @@
 package storage
 
 import (
-	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
-	"time"
 
 	"dev.atomyx/internal/runfolder"
 )
@@ -287,30 +285,5 @@ func TestRunCatalogSetSummaryEditsAVersionedRunWithASummaryField(t *testing.T) {
 	meta, ok, err := c.Get("m")
 	if err != nil || !ok || meta.MCP == nil || meta.MCP.Summary == nil || *meta.MCP.Summary != "reviewed" || meta.MCP.Name != "smoke" {
 		t.Fatalf("meta after SetSummary: %+v ok=%v err=%v", meta, ok, err)
-	}
-}
-
-func TestNewRunLivenessCoversTheOpenRunAndHeldLocks(t *testing.T) {
-	root := t.TempDir()
-	runs := NewRunStore()
-	live := NewRunLiveness(runs, root)
-	open := runs.Start(StartOptions{Name: "n"}).Run
-
-	if !live.IsLive(open.ID) {
-		t.Fatal("the open run is not live")
-	}
-	if live.IsLive("other") {
-		t.Fatal("an unknown run is live")
-	}
-	w, err := runfolder.NewStarter(root, time.Now, bytes.NewReader([]byte{1, 2})).Start("cli", runfolder.Meta{Kind: runfolder.KindScript})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !live.IsLive(w.ID()) {
-		t.Fatal("a run whose lock another writer holds is not live")
-	}
-	_ = w.Close()
-	if live.IsLive(w.ID()) {
-		t.Fatal("a closed run is still live")
 	}
 }

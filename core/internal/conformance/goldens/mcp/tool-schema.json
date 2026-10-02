@@ -42,7 +42,7 @@
     }
   },
   "delete_run": {
-    "description": "Delete a persisted run. Removes every stored form of the run. Associated bug records (`bugs/\u003crunId\u003e-bug-\u003cn\u003e`) are NOT cascade-deleted, and they remain accessible via get_bug with their runId field pointing at the now-missing run. Use list_bugs with the runId filter then delete_bug to clean those up individually if desired. Returns ok:false when the id is not found.",
+    "description": "Delete a persisted run. Removes every stored form of the run. Associated bug records (`bugs/\u003crunId\u003e-bug-\u003cn\u003e`) are NOT cascade-deleted, and they remain accessible via get_bug with their runId field pointing at the now-missing run. Use list_bugs with the runId filter then delete_bug to clean those up individually if desired. Returns ok:false when the id is not found. A run a writer still holds open, such as the run opened by start_run, returns error RUN_BUSY and is left untouched, so call finish_run first.",
     "inputSchema": {
       "properties": {
         "id": {
@@ -1227,7 +1227,7 @@
     }
   },
   "update_run_summary": {
-    "description": "Set or replace the summary field on a persisted run. Useful when the summary wasn't known at finish_run time, or to append context discovered by a later investigation. Only the summary field is mutated, while all other fields (status, findings, durationMs, …) are preserved. Applies to runs started by start_run or run_script, whether open or finished. A run with no summary field, such as one written by the atomyx CLI, returns error RUN_READ_ONLY naming the run. A run another process is still writing returns the same error until it finishes. Returns ok:false when the id is not found.",
+    "description": "Set or replace the summary field on a persisted run. Useful when the summary wasn't known at finish_run time, or to append context discovered by a later investigation. Only the summary field is mutated, while all other fields (status, findings, durationMs, …) are preserved. Applies to runs started by start_run or run_script, whether open or finished. A run with no summary field, such as one written by the atomyx CLI, returns error RUN_READ_ONLY naming the run. A run a writer still holds open returns error RUN_BUSY until it finishes. Returns ok:false when the id is not found.",
     "inputSchema": {
       "properties": {
         "id": {

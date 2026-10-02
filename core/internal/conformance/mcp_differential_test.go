@@ -48,7 +48,7 @@ func newGoMcpClientSession(t *testing.T, ctx context.Context, program *McpDriver
 		Factory:  &mcpScriptedMockFactory{program: program},
 		Storage:  store,
 		RunStore: runStore,
-		Runs:     storage.NewRunCatalog(store, root, storage.NewRunLiveness(runStore, root)),
+		Runs:     storage.NewRunCatalog(store, root, runfolder.NewLockLiveness(root)),
 		RunStarter: runfolder.NewStarter(root,
 			func() time.Time { return mcpConformanceEpoch }, &mcpSuffixReader{}),
 		RunRoot: root,

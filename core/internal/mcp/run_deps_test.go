@@ -27,10 +27,10 @@ func testRunStarter(root string) *runfolder.Starter {
 	return runfolder.NewStarter(root, func() time.Time { return testRunEpoch }, &countingReader{})
 }
 
-// testRunCatalog reads runs under root, counting a run the store holds
+// testRunCatalog reads runs under root, counting a run any writer holds
 // open or any process locks as running.
-func testRunCatalog(store storage.Storage, root string, runStore *storage.RunStore) *storage.RunCatalog {
-	return storage.NewRunCatalog(store, root, storage.NewRunLiveness(runStore, root))
+func testRunCatalog(store storage.Storage, root string) *storage.RunCatalog {
+	return storage.NewRunCatalog(store, root, runfolder.NewLockLiveness(root))
 }
 
 // withRunDeps fills the run dependencies NewServer requires with ones
@@ -42,7 +42,7 @@ func withRunDeps(t testing.TB, deps ServerDeps) ServerDeps {
 		deps.RunStore = storage.NewRunStore()
 	}
 	if deps.Runs == nil {
-		deps.Runs = testRunCatalog(deps.Storage, root, deps.RunStore)
+		deps.Runs = testRunCatalog(deps.Storage, root)
 	}
 	if deps.RunStarter == nil {
 		deps.RunStarter = testRunStarter(root)

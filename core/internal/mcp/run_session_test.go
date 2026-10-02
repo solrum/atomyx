@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -30,7 +31,7 @@ func newRunServer(t *testing.T) runServer {
 		Factory:    singleMockDriverFactory{driver: drv},
 		Storage:    store,
 		RunStore:   runStore,
-		Runs:       testRunCatalog(store, root, runStore),
+		Runs:       testRunCatalog(store, root),
 		RunStarter: testRunStarter(root),
 		RunRoot:    root,
 	})
@@ -221,5 +222,42 @@ func TestGetRunReadsAFlatRecordAndAnMCPRunFolder(t *testing.T) {
 	}
 	if listed := r.call("list_runs", map[string]any{}); listed["totalMatching"] != float64(2) {
 		t.Fatalf("list_runs = %v, want both forms", listed)
+	}
+}
+
+func requireRunBusy(t *testing.T, got map[string]any, id string) {
+	t.Helper()
+	if got["code"] != "RUN_BUSY" || !strings.Contains(got["message"].(string), id) || got["remedy"] == "" {
+		t.Fatalf("got %v, want RUN_BUSY naming %s with a remedy", got, id)
+	}
+}
+
+func TestDeleteRunRefusesTheRunOpenedByStartRun(t *testing.T) {
+	r := newRunServer(t)
+	id := r.call("start_run", map[string]any{"name": "open"})["id"].(string)
+
+	requireRunBusy(t, r.call("delete_run", map[string]any{"id": id}), id)
+
+	if _, err := os.Stat(runfolder.RunDir(r.root, id)); err != nil {
+		t.Fatalf("open run folder was removed: %v", err)
+	}
+	r.call("finish_run", map[string]any{})
+	if got := r.call("delete_run", map[string]any{"id": id}); got["ok"] != true {
+		t.Fatalf("delete_run after finish_run = %v", got)
+	}
+}
+
+func TestRunsHeldByAnotherWriterAreBusyForDeleteAndSummaryUpdate(t *testing.T) {
+	r := newRunServer(t)
+	w, err := testRunStarter(r.root).Start("cli", runfolder.Meta{Kind: runfolder.KindMCP, MCP: &runfolder.MCPInfo{Name: "other"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = w.Close() })
+
+	requireRunBusy(t, r.call("delete_run", map[string]any{"id": w.ID()}), w.ID())
+	requireRunBusy(t, r.call("update_run_summary", map[string]any{"id": w.ID(), "summary": "x"}), w.ID())
+	if _, err := os.Stat(w.Dir()); err != nil {
+		t.Fatalf("held run folder was removed: %v", err)
 	}
 }

@@ -75,9 +75,9 @@ func (SystemClock) NowMs() int64 { return time.Now().UnixMilli() }
 // StartOptions configures RunStore.Start. Source is a pointer so an
 // explicitly empty string and an omitted value stay distinguishable:
 // omitting Source defaults to "unknown", while an explicit empty
-// string is stored as given. A non-empty ID becomes the run's id, so a
-// caller that already owns the run's durable identity keeps one id for
-// both. An empty ID takes the next generated one.
+// string is stored as given. ID is the run's id and must be set by a
+// caller that already owns the run's durable identity, such as its run
+// folder.
 type StartOptions struct {
 	ID     string
 	Name   string
@@ -100,7 +100,6 @@ type RunStore struct {
 	mu     sync.Mutex
 	clock  Clock
 	active *RunRecord
-	nextID int
 }
 
 // NewRunStore constructs a RunStore backed by the system clock.
@@ -111,7 +110,7 @@ func NewRunStore() *RunStore {
 // NewRunStoreWithClock constructs a RunStore backed by clock, for
 // deterministic tests.
 func NewRunStoreWithClock(clock Clock) *RunStore {
-	return &RunStore{clock: clock, nextID: 1}
+	return &RunStore{clock: clock}
 }
 
 // Start begins a new run. If a run is already active, it is marked
@@ -135,12 +134,8 @@ func (r *RunStore) Start(opts StartOptions) StartRunResult {
 	}
 
 	startedAt := r.clock.NowMs()
-	id := opts.ID
-	if id == "" {
-		id = fmt.Sprintf("run-%d-%d", startedAt, r.nextID)
-	}
 	run := &RunRecord{
-		ID:          id,
+		ID:          opts.ID,
 		Name:        opts.Name,
 		Source:      source,
 		StartedAt:   startedAt,
@@ -148,7 +143,6 @@ func (r *RunStore) Start(opts StartOptions) StartRunResult {
 		ActionCount: 0,
 		Findings:    []RunBugReport{},
 	}
-	r.nextID++
 	r.active = run
 
 	return StartRunResult{Run: run, ErroredPredecessor: erroredPredecessor}
@@ -180,15 +174,6 @@ func (r *RunStore) Current() *RunRecord {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.active
-}
-
-// IsLive reports whether runID is the active run, which is the run this
-// process is writing. It satisfies runfolder.Liveness for a catalog
-// that reads in the same process as the writer.
-func (r *RunStore) IsLive(runID string) bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.active != nil && r.active.ID == runID
 }
 
 // IncrementActions increments the action counter on the active run.

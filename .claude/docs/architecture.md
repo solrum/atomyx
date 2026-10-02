@@ -422,8 +422,9 @@ Contract:
 - **Live lock.** A live `Writer` holds an exclusive lock on `run.lock`
   inside the run folder, released by `Finalize` or `Close` and by the
   kernel when the process dies. `LockLiveness` reports a run as live
-  when that lock is held, from any process, and `AnyLive` combines it
-  with other liveness signals.
+  when that lock is held, from any process including the caller's own.
+  The lock file is created and locked under a temporary name and then
+  renamed to `run.lock`, so a probe never sees it unlocked.
 - **Log bound.** `log.jsonl` grows to at most 8 MiB of lines. The
   first line past the bound is dropped and one marker line
   `{"truncated":true,"limitBytes":N}` ends the file, after which

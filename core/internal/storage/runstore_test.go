@@ -5,12 +5,15 @@ import (
 	"testing"
 )
 
-func TestRunStoreStartCreatesActiveRunWithUniqueID(t *testing.T) {
+func TestRunStoreStartCreatesActiveRunWithTheSuppliedID(t *testing.T) {
 	s := NewRunStore()
 	source := "exploratory"
-	result := s.Start(StartOptions{Name: "login flow", Source: &source})
+	result := s.Start(StartOptions{ID: "run-login", Name: "login flow", Source: &source})
 
 	run := result.Run
+	if run.ID != "run-login" {
+		t.Fatalf("ID: got %q, want the supplied id", run.ID)
+	}
 	if run.Status != RunStatusRunning {
 		t.Fatalf("Status: got %q, want %q", run.Status, RunStatusRunning)
 	}
@@ -36,7 +39,7 @@ func TestRunStoreStartCreatesActiveRunWithUniqueID(t *testing.T) {
 
 func TestRunStoreStartDefaultsSourceToUnknown(t *testing.T) {
 	s := NewRunStore()
-	result := s.Start(StartOptions{Name: "x"})
+	result := s.Start(StartOptions{ID: "run-x", Name: "x"})
 	if result.Run.Source != "unknown" {
 		t.Fatalf("Source: got %q, want %q", result.Run.Source, "unknown")
 	}
@@ -44,7 +47,7 @@ func TestRunStoreStartDefaultsSourceToUnknown(t *testing.T) {
 
 func TestRunStoreIncrementActionsBumpsCounterOnActiveRun(t *testing.T) {
 	s := NewRunStore()
-	s.Start(StartOptions{Name: "x"})
+	s.Start(StartOptions{ID: "run-x", Name: "x"})
 	s.IncrementActions()
 	s.IncrementActions()
 	s.IncrementActions()
@@ -63,7 +66,7 @@ func TestRunStoreIncrementActionsNoOpWhenNoActiveRun(t *testing.T) {
 
 func TestRunStoreFinishMarksVerdictAndClearsCurrent(t *testing.T) {
 	s := NewRunStore()
-	s.Start(StartOptions{Name: "x"})
+	s.Start(StartOptions{ID: "run-x", Name: "x"})
 	finished := s.Finish(RunStatusPassed)
 	if finished == nil {
 		t.Fatal("Finish: expected a finished run")
@@ -81,7 +84,7 @@ func TestRunStoreFinishMarksVerdictAndClearsCurrent(t *testing.T) {
 
 func TestRunStoreFinishDefaultsToPassed(t *testing.T) {
 	s := NewRunStore()
-	s.Start(StartOptions{Name: "x"})
+	s.Start(StartOptions{ID: "run-x", Name: "x"})
 	finished := s.Finish("")
 	if finished.Status != RunStatusPassed {
 		t.Fatalf("Status: got %q, want %q", finished.Status, RunStatusPassed)
@@ -97,7 +100,7 @@ func TestRunStoreFinishReturnsNilWhenNoActiveRun(t *testing.T) {
 
 func TestRunStoreFinishCalledTwiceIsNoOpOnSecondCall(t *testing.T) {
 	s := NewRunStore()
-	s.Start(StartOptions{Name: "x"})
+	s.Start(StartOptions{ID: "run-x", Name: "x"})
 	s.Finish(RunStatusPassed)
 	if got := s.Finish(RunStatusPassed); got != nil {
 		t.Fatalf("second Finish: got %v, want nil", got)
@@ -106,8 +109,8 @@ func TestRunStoreFinishCalledTwiceIsNoOpOnSecondCall(t *testing.T) {
 
 func TestRunStoreStartingNewRunWhileOneActiveReturnsErroredPredecessor(t *testing.T) {
 	s := NewRunStore()
-	first := s.Start(StartOptions{Name: "first"}).Run
-	second := s.Start(StartOptions{Name: "second"})
+	first := s.Start(StartOptions{ID: "run-first", Name: "first"}).Run
+	second := s.Start(StartOptions{ID: "run-second", Name: "second"})
 
 	if first.Status != RunStatusError {
 		t.Fatalf("first.Status: got %q, want %q", first.Status, RunStatusError)
@@ -128,7 +131,7 @@ func TestRunStoreStartingNewRunWhileOneActiveReturnsErroredPredecessor(t *testin
 
 func TestRunStoreRecordBugAddsFindingToActiveRun(t *testing.T) {
 	s := NewRunStore()
-	s.Start(StartOptions{Name: "x"})
+	s.Start(StartOptions{ID: "run-x", Name: "x"})
 	bug, err := s.RecordBug(RecordBugOptions{
 		Title:       "crash on login",
 		Description: "tapping login crashes",
@@ -161,7 +164,7 @@ func (c *fakeClock) NowMs() int64 { c.ms++; return c.ms }
 
 func TestRunStoreBugIDsAreDeterministicWithinARun(t *testing.T) {
 	s := NewRunStoreWithClock(&fakeClock{})
-	result := s.Start(StartOptions{Name: "x"})
+	result := s.Start(StartOptions{ID: "run-x", Name: "x"})
 	first, err := s.RecordBug(RecordBugOptions{Title: "a", Description: "d"})
 	if err != nil {
 		t.Fatalf("RecordBug: %v", err)
@@ -175,32 +178,5 @@ func TestRunStoreBugIDsAreDeterministicWithinARun(t *testing.T) {
 	}
 	if want := result.Run.ID + "-bug-2"; second.ID != want {
 		t.Fatalf("second.ID: got %q, want %q", second.ID, want)
-	}
-}
-
-func TestRunStoreIsLiveOnlyForTheActiveRun(t *testing.T) {
-	store := NewRunStoreWithClock(&fakeClock{})
-	if store.IsLive("anything") {
-		t.Fatal("an idle store reported a live run")
-	}
-	run := store.Start(StartOptions{Name: "n"}).Run
-	if !store.IsLive(run.ID) || store.IsLive("other") {
-		t.Fatal("the active run must be the only live run")
-	}
-	store.Finish(RunStatusPassed)
-	if store.IsLive(run.ID) {
-		t.Fatal("a finished run reported live")
-	}
-}
-
-func TestRunStoreStartUsesTheSuppliedID(t *testing.T) {
-	s := NewRunStore()
-	run := s.Start(StartOptions{ID: "20261002-070309-pixel-abcd", Name: "n"}).Run
-
-	if run.ID != "20261002-070309-pixel-abcd" {
-		t.Fatalf("id = %q", run.ID)
-	}
-	if !s.IsLive(run.ID) {
-		t.Fatal("the supplied id is not reported live")
 	}
 }
