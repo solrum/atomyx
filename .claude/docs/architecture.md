@@ -440,7 +440,7 @@ Contract:
   passed, `failed` to failed, `error` to failed with outcome `error`,
   `cancelled` to cancelled, and `running` to cancelled with outcome
   `interrupted`.
-- **Migration.** `storage.MigrateRuns(store, root)` rewrites each flat
+- **Migration.** `storage.MigrateRuns(store, root, onWait)` rewrites each flat
   record `<root>/runs/<id>.json` as the folder `<root>/runs/v1/<id>/`,
   keeping the legacy id as the folder name, with the mapping above and
   the `mcp` block carrying `name`, `source`, `actionCount`, `findings`,
@@ -452,14 +452,23 @@ Contract:
   - The whole call holds `<root>/runs/.migrate.lock` exclusively, and
     `RunCatalog.Delete` and `RunCatalog.SetSummary` hold it shared
     without waiting and fail with `ErrMigrationInProgress` instead.
+    When the lock is held, `LockMigration` calls `onWait` once and then
+    blocks. Sharing the lock creates nothing when `<root>/runs` does
+    not exist.
   - Per record, the folder is built under a scratch name inside
-    `runs/v1`, renamed to the id, read back, and compared with the
-    source meta. Only then is the original deleted.
-  - A folder with the same id and an identical meta counts as already
-    migrated and its original is deleted. A folder with a different
-    meta is a conflict, and both are left untouched.
-  - A record that cannot be read or mapped is damaged and is left
-    untouched.
+    `runs/v1`, renamed to the id with a no-replace rename, read back,
+    and compared with the source meta. Only then is the original
+    deleted.
+  - Each imported folder carries `importedFrom`, the id of its source
+    record, in `meta.json`. A folder whose `importedFrom` equals the
+    record id means the flat record is stale. The record is deleted and
+    counted as already migrated, whatever else the folder holds. A
+    folder with the same id and an identical meta also counts as already
+    migrated. A folder without that marker and with a different meta is
+    a conflict, and both are left untouched.
+  - A record that cannot be read or mapped, and a record whose new
+    folder fails the read-back, are damaged and are left untouched. The
+    failed folder is removed and the pass continues.
   - Repeating the call after any interruption finishes the work and
     never duplicates a run. A call with no flat record left changes
     nothing.

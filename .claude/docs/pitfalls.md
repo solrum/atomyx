@@ -269,16 +269,20 @@ corresponding area. For the high-level map see
   pass, and anything that deletes or edits a run record, whether the
   flat file or the run folder, holds it shared first. `RunCatalog.Delete`
   and `RunCatalog.SetSummary` do, and they refuse with
-  `ErrMigrationInProgress` instead of waiting. A new code path that
+  `ErrMigrationInProgress` instead of waiting. The migration itself
+  waits for the lock and announces it through its `onWait` callback. A new code path that
   writes or removes run records outside the catalog must take
   `runfolder.ShareMigration` too, or a migration can lose its edit or
   bring a deleted run back.
 - **Make every migration step safe to repeat.** The folder is written
   and read back before the original is deleted, in that order, so a crash
   between the two leaves a verified folder and the original. The next
-  pass recognizes the identical folder, deletes only the original, and
-  never writes a second copy. Never delete an original before its folder
-  is verified, and never reuse an id that holds a different folder.
+  pass recognizes the folder by its `importedFrom` marker, even after
+  an edit, deletes only the original, and never writes a second copy.
+  Never delete an original before its folder is verified, never drop
+  the marker from an imported folder, and never reuse an id that holds
+  a folder from another source. A read-back failure is reported as
+  damaged and must not stop the pass.
   Scratch folders named `.import-*` under `runs/v1` are interrupted
   work and are not runs.
 

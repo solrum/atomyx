@@ -267,12 +267,31 @@ Safety:
 
 - A flat record is deleted only after its folder is written, read back,
   and compared with the record.
-- A record that cannot be read, and a record whose id already names a
-  folder with different content, are reported and left where they are.
+- A record that cannot be read, a record whose folder fails the
+  read-back, and a record whose id already names a folder with
+  different content are reported and left where they are. The command
+  then continues with the next record, so one bad record never blocks
+  the others.
+- Each migrated folder records the id of the flat record it came from
+  in the `importedFrom` field of its `meta.json`. If a pass is
+  interrupted after a folder is written and before the flat record is
+  deleted, the next pass sees that the folder names the record as its
+  source, treats the flat record as stale, and deletes it, even when
+  the folder was edited in between, for example by `update_run_summary`.
+  A folder with no such field that differs from the record is a
+  conflict.
 - The command holds a lock on the run root while it works. A running
   `atomyx-mcp` keeps listing and reading runs. Its `delete_run` and
   `update_run_summary` calls return `RUN_BUSY` until the command ends,
-  so no edit is lost and no deleted run comes back.
+  so no edit is lost and no deleted run comes back. When another run
+  operation already holds the lock, the command prints one line to
+  stderr, `waiting for another run operation to finish`, and waits.
+- Stop every `atomyx-mcp` server built before run folders existed
+  before you migrate. Those servers do not know the lock, so they can
+  delete or edit a flat record during the pass.
+- Finding `screenshotPath` values are kept as they are. The screenshot
+  files are not moved into the run's `artifacts` folder, and
+  `delete_run` does not remove them.
 
 Idempotence: the command can be repeated after any interruption. It
 finishes the records that are left, never makes a second copy of a run,
@@ -286,6 +305,13 @@ removed. With `--json` the output carries `root`, `migrated`,
 `alreadyMigrated`, `conflicts`, `damaged`, and `scratchRemoved`, where
 each list is always present and each conflict or damaged entry has `id`
 and `reason`.
+
+If storage fails, the pass stops early. The command still prints the
+report of what it did up to that point, as JSON with `--json`, then the
+error, and exits `1`.
+
+`--report-dir` is accepted only together with `--migrate-runs`. A plain
+`doctor` call that passes it exits `2`.
 
 Exit codes: `0` when no record is conflicting or damaged, `1` when one
 is or when storage failed, and `2` when the command was misused.
