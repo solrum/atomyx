@@ -1,7 +1,6 @@
 package orchestra
 
 import (
-	"fmt"
 	"strings"
 	"unicode/utf8"
 
@@ -51,7 +50,7 @@ func SuggestSelectors(root wire.TreeNodeWire, path []int) ([]SuggestedSelector, 
 	cursors := FromTree(root)
 	target := cursorAt(cursors, path)
 	if target == nil {
-		return nil, fmt.Errorf("node path %v does not address a node in the tree", path)
+		return nil, nodePathError(path)
 	}
 	s := &suggester{cursors: cursors, target: target}
 

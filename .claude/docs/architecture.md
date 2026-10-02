@@ -542,6 +542,25 @@ build on the `.Built(` and `.Orchestra(` accessors, on
   - Every failing `/api/` response has the body
     `{"error": {"code", "message", "remedy"}}`. A closed session is
     `410` with code `session_closed`.
+- **Selector routes.** `SelectorRoutes` works from the stored tree and
+  never calls the device. Every route is an operator action, and a
+  request body with an unknown field, trailing data or a wrong type is
+  refused with `400` and code `INVALID_ARGUMENT`.
+  - `POST /api/v1/selector/suggest` takes `{treeRevision, path}`, where
+    `path` is the child index chain of the node in the tree the page
+    displays, empty for the root. A `treeRevision` other than the stored
+    one is refused with `409` and code `tree_stale`, so a path into a
+    replaced tree never yields a suggestion for another node. Otherwise
+    it returns `{epoch, treeRevision, candidates}`. Each candidate is
+    `{selector, unique, matchCount, obscured}`. `unique` comes from the
+    runtime resolve path, and `obscured` says whether another element
+    renders over the node's midpoint, computed from the tree alone. The
+    text and value of a secure node are never used.
+  - `POST /api/v1/selector/test` takes `{selector}` and returns
+    `{epoch, treeRevision, count, matches, truncated}`. Each match is
+    `{path, bounds}`, listed in resolution order, and at most 100 are
+    listed. An empty selector is `400` with code `INVALID_ARGUMENT`.
+  - Both answer `404` with code `no_tree` before the first capture.
 
 ## Run folder contract
 
