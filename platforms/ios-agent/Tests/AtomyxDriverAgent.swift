@@ -22,10 +22,11 @@ import Foundation
 ///     # Serve mode (blocks)
 ///     xcodebuild test -only-testing:AtomyxDriverAgent/AtomyxDriverAgent/testServeCommands
 ///
+/// The listen port defaults to 22087 and is overridden by the
+/// `ATOMYX_PORT` environment variable (see `RunnerEnvironment`).
+///
 /// The `Makefile` wraps both invocations as `make test` and `make serve`.
 final class AtomyxDriverAgent: XCTestCase {
-    private static let listenPort: UInt16 = 22087
-
     override class var runsForEachTargetApplicationUIConfiguration: Bool { false }
 
     override func setUp() {
@@ -34,6 +35,7 @@ final class AtomyxDriverAgent: XCTestCase {
     }
 
     func testServeCommands() throws {
+        let environment = RunnerEnvironment()
         let bridge = DefaultXCUIBridge()
         let state = DriverState()
 
@@ -51,7 +53,7 @@ final class AtomyxDriverAgent: XCTestCase {
         pressKeyRegistry.register(BackKeyStrategy())
 
         let registry = CommandRegistry()
-        registry.register(PingCommand(synthesizer: synthesizer))
+        registry.register(PingCommand(synthesizer: synthesizer, environment: environment))
         registry.register(LaunchAppCommand())
         registry.register(ForceStopAppCommand())
         registry.register(TapAtCommand(synthesizer: synthesizer))
@@ -68,7 +70,7 @@ final class AtomyxDriverAgent: XCTestCase {
         registry.register(GetScreenSizeCommand())
 
         let server = CommandServer(
-            port: AtomyxDriverAgent.listenPort,
+            port: environment.port,
             handler: { request in
                 registry.dispatch(request, bridge: bridge, state: state)
             },
@@ -77,7 +79,7 @@ final class AtomyxDriverAgent: XCTestCase {
             }
         )
         try server.start()
-        NSLog("[atomyx] driver listening on 127.0.0.1:\(AtomyxDriverAgent.listenPort)")
+        NSLog("[atomyx] driver listening on 127.0.0.1:\(environment.port)")
         RunLoop.current.run()
     }
 }

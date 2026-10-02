@@ -10,13 +10,20 @@ import Foundation
 /// validator reads `canMultiPointer` / `canPressure` at dispatch
 /// time to reject unsupported gesture shapes before they leave the
 /// TypeScript side.
+///
+/// Reports the launch identity (`runnerId`, `targetUdid`,
+/// `simulatorUdid`) so the host can tell its own runner apart from
+/// another runner answering on the same port. A field is present only
+/// when the launch environment supplied it.
 final class PingCommand: CommandHandler {
     let type = "ping"
 
     private let synthesizer: EventSynthesizer
+    private let environment: RunnerEnvironment
 
-    init(synthesizer: EventSynthesizer) {
+    init(synthesizer: EventSynthesizer, environment: RunnerEnvironment = RunnerEnvironment()) {
         self.synthesizer = synthesizer
+        self.environment = environment
     }
 
     func handle(_ request: Request, bridge _: XCUIBridge, state _: DriverState) -> Response {
@@ -34,6 +41,15 @@ final class PingCommand: CommandHandler {
             // (capability matrix is the contract).
             "mechanism": synthesizer.mechanismName,
         ]
+        if let runnerId = environment.runnerId {
+            data["runnerId"] = runnerId
+        }
+        if let targetUdid = environment.targetUdid {
+            data["targetUdid"] = targetUdid
+        }
+        if let simulatorUdid = environment.simulatorUdid {
+            data["simulatorUdid"] = simulatorUdid
+        }
         if let log = synthesizer.probeLog {
             data["probeLog"] = log
         }

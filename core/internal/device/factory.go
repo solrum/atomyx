@@ -166,6 +166,9 @@ func (f *DriverFactory) createDriver(ctx context.Context, desc Descriptor) (driv
 	}
 
 	if desc.Kind == KindSimulator && hidPort != 0 {
+		if idErr := f.verifySimulatorRunner(ctx, port, desc.ID); idErr != nil {
+			return nil, idErr
+		}
 		return iossimdriver.New(conn, f.runner, iossimdriver.NewDialer(), iossimdriver.Options{
 			Options: iosOpts,
 			HidPort: hidPort,
@@ -220,4 +223,22 @@ func (f *MockDriverFactory) Build(ctx context.Context, _ Descriptor) (Built, err
 		Driver:    drv,
 		Orchestra: orchestra.New(orchestra.OrchestraDeps{Driver: drv, Clock: f.clock}),
 	}, nil
+}
+
+// verifySimulatorRunner confirms that a runner already answering on
+// port belongs to the simulator udid, so a runner left behind by a
+// different simulator is never adopted by a direct-HID driver. Nothing
+// answering is not an error, because the driver's own connect reports
+// an unreachable runner. A runner that answers without proving it
+// belongs to udid is refused.
+func (f *DriverFactory) verifySimulatorRunner(ctx context.Context, port int, udid string) error {
+	want := iosdriver.ExpectedRunner{UDID: udid, Kind: iosdriver.KindSimulator}
+	_, unmanaged, idErr := iosdriver.CheckRunnerIdentity(ctx, port, iosdriver.RunnerProbeTimeout, want)
+	if idErr != nil {
+		return idErr
+	}
+	if unmanaged {
+		f.logger.Warn("adopting a simulator runner that carries no launch id", logging.LogContext{"port": port, "udid": udid})
+	}
+	return nil
 }

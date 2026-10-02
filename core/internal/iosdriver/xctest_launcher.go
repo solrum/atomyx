@@ -40,6 +40,28 @@ const (
 	xctestPollIntervalMs         int64 = 500
 )
 
+// Launch retry policy. The host port is chosen by probing for a free
+// one, which races against the real bind, so a launch that loses that
+// race is retried on a fresh port a bounded number of times.
+const (
+	// XctestMaxLaunchAttempts bounds the allocate-and-launch sequence.
+	XctestMaxLaunchAttempts = 3
+	// xcodebuildExitOccupiedPort is the exit status xcodebuild reports
+	// when the runner could not bind its port, which is a retryable
+	// failure. xcodebuild uses the same status for a failing test, so it
+	// is only retried while a port allocator is configured.
+	xcodebuildExitOccupiedPort = 65
+)
+
+// Runner launch environment. xcodebuild forwards every
+// TEST_RUNNER_<NAME> variable to the test runner as <NAME>, which the
+// Swift runner reads at startup.
+const (
+	xctestEnvPort       = "TEST_RUNNER_ATOMYX_PORT"
+	xctestEnvRunnerID   = "TEST_RUNNER_ATOMYX_RUNNER_ID"
+	xctestEnvTargetUDID = "TEST_RUNNER_ATOMYX_TARGET_UDID"
+)
+
 // Byte budgets for the stderr excerpt included in a build or spawn
 // failure message, so a caller gets enough context to diagnose
 // without the message growing unbounded on a verbose xcodebuild
@@ -68,6 +90,9 @@ const (
 	XctestErrLaunchTimeout XctestLauncherErrorCode = "launch-timeout"
 	XctestErrSpawnExit     XctestLauncherErrorCode = "spawn-exit"
 	XctestErrSimNotBooted  XctestLauncherErrorCode = "sim-not-booted"
+	// XctestErrRunnerMismatch means a runner answered on the port but
+	// is not the one this launch expects.
+	XctestErrRunnerMismatch XctestLauncherErrorCode = "runner-mismatch"
 )
 
 // XctestLauncherError is a named, actionable failure from
@@ -76,6 +101,9 @@ const (
 type XctestLauncherError struct {
 	Code    XctestLauncherErrorCode
 	Message string
+	// ExitCode is the xcodebuild exit status for XctestErrSpawnExit,
+	// and zero for every other code.
+	ExitCode int
 }
 
 func (e *XctestLauncherError) Error() string { return e.Message }
@@ -131,6 +159,18 @@ type LaunchConfig struct {
 	// LaunchTimeoutMs bounds the wait for the spawned driver to start
 	// answering the ping handshake. Defaults to 90000 (90s) when zero.
 	LaunchTimeoutMs int64
+	// RunnerID is the launch identifier handed to the runner. The
+	// launcher accepts only a runner that echoes it back. Empty means
+	// identity rests on the UDID alone.
+	RunnerID string
+	// AllocatePort, when set, picks a fresh host port for every launch
+	// attempt instead of using Port, and enables the bounded retry on a
+	// lost bind race. XctestLauncher.Port reports the port the last
+	// attempt used.
+	AllocatePort func() (int, error)
+	// Warn receives a one-line warning when a runner is adopted without
+	// a launch identifier. Nil discards it.
+	Warn func(message string)
 }
 
 // scheme returns c.Scheme, falling back to the standard Atomyx driver
@@ -185,6 +225,16 @@ type XctestLauncher struct {
 	background process.BackgroundRunner
 	clock      clock.Clock
 	cfg        LaunchConfig
+	port       int
+}
+
+// Port reports the host port the most recent EnsureRunning attempt
+// used. It equals the configured port unless LaunchConfig.AllocatePort
+// is set.
+func (l *XctestLauncher) Port() int { return l.port }
+
+func (l *XctestLauncher) expected() ExpectedRunner {
+	return ExpectedRunner{UDID: l.cfg.UDID, Kind: l.cfg.Kind, RunnerID: l.cfg.RunnerID}
 }
 
 // NewXctestLauncher constructs an XctestLauncher. proc, background,
@@ -206,7 +256,7 @@ func NewXctestLauncher(proc process.Runner, background process.BackgroundRunner,
 	if cfg.LaunchTimeoutMs == 0 {
 		cfg.LaunchTimeoutMs = xctestDefaultLaunchTimeoutMs
 	}
-	return &XctestLauncher{proc: proc, background: background, clock: clock, cfg: cfg}
+	return &XctestLauncher{proc: proc, background: background, clock: clock, cfg: cfg, port: cfg.Port}
 }
 
 // noopKill is the kill function EnsureRunning returns whenever it
@@ -239,8 +289,17 @@ func (l *XctestLauncher) EnsureRunning(ctx context.Context) (kill func() error, 
 	if err := ctx.Err(); err != nil {
 		return noopKill, err
 	}
-	if probeIproxyPing(ctx, l.cfg.Port, iproxyPingProbeTimeout) {
-		return noopKill, nil
+	if l.cfg.AllocatePort == nil {
+		found, unmanaged, idErr := CheckRunnerIdentity(ctx, l.cfg.Port, iproxyPingProbeTimeout, l.expected())
+		if idErr != nil {
+			return noopKill, runnerMismatchError(idErr)
+		}
+		if found {
+			if unmanaged && l.cfg.Warn != nil {
+				l.cfg.Warn(unmanagedRunnerWarning(l.cfg.Port))
+			}
+			return noopKill, nil
+		}
 	}
 
 	projectFileName := l.cfg.projectFileName()
@@ -268,11 +327,61 @@ func (l *XctestLauncher) EnsureRunning(ctx context.Context) (kill func() error, 
 		}
 	}
 
-	args, err := l.spawnArgs(xcodeprojPath, derivedDataPath)
-	if err != nil {
-		return noopKill, err
+	return l.launchWithRetry(ctx, xcodeprojPath, derivedDataPath)
+}
+
+// launchWithRetry spawns the runner and waits for it. With an
+// AllocatePort configured, each attempt takes a fresh port, and a
+// failure that means the port was taken (an early xcodebuild exit with
+// xcodebuildExitOccupiedPort, or another runner answering on it) is
+// retried until XctestMaxLaunchAttempts attempts have run. Without an
+// allocator the port is fixed, so a retry could not change the outcome
+// and the first failure is returned.
+func (l *XctestLauncher) launchWithRetry(ctx context.Context, xcodeprojPath, derivedDataPath string) (func() error, error) {
+	for attempt := 1; ; attempt++ {
+		port := l.cfg.Port
+		if l.cfg.AllocatePort != nil {
+			allocated, allocErr := l.cfg.AllocatePort()
+			if allocErr != nil {
+				return noopKill, fmt.Errorf("iosdriver: allocate runner port: %w", allocErr)
+			}
+			port = allocated
+		}
+		l.port = port
+
+		args, err := l.spawnArgs(xcodeprojPath, derivedDataPath)
+		if err != nil {
+			return noopKill, err
+		}
+		kill, err := l.spawnAndWait(ctx, port, args)
+		if err == nil {
+			return kill, nil
+		}
+		if l.cfg.AllocatePort == nil || attempt >= XctestMaxLaunchAttempts || !isPortConflictFailure(err) {
+			return noopKill, err
+		}
 	}
-	return l.spawnAndWait(ctx, args)
+}
+
+// isPortConflictFailure reports whether err means the launch lost the
+// race for its host port.
+func isPortConflictFailure(err error) bool {
+	var launchErr *XctestLauncherError
+	if !errors.As(err, &launchErr) {
+		return false
+	}
+	switch launchErr.Code {
+	case XctestErrRunnerMismatch:
+		return true
+	case XctestErrSpawnExit:
+		return launchErr.ExitCode == xcodebuildExitOccupiedPort
+	default:
+		return false
+	}
+}
+
+func runnerMismatchError(err *RunnerIdentityError) *XctestLauncherError {
+	return &XctestLauncherError{Code: XctestErrRunnerMismatch, Message: err.Error()}
 }
 
 // needsBuild reports whether runnerApp is missing, or older than the
@@ -518,9 +627,9 @@ func tailString(s string, n int) string {
 // injected BackgroundRunner, since it is a long-running process
 // rather than a command that completes (Runner.Run would kill it at
 // its fallback timeout), and does not return until the driver answers
-// the ping handshake or one of the XctestLauncherErrorCode failure
-// modes is confirmed instead. Failing to become ready kills the
-// spawned process before returning, so a caller never observes
+// the ping handshake on port or one of the XctestLauncherErrorCode
+// failure modes is confirmed instead. Failing to become ready kills
+// the spawned process before returning, so a caller never observes
 // success without a live driver behind it.
 //
 // On success, the returned kill function kills the process group and
@@ -533,14 +642,15 @@ func tailString(s string, n int) string {
 // driver must keep running past this call returning, and past ctx
 // being canceled, until the returned kill function stops it
 // explicitly.
-func (l *XctestLauncher) spawnAndWait(ctx context.Context, args []string) (func() error, error) {
-	proc, startErr := l.background.Start(context.WithoutCancel(ctx), "xcodebuild", args...)
+func (l *XctestLauncher) spawnAndWait(ctx context.Context, port int, args []string) (func() error, error) {
+	name, argv := l.spawnCommand(port, args)
+	proc, startErr := l.background.Start(context.WithoutCancel(ctx), name, argv...)
 	if startErr != nil {
 		return noopKill, classifySpawnExit(process.BackgroundResult{}, startErr)
 	}
 	exited, stop := superviseBackground(proc, classifySpawnExit)
 
-	if err := l.waitForReadyOrExit(ctx, exited); err != nil {
+	if err := l.waitForReadyOrExit(ctx, port, exited); err != nil {
 		stop()
 		return noopKill, err
 	}
@@ -550,26 +660,67 @@ func (l *XctestLauncher) spawnAndWait(ctx context.Context, args []string) (func(
 	}, nil
 }
 
-// waitForReadyOrExit polls the ping handshake on cfg.Port every
+// envCommand runs the command that follows its VAR=value operands
+// with those variables added to the environment. xcodebuild only
+// forwards TEST_RUNNER_ variables taken from its own environment, and
+// a VAR=value operand on its command line is ignored, so the launch
+// environment has to reach the process through its environment.
+const envCommand = "env"
+
+// runnerEnv returns the TEST_RUNNER_ variables for a launch whose
+// runner must be reachable on port. A device runner always listens on
+// deviceRunnerPort inside the device, and iproxy maps the host port
+// onto it, so only a simulator runner binds the host port itself.
+func (l *XctestLauncher) runnerEnv(port int) []string {
+	runnerPort := port
+	if l.cfg.Kind == KindDevice {
+		runnerPort = deviceRunnerPort
+	}
+	env := []string{fmt.Sprintf("%s=%d", xctestEnvPort, runnerPort)}
+	if l.cfg.RunnerID != "" {
+		env = append(env, xctestEnvRunnerID+"="+l.cfg.RunnerID)
+	}
+	if l.cfg.Kind == KindDevice {
+		env = append(env, xctestEnvTargetUDID+"="+l.cfg.UDID)
+	}
+	return env
+}
+
+// spawnCommand returns the executable and argv that start the runner
+// with its launch environment applied.
+func (l *XctestLauncher) spawnCommand(port int, args []string) (string, []string) {
+	env := l.runnerEnv(port)
+	argv := make([]string, 0, len(env)+1+len(args))
+	argv = append(argv, env...)
+	argv = append(argv, "xcodebuild")
+	argv = append(argv, args...)
+	return envCommand, argv
+}
+
+// waitForReadyOrExit polls the ping handshake on port every
 // xctestPollIntervalMs, racing that poll against the spawned process
 // exiting early and against ctx being canceled, until cfg.LaunchTimeoutMs
-// elapses on the injected Clock.
-func (l *XctestLauncher) waitForReadyOrExit(ctx context.Context, exited <-chan error) error {
+// elapses on the injected Clock. A runner that answers but is not the
+// expected one ends the wait with XctestErrRunnerMismatch, because
+// that runner holds the port and the launched process never will.
+func (l *XctestLauncher) waitForReadyOrExit(ctx context.Context, port int, exited <-chan error) error {
 	probe := func() (bool, error) {
-		return probeIproxyPing(ctx, l.cfg.Port, iproxyPingProbeTimeout), nil
+		found, _, idErr := CheckRunnerIdentity(ctx, port, iproxyPingProbeTimeout, l.expected())
+		if idErr != nil {
+			return false, runnerMismatchError(idErr)
+		}
+		return found, nil
 	}
 	outcome, err := process.AwaitReady(ctx, l.clock, probe, exited, xctestPollIntervalMs, l.cfg.LaunchTimeoutMs)
 	switch outcome {
-	case process.ReadinessReady:
-		return nil
-	case process.ReadinessExited:
+	case process.ReadinessReady, process.ReadinessExited:
 		return err
 	case process.ReadinessTimeout:
 		return &XctestLauncherError{
 			Code: XctestErrLaunchTimeout,
 			Message: fmt.Sprintf(
 				"XCUITest driver did not start listening on port %d within %ds. Check Xcode console for errors.",
-				l.cfg.Port, l.cfg.LaunchTimeoutMs/1000,
+				port, l.cfg.LaunchTimeoutMs/1000,
 			),
 		}
 	default: // process.ReadinessCtxDone
@@ -577,11 +728,23 @@ func (l *XctestLauncher) waitForReadyOrExit(ctx context.Context, exited <-chan e
 	}
 }
 
+// Exit statuses env reports when it cannot run the command it was
+// given: 127 when the command is not found, 126 when it is not
+// executable.
+const (
+	envExitCommandNotFound = 127
+	envExitNotExecutable   = 126
+)
+
 // classifySpawnExit turns a spawned "xcodebuild test-without-building"
 // process outcome, once it has exited or failed to start before the driver became
 // reachable, into a named XctestLauncherError.
 func classifySpawnExit(result process.BackgroundResult, runErr error) error {
-	if runErr != nil && errors.Is(runErr, exec.ErrNotFound) {
+	missing := runErr != nil && errors.Is(runErr, exec.ErrNotFound)
+	if result.ExitCode == envExitCommandNotFound || result.ExitCode == envExitNotExecutable {
+		missing = true
+	}
+	if missing {
 		return &XctestLauncherError{Code: XctestErrNoXcode, Message: "xcodebuild not found. Install Xcode from the App Store."}
 	}
 	stderr := strings.TrimSpace(result.Stderr)
@@ -591,7 +754,8 @@ func classifySpawnExit(result process.BackgroundResult, runErr error) error {
 		stderr = tailString(stderr, xctestSpawnExitStderrTailChars)
 	}
 	return &XctestLauncherError{
-		Code: XctestErrSpawnExit,
+		Code:     XctestErrSpawnExit,
+		ExitCode: result.ExitCode,
 		Message: fmt.Sprintf(
 			"xcodebuild test-without-building exited early (code %d). stderr: %s",
 			result.ExitCode, stderr,

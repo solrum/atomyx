@@ -62,6 +62,15 @@ BUNDLE_ID   ?= dev.atomyx.driver.host
 IPROXY_PORT ?= 22087
 DEVICE_DESTINATION ?= platform=iOS,id=$(DEVICE_UDID)
 
+# Runner launch environment. xcodebuild forwards every TEST_RUNNER_<NAME>
+# variable to the test runner as <NAME>. ATOMYX_PORT overrides the port the
+# runner listens on (default 22087), so a hand-started runner can sit next to
+# a launcher-managed one. serve-device always reports DEVICE_UDID as the
+# runner target identity.
+ATOMYX_PORT ?=
+SERVE_ENV := $(if $(ATOMYX_PORT),TEST_RUNNER_ATOMYX_PORT=$(ATOMYX_PORT))
+SERVE_DEVICE_ENV := $(SERVE_ENV) TEST_RUNNER_ATOMYX_TARGET_UDID=$(DEVICE_UDID)
+
 # Build-setting overrides passed to xcodebuild for device targets.
 # Uses xcodebuild's space-separated KEY=VALUE syntax which overrides
 # whatever the generated .xcodeproj declares.
@@ -137,6 +146,7 @@ help:
 	@echo "  DEV_TEAM=<team-id>        Apple Developer Team ID (10-char)"
 	@echo "  BUNDLE_ID=<id>            Host app bundle id (default: dev.atomyx.driver.host)"
 	@echo "  IPROXY_PORT=<port>        Tunnel port (default 22087)"
+	@echo "  ATOMYX_PORT=<port>        Runner listen port for serve (default 22087)"
 	@echo ""
 	@echo "Prerequisites for device targets:"
 	@echo "  brew install libimobiledevice  # iproxy tunneling"
@@ -211,7 +221,7 @@ $(BUILD_STAMP): $(PROJECT)
 	@touch $(BUILD_STAMP)
 
 serve: check-udid $(BUILD_STAMP)
-	xcodebuild test-without-building \
+	$(SERVE_ENV) xcodebuild test-without-building \
 		-project $(PROJECT) \
 		-scheme $(SCHEME) \
 		-destination '$(DESTINATION)' \
@@ -327,7 +337,7 @@ $(DEVICE_BUILD_STAMP): $(PROJECT)
 	@touch $(DEVICE_BUILD_STAMP)
 
 serve-device: check-device $(DEVICE_BUILD_STAMP)
-	xcodebuild test-without-building \
+	$(SERVE_DEVICE_ENV) xcodebuild test-without-building \
 		-project $(PROJECT) \
 		-scheme $(SCHEME) \
 		-destination '$(DEVICE_DESTINATION)' \

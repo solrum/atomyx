@@ -9,7 +9,11 @@
 # This gate derives the same four identifiers from the iOS project
 # definition itself and fails loudly the moment they drift apart.
 #
-# Scope: only the Go launcher (core/internal/iosdriver/xctest_launcher.go)
+# It also checks the runner launch environment variable names shared by the
+# Go launcher, the Swift runner, and the Makefile serve targets.
+#
+# Scope: the Go launcher (core/internal/iosdriver/xctest_launcher.go), the
+# Swift runner environment reader (platforms/ios-agent/Tests/Server/RunnerEnvironment.swift)
 # and the iOS project definition (platforms/ios-agent/project.yml and
 # platforms/ios-agent/Makefile).
 set -euo pipefail
@@ -134,6 +138,49 @@ fi
 if [ "$go_only_testing_target" != "$makefile_only_testing_target" ]; then
   report_mismatch "xctestOnlyTestingTarget vs Makefile serve -only-testing target" "$makefile_only_testing_target" "$go_only_testing_target"
 fi
+
+
+# --- Runner launch environment ----------------------------------------------
+#
+# The launcher passes TEST_RUNNER_<NAME> variables, xcodebuild strips the
+# prefix, and the Swift runner reads <NAME>. A rename on either side would
+# leave the runner on its default port with no identity, which the host
+# then rejects at launch time, so the names are compared here instead.
+
+swift_env_file="platforms/ios-agent/Tests/Server/RunnerEnvironment.swift"
+if [ ! -f "$swift_env_file" ]; then
+  echo "ios launcher identifier gate FAILED: expected file not found: $swift_env_file" >&2
+  exit 1
+fi
+
+for pair in "xctestEnvPort:ATOMYX_PORT" "xctestEnvRunnerID:ATOMYX_RUNNER_ID" "xctestEnvTargetUDID:ATOMYX_TARGET_UDID"; do
+  const_name="${pair%%:*}"
+  runner_name="${pair#*:}"
+  go_env_value="$(go_const "$const_name")"
+  if [ "$go_env_value" != "TEST_RUNNER_${runner_name}" ]; then
+    report_mismatch "Go $const_name vs the runner variable $runner_name" "TEST_RUNNER_${runner_name}" "$go_env_value"
+  fi
+  if ! grep -q "\"${runner_name}\"" "$swift_env_file"; then
+    report_mismatch "Swift RunnerEnvironment vs Go $const_name" "a read of \"${runner_name}\" in $swift_env_file" "none"
+  fi
+done
+
+if ! grep -Eq '"SIMULATOR_UDID"' "$swift_env_file"; then
+  report_mismatch "Swift RunnerEnvironment vs the simulator identity variable" "a read of \"SIMULATOR_UDID\" in $swift_env_file" "none"
+fi
+
+# serve forwards the port override and serve-device forwards the device
+# identity, so a hand-started runner reports the same fields a launched one does.
+make_serve_env="$(grep -E '^SERVE_ENV[[:space:]]*:=' "$makefile" || true)"
+make_serve_device_env="$(grep -E '^SERVE_DEVICE_ENV[[:space:]]*:=' "$makefile" || true)"
+case "$make_serve_env" in
+  *TEST_RUNNER_ATOMYX_PORT*) ;;
+  *) report_mismatch "Makefile SERVE_ENV" "forwards TEST_RUNNER_ATOMYX_PORT" "${make_serve_env:-missing}" ;;
+esac
+case "$make_serve_device_env" in
+  *TEST_RUNNER_ATOMYX_TARGET_UDID*) ;;
+  *) report_mismatch "Makefile SERVE_DEVICE_ENV" "forwards TEST_RUNNER_ATOMYX_TARGET_UDID" "${make_serve_device_env:-missing}" ;;
+esac
 
 if [ "$fail" -ne 0 ]; then
   exit 1

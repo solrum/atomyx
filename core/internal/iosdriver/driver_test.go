@@ -345,6 +345,14 @@ func freeTCPPort(t *testing.T) int {
 // using it never leaks a background listener or goroutine.
 func startFakeTunnelListener(t *testing.T, answerPing bool) (int, func()) {
 	t.Helper()
+	return startFakeRunnerListener(t, answerPing, defaultIdentityFields)
+}
+
+// startFakeRunnerListener is startFakeTunnelListener with the identity
+// fields of its ping reply scripted by the caller, as the inner part of
+// the reply's data object, for example `"simulatorUdid":"SIM-2"`.
+func startFakeRunnerListener(t *testing.T, answerPing bool, identityFields string) (int, func()) {
+	t.Helper()
 	l, err := new(net.ListenConfig).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("startFakeTunnelListener: %v", err)
@@ -371,7 +379,7 @@ func startFakeTunnelListener(t *testing.T, answerPing bool) (int, func()) {
 					ID int64 `json:"id"`
 				}
 				_ = json.Unmarshal([]byte(line), &req)
-				_, _ = fmt.Fprintf(c, `{"id":%d,"ok":true,"data":{"pong":true}}`+"\n", req.ID)
+				_, _ = fmt.Fprint(c, pongReply(req.ID, identityFields))
 			}(c)
 		}
 	}()
@@ -406,7 +414,7 @@ func TestIosDriver_Connect_Device_LaunchesIproxyWithExactArgsAndWaitsForReadines
 	if len(invocations) != 1 {
 		t.Fatalf("background starts = %+v, want exactly one iproxy launch", invocations)
 	}
-	want := process.Invocation{Name: "iproxy", Args: []string{fmt.Sprintf("%d:%d", port, port), "-u", "DEV-1"}}
+	want := process.Invocation{Name: "iproxy", Args: []string{fmt.Sprintf("%d:22087", port), "-u", "DEV-1"}}
 	if invocations[0].Name != want.Name || !equalArgs(invocations[0].Args, want.Args) {
 		t.Fatalf("iproxy invocation = %+v, want %+v", invocations[0], want)
 	}

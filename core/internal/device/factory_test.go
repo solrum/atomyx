@@ -2,6 +2,7 @@ package device
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -234,4 +235,74 @@ func TestNewDriverProvisionerPanicsWithoutABackgroundRunner(t *testing.T) {
 		}
 	}()
 	NewDriverProvisioner(DriverProvisionerDeps{Runner: process.NewFake()})
+}
+
+// serveRunnerReply starts a listener that answers every ping with
+// the given identity fields, the inner part of the reply's data
+// object, and returns its port.
+func serveRunnerReply(t *testing.T, identityFields string) int {
+	t.Helper()
+	l, err := new(net.ListenConfig).Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	t.Cleanup(func() { _ = l.Close() })
+	go func() {
+		for {
+			c, err := l.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer func() { _ = c.Close() }()
+				buf := make([]byte, 256)
+				if _, err := c.Read(buf); err != nil {
+					return
+				}
+				_, _ = fmt.Fprintf(c, `{"id":0,"ok":true,"data":{"pong":true,%s}}`+"\n", identityFields)
+			}(c)
+		}
+	}()
+	return l.Addr().(*net.TCPAddr).Port
+}
+
+func TestDriverFactory_CreateDriver_HidPath_RefusesRunnerOfAnotherSimulator(t *testing.T) {
+	port := serveRunnerReply(t, `"simulatorUdid":"sim-2"`)
+	f := NewDriverFactory(DriverFactoryDeps{Runner: process.NewFake(), Background: process.NewFakeBackground()})
+
+	_, err := f.createDriver(context.Background(), Descriptor{
+		ID: "sim-1", Platform: PlatformIOS, Kind: KindSimulator, Port: port, HidPort: 7777,
+	})
+	var idErr *iosdriver.RunnerIdentityError
+	if !errors.As(err, &idErr) {
+		t.Fatalf("createDriver() error = %v, want *iosdriver.RunnerIdentityError for a runner of another simulator", err)
+	}
+}
+
+func TestDriverFactory_CreateDriver_HidPath_AcceptsRunnerOfTheRequestedSimulator(t *testing.T) {
+	port := serveRunnerReply(t, `"simulatorUdid":"SIM-1"`)
+	f := NewDriverFactory(DriverFactoryDeps{Runner: process.NewFake(), Background: process.NewFakeBackground()})
+
+	drv, err := f.createDriver(context.Background(), Descriptor{
+		ID: "sim-1", Platform: PlatformIOS, Kind: KindSimulator, Port: port, HidPort: 7777,
+	})
+	if err != nil {
+		t.Fatalf("createDriver() error = %v", err)
+	}
+	if _, ok := drv.(*iossimdriver.IosSimDriver); !ok {
+		t.Fatalf("createDriver() = %T, want *iossimdriver.IosSimDriver", drv)
+	}
+}
+
+func TestDriverFactory_CreateDriver_HidPath_RefusesRunnerWithoutIdentity(t *testing.T) {
+	port := serveRunnerReply(t, `"extra":1`)
+	f := NewDriverFactory(DriverFactoryDeps{Runner: process.NewFake(), Background: process.NewFakeBackground()})
+
+	_, err := f.createDriver(context.Background(), Descriptor{
+		ID: "sim-1", Platform: PlatformIOS, Kind: KindSimulator, Port: port, HidPort: 7777,
+	})
+	var idErr *iosdriver.RunnerIdentityError
+	if !errors.As(err, &idErr) {
+		t.Fatalf("createDriver() error = %v, want a RunnerIdentityError for a runner that proves no identity", err)
+	}
 }

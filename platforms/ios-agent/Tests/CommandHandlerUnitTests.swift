@@ -35,6 +35,60 @@ final class CommandHandlerUnitTests: XCTestCase {
         XCTAssertEqual(resp.error, "unknown command: nope")
     }
 
+    // MARK: - Ping identity and port
+
+    private func ping(_ env: [String: String]) -> [String: Any] {
+        let cmd = PingCommand(synthesizer: CoordinateSynthesizer(), environment: RunnerEnvironment(environment: env))
+        let resp = cmd.handle(Request(id: 1, type: "ping", args: [:]), bridge: MockXCUIBridge(), state: DriverState())
+        XCTAssertTrue(resp.ok)
+        return resp.data
+    }
+
+    func testPingReportsLaunchIdentity() {
+        let data = ping([
+            "ATOMYX_RUNNER_ID": "r-1",
+            "ATOMYX_TARGET_UDID": "DEV-UDID",
+            "SIMULATOR_UDID": "SIM-UDID",
+        ])
+        XCTAssertEqual(data["runnerId"] as? String, "r-1")
+        XCTAssertEqual(data["targetUdid"] as? String, "DEV-UDID")
+        XCTAssertEqual(data["simulatorUdid"] as? String, "SIM-UDID")
+    }
+
+    func testPingWithoutRunnerIdOmitsIt() {
+        let data = ping(["SIMULATOR_UDID": "SIM-UDID"])
+        XCTAssertNil(data["runnerId"])
+        XCTAssertNil(data["targetUdid"])
+        XCTAssertEqual(data["simulatorUdid"] as? String, "SIM-UDID")
+    }
+
+    func testPingTreatsEmptyIdentityValuesAsAbsent() {
+        let data = ping(["ATOMYX_RUNNER_ID": "", "ATOMYX_TARGET_UDID": "", "SIMULATOR_UDID": ""])
+        XCTAssertNil(data["runnerId"])
+        XCTAssertNil(data["targetUdid"])
+        XCTAssertNil(data["simulatorUdid"])
+    }
+
+    func testPingReportsDeviceTargetUdidOnly() {
+        let data = ping(["ATOMYX_TARGET_UDID": "DEV-UDID"])
+        XCTAssertEqual(data["targetUdid"] as? String, "DEV-UDID")
+        XCTAssertNil(data["simulatorUdid"])
+    }
+
+    func testRunnerEnvironmentPortDefaultsTo22087() {
+        XCTAssertEqual(RunnerEnvironment(environment: [:]).port, 22087)
+    }
+
+    func testRunnerEnvironmentReadsPortOverride() {
+        XCTAssertEqual(RunnerEnvironment(environment: ["ATOMYX_PORT": "40123"]).port, 40123)
+    }
+
+    func testRunnerEnvironmentRejectsInvalidPort() {
+        for raw in ["", "abc", "0", "70000", "-1"] {
+            XCTAssertEqual(RunnerEnvironment(environment: ["ATOMYX_PORT": raw]).port, 22087, raw)
+        }
+    }
+
     // MARK: - LaunchAppCommand
 
     func testLaunchAppRejectsMissingBundleId() {

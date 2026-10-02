@@ -1,9 +1,7 @@
 package iosdriver
 
 import (
-	"bufio"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -30,6 +28,17 @@ const (
 	// iproxy tunnel to become reachable.
 	iproxyTunnelUpTimeout = 5 * time.Second
 )
+
+// deviceRunnerPort is the port the runner listens on inside a physical
+// device. iproxy maps each per-device host port to it, so concurrent
+// devices never share a host port.
+const deviceRunnerPort = defaultIosPort
+
+// unmanagedRunnerWarning is the warning raised when a simulator
+// runner is adopted without a launch identifier.
+func unmanagedRunnerWarning(port int) string {
+	return fmt.Sprintf("adopting the runner on 127.0.0.1:%d without a launch id because it was not started by this process", port)
+}
 
 // IproxyErrorCode names one of the known ways launching or waiting on
 // the iproxy USB tunnel can fail.
@@ -76,11 +85,12 @@ func (e *IproxyError) Error() string { return e.Message }
 //
 //   - Port-conflict detection before spawn. If 127.0.0.1:port already
 //     has a listener, it is probed with the same ping handshake this
-//     driver's own wire protocol speaks. A listener that answers is
-//     an existing Atomyx driver tunnel and is reused without spawning
-//     a second iproxy; a listener that does not answer is refused
-//     with IproxyErrBindConflict instead of racing whatever else is
-//     bound there.
+//     driver's own wire protocol speaks. A listener that answers as the
+//     expected runner (see ExpectedRunner) is an existing Atomyx driver
+//     tunnel and is reused without spawning a second iproxy. A
+//     listener that does not answer, or answers as a different runner,
+//     is refused with IproxyErrBindConflict instead of racing whatever
+//     else is bound there.
 //   - Poll for real tunnel connectivity after spawn. iproxy emits no
 //     "ready" signal on stdout or stderr, so this polls the port on
 //     iproxyTunnelPollInterval until a fresh TCP connect succeeds,
@@ -93,7 +103,15 @@ func (e *IproxyError) Error() string { return e.Message }
 //     instead of waiting on real time.
 func (d *IosDriver) launchIproxy(ctx context.Context) error {
 	if canConnectTCP(ctx, d.opts.Port, iproxyPortProbeTimeout) {
-		if probeIproxyPing(ctx, d.opts.Port, iproxyPingProbeTimeout) {
+		want := ExpectedRunner{UDID: d.opts.UDID, Kind: KindDevice, RunnerID: d.opts.RunnerID}
+		found, unmanaged, idErr := CheckRunnerIdentity(ctx, d.opts.Port, iproxyPingProbeTimeout, want)
+		if idErr != nil {
+			return &IproxyError{Code: IproxyErrBindConflict, Message: idErr.Error()}
+		}
+		if found {
+			if unmanaged && d.opts.Warn != nil {
+				d.opts.Warn(unmanagedRunnerWarning(d.opts.Port))
+			}
 			return nil
 		}
 		return &IproxyError{
@@ -106,7 +124,7 @@ func (d *IosDriver) launchIproxy(ctx context.Context) error {
 		}
 	}
 
-	portMapping := fmt.Sprintf("%d:%d", d.opts.Port, d.opts.Port)
+	portMapping := fmt.Sprintf("%d:%d", d.opts.Port, deviceRunnerPort)
 	proc, startErr := d.background.Start(context.WithoutCancel(ctx), "iproxy", portMapping, "-u", d.opts.UDID)
 	if startErr != nil {
 		return classifyIproxyExit(startErr)
@@ -175,39 +193,6 @@ func canConnectTCP(ctx context.Context, port int, timeout time.Duration) bool {
 	}
 	_ = conn.Close()
 	return true
-}
-
-// probeIproxyPing sends the same ping handshake Connect uses once the
-// TCP transport is up, and reports whether the listener at
-// 127.0.0.1:port answers it. This is how a pre-existing listener on
-// the port is confirmed to be an Atomyx driver tunnel rather than
-// some unrelated process.
-func probeIproxyPing(ctx context.Context, port int, timeout time.Duration) bool {
-	dialCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	conn, err := new(net.Dialer).DialContext(dialCtx, "tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
-	if err != nil {
-		return false
-	}
-	defer func() { _ = conn.Close() }()
-	_ = conn.SetDeadline(time.Now().Add(timeout))
-	if _, err := conn.Write([]byte(`{"id":0,"type":"ping","args":{}}` + "\n")); err != nil {
-		return false
-	}
-	line, err := bufio.NewReader(conn).ReadString('\n')
-	if err != nil {
-		return false
-	}
-	var frame struct {
-		Ok   *bool `json:"ok"`
-		Data struct {
-			Pong bool `json:"pong"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal([]byte(line), &frame); err != nil {
-		return false
-	}
-	return frame.Ok != nil && *frame.Ok && frame.Data.Pong
 }
 
 // stopIproxy kills a running iproxy tunnel's process group and waits

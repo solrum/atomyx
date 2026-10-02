@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -79,12 +80,75 @@ type fakeXcodebuildRunner struct {
 	// process exit instead of only asserting that the caller's kill
 	// call returned.
 	spawnReturned chan struct{}
+
+	// spawnEnvs holds the launch environment of every spawn, in order.
+	spawnEnvs [][]string
+	// exitFirstSpawns makes the first N spawns exit early with status
+	// 65, modeling a runner that lost the race for its port.
+	exitFirstSpawns int
+	// reportRunnerID overrides the runnerId the fake reports. Empty
+	// echoes the TEST_RUNNER_ATOMYX_RUNNER_ID the launcher passed.
+	reportRunnerID string
+	// reportData, when set, replaces the identity fields of the ping
+	// reply entirely.
+	reportData string
+}
+
+// defaultIdentityFields is the identity a fake runner reports when a
+// test does not script one. It names both a simulator and a device so
+// a test aimed at either kind finds a runner that belongs to it.
+const defaultIdentityFields = `"simulatorUdid":"SIM-1","targetUdid":"DEV-1"`
+
+// unwrapEnv splits the launcher's "env VAR=value... command args"
+// invocation into the environment assignments and the wrapped
+// command, so tests assert the xcodebuild argv and the launch
+// environment independently.
+func unwrapEnv(name string, args []string) (env []string, cmd string, cmdArgs []string) {
+	if name != "env" {
+		return nil, name, args
+	}
+	i := 0
+	for i < len(args) && strings.Contains(args[i], "=") {
+		i++
+	}
+	if i >= len(args) {
+		return args, name, nil
+	}
+	return args[:i], args[i], args[i+1:]
+}
+
+func envValue(env []string, key string) string {
+	for _, kv := range env {
+		if v, ok := strings.CutPrefix(kv, key+"="); ok {
+			return v
+		}
+	}
+	return ""
 }
 
 func (r *fakeXcodebuildRunner) record(name string, args []string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.invocations = append(r.invocations, process.Invocation{Name: name, Args: append([]string(nil), args...)})
+}
+
+// SpawnEnvs returns the launch environment of every spawn, in order.
+func (r *fakeXcodebuildRunner) SpawnEnvs() [][]string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([][]string(nil), r.spawnEnvs...)
+}
+
+// replyData builds the identity fields of the ping reply for a spawn.
+func (r *fakeXcodebuildRunner) replyData(env []string) string {
+	if r.reportData != "" {
+		return r.reportData
+	}
+	id := r.reportRunnerID
+	if id == "" {
+		id = envValue(env, "TEST_RUNNER_ATOMYX_RUNNER_ID")
+	}
+	return fmt.Sprintf(`"runnerId":%q,%s`, id, defaultIdentityFields)
 }
 
 func (r *fakeXcodebuildRunner) Run(_ context.Context, name string, args ...string) (process.Result, error) {
@@ -102,7 +166,12 @@ func (r *fakeXcodebuildRunner) Run(_ context.Context, name string, args ...strin
 }
 
 func (r *fakeXcodebuildRunner) Start(ctx context.Context, name string, args ...string) (process.BackgroundProcess, error) {
+	env, name, args := unwrapEnv(name, args)
 	r.record(name, args)
+	r.mu.Lock()
+	r.spawnEnvs = append(r.spawnEnvs, env)
+	spawnIndex := len(r.spawnEnvs)
+	r.mu.Unlock()
 	if r.spawnStartErr != nil {
 		return nil, r.spawnStartErr
 	}
@@ -112,16 +181,16 @@ func (r *fakeXcodebuildRunner) Start(ctx context.Context, name string, args ...s
 	go func() {
 		defer close(proc.done)
 		defer func() { _ = pw.Close() }()
-		proc.err = r.runSpawn(ctx, proc, pw)
+		proc.err = r.runSpawn(ctx, proc, pw, env, spawnIndex)
 	}()
 	return proc, nil
 }
 
-func (r *fakeXcodebuildRunner) runSpawn(ctx context.Context, proc *tunnelProcess, stdout io.Writer) error {
+func (r *fakeXcodebuildRunner) runSpawn(ctx context.Context, proc *tunnelProcess, stdout io.Writer, env []string, spawnIndex int) error {
 	if r.spawnChatterBytes > 0 {
 		_, _ = stdout.Write(make([]byte, r.spawnChatterBytes))
 	}
-	if r.spawnExit {
+	if r.spawnExit || spawnIndex <= r.exitFirstSpawns {
 		proc.exitCode = 65
 		proc.stderr = r.spawnExitStderr
 		return errors.New("exit status 65")
@@ -134,7 +203,11 @@ func (r *fakeXcodebuildRunner) runSpawn(ctx context.Context, proc *tunnelProcess
 		return ctx.Err()
 	}
 
-	listener, err := new(net.ListenConfig).Listen(ctx, "tcp", fmt.Sprintf("127.0.0.1:%d", r.port))
+	port := r.port
+	if port == 0 {
+		port, _ = strconv.Atoi(envValue(env, "TEST_RUNNER_ATOMYX_PORT"))
+	}
+	listener, err := new(net.ListenConfig).Listen(ctx, "tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		return err
 	}
@@ -146,7 +219,7 @@ func (r *fakeXcodebuildRunner) runSpawn(ctx context.Context, proc *tunnelProcess
 			if err != nil {
 				return
 			}
-			go answerPingHandshake(c)
+			go answerPingHandshake(c, r.replyData(env))
 		}
 	}()
 
@@ -178,7 +251,7 @@ var (
 
 // answerPingHandshake answers the same ping handshake
 // probeIproxyPing sends, on a single already-accepted connection.
-func answerPingHandshake(c net.Conn) {
+func answerPingHandshake(c net.Conn, identityFields string) {
 	defer func() { _ = c.Close() }()
 	buf := make([]byte, 4096)
 	n, err := c.Read(buf)
@@ -186,7 +259,7 @@ func answerPingHandshake(c net.Conn) {
 		return
 	}
 	_ = buf[:n]
-	_, _ = c.Write([]byte(`{"id":0,"ok":true,"data":{"pong":true}}` + "\n"))
+	_, _ = fmt.Fprint(c, pongReply(0, identityFields))
 }
 
 // newTestProjectDir creates a temp directory containing

@@ -16,7 +16,8 @@ This doc does NOT cover: the cross-platform `Driver` contract itself
 ## Architecture
 
 iOS support is split across two codebases that talk over TCP, line-
-delimited JSON, on `127.0.0.1:22087`:
+delimited JSON, on `127.0.0.1:22087` by default (see Runner identity and
+port):
 
 ```
 Go core
@@ -60,6 +61,7 @@ Host-side files under `core/internal/iosdriver`:
 | `core/internal/iosdriver/driver.go` | `IosDriver`, implementing `driver.Driver` by mapping each port method to a wire command |
 | `core/internal/iosdriver/transport.go` | The `Conn` interface `IosDriver` depends on |
 | `core/internal/iosdriver/iproxy.go` | `iproxy` USB tunnel lifecycle for physical devices |
+| `core/internal/iosdriver/identity.go` | `ExpectedRunner`, the ping identity probe, and the identity check shared by the tunnel, the launcher, and the direct HID path |
 | `core/internal/iosdriver/xctest_launcher.go` | Reuse-or-spawn `xcodebuild test-without-building` to bring the runner up |
 | `core/internal/iosdriver/normalize.go` | Swift `dumpRawTree` output maps to the canonical `wire.TreeNodeWire` |
 | `core/internal/iosdriver/apps.go` | App lifecycle (`ListApps`, `InstallApp`, `UninstallApp`, `ClearAppData`, `IsAppInstalled`), all host-only via `xcrun simctl` or `xcrun devicectl` |
@@ -69,6 +71,7 @@ Runner-side files under `platforms/ios-agent/Tests`:
 | Path | Responsibility |
 |---|---|
 | `platforms/ios-agent/Tests/AtomyxDriverAgent.swift` | XCTestCase entry point. Registers every command, picks the gesture synthesizer, starts `CommandServer`, blocks on `RunLoop.main.run()` |
+| `platforms/ios-agent/Tests/Server/RunnerEnvironment.swift` | Reads `ATOMYX_PORT`, `ATOMYX_RUNNER_ID`, `ATOMYX_TARGET_UDID`, and `SIMULATOR_UDID` |
 | `platforms/ios-agent/Tests/Server/CommandServer.swift`, `platforms/ios-agent/Tests/Server/WireProtocol.swift` | TCP listener plus the JSON request and response types |
 | `platforms/ios-agent/Tests/Bridge/XCUIBridge.swift` | Protocol wrapping `XCUIApplication` for tree and app-lifecycle operations. `DefaultXCUIBridge` is the concrete implementation |
 | `platforms/ios-agent/Tests/Bridge/EventSynthesizer.swift` | Protocol plus shared types (`PointerPath`, waypoint phases, `EventCapabilities`, `SynthesizerError`) |
@@ -94,7 +97,7 @@ runner never sees a selector: it only receives coordinates and, for
 
 | Driver port method | Wire command | Swift handler | Notes |
 |---|---|---|---|
-| `Connect()` / `Ping()` | `ping` | `PingCommand` | Populates `CanMultiPointer` and `CanPressure` from the active synthesizer's capabilities. |
+| `Connect()` / `Ping()` | `ping` | `PingCommand` | Populates `CanMultiPointer` and `CanPressure` from the active synthesizer's capabilities. Also reports the runner identity (`runnerId`, `targetUdid`, `simulatorUdid`). |
 | `Hierarchy()` | `dumpRawTree` | `DumpRawTreeCommand` | Builds the tree from one `app.snapshot()` call, walked iteratively. |
 | `Tap()` | `tapAt` | `TapAtCommand` | Always coordinates. Selector-based tap composes host-side. |
 | `LongPress()` | `longPressAt` | `LongPressAtCommand` | |
@@ -124,7 +127,7 @@ make serve   # runs the driver, blocks the terminal
 
 `make setup` auto-detects the first booted simulator's UDID.
 `iosdriver.XctestLauncher` (`core/internal/iosdriver/xctest_launcher.go`)
-is reuse-first: when a driver is already answering `ping` on the
+is reuse-first: when the expected runner is already answering `ping` on the
 target port, it skips `xcodebuild` entirely. Otherwise it spawns
 `xcodebuild test-without-building` as a background child process
 (`process.BackgroundRunner`), which stays up until the launcher's kill
@@ -178,6 +181,67 @@ and waits for it to become reachable before dialing. `Disconnect` stops
 the tunnel. On a simulator it dials
 `127.0.0.1:22087` directly, because the simulator shares the host's
 network namespace.
+
+### Runner identity and port
+
+The runner reads its launch parameters from its environment
+(`platforms/ios-agent/Tests/Server/RunnerEnvironment.swift`). A launcher
+passes each variable to `xcodebuild` with a `TEST_RUNNER_` prefix, which
+`xcodebuild` strips before the test runner starts. Only variables in
+`xcodebuild`'s own environment are forwarded, so a `NAME=value` operand
+on its command line has no effect. `XctestLauncher` therefore starts the
+runner as `env TEST_RUNNER_<NAME>=<value> xcodebuild test-without-building`.
+
+| Variable | Meaning | Default |
+|---|---|---|
+| `ATOMYX_PORT` | Port the runner listens on. An unset, empty, non-numeric, or out-of-range value falls back to the default. | `22087` |
+| `ATOMYX_RUNNER_ID` | Identifier the launcher assigned to this one launch | none |
+| `ATOMYX_TARGET_UDID` | Physical device the launcher aimed the runner at | none |
+| `SIMULATOR_UDID` | Simulator the runner executes in. Xcode sets it for every simulator destination, whoever launched the runner. | none |
+
+The `ping` reply carries `runnerId`, `targetUdid`, and `simulatorUdid`
+beside `pong`. A field is present only when its variable was set.
+
+The host accepts a runner only when its reply proves it belongs to the
+requested target (`iosdriver.ExpectedRunner` in
+`core/internal/iosdriver/identity.go`):
+
+- A launcher-assigned runner id must be echoed back exactly.
+- Without a runner id, a simulator runner must report its own
+  `simulatorUdid`. A runner started by hand through `make serve` is
+  adopted this way, and the host logs a warning that it carries no
+  launch id.
+- Without a runner id, a device runner must report a matching
+  `targetUdid`, because Xcode supplies no device identity of its own.
+- A reported UDID that differs from the requested one is refused even
+  when the runner id matches.
+- A runner that reports no identity at all, such as one built before
+  these fields existed, is refused. Rebuild it with `make build`.
+
+A refused runner surfaces as `IproxyErrBindConflict` from the tunnel
+launch and as `XctestErrRunnerMismatch` from the launcher. The direct
+HID path (`DriverFactory.createDriver`) runs the same check against the
+runner it is about to use, so a runner left behind by a different
+simulator is never adopted.
+
+Ports differ by target:
+
+- Simulator: the runner binds the host port itself, so `ATOMYX_PORT`
+  is the host port.
+- Device: the runner always listens on `22087` inside the device, and
+  `iproxy <hostPort>:22087` maps a per-device host port to it.
+
+`XctestLauncher` retries the whole allocate-and-launch sequence when
+`LaunchConfig.AllocatePort` is set. A launch that loses the race for its
+port, either by `xcodebuild` exiting with status 65 before the runner
+answers or by another runner answering on the port, is retried on a
+fresh port, up to `XctestMaxLaunchAttempts` attempts. Without an
+allocator the port is fixed, so the first failure is returned.
+
+For a hand-started runner, `make serve ATOMYX_PORT=<port>` binds it to a
+port other than the default. `make serve-device` always passes
+`DEVICE_UDID` as the target identity. Keep the default `ATOMYX_PORT` for
+a device, because `iproxy` maps to the fixed device-side port.
 
 ## Platform-specific quirks
 

@@ -62,6 +62,15 @@ type Options struct {
 	// required: New panics when it is nil, because a default would
 	// spawn real processes from a caller that never asked for them.
 	Background process.BackgroundRunner
+
+	// RunnerID is the launch identifier the caller assigned to the
+	// runner it expects on Port. Empty means the runner was not
+	// launched by the caller, so identity rests on the UDID alone.
+	RunnerID string
+
+	// Warn receives a one-line warning when a runner is adopted
+	// without a launch identifier. Nil discards it.
+	Warn func(message string)
 }
 
 // IosDriver implements driver.Driver over the Swift XCUITest runner's
