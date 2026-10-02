@@ -166,14 +166,20 @@ func (f *DriverFactory) createDriver(ctx context.Context, desc Descriptor) (driv
 // signal ignores it.
 func (f *DriverFactory) createDriverWatched(ctx context.Context, desc Descriptor, onLost func(error)) (driver.Driver, error) {
 	if desc.Platform == PlatformAndroid {
-		return androiddriver.New(nil, f.runner, androiddriver.Options{
+		opts := androiddriver.Options{
 			Serial:           desc.ID,
 			AllocateHostPort: true,
 			DevicePort:       androidControlPort,
 			NewTransport: func(hostPort int) androiddriver.Transport {
 				return transport.NewHTTPClient("127.0.0.1", hostPort, transport.WithHTTPLogger(f.logger))
 			},
-		}), nil
+		}
+		if f.provisioner != nil {
+			opts.ReinstallAgent = func(ctx context.Context) error {
+				return f.provisioner.ReinstallAndroidAgent(ctx, desc.ID)
+			}
+		}
+		return androiddriver.New(nil, f.runner, opts), nil
 	}
 
 	kind := iosdriver.KindDevice

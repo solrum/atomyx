@@ -53,6 +53,13 @@ type Options struct {
 	// DevicePort is the device-side port the agent's HTTP server
 	// listens on. Defaults to 8765.
 	DevicePort int
+
+	// ReinstallAgent replaces the agent on the device and brings it up
+	// again. Connect calls it once when the running agent is too old to
+	// mark secret fields, and it must report an *AgentLauncherError with
+	// ErrCodeNoAPK when no agent APK can be found. Nil means the driver
+	// cannot reinstall, so Connect fails for such an agent instead.
+	ReinstallAgent func(ctx context.Context) error
 }
 
 // AndroidDriver implements driver.Driver over the Android agent's
@@ -227,17 +234,68 @@ func (d *AndroidDriver) connectAllocated(ctx context.Context, forwards []adbForw
 }
 
 // finishConnect verifies the agent answers /health and runs the /ping
-// capability handshake against the forward Connect settled on.
+// capability handshake against the forward Connect settled on. An
+// agent too old to mark secret fields is replaced once through
+// Options.ReinstallAgent, and Connect fails when it cannot be.
 func (d *AndroidDriver) finishConnect(ctx context.Context) error {
 	if _, err := d.transport.Health(ctx); err != nil {
 		return d.classifyHealthFailure(fmt.Errorf("androiddriver: health check: %w", err))
 	}
-	if pong, err := d.transport.Ping(ctx); err == nil {
+	pong, err := d.transport.Ping(ctx)
+	if agentLacksSecureFields(pong, err) {
+		if err := d.replaceStaleAgent(ctx); err != nil {
+			return err
+		}
+		pong, err = d.transport.Ping(ctx)
+		if agentLacksSecureFields(pong, err) {
+			return d.staleAgentError(nil)
+		}
+	}
+	if err == nil {
 		d.capabilities.CanMultiPointer = pong.Capabilities.CanMultiPointer
 		d.capabilities.CanPressure = pong.Capabilities.CanPressure
 	}
 	d.connected = true
 	return nil
+}
+
+// agentLacksSecureFields reports whether the /ping outcome shows an
+// agent that does not mark secret fields: it answered without the
+// capability, or it answered with an error status because it predates
+// the route. A failure to reach the route at all proves nothing about
+// the agent, so it keeps the conservative defaults instead.
+func agentLacksSecureFields(pong transport.PingResponse, err error) bool {
+	if err == nil {
+		return !pong.Capabilities.SecureFields
+	}
+	var agentErr *transport.AgentError
+	return errors.As(err, &agentErr)
+}
+
+func (d *AndroidDriver) replaceStaleAgent(ctx context.Context) error {
+	if d.opts.ReinstallAgent == nil {
+		return d.staleAgentError(nil)
+	}
+	if err := d.opts.ReinstallAgent(ctx); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return d.staleAgentError(err)
+	}
+	return nil
+}
+
+// staleAgentRemedy is the next step reported for an agent too old to
+// mark secret fields. Connecting to it would leave a password unmasked
+// in every result, so the connection is refused instead.
+const staleAgentRemedy = "Build the agent with ./gradlew :app:assembleDebug in platforms/android-agent, " +
+	"or set ATOMYX_ANDROID_APK to a current agent APK, then connect again so the agent is reinstalled."
+
+func (d *AndroidDriver) staleAgentError(cause error) error {
+	return diag.New(diag.CodeAgentNotReady,
+		fmt.Sprintf("the agent on device %s is out of date and cannot mark secret fields", d.opts.Serial),
+		staleAgentRemedy,
+		cause)
 }
 
 // isStaleForwardFailure reports whether err is a health failure where

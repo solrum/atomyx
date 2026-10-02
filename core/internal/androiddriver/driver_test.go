@@ -58,6 +58,7 @@ type fakeTransport struct {
 
 func newFakeTransport() *fakeTransport {
 	return &fakeTransport{
+		pingResp:         transport.PingResponse{Ok: true, Capabilities: transport.PingCapabilities{SecureFields: true}},
 		clearFocusedResp: transport.ClearFocusedInputResult{Ok: true},
 		hideKeyboardResp: transport.AckResult{Ok: true},
 		forceStopResp:    transport.AckResult{Ok: true},
@@ -275,6 +276,7 @@ func TestAndroidDriver_Connect_ForwardsAdbTunnelThenHealthAndPing(t *testing.T) 
 		Capabilities: transport.PingCapabilities{
 			CanMultiPointer: true,
 			CanPressure:     true,
+			SecureFields:    true,
 		},
 	}
 	d := androiddriver.New(tr, runner, androiddriver.Options{Serial: "S1"})
@@ -1068,4 +1070,88 @@ func equalArgs(got, want []string) bool {
 		}
 	}
 	return true
+}
+
+func staleAgentPing() transport.PingResponse {
+	return transport.PingResponse{Ok: true, Capabilities: transport.PingCapabilities{CanMultiPointer: true}}
+}
+
+func TestAndroidDriver_Connect_AgentWithoutSecureFields_ReinstallsOnceThenConnects(t *testing.T) {
+	tr := newFakeTransport()
+	tr.pingResp = staleAgentPing()
+	reinstalls := 0
+	d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{
+		Serial: "S1",
+		ReinstallAgent: func(context.Context) error {
+			reinstalls++
+			tr.pingResp = transport.PingResponse{Ok: true, Capabilities: transport.PingCapabilities{
+				CanMultiPointer: true, SecureFields: true,
+			}}
+			return nil
+		},
+	})
+
+	if err := d.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	if reinstalls != 1 || !d.IsConnected() {
+		t.Fatalf("reinstalls = %d, connected = %v, want one reinstall and a connected driver", reinstalls, d.IsConnected())
+	}
+	if !d.Capabilities().CanMultiPointer {
+		t.Fatal("capabilities from the replacement agent were not applied")
+	}
+}
+
+func TestAndroidDriver_Connect_AgentWithoutSecureFields_FailsWhenItCannotBeReplaced(t *testing.T) {
+	noAPK := &androiddriver.AgentLauncherError{Code: androiddriver.ErrCodeNoAPK, Message: "APK not found"}
+	cases := map[string]func(*fakeTransport) androiddriver.Options{
+		"no reinstall hook": func(*fakeTransport) androiddriver.Options { return androiddriver.Options{Serial: "S1"} },
+		"no apk": func(*fakeTransport) androiddriver.Options {
+			return androiddriver.Options{Serial: "S1", ReinstallAgent: func(context.Context) error { return noAPK }}
+		},
+		"agent still stale after the reinstall": func(*fakeTransport) androiddriver.Options {
+			return androiddriver.Options{Serial: "S1", ReinstallAgent: func(context.Context) error { return nil }}
+		},
+	}
+	for name, options := range cases {
+		t.Run(name, func(t *testing.T) {
+			tr := newFakeTransport()
+			tr.pingResp = staleAgentPing()
+			d := androiddriver.New(tr, process.NewFake(), options(tr))
+
+			err := d.Connect(context.Background())
+
+			code, message, remedy := diag.Describe(err)
+			if code != diag.CodeAgentNotReady || d.IsConnected() {
+				t.Fatalf("Connect() code = %q, connected = %v, want %q and a failed connect", code, d.IsConnected(), diag.CodeAgentNotReady)
+			}
+			if !strings.Contains(message, "out of date") || !strings.Contains(remedy, "assembleDebug") {
+				t.Fatalf("message = %q, remedy = %q, want the stale agent named with a rebuild remedy", message, remedy)
+			}
+		})
+	}
+}
+
+func TestAndroidDriver_Connect_PingRouteMissing_CountsAsAStaleAgent(t *testing.T) {
+	tr := newFakeTransport()
+	tr.pingErr = &transport.AgentError{Route: "GET /ping", StatusCode: 404, Message: "Unsupported command."}
+	d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{Serial: "S1"})
+
+	err := d.Connect(context.Background())
+
+	if code, _, _ := diag.Describe(err); code != diag.CodeAgentNotReady {
+		t.Fatalf("Connect() code = %q, want %q for an agent that predates /ping", code, diag.CodeAgentNotReady)
+	}
+}
+
+func TestAndroidDriver_Connect_AgentWithSecureFields_NeverReinstalls(t *testing.T) {
+	tr := newFakeTransport()
+	d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{
+		Serial:         "S1",
+		ReinstallAgent: func(context.Context) error { t.Fatal("reinstalled a current agent"); return nil },
+	})
+
+	if err := d.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
 }

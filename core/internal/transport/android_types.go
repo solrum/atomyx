@@ -39,6 +39,11 @@ type HealthResponse struct {
 type PingCapabilities struct {
 	CanMultiPointer bool `json:"canMultiPointer"`
 	CanPressure     bool `json:"canPressure"`
+	// SecureFields is true when the agent marks every secret-holding
+	// node, such as a password input, in its tree. An agent that omits
+	// it predates the marker, so a host that masks secrets must treat
+	// that agent as stale.
+	SecureFields bool `json:"secureFields"`
 }
 
 // PingResponse is the response to GET /ping, the capability

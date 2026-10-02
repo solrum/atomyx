@@ -68,6 +68,12 @@ type AgentProvisioner interface {
 	// call to kill is never reported. A nil onLost watches nothing.
 	EnsureIOSAgentWatched(ctx context.Context, udid string, kind IosAgentKind, onLost func(error)) (port int, kill func() error, err error)
 	EnsureAndroidAgent(ctx context.Context, serial string) error
+	// ReinstallAndroidAgent replaces the agent on the Android device
+	// serial and brings it up again, even when the installed agent
+	// already answers its health probe. It fails with an
+	// *androiddriver.AgentLauncherError whose code is ErrCodeNoAPK when
+	// no agent APK can be found.
+	ReinstallAndroidAgent(ctx context.Context, serial string) error
 }
 
 // DriverProvisionerDeps configures a DriverProvisioner. A nil Clock
@@ -505,22 +511,38 @@ func (p *DriverProvisioner) recordTunnel(path string, state RunnerState, tunnelP
 // forward adb already holds for serial, or a fresh one adb allocates,
 // so two devices never contend for one fixed host port.
 func (p *DriverProvisioner) EnsureAndroidAgent(ctx context.Context, serial string) error {
+	launcher, err := p.androidLauncher(ctx, serial)
+	if err != nil {
+		return err
+	}
+	return launcher.EnsureRunning(ctx)
+}
+
+// ReinstallAndroidAgent implements AgentProvisioner.
+func (p *DriverProvisioner) ReinstallAndroidAgent(ctx context.Context, serial string) error {
+	launcher, err := p.androidLauncher(ctx, serial)
+	if err != nil {
+		return err
+	}
+	return launcher.Reinstall(ctx)
+}
+
+func (p *DriverProvisioner) androidLauncher(ctx context.Context, serial string) (*androiddriver.AgentLauncher, error) {
 	apkPath := p.deps.AndroidAPKPath
 	if apkPath == "" {
 		apkPath = os.Getenv("ATOMYX_ANDROID_APK")
 	}
 	hostPort, err := androiddriver.ForwardHostPort(ctx, p.runner, serial, androidControlPort)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	client := transport.NewHTTPClient("127.0.0.1", hostPort)
-	launcher := androiddriver.NewAgentLauncher(p.runner, p.clock, client, androiddriver.AgentLauncherOptions{
+	return androiddriver.NewAgentLauncher(p.runner, p.clock, client, androiddriver.AgentLauncherOptions{
 		Serial:     serial,
 		HostPort:   hostPort,
 		DevicePort: androidControlPort,
 		APKPath:    apkPath,
-	})
-	return launcher.EnsureRunning(ctx)
+	}), nil
 }
 
 // FakeIOSCall records one EnsureIOSAgent invocation FakeProvisioner
@@ -535,15 +557,17 @@ type FakeIOSCall struct {
 // so a sidecar test drives the ready and failed transitions without a
 // real launcher, device, process, or network access.
 type FakeProvisioner struct {
-	mu            sync.Mutex
-	iosResult     map[string]error
-	androidResult map[string]error
-	iosCalls      []FakeIOSCall
-	androidCalls  []string
-	iosKillCounts map[string]int
-	iosLost       map[string]func(error)
-	iosKills      map[string]func() error
-	iosPorts      map[string]int
+	mu              sync.Mutex
+	iosResult       map[string]error
+	androidResult   map[string]error
+	reinstallResult map[string]error
+	reinstallCalls  []string
+	iosCalls        []FakeIOSCall
+	androidCalls    []string
+	iosKillCounts   map[string]int
+	iosLost         map[string]func(error)
+	iosKills        map[string]func() error
+	iosPorts        map[string]int
 
 	// gate, when non-nil, is waited on before every call returns. A
 	// test sets it to hold a call open through the "building" or
@@ -557,12 +581,13 @@ type FakeProvisioner struct {
 // call immediately until configured otherwise.
 func NewFakeProvisioner() *FakeProvisioner {
 	return &FakeProvisioner{
-		iosResult:     make(map[string]error),
-		androidResult: make(map[string]error),
-		iosKillCounts: make(map[string]int),
-		iosLost:       make(map[string]func(error)),
-		iosKills:      make(map[string]func() error),
-		iosPorts:      make(map[string]int),
+		iosResult:       make(map[string]error),
+		androidResult:   make(map[string]error),
+		reinstallResult: make(map[string]error),
+		iosKillCounts:   make(map[string]int),
+		iosLost:         make(map[string]func(error)),
+		iosKills:        make(map[string]func() error),
+		iosPorts:        make(map[string]int),
 	}
 }
 
@@ -590,6 +615,22 @@ func (f *FakeProvisioner) SetAndroidResult(serial string, err error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.androidResult[serial] = err
+}
+
+// SetReinstallResult makes the next ReinstallAndroidAgent calls for
+// serial return err (nil for success).
+func (f *FakeProvisioner) SetReinstallResult(serial string, err error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.reinstallResult[serial] = err
+}
+
+// ReinstallCalls returns every ReinstallAndroidAgent serial received
+// so far.
+func (f *FakeProvisioner) ReinstallCalls() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.reinstallCalls...)
 }
 
 // SetGate installs gate: every in-flight and future call blocks until
@@ -702,4 +743,12 @@ func (f *FakeProvisioner) EnsureAndroidAgent(ctx context.Context, serial string)
 		}
 	}
 	return err
+}
+
+// ReinstallAndroidAgent implements AgentProvisioner.
+func (f *FakeProvisioner) ReinstallAndroidAgent(_ context.Context, serial string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.reinstallCalls = append(f.reinstallCalls, serial)
+	return f.reinstallResult[serial]
 }

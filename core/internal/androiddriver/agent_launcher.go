@@ -131,7 +131,7 @@ type AgentLauncherOptions struct {
 //     elapses.
 //
 // EnsureRunning is idempotent: calling it repeatedly is cheap once
-// step 2's probe passes.
+// step 2's probe passes. Reinstall runs steps 1 and 3 to 6 only.
 type AgentLauncher struct {
 	proc   process.Runner
 	clock  clock.Clock
@@ -171,10 +171,31 @@ func NewAgentLauncher(proc process.Runner, clock clock.Clock, prober HealthProbe
 // (missing APK, failed install, failed rebind, launch timeout), or
 // the underlying error unwrapped for an adb or context failure.
 func (l *AgentLauncher) EnsureRunning(ctx context.Context) error {
+	if err := l.forward(ctx); err != nil {
+		return err
+	}
+	if l.probeHealth(ctx) {
+		return nil
+	}
+	return l.installAndStart(ctx)
+}
+
+// Reinstall replaces the agent on the device and brings it up again,
+// skipping the readiness probe EnsureRunning starts with. A caller
+// uses it when the running agent answers but is too old to serve what
+// the host needs, so a healthy /health must not end the pipeline. It
+// returns the same errors as EnsureRunning.
+func (l *AgentLauncher) Reinstall(ctx context.Context) error {
+	if err := l.forward(ctx); err != nil {
+		return err
+	}
+	return l.installAndStart(ctx)
+}
+
+func (l *AgentLauncher) forward(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-
 	if _, err := l.proc.Run(ctx, "adb",
 		"-s", l.opts.Serial, "forward",
 		fmt.Sprintf("tcp:%d", l.hostPort),
@@ -182,11 +203,12 @@ func (l *AgentLauncher) EnsureRunning(ctx context.Context) error {
 	); err != nil {
 		return fmt.Errorf("agentlauncher: adb forward: %w", err)
 	}
+	return nil
+}
 
-	if l.probeHealth(ctx) {
-		return nil
-	}
-
+// installAndStart runs steps 3 to 6 of the pipeline: install, rebind,
+// start the foreground service, and wait for /health.
+func (l *AgentLauncher) installAndStart(ctx context.Context) error {
 	apk := l.resolveAPKPath()
 	if _, err := os.Stat(apk); err != nil {
 		return &AgentLauncherError{

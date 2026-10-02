@@ -870,3 +870,30 @@ func isHTTPError(err error, target **HTTPError) bool {
 func isContextCanceled(err error) bool {
 	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }
+
+func TestHTTPClient_Ping_DecodesTheSecureFieldsCapabilityAndIgnoresUnknownOnes(t *testing.T) {
+	cases := map[string]struct {
+		body string
+		want bool
+	}{
+		"current agent":          {`{"ok":true,"capabilities":{"canMultiPointer":true,"canPressure":false,"secureFields":true,"somethingNew":true}}`, true},
+		"agent that predates it": {`{"ok":true,"capabilities":{"canMultiPointer":true,"canPressure":false}}`, false},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(tc.body))
+			}))
+			defer server.Close()
+
+			got, err := newTestHTTPClient(t, server).Ping(context.Background())
+			if err != nil {
+				t.Fatalf("Ping() error = %v", err)
+			}
+			if got.Capabilities.SecureFields != tc.want || !got.Capabilities.CanMultiPointer {
+				t.Fatalf("Ping() capabilities = %+v, want secureFields %v", got.Capabilities, tc.want)
+			}
+		})
+	}
+}

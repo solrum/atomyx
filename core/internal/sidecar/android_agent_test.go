@@ -193,6 +193,10 @@ func (panickingProvisioner) EnsureAndroidAgent(context.Context, string) error {
 	panic("android agent panic")
 }
 
+func (panickingProvisioner) ReinstallAndroidAgent(context.Context, string) error {
+	panic("android agent panic")
+}
+
 // TestAndroidAgent_EnsureAndroidAgent_ProvisionerPanics_RecoversAndMarksFailed
 // guards against a background provisioning panic crashing the whole
 // process: the goroutine must recover, report through the injected

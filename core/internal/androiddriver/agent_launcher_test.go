@@ -385,3 +385,39 @@ func TestAgentLauncher_EnsureRunning_APKPathResolution_DefaultNotFound_ReturnsNo
 		t.Fatalf("error message = %q, want it to name the default relative APK path %q", launcherErr.Message, wantSuffix)
 	}
 }
+
+func TestAgentLauncher_Reinstall_ReplacesAnAgentThatAlreadyAnswersHealth(t *testing.T) {
+	apk := newTestAPK(t)
+	runner := process.NewFake()
+	prober := newFakeHealthProber(healthy())
+	l := androiddriver.NewAgentLauncher(runner, newFakeClock(0), prober, androiddriver.AgentLauncherOptions{
+		Serial:  "S1",
+		APKPath: apk,
+	})
+
+	if err := l.Reinstall(context.Background()); err != nil {
+		t.Fatalf("Reinstall() error = %v", err)
+	}
+
+	installed := false
+	for _, inv := range runner.Invocations() {
+		if equalArgs(inv.Args, []string{"-s", "S1", "install", "-r", apk}) {
+			installed = true
+		}
+	}
+	if !installed {
+		t.Fatalf("adb invocations = %+v, want the install even though /health was ready", runner.Invocations())
+	}
+}
+
+func TestAgentLauncher_Reinstall_MissingAPK_ReturnsNoAPKError(t *testing.T) {
+	l := androiddriver.NewAgentLauncher(process.NewFake(), newFakeClock(0), newFakeHealthProber(healthy()),
+		androiddriver.AgentLauncherOptions{Serial: "S1", APKPath: filepath.Join(t.TempDir(), "missing.apk")})
+
+	err := l.Reinstall(context.Background())
+
+	var launchErr *androiddriver.AgentLauncherError
+	if !errors.As(err, &launchErr) || launchErr.Code != androiddriver.ErrCodeNoAPK {
+		t.Fatalf("Reinstall() error = %v, want an ErrCodeNoAPK launcher error", err)
+	}
+}

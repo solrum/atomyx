@@ -74,7 +74,7 @@ func faultInjectionOkBody(path string) string {
 	switch path {
 	case "/ping":
 		return `{"ok":true,"agent":"fault-injection","sdkInt":1,"mechanism":"test",` +
-			`"capabilities":{"canMultiPointer":false,"canPressure":false}}`
+			`"capabilities":{"canMultiPointer":false,"canPressure":false,"secureFields":true}}`
 	default:
 		return `{"ok":true,"accessibilityConnected":true}`
 	}
