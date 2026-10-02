@@ -163,3 +163,12 @@ func rejectUnsupportedJSRegexSyntax(source string) error {
 	}
 	return nil
 }
+
+// Literal returns the exact string of a literal pattern. The second
+// result is false for a regex pattern, which has no single string.
+func (p Pattern) Literal() (string, bool) {
+	if p.regex != nil {
+		return "", false
+	}
+	return p.literal, true
+}

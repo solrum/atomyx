@@ -11,19 +11,21 @@ import (
 const (
 	routeSelectorSuggest = "/api/v1/selector/suggest"
 	routeSelectorTest    = "/api/v1/selector/test"
+	routeStepYAML        = "/api/v1/step/yaml"
 
 	codeTreeStale      = "tree_stale"
 	maxReportedMatches = 100
 )
 
 // SelectorRoutes is the route group that turns the stored tree into
-// selectors: it suggests selectors for a node and tests a selector
-// against the tree. Every route is an operator action and none of them
+// selectors and script steps: it suggests selectors for a node, tests a
+// selector against the tree, and renders one step as YAML. Every route is an operator action and none of them
 // calls the device, so they work from the tree the page displays.
 func SelectorRoutes(c session.Controller) []Route {
 	return []Route{
 		{Method: http.MethodPost, Path: routeSelectorSuggest, Handler: suggestHandler(c), Operator: true},
 		{Method: http.MethodPost, Path: routeSelectorTest, Handler: selectorTestHandler(c), Operator: true},
+		{Method: http.MethodPost, Path: routeStepYAML, Handler: stepYAMLHandler(c), Operator: true},
 	}
 }
 

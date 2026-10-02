@@ -108,3 +108,17 @@ func TestPattern_SupportedJSRegexConstructsStillCompile(t *testing.T) {
 		}
 	}
 }
+
+func TestPattern_LiteralReportsTheStringOfALiteralPatternOnly(t *testing.T) {
+	lit := LiteralPattern("Sign in")
+	if got, ok := lit.Literal(); !ok || got != "Sign in" {
+		t.Errorf("literal pattern: Literal() = %q, %v, want %q, true", got, ok, "Sign in")
+	}
+	var re Pattern
+	if err := re.UnmarshalJSON([]byte(`{"regex":"^Sign"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := re.Literal(); ok || got != "" {
+		t.Errorf("regex pattern: Literal() = %q, %v, want empty, false", got, ok)
+	}
+}

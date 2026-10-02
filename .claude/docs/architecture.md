@@ -560,7 +560,21 @@ build on the `.Built(` and `.Orchestra(` accessors, on
     `{epoch, treeRevision, count, matches, truncated}`. Each match is
     `{path, bounds}`, listed in resolution order, and at most 100 are
     listed. An empty selector is `400` with code `INVALID_ARGUMENT`.
-  - Both answer `404` with code `no_tree` before the first capture.
+  - `POST /api/v1/step/yaml` takes `{selector, action, text}` and
+    returns `{yaml, secure, placeholder}`. `yaml` is one script step
+    from the YAML encoder in the script package. The actions are `tap`,
+    `assertVisible`, `assertNotVisible`, `assertExists`, `waitFor` and
+    `type`, and any other action is `400` with code `INVALID_ARGUMENT`,
+    as is a selector that uses a regular expression, a value or an
+    enabled, clickable or focused constraint, because a script selector
+    holds only exact id, text, label, hint, role and nth. `text` applies
+    to `type` only. For `type` the selector is resolved in the stored
+    tree, and when any match is secure the step holds `${password}` and
+    the response sets `secure` and `placeholder`, never echoing the
+    text. A `type` selector that matches no node is `404` with code
+    `node_not_found`, because the field cannot be shown to be non-secure.
+  - Suggest and test answer `404` with code `no_tree` before the first
+    capture, and so does `type` in step/yaml.
 
 ## Run folder contract
 

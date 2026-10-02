@@ -46,7 +46,7 @@ func selectorHarness(t *testing.T, ctrl *stubController) *apiHarness {
 }
 
 func TestSelectorRoutes_AreAllOperatorActions(t *testing.T) {
-	want := map[string]bool{routeSelectorSuggest: true, routeSelectorTest: true}
+	want := map[string]bool{routeSelectorSuggest: true, routeSelectorTest: true, routeStepYAML: true}
 	for _, r := range SelectorRoutes(&stubController{}) {
 		if !want[r.Path] || !r.Operator || r.Method != http.MethodPost {
 			t.Errorf("route %s %s: operator = %v, want a listed POST operator action", r.Method, r.Path, r.Operator)
