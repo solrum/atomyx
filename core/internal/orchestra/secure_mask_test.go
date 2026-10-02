@@ -52,21 +52,55 @@ func TestMaskSecure_LeavesTheInputTreeIntact(t *testing.T) {
 	}
 }
 
-func TestMaskSecureAttributes_EmptyValuesStayEmpty(t *testing.T) {
-	got := MaskSecureAttributes(secureNode("", "").Attributes)
+func TestMaskSecure_EmptyValuesStayEmpty(t *testing.T) {
+	got := MaskSecure(secureNode("", "")).Attributes
 	if got[AttrText] != "" || got[AttrValue] != "" {
 		t.Fatalf("empty secure field = %v, want it left empty", got)
 	}
 }
 
-func TestTreeNodeToCompactElements_MasksSecureText(t *testing.T) {
+func TestMaskSecure_ReadsSecrecyThroughIsSecure(t *testing.T) {
+	node := secureNode("hunter2", "hunter2")
+	node.Attributes[AttrSecure] = "false"
+
+	if got := MaskSecure(node).Attributes[AttrText]; got != "hunter2" {
+		t.Fatalf("node with secure=false was masked: %q", got)
+	}
+}
+
+func TestTreeNodeToCompactElements_SecureSelectorNeverCarriesText(t *testing.T) {
 	root := wire.TreeNodeWire{Children: []wire.TreeNodeWire{secureNode("hunter2", "hunter2")}}
 
 	elements := TreeNodeToCompactElements(root)
 
-	for _, el := range elements {
-		if el.Text == "hunter2" || el.Selector["text"] == "hunter2" {
-			t.Fatalf("compact element carries the secret: %+v", el)
-		}
+	if len(elements) != 1 {
+		t.Fatalf("elements = %d, want only the node with bounds", len(elements))
+	}
+	pw := elements[0]
+	if !pw.Secure {
+		t.Fatalf("secure node not flagged: %+v", pw)
+	}
+	if _, has := pw.Selector["text"]; has {
+		t.Fatalf("secure selector carries text: %v", pw.Selector)
+	}
+	if pw.Selector["resourceId"] != "pw" || pw.Selector["contentDesc"] != "Password" {
+		t.Fatalf("secure selector = %v, want id and label kept", pw.Selector)
+	}
+}
+
+func TestDiffAppeared_SecureElementSelectorResolvesWithoutText(t *testing.T) {
+	before := TreeNodeToCompactElements(wire.TreeNodeWire{})
+	after := TreeNodeToCompactElements(wire.TreeNodeWire{Children: []wire.TreeNodeWire{secureNode("hunter2", "hunter2")}})
+
+	appeared := DiffAppeared(before, after)
+
+	if len(appeared) != 1 || !appeared[0].Secure {
+		t.Fatalf("appeared = %+v, want one secure element", appeared)
+	}
+	if text, has := appeared[0].Selector["text"]; has {
+		t.Fatalf("appeared selector carries text %q", text)
+	}
+	if appeared[0].Selector["resourceId"] != "pw" {
+		t.Fatalf("appeared selector = %v, want the id", appeared[0].Selector)
 	}
 }

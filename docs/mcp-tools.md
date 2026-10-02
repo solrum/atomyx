@@ -544,7 +544,7 @@ instead when no screen transition is expected.
   obscurement check, keyboard-dismiss retry). If the tap itself is
   rejected, the call returns immediately with `classification:
   "tap_failed"` and never starts waiting.
-- An appeared element that holds a secret reports the mask `********` in place of its text, in the `selector` of the `appeared` entry.
+- An appeared element that holds a secret reports `secure: true`, and its `selector` carries its id or label, never its text, so the selector still resolves the field. The mask `********` never appears in a selector.
 - After a successful tap, polls the hierarchy until waitForAbsent no
   longer matches and waitForAppear matches, whichever of the two was
   supplied.

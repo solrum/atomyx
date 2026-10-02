@@ -42,8 +42,12 @@ func maskSecureResult(result *mcp.CallToolResult) {
 	}
 }
 
-// maskSecureJSON masks every secure element object inside doc and
-// returns the re-indented document. It reports false, with doc
+// maskSecureJSON masks every secure element object inside doc. It
+// keeps the layout of doc: a document spread over several lines comes
+// back indented with the indent unit it already used, and a
+// single-line document comes back on one line. Strings are written
+// without HTML escaping, so a masked document differs from the
+// original only in the masked strings. It reports false, with doc
 // unchanged, when doc is not valid JSON or nothing needed masking.
 func maskSecureJSON(doc []byte) ([]byte, bool) {
 	var compact bytes.Buffer
@@ -54,11 +58,40 @@ func maskSecureJSON(doc []byte) ([]byte, bool) {
 	if !changed {
 		return doc, false
 	}
+	indent, multiline := indentUnit(doc)
+	if !multiline {
+		return masked, true
+	}
 	var out bytes.Buffer
-	if err := json.Indent(&out, masked, "", "  "); err != nil {
+	if err := json.Indent(&out, masked, "", indent); err != nil {
 		return doc, false
 	}
 	return out.Bytes(), true
+}
+
+// indentUnit reports the leading whitespace of the first indented
+// line of doc, and whether doc spans more than one line.
+func indentUnit(doc []byte) (string, bool) {
+	lines := bytes.Split(doc, []byte("\n"))
+	if len(lines) < 2 {
+		return "", false
+	}
+	for _, line := range lines[1:] {
+		trimmed := bytes.TrimLeft(line, " \t")
+		if len(trimmed) > 0 && len(trimmed) < len(line) {
+			return string(line[:len(line)-len(trimmed)]), true
+		}
+	}
+	return "", true
+}
+
+// encodeString renders s as a JSON string without HTML escaping.
+func encodeString(s string) []byte {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(s)
+	return bytes.TrimSuffix(buf.Bytes(), []byte("\n"))
 }
 
 type member struct {
@@ -85,8 +118,7 @@ func maskValue(raw json.RawMessage) (json.RawMessage, bool) {
 		if !changed {
 			return raw, false
 		}
-		out, err := json.Marshal(items)
-		return out, err == nil
+		return encodeArray(items), true
 	case '{':
 		members, ok := decodeMembers(raw)
 		if !ok {
@@ -119,7 +151,7 @@ func maskSecureMembers(members []member) bool {
 	if !secure {
 		return false
 	}
-	maskedValue, _ := json.Marshal(orchestra.SecureMask)
+	maskedValue := encodeString(orchestra.SecureMask)
 	changed := false
 	for i, m := range members {
 		for _, name := range maskedMembers {
@@ -167,8 +199,7 @@ func encodeMembers(members []member) json.RawMessage {
 		if i > 0 {
 			out.WriteByte(',')
 		}
-		key, _ := json.Marshal(m.key)
-		out.Write(key)
+		out.Write(encodeString(m.key))
 		out.WriteByte(':')
 		out.Write(m.value)
 	}
@@ -185,4 +216,17 @@ func secureFlag(node wire.TreeNodeWire) *bool {
 	}
 	secure := true
 	return &secure
+}
+
+func encodeArray(items []json.RawMessage) json.RawMessage {
+	var out bytes.Buffer
+	out.WriteByte('[')
+	for i, item := range items {
+		if i > 0 {
+			out.WriteByte(',')
+		}
+		out.Write(item)
+	}
+	out.WriteByte(']')
+	return out.Bytes()
 }

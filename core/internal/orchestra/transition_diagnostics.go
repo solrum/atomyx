@@ -181,6 +181,7 @@ type AppearedElement struct {
 	Label           string
 	Role            string
 	Selector        map[string]string
+	Secure          bool
 	LooksLikeDialog bool
 }
 
@@ -221,6 +222,7 @@ func DiffAppeared(before, after []CompactElement) []AppearedElement {
 			Label:           el.Label,
 			Role:            el.Role,
 			Selector:        sel,
+			Secure:          el.Secure,
 			LooksLikeDialog: looksLikeDialog,
 		})
 	}

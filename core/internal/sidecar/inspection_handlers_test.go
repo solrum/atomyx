@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"testing"
 
+	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/wire"
 )
 
@@ -77,5 +78,31 @@ func TestInspection_InvalidateUiCache_ForcesFreshCapture(t *testing.T) {
 	tree, ok := result.(wire.TreeNodeWire)
 	if !ok || tree.Attributes["id"] != "second" {
 		t.Fatalf("Dispatch() result = %#v, want tree with id=second", result)
+	}
+}
+
+func TestInspection_GetUiTree_MasksSecureNodesFreshAndCached(t *testing.T) {
+	ctx := newTestContext()
+	drv := selectMockDevice(t, ctx)
+	RegisterInspectionFeature(ctx)
+	drv.StageHierarchy(wire.TreeNodeWire{
+		Attributes: map[string]string{"id": "root"},
+		Children: []wire.TreeNodeWire{{Attributes: map[string]string{
+			"id": "pw", "label": "Password", "text": "hunter2", "value": "hunter2", "secure": "true",
+		}}},
+	})
+
+	for _, call := range []string{"fresh capture", "cached read"} {
+		result, err := ctx.Dispatcher.Dispatch(context.Background(), "getUiTree", nil)
+		if err != nil {
+			t.Fatalf("%s: Dispatch() error = %v", call, err)
+		}
+		field := result.(wire.TreeNodeWire).Children[0].Attributes
+		if field["text"] != orchestra.SecureMask || field["value"] != orchestra.SecureMask {
+			t.Fatalf("%s: secure field = %v, want text and value masked", call, field)
+		}
+		if field["label"] != "Password" || field["id"] != "pw" {
+			t.Fatalf("%s: secure field = %v, want label and id kept", call, field)
+		}
 	}
 }

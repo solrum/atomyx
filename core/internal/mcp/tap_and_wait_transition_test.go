@@ -172,3 +172,20 @@ func TestTapAndWaitTransitionExtendsDeadlineWhileLoadingPersists(t *testing.T) {
 		t.Fatalf("tap_and_wait_transition (extends deadline) classification: got %v, want still_loading", decoded["classification"])
 	}
 }
+
+func TestTapAndWaitTransitionFlagsASecureAppearedElementWithoutItsText(t *testing.T) {
+	password := map[string]string{
+		"role": "text-field", "id": "pw", "label": "Password", "text": "hunter2", "secure": "true", "bounds": "0,200,100,250",
+	}
+	appeared := tapAndWaitAppearedPayload(orchestra.DiffAppeared(nil, orchestra.TreeNodeToCompactElements(
+		wire.TreeNodeWire{Children: []wire.TreeNodeWire{{Attributes: password}}},
+	)))
+
+	if len(appeared) != 1 || appeared[0]["secure"] != true {
+		t.Fatalf("appeared = %v, want one entry flagged secure", appeared)
+	}
+	selector := appeared[0]["selector"].(map[string]string)
+	if _, has := selector["text"]; has || selector["resourceId"] != "pw" {
+		t.Fatalf("selector = %v, want the id and no text", selector)
+	}
+}

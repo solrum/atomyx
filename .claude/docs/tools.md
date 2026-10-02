@@ -313,15 +313,17 @@ applies.
 - **Every tool result passes through one masking pass.** The
   tool-call middleware (`core/internal/mcp/tool_call_middleware.go`)
   runs `maskSecureResult` (`core/internal/mcp/secure_result.go`) on
-  each result. An element object that reports `secure: true` has its
-  `text` and `value` replaced by `orchestra.SecureMask`, and its label,
-  hint, id and role stay. A tool that returns element or tree data
-  therefore sets `secure` through `secureFlag`, and never masks in its
-  own handler. `TestEverySecureElementIsMaskedInEveryToolResult` calls
-  every registered tool against a secure fixture, so a new tool must be
-  added to its table. Projections built inside `orchestra` for output,
-  such as `TreeNodeToCompactElements`, mask through
-  `orchestra.MaskSecureAttributes`, and selector resolution always
+  each result, and it is the only mechanism that masks tool output. An
+  element object that reports `secure: true` has its `text` and `value`
+  replaced by `orchestra.SecureMask`, and its label, hint, id and role
+  stay. The pass keeps the layout of the document and never escapes
+  markup. A tool that returns element or tree data therefore sets
+  `secure` through `secureFlag`, and never masks in its own handler.
+  `TestEverySecureElementIsMaskedInEveryToolResult` calls every
+  registered tool against a secure fixture, so a new tool must be added
+  to its table. A projection built inside `orchestra` for output, such
+  as `TreeNodeToCompactElements`, carries `Secure` and leaves the secret
+  field out of any selector it builds, and selector resolution always
   reads the real tree.
 - **A tool's `execute` closure is pure orchestration.** Logic beyond
   argument decoding and result shaping belongs on `Orchestra`, a

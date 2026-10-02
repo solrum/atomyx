@@ -166,12 +166,16 @@ func tapAndWaitAppearedPayload(appeared []orchestra.AppearedElement) []map[strin
 		if sel == nil {
 			sel = map[string]string{}
 		}
-		out = append(out, map[string]any{
+		entry := map[string]any{
 			"label":           a.Label,
 			"role":            a.Role,
 			"selector":        sel,
 			"looksLikeDialog": a.LooksLikeDialog,
-		})
+		}
+		if a.Secure {
+			entry[secureField] = true
+		}
+		out = append(out, entry)
 	}
 	return out
 }

@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/wire"
 )
 
@@ -30,11 +31,14 @@ func newInspectionService(session *Session) *inspectionService {
 	return &inspectionService{session: session}
 }
 
+// GetUiTree returns the selected device's UI tree for display, with the
+// text and value of every secure node masked. The cache keeps the real
+// tree and masking happens on the way out.
 func (s *inspectionService) GetUiTree(ctx context.Context, fresh bool) (wire.TreeNodeWire, error) {
 	now := time.Now().UnixMilli()
 	if !fresh {
 		if tree, ok := s.cachedIfFresh(now); ok {
-			return tree, nil
+			return orchestra.MaskSecure(tree), nil
 		}
 	}
 
@@ -51,7 +55,7 @@ func (s *inspectionService) GetUiTree(ctx context.Context, fresh bool) (wire.Tre
 	s.cachedTree = &tree
 	s.capturedAt = now
 	s.mu.Unlock()
-	return tree, nil
+	return orchestra.MaskSecure(tree), nil
 }
 
 func (s *inspectionService) Screenshot(ctx context.Context) ([]byte, error) {

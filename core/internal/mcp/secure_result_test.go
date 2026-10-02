@@ -55,7 +55,28 @@ func TestMaskSecureResult_LeavesUnmarkedAndNonJSONBlocksUntouched(t *testing.T) 
 func TestMaskSecureResult_KeepsEmptyValuesAndMasksNestedObjects(t *testing.T) {
 	got := maskedText(t, `{"outer":{"inner":[{"text":"","value":"s3","secure":true}]}}`)
 
-	if strings.Contains(got, "s3") || !strings.Contains(got, `"text": ""`) {
+	if strings.Contains(got, "s3") || !strings.Contains(got, `"text":""`) {
 		t.Fatalf("got %s, want the value masked and the empty text kept", got)
+	}
+}
+
+func TestMaskSecureResult_KeepsTheOriginalLayout(t *testing.T) {
+	compact := `{"a":[{"text":"s3","secure":true}]}`
+	if got, want := maskedText(t, compact), `{"a":[{"text":"********","secure":true}]}`; got != want {
+		t.Fatalf("compact document = %s, want %s", got, want)
+	}
+
+	tabbed := "{\n\t\"text\": \"s3\",\n\t\"secure\": true\n}"
+	if got, want := maskedText(t, tabbed), "{\n\t\"text\": \"********\",\n\t\"secure\": true\n}"; got != want {
+		t.Fatalf("tab-indented document = %q, want %q", got, want)
+	}
+}
+
+func TestMaskSecureResult_DoesNotHTMLEscapeTheRestOfTheDocument(t *testing.T) {
+	doc := "{\n  \"label\": \"<b>Sign in & go</b>\",\n  \"items\": [\n    {\n      \"label\": \"a<b\"\n    },\n    {\n      \"text\": \"s3\",\n      \"secure\": true\n    }\n  ]\n}"
+	want := strings.Replace(doc, `"s3"`, `"********"`, 1)
+
+	if got := maskedText(t, doc); got != want {
+		t.Fatalf("masked document escaped markup:\n got: %s\nwant: %s", got, want)
 	}
 }

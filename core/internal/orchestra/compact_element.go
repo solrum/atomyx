@@ -21,6 +21,10 @@ type CompactElement struct {
 	Bounds     wire.Bounds
 	Clickable  bool
 	Enabled    bool
+	// Secure is true for a node that holds a secret. Text still holds
+	// the real value for in-process diagnostics, so output code must
+	// not print it for a secure element.
+	Secure bool
 	// Selector is nil when the node carries none of resourceId,
 	// contentDesc, or text. Callers read it with a plain map index
 	// (el.Selector["resourceId"]), which returns the empty string for
@@ -32,27 +36,34 @@ type CompactElement struct {
 // TreeNodeToCompactElements flattens root into a CompactElement list
 // in pre-order (matching Walk's traversal, since both implement the
 // same parent-before-children, earlier-sibling-before-later-sibling
-// stack walk). A secure node's text is masked, because the list is
-// built for output. Nodes with no parseable bounds attribute are dropped:
-// they have no geometry for the diagnostic functions to reason about
-// and typically represent invisible semantic grouping nodes.
+// stack walk). The selector of a secure node never carries its text,
+// so the node stays addressable by id or label and the list can be
+// shown without leaking a secret. Nodes with no parseable bounds
+// attribute are dropped: they have no geometry for the diagnostic
+// functions to reason about and typically represent invisible
+// semantic grouping nodes.
 func TreeNodeToCompactElements(root wire.TreeNodeWire) []CompactElement {
 	cursors := Walk(root)
 	out := make([]CompactElement, 0, len(cursors))
 	counter := 0
 	for _, c := range cursors {
-		attrs := MaskSecureAttributes(c.Node.Attributes)
+		attrs := c.Node.Attributes
 		bounds, ok := ParseBounds(attrs[AttrBounds])
 		if !ok {
 			continue
 		}
+		secure := IsSecure(c.Node)
 		resourceID := attrs[AttrID]
 		label := attrs[AttrLabel]
 		text := attrs[AttrText]
 		role := attrs[AttrRole]
 
+		selectorText := text
+		if secure {
+			selectorText = ""
+		}
 		var selector map[string]string
-		if resourceID != "" || label != "" || text != "" {
+		if resourceID != "" || label != "" || selectorText != "" {
 			selector = make(map[string]string, 3)
 			if resourceID != "" {
 				selector["resourceId"] = resourceID
@@ -60,8 +71,8 @@ func TreeNodeToCompactElements(root wire.TreeNodeWire) []CompactElement {
 			if label != "" {
 				selector["contentDesc"] = label
 			}
-			if text != "" {
-				selector["text"] = text
+			if selectorText != "" {
+				selector["text"] = selectorText
 			}
 		}
 
@@ -74,6 +85,7 @@ func TreeNodeToCompactElements(root wire.TreeNodeWire) []CompactElement {
 			Bounds:     bounds,
 			Clickable:  c.Node.Clickable != nil && *c.Node.Clickable,
 			Enabled:    c.Node.Enabled == nil || *c.Node.Enabled,
+			Secure:     secure,
 			Selector:   selector,
 		})
 		counter++
