@@ -20,6 +20,7 @@
 // identifier and is not flagged. The bare words v1 and report are
 // common in config keys and message text, so outside a slashed path
 // they are only flagged as an argument of a path or file call. A
+// literal beginning with /api/ is an HTTP route of a local server. A
 // literal containing whitespace or a URL scheme is prose or an
 // address, not a directory, and is never treated as a path.
 //
@@ -199,6 +200,9 @@ func spellsLayoutName(value string, pathCallArg bool) bool {
 	}
 	if pathCallArg && pathOnlyNames[value] {
 		return true
+	}
+	if strings.HasPrefix(value, "/api/") {
+		return false
 	}
 	if !strings.Contains(value, "/") || strings.ContainsAny(value, " \t\r\n") || strings.Contains(value, "://") {
 		return false

@@ -478,6 +478,39 @@ project config from the working directory.
 `cmd/internal/sessionwire` resolves them. The holder state machine is
 documented in [`tools.md`](./tools.md).
 
+## Inspector server
+
+`core/internal/inspector` is the HTTP server behind the browser
+inspector. Its only way to the device is a `session.Controller`, passed
+to `inspector.New`. It never takes `*Session`, the built driver or the
+Orchestra, and `core/scripts/check-inspector-boundary.sh` fails the
+build on the `.Built(` and `.Orchestra(` accessors, on
+`orchestra.Orchestra` and on any `driver` import under the package.
+
+- **Listener.** It binds `127.0.0.1` with a system-chosen port and
+  nothing else. `core/scripts/check-listen-loopback` fails the build on
+  any production listen address it cannot prove loopback.
+- **Request checks.** Every request must carry a Host of
+  `127.0.0.1:<port>` or `localhost:<port>`. Every request under `/api/`
+  must carry `X-Atomyx-Token`, a `GET` and the event stream included.
+  Every non-`GET` request under `/api/` must carry an Origin equal to
+  the served origin. Only `GET /` is exempt from the token. Responses
+  carry `Cache-Control: no-store` and
+  `Content-Security-Policy: default-src 'self'; img-src 'self' blob:`,
+  and never a CORS header.
+- **Bootstrap.** `Server.NewBootstrapURL` mints a 256-bit single-use
+  code from `crypto/rand` and returns a URL that carries it in the
+  fragment. `POST /api/v1/auth` exchanges it for a 256-bit token that
+  the page keeps in memory. The server stores only digests and compares
+  in constant time. Every exchange is logged through the injected
+  logger, refusals included, and never with a secret in the entry.
+  Minting a new code replaces any code not yet exchanged and leaves
+  issued tokens valid until the server stops.
+- **Routes.** A feature contributes a `RouteGroup`, a function from the
+  controller to `[]Route`, through `Config.Groups`. The server rejects
+  a duplicate route, a path outside `/` and `/api/`, and a missing
+  method or handler, so adding an endpoint never edits a switch.
+
 ## Run folder contract
 
 `core/internal/runfolder` owns the on-disk shape of a run. Consumers

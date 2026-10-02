@@ -28,6 +28,7 @@ func TestCheck(t *testing.T) {
 		{"import path", "package p\nimport _ \"example.com/runs/v1\"\n", 0},
 		{"prose with a slash", "package p\nvar m = \"see runs/v1 for details\"\n", 0},
 		{"url", "package p\nvar u = \"https://example.com/runs\"\n", 0},
+		{"http api route", "package p\nvar r = \"/api/v1/auth\"\n", 0},
 		{"unrelated path", "package p\nvar p = \"a/b/c\"\n", 0},
 	}
 	for _, c := range cases {
