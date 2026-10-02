@@ -193,7 +193,7 @@ func TestIosDriver_SatisfiesContract(t *testing.T) {
 	var conn *fakeConn
 	drivertest.Run(t, func() driver.Driver {
 		conn = newDefaultFakeConn()
-		return iosdriver.New(conn, newIosContractRunner(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+		return iosdriver.New(conn, newIosContractRunner(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 	}, drivertest.Hooks{
 		FailPing: func() {
 			conn.Respond("ping", func(map[string]any) (map[string]any, error) {
@@ -209,7 +209,7 @@ func TestIosDriver_Connect_Simulator_ConnectsAndPingsWithoutIproxy(t *testing.T)
 		return map[string]any{"capabilities": map[string]any{"canMultiPointer": true, "canPressure": true}}, nil
 	})
 	runner := process.NewFake()
-	d := iosdriver.New(conn, runner, iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, runner, iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	if err := d.Connect(context.Background()); err != nil {
 		t.Fatalf("Connect() error = %v", err)
@@ -579,7 +579,7 @@ func TestIosDriver_Connect_Device_ForeignListenerRefusesWithBindConflict(t *test
 func TestIosDriver_Connect_TransportFailureSurfacesAgentUnreachableCode(t *testing.T) {
 	conn := newFakeConn()
 	conn.connectErr = errors.New("dial tcp 127.0.0.1:22087: connect: connection refused")
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	err := d.Connect(context.Background())
 	if err == nil {
@@ -599,7 +599,7 @@ func TestIosDriver_Connect_PingFailure_ReturnsError(t *testing.T) {
 	conn.Respond("ping", func(map[string]any) (map[string]any, error) {
 		return nil, errors.New("driver-error: ping unsupported")
 	})
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	if err := d.Connect(context.Background()); err == nil {
 		t.Fatal("Connect() error = nil, want the ping failure surfaced")
@@ -611,7 +611,7 @@ func TestIosDriver_Ping_Succeeds(t *testing.T) {
 	conn.Respond("ping", func(map[string]any) (map[string]any, error) {
 		return map[string]any{"capabilities": map[string]any{"canMultiPointer": false, "canPressure": false}}, nil
 	})
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	if err := d.Ping(context.Background()); err != nil {
 		t.Fatalf("Ping() error = %v", err)
@@ -627,7 +627,7 @@ func TestIosDriver_Ping_RoundTripFailure_ReturnsAgentUnreachable(t *testing.T) {
 	conn.Respond("ping", func(map[string]any) (map[string]any, error) {
 		return nil, errors.New("broken pipe")
 	})
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	err := d.Ping(context.Background())
 	if err == nil {
@@ -647,7 +647,7 @@ func TestIosDriver_Ping_RoundTripFailure_ReturnsAgentUnreachable(t *testing.T) {
 
 func TestIosDriver_Tap_SendsCoordinates(t *testing.T) {
 	conn := newFakeConn()
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	if err := d.Tap(context.Background(), wire.Point{X: 10, Y: 20}); err != nil {
 		t.Fatalf("Tap() error = %v", err)
@@ -663,7 +663,7 @@ func TestIosDriver_Tap_SendsCoordinates(t *testing.T) {
 
 func TestIosDriver_LongPress_SendsDuration(t *testing.T) {
 	conn := newFakeConn()
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	if err := d.LongPress(context.Background(), wire.Point{X: 1, Y: 2}, 900); err != nil {
 		t.Fatalf("LongPress() error = %v", err)
@@ -676,7 +676,7 @@ func TestIosDriver_LongPress_SendsDuration(t *testing.T) {
 
 func TestIosDriver_Swipe_SendsEndpointsAndDuration(t *testing.T) {
 	conn := newFakeConn()
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	if err := d.Swipe(context.Background(), wire.Point{X: 1, Y: 2}, wire.Point{X: 3, Y: 4}, 300); err != nil {
 		t.Fatalf("Swipe() error = %v", err)
@@ -691,7 +691,7 @@ func TestIosDriver_Swipe_SendsEndpointsAndDuration(t *testing.T) {
 }
 
 func TestIosDriver_DispatchGesture_RejectsMultiPointerWithoutCapability(t *testing.T) {
-	d := iosdriver.New(newFakeConn(), process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(newFakeConn(), process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 	gesture := driver.Gesture{Pointers: []driver.GesturePointer{{ID: "a"}, {ID: "b"}}}
 
 	if _, err := d.DispatchGesture(context.Background(), gesture); err == nil {
@@ -700,7 +700,7 @@ func TestIosDriver_DispatchGesture_RejectsMultiPointerWithoutCapability(t *testi
 }
 
 func TestIosDriver_DispatchGesture_RejectsPressureWithoutCapability(t *testing.T) {
-	d := iosdriver.New(newFakeConn(), process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(newFakeConn(), process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 	pressure := 0.5
 	gesture := driver.Gesture{Pointers: []driver.GesturePointer{
 		{ID: "a", Waypoints: []driver.GestureWaypoint{{Phase: driver.GesturePhaseDown, Pressure: &pressure}}},
@@ -725,7 +725,7 @@ func TestIosDriver_DispatchGesture_ForwardsCaptureWaypointAndDecodesImage(t *tes
 			},
 		}, nil
 	})
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 	gesture := driver.Gesture{Pointers: []driver.GesturePointer{
 		{ID: "single", Waypoints: []driver.GestureWaypoint{
 			{Phase: driver.GesturePhaseDown, Point: wire.Point{X: 1, Y: 1}},
@@ -764,7 +764,7 @@ func TestIosDriver_DispatchGesture_ForwardsCaptureWaypointAndDecodesImage(t *tes
 
 func TestIosDriver_DispatchGesture_ForwardsWaypointsToConn(t *testing.T) {
 	conn := newFakeConn()
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 	gesture := driver.Gesture{Pointers: []driver.GesturePointer{
 		{ID: "finger1", Waypoints: []driver.GestureWaypoint{
 			{Phase: driver.GesturePhaseDown, Point: wire.Point{X: 1, Y: 2}, AtOffsetSeconds: 0},
@@ -791,7 +791,7 @@ func TestIosDriver_DispatchGesture_ForwardsWaypointsToConn(t *testing.T) {
 
 func TestIosDriver_InputText_SendsText(t *testing.T) {
 	conn := newFakeConn()
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	if err := d.InputText(context.Background(), "hello"); err != nil {
 		t.Fatalf("InputText() error = %v", err)
@@ -803,7 +803,7 @@ func TestIosDriver_InputText_SendsText(t *testing.T) {
 
 func TestIosDriver_EraseText_SendsMaxDeletes(t *testing.T) {
 	conn := newFakeConn()
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	if err := d.EraseText(context.Background(), 5); err != nil {
 		t.Fatalf("EraseText() error = %v", err)
@@ -818,7 +818,7 @@ func TestIosDriver_PressKey_ReportsAffordanceFoundAsOk(t *testing.T) {
 	conn.Respond("pressKey", func(map[string]any) (map[string]any, error) {
 		return map[string]any{"affordanceFound": true, "strategy": "nav_bar_back"}, nil
 	})
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	res, err := d.PressKey(context.Background(), driver.KeyBack)
 	if err != nil {
@@ -834,7 +834,7 @@ func TestIosDriver_HideKeyboard_ReportsOkAndStrategy(t *testing.T) {
 	conn.Respond("hideKeyboard", func(map[string]any) (map[string]any, error) {
 		return map[string]any{"ok": true, "strategy": "swipe_down"}, nil
 	})
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	res, err := d.HideKeyboard(context.Background())
 	if err != nil {
@@ -847,7 +847,7 @@ func TestIosDriver_HideKeyboard_ReportsOkAndStrategy(t *testing.T) {
 
 func TestIosDriver_LaunchApp_PlainLaunch_AlwaysDispatches(t *testing.T) {
 	conn := newFakeConn()
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	if err := d.LaunchApp(context.Background(), "dev.atomyx.app", driver.LaunchArgs{}); err != nil {
 		t.Fatalf("LaunchApp() error = %v", err)
@@ -863,7 +863,7 @@ func TestIosDriver_LaunchApp_PlainLaunch_AlwaysDispatches(t *testing.T) {
 
 func TestIosDriver_LaunchApp_FreshReset_StopsThenLaunches(t *testing.T) {
 	conn := newFakeConn()
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 	if err := d.LaunchApp(context.Background(), "dev.atomyx.app", driver.LaunchArgs{}); err != nil {
 		t.Fatalf("initial LaunchApp() error = %v", err)
 	}
@@ -885,7 +885,7 @@ func TestIosDriver_LaunchApp_FreshReset_StopsThenLaunches(t *testing.T) {
 
 func TestIosDriver_LaunchApp_Attach_SkipsWhenAlreadyForeground(t *testing.T) {
 	conn := newFakeConn()
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 	if err := d.LaunchApp(context.Background(), "dev.atomyx.app", driver.LaunchArgs{}); err != nil {
 		t.Fatalf("initial LaunchApp() error = %v", err)
 	}
@@ -901,7 +901,7 @@ func TestIosDriver_LaunchApp_Attach_SkipsWhenAlreadyForeground(t *testing.T) {
 
 func TestIosDriver_LaunchApp_Attach_FallsBackToPlainLaunchWhenNotTrackedYet(t *testing.T) {
 	conn := newFakeConn()
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	attach := true
 	if err := d.LaunchApp(context.Background(), "dev.atomyx.app", driver.LaunchArgs{NoReset: &attach}); err != nil {
@@ -919,7 +919,7 @@ func TestIosDriver_LaunchApp_Attach_FallsBackToPlainLaunchWhenNotTrackedYet(t *t
 // plain launch of an app the new connection has never launched.
 func TestIosDriver_Connect_ResetsStaleTrackedBundleIDFromPriorConnection(t *testing.T) {
 	conn := newFakeConn()
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	if err := d.LaunchApp(context.Background(), "dev.atomyx.app", driver.LaunchArgs{}); err != nil {
 		t.Fatalf("LaunchApp() error = %v", err)
@@ -952,7 +952,7 @@ func TestIosDriver_Connect_ResetsStaleTrackedBundleIDFromPriorConnection(t *test
 // cleared.
 func TestIosDriver_StopApp_ClearsTrackedForeground(t *testing.T) {
 	conn := newFakeConn()
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 	if err := d.LaunchApp(context.Background(), "dev.atomyx.app", driver.LaunchArgs{}); err != nil {
 		t.Fatalf("LaunchApp() error = %v", err)
 	}
@@ -976,7 +976,7 @@ func TestIosDriver_StopApp_ClearsTrackedForeground(t *testing.T) {
 
 func TestIosDriver_KillApp_DelegatesToStopApp(t *testing.T) {
 	conn := newFakeConn()
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 	if err := d.LaunchApp(context.Background(), "dev.atomyx.app", driver.LaunchArgs{}); err != nil {
 		t.Fatalf("LaunchApp() error = %v", err)
 	}
@@ -990,7 +990,7 @@ func TestIosDriver_KillApp_DelegatesToStopApp(t *testing.T) {
 }
 
 func TestIosDriver_CurrentForeground_ReportsUnsupported(t *testing.T) {
-	d := iosdriver.New(newFakeConn(), process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(newFakeConn(), process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 	if d.Capabilities().CanQueryForeground {
 		t.Fatal("Capabilities().CanQueryForeground = true, want false")
 	}
@@ -1018,7 +1018,7 @@ func TestIosDriver_ListApps_Simulator_RunsListappsThroughShell(t *testing.T) {
 		process.Result{Stdout: `{"dev.atomyx.app":{"CFBundleDisplayName":"Atomyx"}}`},
 		nil,
 	)
-	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	apps, err := d.ListApps(context.Background())
 	if err != nil {
@@ -1036,7 +1036,7 @@ func TestIosDriver_ListApps_Device_RunsDevicectlWithExactArgs(t *testing.T) {
 		process.Result{Stdout: `{"result":{"apps":[{"bundleIdentifier":"dev.atomyx.app","name":"Atomyx"}]}}`},
 		nil,
 	)
-	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{UDID: "DEV-1", Kind: iosdriver.KindDevice})
+	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{Background: process.NewFakeBackground(), UDID: "DEV-1", Kind: iosdriver.KindDevice})
 
 	apps, err := d.ListApps(context.Background())
 	if err != nil {
@@ -1050,7 +1050,7 @@ func TestIosDriver_ListApps_Device_RunsDevicectlWithExactArgs(t *testing.T) {
 func TestIosDriver_ListApps_Device_GenuineFailurePropagates(t *testing.T) {
 	runner := process.NewFake()
 	runner.DefaultErr = errors.New("devicectl daemon unreachable")
-	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{UDID: "DEV-1", Kind: iosdriver.KindDevice})
+	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{Background: process.NewFakeBackground(), UDID: "DEV-1", Kind: iosdriver.KindDevice})
 
 	apps, err := d.ListApps(context.Background())
 	if err == nil {
@@ -1060,7 +1060,7 @@ func TestIosDriver_ListApps_Device_GenuineFailurePropagates(t *testing.T) {
 
 func TestIosDriver_InstallApp_Simulator_ExactArgs(t *testing.T) {
 	runner := process.NewFake()
-	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	if err := d.InstallApp(context.Background(), "/tmp/App.app"); err != nil {
 		t.Fatalf("InstallApp() error = %v", err)
@@ -1073,7 +1073,7 @@ func TestIosDriver_InstallApp_Simulator_ExactArgs(t *testing.T) {
 
 func TestIosDriver_InstallApp_Device_ExactArgs(t *testing.T) {
 	runner := process.NewFake()
-	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{UDID: "DEV-1", Kind: iosdriver.KindDevice})
+	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{Background: process.NewFakeBackground(), UDID: "DEV-1", Kind: iosdriver.KindDevice})
 
 	if err := d.InstallApp(context.Background(), "/tmp/App.ipa"); err != nil {
 		t.Fatalf("InstallApp() error = %v", err)
@@ -1086,7 +1086,7 @@ func TestIosDriver_InstallApp_Device_ExactArgs(t *testing.T) {
 
 func TestIosDriver_UninstallApp_Simulator_ExactArgs(t *testing.T) {
 	runner := process.NewFake()
-	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	if err := d.UninstallApp(context.Background(), "dev.atomyx.app"); err != nil {
 		t.Fatalf("UninstallApp() error = %v", err)
@@ -1099,7 +1099,7 @@ func TestIosDriver_UninstallApp_Simulator_ExactArgs(t *testing.T) {
 
 func TestIosDriver_UninstallApp_Device_ExactArgs(t *testing.T) {
 	runner := process.NewFake()
-	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{UDID: "DEV-1", Kind: iosdriver.KindDevice})
+	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{Background: process.NewFakeBackground(), UDID: "DEV-1", Kind: iosdriver.KindDevice})
 
 	if err := d.UninstallApp(context.Background(), "dev.atomyx.app"); err != nil {
 		t.Fatalf("UninstallApp() error = %v", err)
@@ -1122,7 +1122,7 @@ func TestIosDriver_IsAppInstalled_Simulator_ExactArgsAndNotInstalledDetection(t 
 		process.Result{Stderr: "get_app_container: is not installed"},
 		errors.New("exit status 2"),
 	)
-	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	installed, err := d.IsAppInstalled(context.Background(), "dev.atomyx.app")
 	if err != nil {
@@ -1144,7 +1144,7 @@ func TestIosDriver_IsAppInstalled_Simulator_ExactArgsAndNotInstalledDetection(t 
 func TestIosDriver_IsAppInstalled_Simulator_GenuineFailurePropagates(t *testing.T) {
 	runner := process.NewFake()
 	runner.DefaultErr = errors.New("CoreSimulatorService is unavailable")
-	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	if _, err := d.IsAppInstalled(context.Background(), "dev.atomyx.app"); err == nil {
 		t.Fatal("IsAppInstalled() error = nil, want the genuine simctl failure surfaced")
@@ -1158,7 +1158,7 @@ func TestIosDriver_IsAppInstalled_Device_UsesAppList(t *testing.T) {
 		process.Result{Stdout: `{"result":{"apps":[{"bundleIdentifier":"dev.atomyx.app","name":"Atomyx"}]}}`},
 		nil,
 	)
-	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{UDID: "DEV-1", Kind: iosdriver.KindDevice})
+	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{Background: process.NewFakeBackground(), UDID: "DEV-1", Kind: iosdriver.KindDevice})
 
 	installed, err := d.IsAppInstalled(context.Background(), "dev.atomyx.app")
 	if err != nil {
@@ -1178,7 +1178,7 @@ func TestIosDriver_IsAppInstalled_Device_UsesAppList(t *testing.T) {
 }
 
 func TestIosDriver_ClearAppData_RequiresSource(t *testing.T) {
-	d := iosdriver.New(newFakeConn(), process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(newFakeConn(), process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	if err := d.ClearAppData(context.Background(), "dev.atomyx.app", driver.ClearAppDataOptions{}); err == nil {
 		t.Fatal("ClearAppData() error = nil, want an error when Source is empty")
@@ -1187,7 +1187,7 @@ func TestIosDriver_ClearAppData_RequiresSource(t *testing.T) {
 
 func TestIosDriver_ClearAppData_Simulator_UninstallThenReinstallInOrder(t *testing.T) {
 	runner := process.NewFake()
-	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	if err := d.ClearAppData(context.Background(), "dev.atomyx.app", driver.ClearAppDataOptions{Source: "/tmp/App.app"}); err != nil {
 		t.Fatalf("ClearAppData() error = %v", err)
@@ -1213,7 +1213,7 @@ func TestIosDriver_ClearAppData_Simulator_ToleratesNotInstalledThenInstalls(t *t
 		process.Result{Stderr: "Failed to find app"},
 		errors.New("exit status 3"),
 	)
-	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	if err := d.ClearAppData(context.Background(), "dev.atomyx.app", driver.ClearAppDataOptions{Source: "/tmp/App.app"}); err != nil {
 		t.Fatalf("ClearAppData() error = %v, want the not-installed uninstall failure tolerated", err)
@@ -1227,7 +1227,7 @@ func TestIosDriver_ClearAppData_Simulator_ToleratesNotInstalledThenInstalls(t *t
 func TestIosDriver_ClearAppData_GenuineUninstallFailurePropagates(t *testing.T) {
 	runner := process.NewFake()
 	runner.DefaultErr = errors.New("simctl daemon unreachable")
-	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	err := d.ClearAppData(context.Background(), "dev.atomyx.app", driver.ClearAppDataOptions{Source: "/tmp/App.app"})
 	if err == nil {
@@ -1259,7 +1259,7 @@ func TestIosDriver_Hierarchy_Simulator_QueriesRunningBundleIdsWhenNoneTracked(t 
 		}
 		return map[string]any{"bundleId": "dev.atomyx.app", "root": map[string]any{"elementType": "window"}}, nil
 	})
-	d := iosdriver.New(conn, runner, iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, runner, iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	tree, err := d.Hierarchy(context.Background())
 	if err != nil {
@@ -1291,7 +1291,7 @@ func TestIosDriver_Hierarchy_SkipsBundleQueryOnceAppIsTracked(t *testing.T) {
 		}
 		return map[string]any{"root": map[string]any{"elementType": "window"}}, nil
 	})
-	d := iosdriver.New(conn, runner, iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, runner, iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 	if err := d.LaunchApp(context.Background(), "dev.atomyx.app", driver.LaunchArgs{}); err != nil {
 		t.Fatalf("LaunchApp() error = %v", err)
 	}
@@ -1313,7 +1313,7 @@ func TestIosDriver_Hierarchy_Device_NeverQueriesRunningBundleIds(t *testing.T) {
 		}
 		return map[string]any{"root": map[string]any{"elementType": "window"}}, nil
 	})
-	d := iosdriver.New(conn, runner, iosdriver.Options{UDID: "DEV-1", Kind: iosdriver.KindDevice})
+	d := iosdriver.New(conn, runner, iosdriver.Options{Background: process.NewFakeBackground(), UDID: "DEV-1", Kind: iosdriver.KindDevice})
 
 	if _, err := d.Hierarchy(context.Background()); err != nil {
 		t.Fatalf("Hierarchy() error = %v", err)
@@ -1328,7 +1328,7 @@ func TestIosDriver_Screenshot_DecodesBase64Payload(t *testing.T) {
 	conn.Respond("screenshot", func(map[string]any) (map[string]any, error) {
 		return map[string]any{"base64": base64.StdEncoding.EncodeToString([]byte("hello"))}, nil
 	})
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	got, err := d.Screenshot(context.Background())
 	if err != nil {
@@ -1344,7 +1344,7 @@ func TestIosDriver_ScreenSize_DecodesWidthAndHeight(t *testing.T) {
 	conn.Respond("getScreenSize", func(map[string]any) (map[string]any, error) {
 		return map[string]any{"width": 390.0, "height": 844.0}, nil
 	})
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
 	size, err := d.ScreenSize(context.Background())
 	if err != nil {
@@ -1356,7 +1356,7 @@ func TestIosDriver_ScreenSize_DecodesWidthAndHeight(t *testing.T) {
 }
 
 func TestIosDriver_DeviceInfo_ReportsKindFromOptions(t *testing.T) {
-	sim := iosdriver.New(newFakeConn(), process.NewFake(), iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	sim := iosdriver.New(newFakeConn(), process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 	info, err := sim.DeviceInfo(context.Background())
 	if err != nil {
 		t.Fatalf("DeviceInfo() error = %v", err)
@@ -1365,7 +1365,7 @@ func TestIosDriver_DeviceInfo_ReportsKindFromOptions(t *testing.T) {
 		t.Fatalf("DeviceInfo() = %+v, want kind simulator and udid SIM-1", info)
 	}
 
-	dev := iosdriver.New(newFakeConn(), process.NewFake(), iosdriver.Options{UDID: "DEV-1", Kind: iosdriver.KindDevice})
+	dev := iosdriver.New(newFakeConn(), process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "DEV-1", Kind: iosdriver.KindDevice})
 	infoDev, err := dev.DeviceInfo(context.Background())
 	if err != nil {
 		t.Fatalf("DeviceInfo() error = %v", err)

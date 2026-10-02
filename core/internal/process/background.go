@@ -11,8 +11,9 @@ type BackgroundResult struct {
 	ExitCode int
 	// Stderr is the process's captured standard error, bounded to a
 	// fixed byte budget so a verbose or endlessly chatty process
-	// cannot grow memory without limit. Output beyond that budget is
-	// silently dropped rather than causing a capture failure.
+	// cannot grow memory without limit. When the output exceeds that
+	// budget the end of it is kept and the earlier part is silently
+	// dropped, because a failing tool prints its real error last.
 	Stderr string
 }
 

@@ -16,10 +16,6 @@ import (
 	"dev.atomyx/internal/shutdown"
 )
 
-// exitForced is the exit code when cleanup outlasts the grace period
-// and the process is ended without finishing it.
-const exitForced = 1
-
 func main() {
 	procRunner := process.NewExec()
 	background := process.NewExecBackground()
@@ -53,22 +49,21 @@ func main() {
 	// Disconnect and adb-forward, XCUITest, or netcapture teardown a
 	// command has already started. Trapping SIGINT and SIGTERM here
 	// and threading the cancelable context through RunContext instead
-	// lets those defers run on the way out.
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-
-	// A command whose deferred cleanup hangs, such as a driver
-	// Disconnect waiting on a stuck child, must not hold the exit open
-	// after the stop request: the watchdog ends the process once the
-	// grace period lapses.
+	// lets those defers run on the way out. The command writes its
+	// report and flushes its logs before RunContext returns, and the
+	// watchdog only fires once the whole grace period has lapsed, so
+	// a flush that finishes in time is never cut short.
+	ctx, cancel := context.WithCancel(context.Background())
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		<-ctx.Done()
-		shutdown.ForceExitAfter(shutdown.GracePeriod, func() { os.Exit(exitForced) })
+		sig := <-sigCh
+		shutdown.HandleStop(clock, sig, shutdown.StopHooks{Cancel: cancel, Exit: os.Exit})
 	}()
 
-	// stop deliberately does not run before this os.Exit: the process
-	// is terminating either way, and stop only releases in-process
-	// signal and context bookkeeping the OS reclaims regardless.
+	// cancel deliberately does not run before this os.Exit: the process
+	// is terminating either way, and cancel only releases in-process
+	// context bookkeeping the OS reclaims regardless.
 	//nolint:gocritic // see the comment above
 	os.Exit(cli.RunContext(ctx, os.Args[1:], deps))
 }

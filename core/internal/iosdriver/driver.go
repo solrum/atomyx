@@ -58,9 +58,9 @@ type Options struct {
 	// needs to set it.
 	Clock clock.Clock
 
-	// Background starts the long-lived iproxy tunnel process.
-	// Defaults to process.NewExecBackground() when nil, so only a
-	// test that wants a scripted process needs to set it.
+	// Background starts the long-lived iproxy tunnel process. It is
+	// required: New panics when it is nil, because a default would
+	// spawn real processes from a caller that never asked for them.
 	Background process.BackgroundRunner
 }
 
@@ -106,7 +106,7 @@ func New(conn Conn, proc process.Runner, opts Options) *IosDriver {
 	}
 	background := opts.Background
 	if background == nil {
-		background = process.NewExecBackground()
+		panic("iosdriver.New: Options.Background is required")
 	}
 	return &IosDriver{
 		opts:       opts,

@@ -77,7 +77,7 @@ func TestDriverFactory_CreateDriver_SimHidOptInUnset_BuildsIosDriverWithoutStart
 	setEnv(t, simHidOptInEnv, "")
 	starter := &fakeSimHidStarter{port: 4242}
 	runner := process.NewFake()
-	f := NewDriverFactory(DriverFactoryDeps{Runner: runner, SimHid: starter})
+	f := NewDriverFactory(DriverFactoryDeps{Runner: runner, Background: process.NewFakeBackground(), SimHid: starter})
 
 	drv, err := f.createDriver(context.Background(), Descriptor{ID: "sim-1", Platform: PlatformIOS, Kind: KindSimulator})
 	if err != nil {
@@ -102,7 +102,7 @@ func TestDriverFactory_CreateDriver_SimHidOptInSetAndSupported_StartsHelperAndBu
 	runner := process.NewFake()
 	stubArm64XcodeFloor(t, runner)
 	starter := &fakeSimHidStarter{port: 19876}
-	f := NewDriverFactory(DriverFactoryDeps{Runner: runner, SimHid: starter})
+	f := NewDriverFactory(DriverFactoryDeps{Runner: runner, Background: process.NewFakeBackground(), SimHid: starter})
 
 	drv, err := f.createDriver(context.Background(), Descriptor{ID: "sim-1", Platform: PlatformIOS, Kind: KindSimulator})
 	if err != nil {
@@ -124,7 +124,7 @@ func TestDriverFactory_CreateDriver_SimHidStartFails_FallsBackToIosDriver(t *tes
 	runner := process.NewFake()
 	stubArm64XcodeFloor(t, runner)
 	starter := &fakeSimHidStarter{err: context.DeadlineExceeded}
-	f := NewDriverFactory(DriverFactoryDeps{Runner: runner, SimHid: starter})
+	f := NewDriverFactory(DriverFactoryDeps{Runner: runner, Background: process.NewFakeBackground(), SimHid: starter})
 
 	drv, err := f.createDriver(context.Background(), Descriptor{ID: "sim-1", Platform: PlatformIOS, Kind: KindSimulator})
 	if err != nil {
@@ -141,7 +141,7 @@ func TestDriverFactory_CreateDriver_SimHidStartFails_FallsBackToIosDriver(t *tes
 func TestDriverFactory_CreateDriver_NoSimHidManagerInjected_BuildsIosDriverEvenWithOptIn(t *testing.T) {
 	setEnv(t, simHidOptInEnv, "1")
 	runner := process.NewFake()
-	f := NewDriverFactory(DriverFactoryDeps{Runner: runner})
+	f := NewDriverFactory(DriverFactoryDeps{Runner: runner, Background: process.NewFakeBackground()})
 
 	drv, err := f.createDriver(context.Background(), Descriptor{ID: "sim-1", Platform: PlatformIOS, Kind: KindSimulator})
 	if err != nil {
@@ -154,7 +154,7 @@ func TestDriverFactory_CreateDriver_NoSimHidManagerInjected_BuildsIosDriverEvenW
 
 func TestDriverFactory_CreateDriver_ExplicitHidPort_BuildsIosSimDriverWithoutStarter(t *testing.T) {
 	starter := &fakeSimHidStarter{}
-	f := NewDriverFactory(DriverFactoryDeps{Runner: process.NewFake(), SimHid: starter})
+	f := NewDriverFactory(DriverFactoryDeps{Runner: process.NewFake(), Background: process.NewFakeBackground(), SimHid: starter})
 
 	drv, err := f.createDriver(context.Background(), Descriptor{ID: "sim-1", Platform: PlatformIOS, Kind: KindSimulator, HidPort: 7777})
 	if err != nil {
@@ -216,4 +216,22 @@ func TestDriverFactory_Build_ConnectFailsAfterTunnelStarted_StopsTheTunnel(t *te
 	if !proc.Killed() {
 		t.Fatal("the tunnel process was left running after Build failed")
 	}
+}
+
+func TestNewDriverFactoryPanicsWithoutABackgroundRunner(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("NewDriverFactory accepted a nil Background")
+		}
+	}()
+	NewDriverFactory(DriverFactoryDeps{Runner: process.NewFake()})
+}
+
+func TestNewDriverProvisionerPanicsWithoutABackgroundRunner(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("NewDriverProvisioner accepted a nil Background")
+		}
+	}()
+	NewDriverProvisioner(DriverProvisionerDeps{Runner: process.NewFake()})
 }

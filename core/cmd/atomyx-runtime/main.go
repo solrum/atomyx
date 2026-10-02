@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"dev.atomyx/internal/device"
@@ -96,6 +97,8 @@ func run() int {
 	unsubscribe := events.Subscribe(func(event sidecar.Event) { transport.Emit(event) })
 	defer unsubscribe()
 
+	disposeOnce := sync.OnceFunc(func() { dispose(handles, session, simHid) })
+
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
@@ -111,22 +114,24 @@ func run() int {
 	}()
 
 	select {
-	case <-sigCh:
-		cancel()
+	case sig := <-sigCh:
 		// Run's ReadString blocks on stdin regardless of ctx, so
 		// cancellation alone never unblocks it: closing stdin makes
 		// the pending read return, which lets Run observe ctx.Err()
-		// and drain every in-flight dispatch before done closes.
-		_ = os.Stdin.Close()
-		// A dispatch that never returns must not keep the children
-		// alive: the drain is bounded, and dispose runs regardless.
-		if !shutdown.Bounded(shutdown.GracePeriod, func() { <-done }) {
-			writeSidecarErrorLine("in-flight requests did not finish in time")
-		}
+		// and drain every in-flight dispatch before done closes. The
+		// watchdog bounds the drain and the dispose together to one
+		// grace period, disposing before it forces the exit.
+		shutdown.HandleStop(clock, sig, shutdown.StopHooks{
+			Cancel:     cancel,
+			CloseInput: os.Stdin.Close,
+			Cleanup:    disposeOnce,
+			Exit:       os.Exit,
+		})
+		<-done
 	case <-done:
 		cancel()
 	}
-	if !shutdown.Bounded(shutdown.GracePeriod, func() { dispose(handles, session, simHid) }) {
+	if !shutdown.Bounded(clock, shutdown.GracePeriod, disposeOnce) {
 		writeSidecarErrorLine("device cleanup did not finish in time")
 	}
 	return 0

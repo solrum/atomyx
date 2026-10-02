@@ -208,7 +208,7 @@ func connectedFaultInjectionDriver(t *testing.T, agent *faultInjectionIosAgent) 
 	t.Helper()
 	host, port := agent.hostPort(t)
 	conn := transport.NewTCPClient(host, port, transport.WithTCPResponseTimeout(responseTimeout))
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "fault-injection", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "fault-injection", Kind: iosdriver.KindSimulator})
 	if err := d.Connect(context.Background()); err != nil {
 		t.Fatalf("Connect() against a healthy runner: %v", err)
 	}
@@ -324,7 +324,7 @@ func TestIosDriver_Connect_HungPing_SurfacesTypedTimeout(t *testing.T) {
 	agent := newFaultInjectionIosAgent(t) // no command type is healthy, including "ping".
 	host, port := agent.hostPort(t)
 	conn := transport.NewTCPClient(host, port, transport.WithTCPResponseTimeout(responseTimeout))
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "fault-injection", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "fault-injection", Kind: iosdriver.KindSimulator})
 
 	start := time.Now()
 	err := d.Connect(context.Background())
@@ -356,7 +356,7 @@ func TestIosDriver_Ping_Hung_SurfacesTypedUnreachable(t *testing.T) {
 	agent := newFaultInjectionIosAgent(t) // no command type is healthy, including "ping".
 	host, port := agent.hostPort(t)
 	conn := transport.NewTCPClient(host, port, transport.WithTCPResponseTimeout(responseTimeout))
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "fault-injection", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "fault-injection", Kind: iosdriver.KindSimulator})
 	if err := conn.Connect(context.Background()); err != nil {
 		t.Fatalf("conn.Connect() against a live listener: %v", err)
 	}
@@ -444,7 +444,7 @@ func TestIosDriver_BoundaryTranslation_CoversEveryDriverMethod(t *testing.T) {
 func deadEndpointDriver(t *testing.T) *iosdriver.IosDriver {
 	t.Helper()
 	conn := transport.NewTCPClient("127.0.0.1", 1, transport.WithTCPResponseTimeout(responseTimeout))
-	return iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "fault-injection", Kind: iosdriver.KindSimulator})
+	return iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "fault-injection", Kind: iosdriver.KindSimulator})
 }
 
 // agentRejectionDriver builds an IosDriver whose conn is connected to
@@ -459,7 +459,7 @@ func agentRejectionDriver(t *testing.T) *iosdriver.IosDriver {
 	if err := conn.Connect(context.Background()); err != nil {
 		t.Fatalf("conn.Connect() against a rejecting runner: %v", err)
 	}
-	return iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "fault-injection", Kind: iosdriver.KindSimulator})
+	return iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "fault-injection", Kind: iosdriver.KindSimulator})
 }
 
 // TestIosDriver_BoundaryTranslation_SanitizesLeakingAgentRejectionMessage
@@ -476,7 +476,7 @@ func TestIosDriver_BoundaryTranslation_SanitizesLeakingAgentRejectionMessage(t *
 	if err := conn.Connect(context.Background()); err != nil {
 		t.Fatalf("conn.Connect() against a rejecting runner: %v", err)
 	}
-	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{UDID: "fault-injection", Kind: iosdriver.KindSimulator})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "fault-injection", Kind: iosdriver.KindSimulator})
 
 	err := d.Tap(context.Background(), wire.Point{X: 1, Y: 1})
 	if err == nil {

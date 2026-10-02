@@ -63,8 +63,8 @@ type DriverProvisionerDeps struct {
 	Runner process.Runner
 	// Background starts the long-lived "xcodebuild
 	// test-without-building" process the XCUITest launcher
-	// supervises. A nil Background defaults to
-	// process.NewExecBackground().
+	// supervises. It is required: NewDriverProvisioner panics when it
+	// is nil.
 	Background     process.BackgroundRunner
 	Clock          orchestra.Clock
 	IosProjectDir  string
@@ -99,7 +99,7 @@ func NewDriverProvisioner(deps DriverProvisionerDeps) *DriverProvisioner {
 	}
 	background := deps.Background
 	if background == nil {
-		background = process.NewExecBackground()
+		panic("device.NewDriverProvisioner: Background runner is required")
 	}
 	return &DriverProvisioner{runner: deps.Runner, background: background, clock: clock, deps: deps}
 }

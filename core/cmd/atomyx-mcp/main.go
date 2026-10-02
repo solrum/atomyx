@@ -28,10 +28,6 @@ const (
 	// is distinct from serverName, which the MCP protocol handshake
 	// reports and is not part of this operator-facing surface.
 	binaryName = "atomyx-mcp"
-
-	// exitForced is the exit code when cleanup outlasts the grace period
-	// and the process is ended without finishing it.
-	exitForced = 1
 )
 
 func main() {
@@ -94,11 +90,18 @@ func run() int {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		<-sigCh
-		cancel()
-		// A hung Serve or Close must not hold the exit open: the
-		// watchdog ends the process once the grace period lapses.
-		shutdown.ForceExitAfter(shutdown.GracePeriod, func() { os.Exit(exitForced) })
+		sig := <-sigCh
+		// Serve blocks in the stdin read and its session close waits
+		// for in-flight tool calls, whose contexts are not canceled by
+		// the session closing. Closing stdin fails the read so those
+		// calls are canceled, and the watchdog releases the device
+		// and ends the process if they still do not return in time.
+		shutdown.HandleStop(clock, sig, shutdown.StopHooks{
+			Cancel:     cancel,
+			CloseInput: os.Stdin.Close,
+			Cleanup:    server.Close,
+			Exit:       os.Exit,
+		})
 	}()
 
 	serveErr := mcp.Serve(ctx, server)
@@ -107,7 +110,7 @@ func run() int {
 	// alike. Either way the active device must be released here, because
 	// its helper processes run in their own process group and a terminal
 	// Ctrl-C does not reach them.
-	if !shutdown.Bounded(shutdown.GracePeriod, server.Close) {
+	if !shutdown.Bounded(clock, shutdown.GracePeriod, server.Close) {
 		fmt.Fprintln(os.Stderr, "atomyx-mcp: device cleanup did not finish in time")
 	}
 	if serveErr != nil {

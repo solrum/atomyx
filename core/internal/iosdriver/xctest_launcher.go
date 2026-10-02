@@ -180,11 +180,11 @@ type XctestLauncher struct {
 // and clock are injected so a test can substitute fakes for the
 // bounded "build-for-testing" invocation, the long-lived
 // "test-without-building" process, and the poll timing, without a
-// real Xcode toolchain or device. A nil background defaults to
-// process.NewExecBackground().
+// real Xcode toolchain or device. A nil background panics, because
+// there is no safe default for a runner that spawns real processes.
 func NewXctestLauncher(proc process.Runner, background process.BackgroundRunner, clock clock.Clock, cfg LaunchConfig) *XctestLauncher {
 	if background == nil {
-		background = process.NewExecBackground()
+		panic("iosdriver.NewXctestLauncher: background runner is required")
 	}
 	if cfg.Port == 0 {
 		cfg.Port = defaultIosPort

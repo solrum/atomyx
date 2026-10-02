@@ -53,8 +53,8 @@ type Factory interface {
 type DriverFactoryDeps struct {
 	Runner process.Runner
 	// Background starts the long-lived processes an iOS driver
-	// supervises, such as the USB tunnel to a physical device. A nil
-	// Background defaults to process.NewExecBackground().
+	// supervises, such as the USB tunnel to a physical device. It is
+	// required: NewDriverFactory panics when it is nil.
 	Background process.BackgroundRunner
 	Clock      orchestra.Clock
 	// SimHid starts the atomyx-sim-hid helper for an iOS simulator
@@ -94,7 +94,7 @@ func NewDriverFactory(deps DriverFactoryDeps) *DriverFactory {
 	}
 	background := deps.Background
 	if background == nil {
-		background = process.NewExecBackground()
+		panic("device.NewDriverFactory: Background runner is required")
 	}
 	return &DriverFactory{runner: deps.Runner, background: background, clock: clock, simHid: deps.SimHid, logger: logger}
 }

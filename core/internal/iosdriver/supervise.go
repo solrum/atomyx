@@ -8,10 +8,12 @@ import (
 )
 
 // superviseBackground watches a started long-lived process. It
-// drains the process's standard output so a verbose child can never
-// fill the pipe and stall, then waits for the process to exit and
-// reports classify's verdict on the outcome through the returned
-// exited channel, which receives exactly one value.
+// drains the process's standard output on its own goroutine so a
+// verbose child can never fill the pipe and stall, and waits for the
+// process to exit independently of that drain, so a descendant that
+// keeps the pipe open cannot delay the exit verdict. classify's
+// verdict on the outcome arrives through the returned exited
+// channel, which receives exactly one value.
 //
 // stop kills the process group, waits until the watcher has observed
 // the exit, and is safe to call any number of times, including after
@@ -27,9 +29,9 @@ func superviseBackground(
 ) (exited <-chan error, stop func()) {
 	out := make(chan error, 1)
 	done := make(chan struct{})
+	go func() { _, _ = io.Copy(io.Discard, proc.Stdout()) }()
 	go func() {
 		defer close(done)
-		_, _ = io.Copy(io.Discard, proc.Stdout())
 		result, err := proc.Wait()
 		out <- classify(result, err)
 	}()

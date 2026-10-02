@@ -136,27 +136,19 @@ func (s *DeviceSession) Current() *ActiveDevice {
 // failure on the previous driver is logged and does not block the new
 // selection; a connect failure on the new driver leaves the session
 // idle and is returned so select_device can report a structured
-// failure.
+// failure. A Select that finishes while another Select's driver is
+// already current releases that driver instead of orphaning it, and a
+// Select on a closed session fails before building anything.
 func (s *DeviceSession) Select(ctx context.Context, input SelectDeviceInput) (*ActiveDevice, error) {
 	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return nil, errSessionClosed
+	}
 	previous := s.active
 	s.active = nil
 	s.mu.Unlock()
-
-	if previous != nil {
-		if err := previous.Driver.Disconnect(); err != nil {
-			s.logger.Warn("session.previous_disconnect_failed", logging.LogContext{
-				"id":       previous.ID,
-				"platform": string(previous.Platform),
-				"error":    err.Error(),
-			})
-		} else {
-			s.logger.Info("session.previous_disconnected", logging.LogContext{
-				"id":       previous.ID,
-				"platform": string(previous.Platform),
-			})
-		}
-	}
+	s.releasePrevious(previous)
 
 	desc := descriptorFor(input)
 	built, err := s.factory.Build(ctx, desc)
@@ -186,14 +178,37 @@ func (s *DeviceSession) Select(ctx context.Context, input SelectDeviceInput) (*A
 		_ = built.Driver.Disconnect()
 		return nil, errSessionClosed
 	}
+	displaced := s.active
 	s.active = active
 	s.mu.Unlock()
+	s.releasePrevious(displaced)
 	s.logger.Info("session.device_selected", logging.LogContext{
 		"platform": string(input.Platform),
 		"id":       input.ID,
 		"kind":     string(active.Kind),
 	})
 	return active, nil
+}
+
+// releasePrevious disconnects a driver the session no longer
+// tracks. A nil previous is a no-op, and a disconnect failure is
+// logged because the replacement selection must proceed regardless.
+func (s *DeviceSession) releasePrevious(previous *ActiveDevice) {
+	if previous == nil {
+		return
+	}
+	if err := previous.Driver.Disconnect(); err != nil {
+		s.logger.Warn("session.previous_disconnect_failed", logging.LogContext{
+			"id":       previous.ID,
+			"platform": string(previous.Platform),
+			"error":    err.Error(),
+		})
+		return
+	}
+	s.logger.Info("session.previous_disconnected", logging.LogContext{
+		"id":       previous.ID,
+		"platform": string(previous.Platform),
+	})
 }
 
 // CheckHealth reports whether a device is currently bound and, when

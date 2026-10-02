@@ -1,7 +1,6 @@
 package process
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"os/exec"
@@ -13,7 +12,11 @@ import (
 // ExecBackground starts commands through the operating system's
 // process loader without waiting for them to exit. It is the
 // production BackgroundRunner.
-type ExecBackground struct{}
+type ExecBackground struct {
+	// waitDelay overrides ioDrainDelay when positive, so a test can
+	// observe the bounded-drain behavior without waiting real seconds.
+	waitDelay time.Duration
+}
 
 // NewExecBackground constructs an ExecBackground runner.
 func NewExecBackground() *ExecBackground {
@@ -28,6 +31,12 @@ var _ BackgroundRunner = (*ExecBackground)(nil)
 // limit just because nobody has read its stderr yet.
 const stderrCaptureLimit = 64 * 1024
 
+// ioDrainDelay bounds how long Wait keeps waiting for a process's
+// output pipes to close after the process itself has exited. A
+// descendant that inherited the pipe and outlives its parent would
+// otherwise hold Wait open for as long as it runs.
+const ioDrainDelay = 2 * time.Second
+
 // killGracePeriod bounds how long Kill waits for a SIGTERM'd process
 // group to exit on its own before escalating to SIGKILL. Long enough
 // for a well-behaved local dev-tooling subprocess (xcodebuild, adb,
@@ -39,7 +48,7 @@ const killGracePeriod = 2 * time.Second
 // exec.CommandContext and returning as soon as the process has
 // started. A canceled or expired ctx kills the process at any later
 // point, including while a caller is blocked reading its stdout.
-func (ExecBackground) Start(ctx context.Context, name string, args ...string) (BackgroundProcess, error) {
+func (r ExecBackground) Start(ctx context.Context, name string, args ...string) (BackgroundProcess, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -51,6 +60,10 @@ func (ExecBackground) Start(ctx context.Context, name string, args ...string) (B
 	// child forked (for example a shell running a background job)
 	// would survive Kill as an orphan.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.WaitDelay = ioDrainDelay
+	if r.waitDelay > 0 {
+		cmd.WaitDelay = r.waitDelay
+	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
@@ -124,15 +137,17 @@ func (p *execBackgroundProcess) Kill() error {
 	return nil
 }
 
-// cappedBuffer retains up to limit bytes written to it and silently
-// discards the rest, so a background process's stderr can be captured
-// for diagnostics without an unbounded buffer. Safe for concurrent
-// use because a write arriving on the process's stderr pipe and a
-// String call from Wait can race.
+// cappedBuffer retains the last limit bytes written to it and
+// silently discards everything before them, so a background process's
+// stderr can be captured for diagnostics without an unbounded buffer
+// while still keeping the end of the output, where a failing tool
+// prints its real error. Safe for concurrent use because a write
+// arriving on the process's stderr pipe and a String call from Wait
+// can race.
 type cappedBuffer struct {
 	mu    sync.Mutex
 	limit int
-	buf   bytes.Buffer
+	buf   []byte
 }
 
 func newCappedBuffer(limit int) *cappedBuffer {
@@ -142,11 +157,13 @@ func newCappedBuffer(limit int) *cappedBuffer {
 func (w *cappedBuffer) Write(p []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if remaining := w.limit - w.buf.Len(); remaining > 0 {
-		if len(p) < remaining {
-			remaining = len(p)
+	if len(p) >= w.limit {
+		w.buf = append(w.buf[:0], p[len(p)-w.limit:]...)
+	} else {
+		w.buf = append(w.buf, p...)
+		if excess := len(w.buf) - w.limit; excess > 0 {
+			w.buf = append(w.buf[:0], w.buf[excess:]...)
 		}
-		w.buf.Write(p[:remaining])
 	}
 	// Reporting the full length written, rather than just what was
 	// retained, matches io.Writer's contract that a nil error implies
@@ -158,5 +175,5 @@ func (w *cappedBuffer) Write(p []byte) (int, error) {
 func (w *cappedBuffer) String() string {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	return w.buf.String()
+	return string(w.buf)
 }
