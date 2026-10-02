@@ -224,6 +224,13 @@ an `atomyx-mcp` server, can drive a device at a time.
   that is building the same runner. When it elapses the command fails
   with code `RUNNER_BUILD_TIMEOUT`, which is distinct from the codes of
   a lease conflict.
+- After the build, taking the device and launching its driver has its
+  own budget of 120 seconds by default, which excludes the build. A
+  runner that is already fresh launches without waiting for another
+  process's build. When the budget elapses the command fails with code
+  `TOOL_TIMEOUT`. Configure it with `session.deviceAcquireTimeoutMs` in
+  the project config or the `ATOMYX_DEVICE_ACQUIRE_TIMEOUT_MS`
+  environment variable. The environment variable wins.
 - Ownership is released when the command ends, including on an
   interrupt.
 - If a command crashes or is killed with `kill -9`, the next command

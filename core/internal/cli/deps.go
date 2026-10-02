@@ -41,6 +41,9 @@ type Deps struct {
 	// is always Deps.Factory. A zero value disables exclusion, which
 	// only a test wants.
 	Session session.Deps
+	// Timeouts bounds a device acquisition. A zero DeviceAcquireMs means
+	// session.DefaultDeviceAcquireTimeoutMs.
+	Timeouts session.Timeouts
 	// Debug, when true, appends a stack trace to an unhandled error
 	// reported on Stderr, matching ATOMYX_DEBUG=1.
 	Debug bool

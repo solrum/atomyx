@@ -6,6 +6,7 @@ package sessionwire
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 
 	"dev.atomyx/internal/clock"
@@ -79,4 +80,25 @@ func fromEnv(dst *int64, name string, getenv func(string) string, logger logging
 		return
 	}
 	*dst = n
+}
+
+// LoadConfigBestEffort reads the project config from the working
+// directory, for its session timeouts only. A missing config is normal,
+// and an unreadable one is logged and ignored, because a host must
+// start with its defaults rather than fail on a config it was never
+// asked to read.
+func LoadConfigBestEffort(logger logging.Logger) *config.AtomyxConfig {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil
+	}
+	loaded, err := config.Load(config.LoadOptions{Cwd: cwd})
+	if err != nil {
+		logger.Warn("ignoring the project config for session timeouts", logging.LogContext{"error": err.Error()})
+		return nil
+	}
+	if loaded == nil {
+		return nil
+	}
+	return &loaded.Config
 }

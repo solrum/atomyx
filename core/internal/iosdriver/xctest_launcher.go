@@ -346,6 +346,10 @@ func noopKill() error { return nil }
 // A non-nil error carries an *XctestLauncherError except when ctx is
 // canceled or the poll loop's own Sleep call fails, in which case the
 // ctx error is returned directly.
+//
+// A fresh product launches without taking the build lock, so a launch
+// never waits on another process's build of a different configuration.
+// Only a missing or stale product takes the lock and builds.
 func (l *XctestLauncher) EnsureRunning(ctx context.Context) (kill func() error, err error) {
 	if err := ctx.Err(); err != nil {
 		return noopKill, err
@@ -363,7 +367,7 @@ func (l *XctestLauncher) EnsureRunning(ctx context.Context) (kill func() error, 
 		}
 	}
 
-	if err := l.EnsureBuilt(ctx); err != nil {
+	if err := l.ensureBuilt(ctx, false); err != nil {
 		return noopKill, err
 	}
 	buildDir := l.buildDir()
@@ -386,6 +390,13 @@ func (l *XctestLauncher) EnsureRunning(ctx context.Context) (kill func() error, 
 // missing project, a signing problem or a failed build, and ctx's
 // error when ctx ends while waiting for the lock.
 func (l *XctestLauncher) EnsureBuilt(ctx context.Context) error {
+	return l.ensureBuilt(ctx, true)
+}
+
+// ensureBuilt validates the project, then builds the runner when it is
+// missing or stale. With alwaysLock false, a product that is already
+// fresh returns without touching the build lock.
+func (l *XctestLauncher) ensureBuilt(ctx context.Context, alwaysLock bool) error {
 	projectFileName := l.cfg.projectFileName()
 	xcodeprojPath := filepath.Join(l.cfg.ProjectDir, projectFileName)
 	if _, err := os.Stat(xcodeprojPath); err != nil {
@@ -406,7 +417,10 @@ func (l *XctestLauncher) EnsureBuilt(ctx context.Context) error {
 	}
 	buildDir := l.buildDir()
 	runnerApp := filepath.Join(buildDir, "Build", "Products", buildConfig, l.cfg.runnerAppName())
-	return l.ensureBuilt(ctx, xcodeprojPath, buildDir, runnerApp)
+	if !alwaysLock && !l.needsBuild(runnerApp) {
+		return nil
+	}
+	return l.buildLocked(ctx, xcodeprojPath, buildDir, runnerApp)
 }
 
 func (l *XctestLauncher) buildDir() string { return filepath.Join(l.cfg.ProjectDir, "build") }
@@ -417,13 +431,13 @@ func (l *XctestLauncher) progress(message string) {
 	}
 }
 
-// ensureBuilt builds the runner into buildDir when it is missing or
+// buildLocked builds the runner into buildDir when it is missing or
 // stale. The shared build directory is serialized by a lock on
 // buildDir/.build.lock, and the decision to build is taken only after
 // the lock is held, so launches that start together build exactly once
 // and never race on the same derived data. A launch that waited on the
 // lock finds the product the holder built and skips the build.
-func (l *XctestLauncher) ensureBuilt(ctx context.Context, xcodeprojPath, buildDir, runnerApp string) error {
+func (l *XctestLauncher) buildLocked(ctx context.Context, xcodeprojPath, buildDir, runnerApp string) error {
 	if err := os.MkdirAll(buildDir, 0o755); err != nil {
 		return fmt.Errorf("iosdriver: create the build directory: %w", err)
 	}

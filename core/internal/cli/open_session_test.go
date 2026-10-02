@@ -204,3 +204,35 @@ func TestOpenDeviceFailedPrepareTakesNoLease(t *testing.T) {
 		t.Fatalf("lease held = %v, probe error = %v, want a failed prepare to leave the device free", status.Held, probeErr)
 	}
 }
+
+type hangingFactory struct{}
+
+func (hangingFactory) Build(ctx context.Context, _ device.Descriptor) (device.Built, error) {
+	<-ctx.Done()
+	return device.Built{}, ctx.Err()
+}
+
+func TestOpenDeviceBoundsAHungLaunchByTheAcquireBudget(t *testing.T) {
+	const budgetMs = 5_000
+	manager := newLeaseManager(t)
+	var out, errOut bytes.Buffer
+	clk := clock.NewManualClock(0)
+	deps := leaseDeps(t, manager, &out, &errOut)
+	deps.Factory = hangingFactory{}
+	deps.Session.Clock = clk
+	deps.Timeouts = session.Timeouts{DeviceAcquireMs: budgetMs}
+	go func() {
+		clk.AwaitSleepers(1)
+		clk.Advance(budgetMs + 1)
+	}()
+
+	_, err := openDevice(context.Background(), deps, "atomyx run", device.Descriptor{Platform: device.PlatformAndroid, ID: "emulator-5554"})
+
+	if code, _, _ := diag.Describe(err); code != diag.CodeToolTimeout {
+		t.Fatalf("openDevice() code = %q, error = %v, want %s once the acquire budget elapses", code, err, diag.CodeToolTimeout)
+	}
+	status, probeErr := manager.Probe(context.Background(), lease.KeyFor("android", "emulator-5554"))
+	if probeErr != nil || status.Held {
+		t.Fatalf("lease held = %v, probe error = %v, want the timed out acquisition to release the device", status.Held, probeErr)
+	}
+}

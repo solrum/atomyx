@@ -28,7 +28,7 @@ func Prepare(ctx context.Context, deps Deps, desc device.Descriptor) error {
 		return nil
 	}
 	deps = deps.withDefaults()
-	budget, stop := withClockTimeout(ctx, deps.Clock, device.DefaultRunnerBuildTimeoutMs)
+	budget, stop := withClockTimeout(ctx, deps.Clock, device.DefaultRunnerBuildTimeoutMs, errBuildBudget)
 	err := deps.Preparer.Prepare(budget, desc)
 	elapsed := errors.Is(context.Cause(budget), errBuildBudget)
 	stop()
@@ -41,15 +41,15 @@ func Prepare(ctx context.Context, deps Deps, desc device.Descriptor) error {
 }
 
 // withClockTimeout returns a context derived from parent that ends with
-// errBuildBudget as its cause once ms milliseconds of clk time pass.
+// cause as its cause once ms milliseconds of clk time pass.
 // The returned stop function releases the timer and must be called.
-func withClockTimeout(parent context.Context, clk clock.Clock, ms int64) (context.Context, func()) {
+func withClockTimeout(parent context.Context, clk clock.Clock, ms int64, cause error) (context.Context, func()) {
 	ctx, cancel := context.WithCancelCause(parent)
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		if clk.Sleep(ctx, ms) == nil {
-			cancel(errBuildBudget)
+			cancel(cause)
 		}
 	}()
 	return ctx, func() {

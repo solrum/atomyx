@@ -159,9 +159,6 @@ func TestXctestLauncher_EnsureRunning_EachTargetRunsFromItsOwnDerivedDataAndResu
 	if valueOf(argsA, "-xctestrun") != valueOf(argsB, "-xctestrun") {
 		t.Errorf("targets run different test products: %s and %s", valueOf(argsA, "-xctestrun"), valueOf(argsB, "-xctestrun"))
 	}
-	if _, err := os.Stat(filepath.Join(buildDir, ".build.lock")); err != nil {
-		t.Errorf("build lock file missing: %v", err)
-	}
 }
 
 func TestXctestLauncher_EnsureRunning_ReportsBuildAndStartProgress(t *testing.T) {
@@ -536,5 +533,32 @@ func TestXctestLauncher_EnsureRunning_ReleasesTheLastFailedAttemptsPort(t *testi
 	}
 	if len(released) != len(ports) {
 		t.Fatalf("released = %v, want every attempt's port %v", released, ports)
+	}
+}
+
+func TestXctestLauncher_EnsureRunning_FreshProductLaunchesWhileAnotherProcessHoldsTheBuildLock(t *testing.T) {
+	projectDir, pbxproj := newTestProjectDir(t)
+	past := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(pbxproj, past, past); err != nil {
+		t.Fatal(err)
+	}
+	createFreshRunnerApp(t, projectDir, iosdriver.KindSimulator, time.Now())
+	holder := holdFlock(t, filepath.Join(projectDir, "build", ".build.lock"))
+	defer holder()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	runner := &fakeXcodebuildRunner{spawnReady: true}
+	l := newSimLauncherIn(t, projectDir, runner, &fakeClock{}, iosdriver.LaunchConfig{UDID: "SIM-1", Port: freeTCPPort(t)})
+
+	kill, err := l.EnsureRunning(ctx)
+	if err != nil {
+		t.Fatalf("EnsureRunning() error = %v, want a fresh product to launch without waiting on the build lock", err)
+	}
+	defer func() { _ = kill() }()
+	for _, inv := range runner.Invocations() {
+		if inv.Args[0] == "build-for-testing" {
+			t.Fatalf("launch ran %+v, want no build for a fresh product", inv)
+		}
 	}
 }

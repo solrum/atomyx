@@ -12,7 +12,6 @@ import (
 
 	"dev.atomyx/cmd/internal/runnerprovision"
 	"dev.atomyx/cmd/internal/sessionwire"
-	"dev.atomyx/internal/config"
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/mcp"
@@ -96,7 +95,7 @@ func run() int {
 		Clock:    clock,
 		Logger:   logger,
 		Session:  sessionDeps,
-		Timeouts: sessionwire.ResolveTimeouts(loadConfigBestEffort(logger), os.Getenv, logger),
+		Timeouts: sessionwire.ResolveTimeouts(sessionwire.LoadConfigBestEffort(logger), os.Getenv, logger),
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -132,25 +131,4 @@ func run() int {
 		return 1
 	}
 	return 0
-}
-
-// loadConfigBestEffort reads the project config from the working
-// directory, for its session timeouts only. A missing config is normal,
-// and an unreadable one is logged and ignored, because the server must
-// start with its defaults rather than fail on a config the agent never
-// asked it to read.
-func loadConfigBestEffort(logger logging.Logger) *config.AtomyxConfig {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil
-	}
-	loaded, err := config.Load(config.LoadOptions{Cwd: cwd})
-	if err != nil {
-		logger.Warn("ignoring the project config for session timeouts", logging.LogContext{"error": err.Error()})
-		return nil
-	}
-	if loaded == nil {
-		return nil
-	}
-	return &loaded.Config
 }

@@ -48,15 +48,16 @@ func main() {
 	sessionDeps.Preparer = provisioner
 
 	deps := cli.Deps{
-		Probe:   probe,
-		Runners: device.PingRunnerIdentifier{},
-		Factory: factory,
-		Clock:   clock,
-		Logger:  logger,
-		Stdout:  os.Stdout,
-		Stderr:  os.Stderr,
-		Session: sessionDeps,
-		Debug:   os.Getenv("ATOMYX_DEBUG") == "1",
+		Probe:    probe,
+		Runners:  device.PingRunnerIdentifier{},
+		Factory:  factory,
+		Clock:    clock,
+		Logger:   logger,
+		Stdout:   os.Stdout,
+		Stderr:   os.Stderr,
+		Session:  sessionDeps,
+		Timeouts: sessionwire.ResolveTimeouts(sessionwire.LoadConfigBestEffort(logger), os.Getenv, logger),
+		Debug:    os.Getenv("ATOMYX_DEBUG") == "1",
 	}
 
 	// A plain cli.Run would leave Ctrl-C during a run or suite command

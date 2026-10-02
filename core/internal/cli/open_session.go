@@ -37,9 +37,9 @@ func (d *deviceSession) cancelOnLost(cancel context.CancelCauseFunc) {
 	}()
 }
 
-// openDevice prepares the device named by desc, which builds an iOS runner
-// that needs it before any lease is taken, then acquires it through
-// session.Open on behalf of command. The command is the name other
+// openDevice acquires the device named by desc through session.Acquire on
+// behalf of command: the runner build runs before any lease is taken, then
+// the acquisition runs within deps.Timeouts.DeviceAcquireMs. The command is the name other
 // processes see when they find the device held, for example "atomyx run".
 func openDevice(ctx context.Context, deps Deps, command string, desc device.Descriptor) (*deviceSession, error) {
 	sessionDeps := deps.Session
@@ -53,10 +53,7 @@ func openDevice(ctx context.Context, deps Deps, command string, desc device.Desc
 	if sessionDeps.Logger == nil {
 		sessionDeps.Logger = deps.logger()
 	}
-	if err := session.Prepare(ctx, sessionDeps, desc); err != nil {
-		return nil, err
-	}
-	opened, err := session.Open(ctx, sessionDeps, session.Request{Descriptor: desc})
+	opened, err := session.Acquire(ctx, sessionDeps, session.Request{Descriptor: desc}, session.Acquisition{BudgetMs: deps.Timeouts.DeviceAcquireMs})
 	if err != nil {
 		return nil, err
 	}
