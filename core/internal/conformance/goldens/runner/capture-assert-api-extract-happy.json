@@ -212,7 +212,7 @@
     {
       "command": "extract",
       "depth": 0,
-      "detail": "Extracted: userId=42",
+      "detail": "Extracted: userId (2 characters)",
       "durationMs": 0,
       "line": 13,
       "ok": true,
@@ -306,7 +306,7 @@
     },
     {
       "command": "extract",
-      "detail": "Extracted: userId=42",
+      "detail": "Extracted: userId (2 characters)",
       "durationMs": 0,
       "ok": true,
       "stepIndex": 3

@@ -224,7 +224,7 @@
       "line": 7,
       "ok": null,
       "stepIndex": 2,
-      "summary": "input: element.text = \"Email\" ← ••••••••••••",
+      "summary": "input: element.text = \"Email\" ← ••••••••",
       "tokens": [
         {
           "kind": "keyword",
@@ -260,7 +260,7 @@
         },
         {
           "kind": "mask",
-          "text": "••••••••••••"
+          "text": "••••••••"
         }
       ],
       "type": "stepStarted"
@@ -273,7 +273,7 @@
       "line": 7,
       "ok": true,
       "stepIndex": 2,
-      "summary": "input: element.text = \"Email\" ← ••••••••••••",
+      "summary": "input: element.text = \"Email\" ← ••••••••",
       "tokens": [
         {
           "kind": "keyword",
@@ -309,7 +309,7 @@
         },
         {
           "kind": "mask",
-          "text": "••••••••••••"
+          "text": "••••••••"
         }
       ],
       "type": "stepCompleted"
@@ -322,7 +322,7 @@
       "line": 10,
       "ok": null,
       "stepIndex": 3,
-      "summary": "input: ••••",
+      "summary": "input: ••••••••",
       "tokens": [
         {
           "kind": "keyword",
@@ -334,7 +334,7 @@
         },
         {
           "kind": "mask",
-          "text": "••••"
+          "text": "••••••••"
         }
       ],
       "type": "stepStarted"
@@ -347,7 +347,7 @@
       "line": 10,
       "ok": true,
       "stepIndex": 3,
-      "summary": "input: ••••",
+      "summary": "input: ••••••••",
       "tokens": [
         {
           "kind": "keyword",
@@ -359,7 +359,7 @@
         },
         {
           "kind": "mask",
-          "text": "••••"
+          "text": "••••••••"
         }
       ],
       "type": "stepCompleted"

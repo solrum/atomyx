@@ -3,6 +3,7 @@ package runner
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"dev.atomyx/internal/script"
 	"dev.atomyx/internal/script/expression"
@@ -35,8 +36,9 @@ func (ExtractCommand) Execute(step script.ScriptStep, ctx *CommandContext) Comma
 			return CommandResult{Ok: false, Detail: strPtr(fmt.Sprintf(
 				"Path \"%s\" resolved to undefined in captured \"%s\"", path, fromKey))}
 		}
-		ctx.Variables[name] = expression.StringValue(jsStringOf(value))
-		extracted = append(extracted, fmt.Sprintf("%s=%s", name, jsonStringifyJS(value)))
+		stored := jsStringOf(value)
+		ctx.Variables[name] = expression.StringValue(stored)
+		extracted = append(extracted, fmt.Sprintf("%s (%d characters)", name, utf8.RuneCountInString(stored)))
 	}
 
 	return CommandResult{Ok: true, Detail: strPtr(fmt.Sprintf("Extracted: %s", strings.Join(extracted, ", ")))}

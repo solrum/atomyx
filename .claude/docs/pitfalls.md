@@ -342,21 +342,33 @@ corresponding area. For the high-level map see
   tool handler, not pasted into the handler itself. Selector
   compilation lives in `core/internal/orchestra/priority_broadening.go`
   and the raw filter primitives in `core/internal/orchestra/filter.go`.
-- **Never emit a tree or an element without the masking pass.** A
-  node that holds a secret has `secure` set (`orchestra.IsSecure`), and
-  its `text` and `value` must reach no output as the real string. A
-  tool result gets this from the tool-call middleware, which masks every
-  element object that reports `secure: true`, so a new result shape for
-  tree or element data must carry the `secure` member
-  (`core/internal/mcp/secure_result.go`). Any other output, such as an
-  evidence file, must call `orchestra.MaskSecure` or
-  `orchestra.MaskSecureAttributes` first. Selector resolution keeps the
-  real tree, so never mask before resolving.
-- **Never log or return typed text.** A `type` step may enter a
-  secret, so its result detail states a character count only
-  (`core/internal/runner/type_command.go`). Any new step result, log
-  line or evidence file that would carry the typed value must carry its
-  length instead.
+- **Never emit a tree or an element without the masking pass, and
+  detect secrets only through `orchestra.IsSecure`.** Every driver sets
+  `attributes["secure"] = "true"` on a node that holds a secret, and
+  `IsSecure` is the only reader, never the role, because an Android
+  password field (role `text-field`) and an iOS secure text field must
+  take the same path, including the masked-count check in
+  `WaitForInputCommitted`. A secret's `text` and `value` must reach no
+  output as the real string. A tool result gets this from the tool-call
+  middleware, the single masking mechanism for tool output, which masks
+  every element object that reports `secure: true`, so a new result
+  shape for tree or element data must carry the `secure` member
+  (`core/internal/mcp/secure_result.go`). A value that a tool result
+  builds from a node and that is not an element object, such as a
+  selector, must leave out the secret field itself. Any output outside a
+  tool result, such as an evidence file or the sidecar tree, must call
+  `orchestra.MaskSecure`. Selector resolution keeps the real tree, so
+  never mask before resolving.
+- **Never log or return typed or captured values.** A `type` step may
+  enter a secret, so its result detail states a character count only
+  (`core/internal/runner/type_command.go`), and the step summary shows
+  a mask of one fixed width for every input. A captured API response
+  can hold tokens, so `extract` reports each variable name with the
+  length of its value, and a failed `assertApi` or `assertExpr` describes
+  an actual string by length instead of printing it
+  (`describeCapturedValue` in `core/internal/runner/support.go`). Any
+  new step result, log line or evidence file that would carry such a
+  value must carry its length instead.
 
 ## Observation-driven input and waits
 
@@ -394,14 +406,6 @@ corresponding area. For the high-level map see
   `WaitForInputCommitted` take a `Clock` for deterministic tests. Add
   a new wait here, following the same signature pattern, rather than
   inline inside an Orchestra method.
-- **Secret-holding inputs are detected through `orchestra.IsSecure`,
-  never through the role.** Every driver sets `attributes["secure"] =
-  "true"` on a node that holds a secret, so an Android password field
-  (role `text-field`) and an iOS secure text field take the same
-  masked-count verification in `WaitForInputCommitted`. A new wait or
-  action that treats secrets differently must call `IsSecure`, because
-  a role check misses the platform whose role vocabulary has no secure
-  role.
 - **The script `handle` command polls, so do not add a `sleep` before
   it.** `HandleCommand`
   (`core/internal/runner/handle_command.go`) polls the current screen

@@ -146,7 +146,7 @@
     {
       "command": "assertApi",
       "depth": 0,
-      "detail": "API assertion failed on \"userRsp\":\n  - body $.user: expected {\"id\":1,\"name\":\"Ann\"}, got {\"id\":2,\"name\":\"Ann\"}",
+      "detail": "API assertion failed on \"userRsp\":\n  - body $.user: expected {\"id\":1,\"name\":\"Ann\"}, got an object with 2 members",
       "durationMs": 0,
       "line": 8,
       "ok": false,
@@ -199,7 +199,7 @@
     },
     {
       "command": "assertApi",
-      "detail": "API assertion failed on \"userRsp\":\n  - body $.user: expected {\"id\":1,\"name\":\"Ann\"}, got {\"id\":2,\"name\":\"Ann\"}",
+      "detail": "API assertion failed on \"userRsp\":\n  - body $.user: expected {\"id\":1,\"name\":\"Ann\"}, got an object with 2 members",
       "durationMs": 0,
       "ok": false,
       "stepIndex": 2

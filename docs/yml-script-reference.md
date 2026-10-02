@@ -286,9 +286,13 @@ Type text into an input field.
 ```
 
 A type step reports only how many characters it entered, for example
-`Typed 13 characters`. The typed text never appears in the step
+`Typed 13 characters`, and its progress summary shows the same fixed
+mask whatever the text. The typed text never appears in the step
 result, the run log, the failure bundle or the report, so a value that
-is a secret stays out of them.
+is a secret stays out of them. An `extract` step reports each variable
+name with the length of its value, and a failed `assertApi` or
+`assertExpr` describes a string it compared by length, for the same
+reason.
 
 ### waitFor
 

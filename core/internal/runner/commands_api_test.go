@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"strings"
 	"testing"
 
 	"dev.atomyx/internal/wire"
@@ -76,7 +77,7 @@ func TestAssertApiCommand_OperatorFailureMessage(t *testing.T) {
 	if result.Ok {
 		t.Fatalf("got Ok=true, want false")
 	}
-	want := "API assertion failed on \"r\":\n  - body $.name: expected $not_empty, got \"\""
+	want := "API assertion failed on \"r\":\n  - body $.name: expected $not_empty, got a string of 0 characters"
 	if got := detail(lastStep(t, result)); got != want {
 		t.Fatalf("got detail %q, want %q", got, want)
 	}
@@ -164,5 +165,67 @@ func TestReadCommand_ReadsAttribute(t *testing.T) {
 	}
 	if got := detail(lastStep(t, result)); got != `Read value into "v"` {
 		t.Fatalf("got detail %q", got)
+	}
+}
+
+const capturedSecret = "tok-s3cr3t-9f3a"
+
+func runWithCapturedToken(t *testing.T, steps string) capturedRun {
+	t.Helper()
+	tr := newTestRunner()
+	tr.driver.StageHierarchy(rootTree())
+	tr.capture.queue = []CapturedRequest{{
+		Method: "POST", URL: "/login", Status: 200,
+		Body: map[string]any{"token": capturedSecret, "profile": map[string]any{"a": "1", "b": "2"}},
+	}}
+	result := run(t, tr, "appId: com.test\nproxy: required\n---\n- capture: \"POST /login as: r\"\n"+steps)
+	return capturedRun{result: result, last: detail(lastStep(t, result))}
+}
+
+// capturedRun carries a run result and the detail of its last step.
+type capturedRun struct {
+	result ScriptResult
+	last   string
+}
+
+func TestExtractCommand_DetailNamesVariablesAndLengthsOnly(t *testing.T) {
+	view := runWithCapturedToken(t, "- extract:\n    from: r\n    values:\n      token: $.body.token\n")
+
+	if !view.result.Ok {
+		t.Fatalf("extract failed: %s", view.last)
+	}
+	if want := "Extracted: token (15 characters)"; view.last != want {
+		t.Fatalf("detail = %q, want %q", view.last, want)
+	}
+	if strings.Contains(view.last, capturedSecret) {
+		t.Fatalf("detail carries the extracted value: %q", view.last)
+	}
+}
+
+func TestAssertApiCommand_FailureNeverPrintsTheCapturedString(t *testing.T) {
+	view := runWithCapturedToken(t, "- assertApi:\n    from: r\n    body:\n      $.token: something-else\n      $.profile: $contains:x\n")
+
+	if view.result.Ok {
+		t.Fatal("assertion unexpectedly passed")
+	}
+	if strings.Contains(view.last, capturedSecret) {
+		t.Fatalf("detail carries the captured token: %q", view.last)
+	}
+	if !strings.Contains(view.last, "got a string of 15 characters") {
+		t.Fatalf("detail = %q, want the captured string described by length", view.last)
+	}
+}
+
+func TestAssertExprCommand_NonBooleanFailureNeverPrintsTheValue(t *testing.T) {
+	view := runWithCapturedToken(t, "- extract:\n    from: r\n    values:\n      token: $.body.token\n- assertExpr:\n    expr: token\n")
+
+	if view.result.Ok {
+		t.Fatal("assertion unexpectedly passed")
+	}
+	if strings.Contains(view.last, capturedSecret) {
+		t.Fatalf("detail carries the variable value: %q", view.last)
+	}
+	if want := `Assertion "token" must evaluate to a boolean, got string`; view.last != want {
+		t.Fatalf("detail = %q, want %q", view.last, want)
 	}
 }

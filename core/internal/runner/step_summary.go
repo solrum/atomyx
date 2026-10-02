@@ -26,6 +26,11 @@ const (
 	StepTokenMask       StepTokenKind = "mask"
 )
 
+// typedSecretMask stands in for the text of an input step in a step
+// summary. Every input renders the same eight bullet characters, so the
+// summary reveals neither the content nor the length of what was typed.
+const typedSecretMask = "••••••••"
+
 // StepToken is one colored token in a step's rendered description.
 type StepToken struct {
 	Kind StepTokenKind
@@ -59,7 +64,7 @@ func SummarizeStep(step script.ScriptStep) StepSummary {
 		} else {
 			b.punct(": ")
 		}
-		b.mask(maskOf(jsLength(s.Text)))
+		b.mask(typedSecretMask)
 	case *script.WaitForStep:
 		b.kw("waitFor").punct(": ").selector(&s.Selector)
 		if s.TimeoutMs != nil {
@@ -203,31 +208,10 @@ func selectorFieldNameAndValue(sel *script.ScriptSelector) (field string, value 
 	}
 }
 
-// maskOf renders a fixed-width mask for a secret value of the given
-// length, clamped to between 4 and 12 bullet characters so the
-// rendered width never reveals the value's real length.
-func maskOf(length int) string {
-	n := length
-	if n < 4 {
-		n = 4
-	}
-	if n > 12 {
-		n = 12
-	}
-	return strings.Repeat("•", n)
-}
-
-// jsLength reports value's length the way JavaScript's `string.length`
-// would: a count of UTF-16 code units, not bytes or runes.
-func jsLength(value string) int {
-	return len(utf16.Encode([]rune(value)))
-}
-
-// jsTruncate truncates value to at most max UTF-16 code units (see
-// jsLength), leaving it unchanged when it already fits. A longer
-// value keeps its first max-1 code units and gets an ellipsis
-// appended, so the truncated result still occupies no more than max
-// units in total.
+// jsTruncate truncates value to at most max UTF-16 code units, leaving it unchanged when it
+// already fits. A longer value keeps its first max-1 code units and
+// gets an ellipsis appended, so the truncated result still occupies
+// no more than max units in total.
 func jsTruncate(value string, max int) string {
 	units := utf16.Encode([]rune(value))
 	if len(units) <= max {

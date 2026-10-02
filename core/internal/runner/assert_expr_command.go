@@ -25,8 +25,8 @@ func (AssertExprCommand) Execute(step script.ScriptStep, ctx *CommandContext) Co
 
 	if result.Kind() != expression.KindBool {
 		return CommandResult{Ok: false, Detail: strPtr(fmt.Sprintf(
-			"Assertion \"%s\" must evaluate to a boolean, got %s (%s)",
-			s.Expr, jsTypeOfValue(result), jsonStringifyExprValue(result)))}
+			"Assertion \"%s\" must evaluate to a boolean, got %s",
+			s.Expr, jsTypeOfValue(result)))}
 	}
 
 	if !result.Bool() {

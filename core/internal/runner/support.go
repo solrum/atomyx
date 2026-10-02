@@ -3,6 +3,8 @@ package runner
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"unicode/utf8"
 
 	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/script/expression"
@@ -71,25 +73,31 @@ func jsTypeOfValue(v expression.Value) string {
 	}
 }
 
-// jsonStringifyExprValue renders an expression.Value the way
-// JavaScript's JSON.stringify would render the same primitive,
-// matching assertExpr's non-boolean failure message wording.
-func jsonStringifyExprValue(v expression.Value) string {
-	switch v.Kind() {
-	case expression.KindNumber:
-		return expression.FormatNumber(v.Num())
-	case expression.KindString:
-		b, err := json.Marshal(v.Str())
-		if err != nil {
-			return `""`
-		}
-		return string(b)
-	case expression.KindBool:
-		if v.Bool() {
-			return "true"
-		}
-		return "false"
-	default:
+// describeCapturedValue renders v for a step detail without printing a
+// captured string or composite: a string reports its length in
+// characters, an array its item count, and an object its member
+// count. A number, a boolean, null and undefined print as is, because
+// they carry little that could be a credential and a failed numeric
+// comparison is unreadable without them. The detail flows into run
+// logs, results, failure bundles and reports, and a captured response
+// can hold tokens and personal data.
+func describeCapturedValue(v any) string {
+	if v == nil {
 		return "null"
+	}
+	if isJSUndefined(v) {
+		return "undefined"
+	}
+	switch t := v.(type) {
+	case string:
+		return fmt.Sprintf("a string of %d characters", utf8.RuneCountInString(t))
+	case []any:
+		return fmt.Sprintf("an array of %d items", len(t))
+	case map[string]any:
+		return fmt.Sprintf("an object with %d members", len(t))
+	case bool, float64, int, int64, json.Number:
+		return jsonStringifyJS(v)
+	default:
+		return "a value of an unreadable type"
 	}
 }

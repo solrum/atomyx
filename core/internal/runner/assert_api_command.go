@@ -80,7 +80,7 @@ func assertValue(actual, expected any) assertOutcome {
 		switch op {
 		case "not_empty":
 			if isJSUndefined(actual) || actual == nil || actual == "" || isEmptyArray(actual) {
-				return assertOutcome{false, fmt.Sprintf("expected $not_empty, got %s", jsonStringifyJS(actual))}
+				return assertOutcome{false, fmt.Sprintf("expected $not_empty, got %s", describeCapturedValue(actual))}
 			}
 			return assertOutcome{true, ""}
 		case "exists":
@@ -90,7 +90,7 @@ func assertValue(actual, expected any) assertOutcome {
 			return assertOutcome{true, ""}
 		case "not_exists":
 			if !isJSUndefined(actual) {
-				return assertOutcome{false, fmt.Sprintf("expected $not_exists, got %s", jsonStringifyJS(actual))}
+				return assertOutcome{false, fmt.Sprintf("expected $not_exists, got %s", describeCapturedValue(actual))}
 			}
 			return assertOutcome{true, ""}
 		}
@@ -99,7 +99,7 @@ func assertValue(actual, expected any) assertOutcome {
 			needle := m[1]
 			s, isStr := actual.(string)
 			if !isStr || !strings.Contains(s, needle) {
-				return assertOutcome{false, fmt.Sprintf("expected $contains:\"%s\", got %s", needle, jsonStringifyJS(actual))}
+				return assertOutcome{false, fmt.Sprintf("expected $contains:\"%s\", got %s", needle, describeCapturedValue(actual))}
 			}
 			return assertOutcome{true, ""}
 		}
@@ -110,7 +110,7 @@ func assertValue(actual, expected any) assertOutcome {
 			num, numErr := toJSNumber(actual)
 			if minErr != nil || maxErr != nil || numErr != nil {
 				return assertOutcome{false, fmt.Sprintf(
-					"cannot compare: actual=%s, range=%s,%s", jsonStringifyJS(actual), m[1], m[2])}
+					"cannot compare: actual=%s, range=%s,%s", describeCapturedValue(actual), m[1], m[2])}
 			}
 			if num < min || num > max {
 				return assertOutcome{false, fmt.Sprintf(
@@ -125,7 +125,7 @@ func assertValue(actual, expected any) assertOutcome {
 			num, numErr := toJSNumber(actual)
 			if threshErr != nil || numErr != nil {
 				return assertOutcome{false, fmt.Sprintf(
-					"cannot compare: actual=%s, threshold=%s", jsonStringifyJS(actual), m[2])}
+					"cannot compare: actual=%s, threshold=%s", describeCapturedValue(actual), m[2])}
 			}
 			var passed bool
 			switch cmp {
@@ -150,7 +150,7 @@ func assertValue(actual, expected any) assertOutcome {
 	}
 
 	if !jsDeepEqual(actual, expected) {
-		return assertOutcome{false, fmt.Sprintf("expected %s, got %s", jsonStringifyJS(expected), jsonStringifyJS(actual))}
+		return assertOutcome{false, fmt.Sprintf("expected %s, got %s", jsonStringifyJS(expected), describeCapturedValue(actual))}
 	}
 	return assertOutcome{true, ""}
 }
