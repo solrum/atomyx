@@ -253,16 +253,12 @@ func timeoutResult(logger logging.Logger, clk clock.Clock, tool string, startedA
 // gateWaitResult maps the failure of a wait at the activity gate to a
 // coded result. The wait counts against the call's budget, so an
 // elapsed budget reports TOOL_TIMEOUT like any other call that ran out
-// of time, and a call canceled while it waited reports HOLDER_BUSY,
-// because the only thing it waited for was a fresh capture of the
-// device. Neither leaks a bare context error.
+// of time. Any other failure, a caller cancel included, is reported
+// from its own error: a canceled caller is not a busy holder, and
+// nobody is left to retry on its behalf.
 func gateWaitResult(callCtx context.Context, err error, timedOut func() *mcp.CallToolResult) *mcp.CallToolResult {
-	switch {
-	case errors.Is(callCtx.Err(), context.DeadlineExceeded):
+	if errors.Is(callCtx.Err(), context.DeadlineExceeded) {
 		return timedOut()
-	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
-		return errorResult(diag.NewHolderBusy("a fresh capture held the device while this call waited, and the call was canceled"))
-	default:
-		return errorResult(err)
 	}
+	return errorResult(err)
 }

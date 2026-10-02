@@ -190,8 +190,8 @@ above). Registration is never auto-discovered, so adding a file under
   any call is inside, so it never runs between two device operations of
   one call. A call that arrives during a capture waits for it inside its
   own tool budget. When the budget elapses first the call fails with
-  `TOOL_TIMEOUT`, and when the caller cancels first it fails with
-  `HOLDER_BUSY`, never with a bare context error.
+  `TOOL_TIMEOUT`, and when the caller cancels first the call reports
+  the context cancellation from its own error, never `HOLDER_BUSY`.
   The middleware also appends the notices raised during a call
   (`core/internal/mcp/call_notices.go`) as extra text content blocks
   after the tool's own content. `DeviceSession.Ensure` raises one when a

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"runtime"
+	"strings"
 	"testing"
 
 	"dev.atomyx/internal/clock"
@@ -176,7 +177,7 @@ func TestToolCallMiddleware_TheWaitForTheGateCountsAgainstTheCallBudget(t *testi
 	}
 }
 
-func TestToolCallMiddleware_ACallCanceledWhileItWaitsForTheGateReportsACodedError(t *testing.T) {
+func TestToolCallMiddleware_ACallCanceledWhileItWaitsForTheGateIsNotReportedAsABusyHolder(t *testing.T) {
 	sess := newGateTestSession()
 	t.Cleanup(sess.Close)
 	capture, _ := sess.gate.TryExclusive()
@@ -198,8 +199,13 @@ func TestToolCallMiddleware_ACallCanceledWhileItWaitsForTheGateReportsACodedErro
 	}
 	cancel()
 
-	if code := errorResultCode(t, <-done); code != diag.CodeHolderBusy {
-		t.Fatalf("code = %q, want %q, never UNKNOWN from a bare context error", code, diag.CodeHolderBusy)
+	result := <-done
+	if code := errorResultCode(t, result); code == diag.CodeHolderBusy {
+		t.Fatalf("code = %q, a caller cancel is not a busy holder", code)
+	}
+	text := result.(*mcp.CallToolResult).Content[0].(*mcp.TextContent).Text
+	if !strings.Contains(text, context.Canceled.Error()) {
+		t.Fatalf("result %q does not report the cancellation", text)
 	}
 }
 
