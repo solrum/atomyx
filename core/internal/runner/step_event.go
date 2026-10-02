@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"fmt"
 
 	"dev.atomyx/internal/logging"
@@ -68,6 +69,7 @@ type StepEvent struct {
 // the host's own step-reporting code and must stay visible even though
 // the run itself continues.
 func (r *ScriptRunner) emitStep(event StepEvent) {
+	r.recordTrail(event)
 	if event.Type == StepCompleted {
 		r.stepLog.Info("script.step", logging.LogContext{
 			"command":    event.Command,
@@ -90,4 +92,38 @@ func (r *ScriptRunner) emitStep(event StepEvent) {
 		}
 	}()
 	hook(event)
+}
+
+func (r *ScriptRunner) resetTrail() {
+	r.trailMu.Lock()
+	defer r.trailMu.Unlock()
+	r.trail = r.trail[:0]
+}
+
+func (r *ScriptRunner) recordTrail(event StepEvent) {
+	r.trailMu.Lock()
+	defer r.trailMu.Unlock()
+	r.trail = append(r.trail, event)
+}
+
+// captureFailure hands failure, completed with the events of the failed
+// step, to the configured FailureCapture. A capture that panics is
+// logged and discarded so evidence gathering can never change the run
+// outcome.
+func (r *ScriptRunner) captureFailure(ctx context.Context, failure StepFailure) {
+	if r.deps.FailureCapture == nil || ctx.Err() != nil {
+		return
+	}
+	r.trailMu.Lock()
+	failure.Events = append([]StepEvent(nil), r.trail...)
+	r.trailMu.Unlock()
+
+	defer func() {
+		if rec := recover(); rec != nil {
+			r.stepLog.Error("failure capture panicked", nil, logging.LogContext{
+				"panic": fmt.Sprintf("%v", rec),
+			})
+		}
+	}()
+	r.deps.FailureCapture.CaptureFailure(ctx, failure)
 }

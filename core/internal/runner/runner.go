@@ -83,6 +83,11 @@ type ScriptRunnerDeps struct {
 	// field, which a caller only wants when it has no report id to
 	// correlate against.
 	RunID string
+	// FailureCapture, when non-nil, is called once for a failed
+	// top-level step whose failure is an ordinary one. It is not
+	// called when the run aborts because the device was lost, or when
+	// the run's context is already done. Nil captures nothing.
+	FailureCapture FailureCapture
 }
 
 // StepResult is the outcome of one executed top-level step.
@@ -179,6 +184,11 @@ type ScriptRunner struct {
 	requiresMu        sync.Mutex
 	completedRequires map[string]struct{}
 	callStack         map[string]struct{}
+
+	// trailMu guards trail, the events emitted since the current
+	// top-level step started, which a failure capture reports.
+	trailMu sync.Mutex
+	trail   []StepEvent
 }
 
 // NewScriptRunner constructs a ScriptRunner from deps. Orchestra,
@@ -350,6 +360,7 @@ func (r *ScriptRunner) Run(ctx context.Context, def *script.ScriptDefinition) (S
 
 		summary := SummarizeStep(step)
 		line := lineForStep(def, i)
+		r.resetTrail()
 		r.emitStep(StepEvent{
 			Type: StepStarted, StepIndex: myIndex, Command: step.StepCommand(),
 			Summary: summary.Text, Tokens: summary.Tokens, Depth: 0, Line: line,
@@ -383,6 +394,10 @@ func (r *ScriptRunner) Run(ctx context.Context, def *script.ScriptDefinition) (S
 				})
 				neutral := deviceLostDetail(abort)
 				stepResults[len(stepResults)-1].Detail = &neutral
+			} else {
+				r.captureFailure(ctx, StepFailure{
+					StepNumber: i + 1, Command: step.StepCommand(), Detail: result.Detail,
+				})
 			}
 			break
 		}
