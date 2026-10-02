@@ -55,12 +55,12 @@ func main() {
 	// report and flushes its logs before RunContext returns, and the
 	// watchdog only fires once the whole grace period has lapsed, so
 	// a flush that finishes in time is never cut short.
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancelCause(context.Background())
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		sig := <-sigCh
-		shutdown.HandleStop(clock, sig, shutdown.StopHooks{Cancel: cancel, Exit: os.Exit})
+		shutdown.HandleStop(clock, sig, shutdown.StopHooks{Cancel: func() { cancel(shutdown.InterruptCause(sig)) }, Exit: os.Exit})
 	}()
 
 	// cancel deliberately does not run before this os.Exit: the process

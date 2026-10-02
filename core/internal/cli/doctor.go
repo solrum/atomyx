@@ -32,11 +32,11 @@ func Doctor(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 
 	desc, err := resolveDescriptor(ctx, deps.Probe, platform, deviceID)
 	if err != nil {
-		return reportUncaught(stderr, deps.Debug, err)
+		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
 	built, err := deps.Factory.Build(ctx, desc)
 	if err != nil {
-		return reportUncaught(stderr, deps.Debug, err)
+		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
 	defer func() { _ = built.Driver.Disconnect() }()
 
@@ -44,7 +44,7 @@ func Doctor(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 
 	if jsonOutput {
 		if err := encodeJSON(stdout, report); err != nil {
-			return reportUncaught(stderr, deps.Debug, err)
+			return reportUncaught(ctx, stderr, deps.Debug, err)
 		}
 	} else {
 		printHealthReport(stdout, platform, desc.ID, report)

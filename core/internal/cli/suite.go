@@ -71,7 +71,7 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 
 	cwd, err := os.Getwd()
 	if err != nil {
-		return reportUncaught(stderr, deps.Debug, err)
+		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
 	var testRoots []string
 	if loaded != nil && loaded.Config.TestRoots != nil {
@@ -91,7 +91,7 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 	for i, flow := range resolvedFlows {
 		content, err := os.ReadFile(flow.Path)
 		if err != nil {
-			return reportUncaught(stderr, deps.Debug, err)
+			return reportUncaught(ctx, stderr, deps.Debug, err)
 		}
 		entries[i] = scenario.SuiteEntry{Path: flow.Path, Content: string(content)}
 	}
@@ -102,11 +102,11 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 
 	desc, err := resolveDescriptor(ctx, deps.Probe, platform, deviceID)
 	if err != nil {
-		return reportUncaught(stderr, deps.Debug, err)
+		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
 	built, err := deps.Factory.Build(ctx, desc)
 	if err != nil {
-		return reportUncaught(stderr, deps.Debug, err)
+		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
 	// Disconnect is best-effort cleanup: by the time this runs, the
 	// command has already produced its report and exit code, so a
@@ -117,7 +117,7 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 	captureConfig := parseCaptureFlag(proxyFlag)
 	networkCapture, err := netcapture.New(captureConfig)
 	if err != nil {
-		return reportUncaught(stderr, deps.Debug, err)
+		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
 
 	var envName *string
@@ -158,7 +158,7 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 	})
 	finishedAt := time.Now()
 	if err != nil {
-		return reportUncaught(stderr, deps.Debug, err)
+		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
 
 	printSuiteResult(stdout, result)
@@ -177,7 +177,7 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 		}
 		bundle, genErr := report.NewFsReporter().Generate(input, *reportOptions)
 		if genErr != nil {
-			return reportUncaught(stderr, deps.Debug, genErr)
+			return reportUncaught(ctx, stderr, deps.Debug, genErr)
 		}
 		_, _ = fmt.Fprintf(stderr, "Report: %s\n", bundle.BundleDir)
 	}

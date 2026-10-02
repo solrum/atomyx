@@ -225,6 +225,7 @@ deps:
       - runfolder
       - inspector
       - lease
+      - shutdown
   skills:
     anyVendorDeps: true
   storage:

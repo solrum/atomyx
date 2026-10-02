@@ -15,6 +15,7 @@ import (
 	"dev.atomyx/internal/runner"
 	"dev.atomyx/internal/scenario"
 	"dev.atomyx/internal/script"
+	"dev.atomyx/internal/shutdown"
 )
 
 // The run command's top-level flow: parse and validate its flags, connect
@@ -82,11 +83,11 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 
 	absPath, err := filepath.Abs(filePath)
 	if err != nil {
-		return reportUncaught(stderr, deps.Debug, err)
+		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
 	content, err := os.ReadFile(absPath)
 	if err != nil {
-		return reportUncaught(stderr, deps.Debug, err)
+		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
 
 	// The device connects before the script or scenario is parsed.
@@ -95,11 +96,11 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	// never runs until the connection succeeds.
 	desc, err := resolveDescriptor(ctx, deps.Probe, platform, deviceID)
 	if err != nil {
-		return reportUncaught(stderr, deps.Debug, err)
+		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
 	built, err := deps.Factory.Build(ctx, desc)
 	if err != nil {
-		return reportUncaught(stderr, deps.Debug, err)
+		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
 	// Disconnect is best-effort cleanup: by the time this runs, the
 	// command has already produced its report and exit code, so a
@@ -110,7 +111,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	captureConfig := parseCaptureFlag(proxyFlag)
 	networkCapture, err := netcapture.New(captureConfig)
 	if err != nil {
-		return reportUncaught(stderr, deps.Debug, err)
+		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
 
 	var envName *string
@@ -130,7 +131,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	if script.IsScenarioYaml(string(content)) {
 		scenarioDef, err := script.ParseScenario(string(content))
 		if err != nil {
-			return reportUncaught(stderr, deps.Debug, err)
+			return reportUncaught(ctx, stderr, deps.Debug, err)
 		}
 
 		fromScenarioPreconditions := runner.PreconditionsNoOverride
@@ -153,12 +154,12 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		result, err := scenarioRunner.Run(ctx, scenarioDef)
 		finishedAt := time.Now()
 		if err != nil {
-			return reportUncaught(stderr, deps.Debug, err)
+			return reportUncaught(ctx, stderr, deps.Debug, err)
 		}
 
 		if jsonOutput {
 			if err := encodeJSON(stdout, toJSONScenarioResult(result)); err != nil {
-				return reportUncaught(stderr, deps.Debug, err)
+				return reportUncaught(ctx, stderr, deps.Debug, err)
 			}
 		} else {
 			printScenarioResult(stdout, result)
@@ -167,7 +168,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		if reportOptions != nil {
 			bundle, genErr := writeScenarioReport(runID, result, runStartedAt, finishedAt, platform, deviceID, envName, *reportOptions)
 			if genErr != nil {
-				return reportUncaught(stderr, deps.Debug, genErr)
+				return reportUncaught(ctx, stderr, deps.Debug, genErr)
 			}
 			_, _ = fmt.Fprintf(stderr, "Report: %s\n", bundle.BundleDir)
 		}
@@ -180,7 +181,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 
 	def, err := script.ParseScript(string(content), externalEnv)
 	if err != nil {
-		return reportUncaught(stderr, deps.Debug, err)
+		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
 	preconditionsOverride := resolvePreconditionsOverride(cliPreconditionsFlag, runner.PreconditionsNoOverride, fromConfigPreconditions)
 
@@ -197,12 +198,12 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	result, err := scriptRunner.Run(ctx, def)
 	finishedAt := time.Now()
 	if err != nil {
-		return reportUncaught(stderr, deps.Debug, err)
+		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
 
 	if jsonOutput {
 		if err := encodeJSON(stdout, toJSONScriptResult(result)); err != nil {
-			return reportUncaught(stderr, deps.Debug, err)
+			return reportUncaught(ctx, stderr, deps.Debug, err)
 		}
 	} else {
 		printTextResult(stdout, result)
@@ -211,7 +212,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	if reportOptions != nil {
 		bundle, genErr := writeReport(runID, result, runStartedAt, finishedAt, platform, deviceID, envName, *reportOptions)
 		if genErr != nil {
-			return reportUncaught(stderr, deps.Debug, genErr)
+			return reportUncaught(ctx, stderr, deps.Debug, genErr)
 		}
 		_, _ = fmt.Fprintf(stderr, "Report: %s\n", bundle.BundleDir)
 	}
@@ -226,8 +227,14 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 // followed by an actionable remedy on its own line when err carries
 // one, with a stack trace appended when debug is set. It is the
 // catch-all for an error that aborted a run before it produced a
-// ScriptResult. It always returns 1.
-func reportUncaught(stderr io.Writer, debugEnabled bool, err error) int {
+// ScriptResult. It returns 1, except when a stop signal canceled ctx:
+// then it prints a single "interrupted" line and returns the
+// signal's conventional exit code.
+func reportUncaught(ctx context.Context, stderr io.Writer, debugEnabled bool, err error) int {
+	if code, ok := shutdown.InterruptExitCode(ctx); ok {
+		_, _ = fmt.Fprintln(stderr, "interrupted")
+		return code
+	}
 	code, message, remedy := diag.Describe(err)
 	_, _ = fmt.Fprintf(stderr, "error [%s]: %s\n", code, message)
 	if remedy != "" {

@@ -6,6 +6,7 @@ package shutdown
 
 import (
 	"context"
+	"errors"
 	"os"
 	"syscall"
 	"time"
@@ -45,6 +46,28 @@ func ExitCodeFor(sig os.Signal) int {
 	default:
 		return exitCodeFallback
 	}
+}
+
+// interrupt is the cancellation cause recorded when a stop signal
+// cancels a context, so a consumer can tell a user interrupt apart from
+// any other context.Canceled.
+type interrupt struct{ sig os.Signal }
+
+func (i interrupt) Error() string { return "interrupted by " + i.sig.String() }
+
+// InterruptCause returns the cancellation cause to pass to a
+// context.CancelCauseFunc when sig stops the process.
+func InterruptCause(sig os.Signal) error { return interrupt{sig: sig} }
+
+// InterruptExitCode reports the exit code for a context that a stop
+// signal canceled, using the same mapping as ExitCodeFor. It reports
+// false when ctx is live or was canceled for any other reason.
+func InterruptExitCode(ctx context.Context) (int, bool) {
+	var i interrupt
+	if !errors.As(context.Cause(ctx), &i) {
+		return 0, false
+	}
+	return ExitCodeFor(i.sig), true
 }
 
 // Bounded runs cleanup and reports whether it finished within grace

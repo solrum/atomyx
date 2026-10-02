@@ -1,6 +1,7 @@
 package shutdown
 
 import (
+	"context"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -202,5 +203,22 @@ func TestHandleStopToleratesNilOptionalHooks(t *testing.T) {
 	clk.Advance(GracePeriod.Milliseconds())
 	if code := waitExit(t, rec); code != ExitCodeSigterm {
 		t.Fatalf("exit code = %d, want %d", code, ExitCodeSigterm)
+	}
+}
+
+func TestInterruptExitCode(t *testing.T) {
+	ctx, cancel := context.WithCancelCause(context.Background())
+	if _, ok := InterruptExitCode(ctx); ok {
+		t.Fatal("live context reported as interrupted")
+	}
+	cancel(InterruptCause(syscall.SIGTERM))
+	if got, ok := InterruptExitCode(ctx); !ok || got != ExitCodeSigterm {
+		t.Errorf("InterruptExitCode = %d, %v, want %d, true", got, ok, ExitCodeSigterm)
+	}
+
+	plain, cancelPlain := context.WithCancel(context.Background())
+	cancelPlain()
+	if _, ok := InterruptExitCode(plain); ok {
+		t.Error("plain cancellation reported as interrupted")
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"dev.atomyx/internal/shutdown"
 	"dev.atomyx/internal/version"
 )
 
@@ -17,8 +18,21 @@ func Run(args []string, deps Deps) int {
 	return RunContext(context.Background(), args, deps)
 }
 
-// RunContext is Run with an explicit context.
+// RunContext is Run with an explicit context. When a stop signal
+// canceled ctx, a nonzero result becomes the signal's conventional
+// exit code, so a run that flushed a partial report still reports the
+// interrupt. A command that finished successfully keeps exit code 0.
 func RunContext(ctx context.Context, args []string, deps Deps) int {
+	code := dispatch(ctx, args, deps)
+	if code != 0 {
+		if interrupted, ok := shutdown.InterruptExitCode(ctx); ok {
+			return interrupted
+		}
+	}
+	return code
+}
+
+func dispatch(ctx context.Context, args []string, deps Deps) int {
 	stdout := deps.stdout()
 	stderr := deps.stderr()
 

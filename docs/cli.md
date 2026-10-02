@@ -122,7 +122,9 @@ atomyx driver run --file test.yml --report html,json --report-dir ./reports
 
 Exit codes: `0` when the script passed, `1` when the script ran and
 failed, `2` when the command was misused or a usage or config error
-occurred.
+occurred, `130` when SIGINT interrupted the run, and `143` when SIGTERM
+did. An interrupted run prints `interrupted` and still writes the
+partial report.
 
 ## driver suite
 
@@ -166,7 +168,9 @@ atomyx driver suite --tag smoke --tag regression
 
 Exit codes: `0` when every flow passed, `1` when the suite ran and at
 least one flow failed, `2` when the selector matched no flows or the
-command was misused.
+command was misused, `130` when SIGINT interrupted the suite, and `143`
+when SIGTERM did. An interrupted suite prints `interrupted` and still
+writes the partial report.
 
 ## driver list-devices
 
