@@ -13,6 +13,11 @@ corresponding area. For the high-level map see
   stable selectors at dump time, uses the cached bounds for gestures,
   and re-resolves a fresh node from the live tree for any action that
   needs one.
+- **Declare `mutates` on every new agent route.** `Route.mutates` is
+  abstract, so a route cannot compile without a choice. The router
+  runs mutating routes one at a time. Mark a route false only when it
+  reads state or must stay answerable during a held gesture, because
+  a false route runs concurrently with whatever action is in flight.
 - **Never replace `serviceInfo` wholesale in `onServiceConnected`.**
   Augment it instead. Replacing it with a fresh
   `AccessibilityServiceInfo()` clobbers the capability and flag values

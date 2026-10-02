@@ -8,13 +8,22 @@ import fi.iki.elonen.NanoHTTPD
  * build a response. Lifecycle/cache concerns live in AtomyxServices.
  *
  * Adding a new endpoint:
- *   1. Create a new class implementing Route
+ *   1. Create a new class implementing Route and declare `mutates`
  *   2. Register it in the Router constructor
  *   No existing files need to change.
  */
 interface Route {
     val method: NanoHTTPD.Method
     val path: String
+
+    /**
+     * True when the route changes device state or drives the
+     * accessibility service (gestures, typing, key presses, app
+     * lifecycle). The router runs mutating routes one at a time. A
+     * route that only reads state, or whose work must stay possible
+     * while a mutating route is in flight, declares false.
+     */
+    val mutates: Boolean
     fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse
 }
 

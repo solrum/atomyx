@@ -257,6 +257,19 @@ every call for this reason. `AndroidDriver.Connect` instead checks
 already points where this driver needs it, so it can tell a forward it
 created apart from one it is merely reusing.
 
+**Mutating routes run one at a time.** The HTTP server handles each
+request on its own thread. `Route.mutates` marks a route that changes
+device state, and `Router` runs every such route behind one lock, so a
+multi-step action such as `TypeKeyboardRoute` never interleaves with a
+tap, swipe, key press, or launch from another request. The routes
+outside the lock are `PingRoute`, `TreeRoute`, `KeyboardRoute`,
+`ScreenshotRoute`, `CurrentActivityRoute`, and `AppsRoute`. They only
+read state, and a gesture can run for tens of seconds, so a screenshot
+or tree read during a held gesture must not wait for it. Tree reads
+serialize against each other through `UiTreeService`'s own guard. A
+`capture` waypoint inside `DispatchGestureRoute` calls the screenshot
+surface directly on its own thread, so it never contends for the lock.
+
 **Never cache `AccessibilityNodeInfo` across calls.** `UiTreeService`
 is a metadata-only registry by design, because node references go
 stale the moment the underlying view tree changes (keyboard appears,
@@ -285,7 +298,7 @@ the live tree whenever an action needs one.
 
 **Add a new route** (host-agent wire method):
 
-1. Add a `Route` implementation in
+1. Add a `Route` implementation, declaring `mutates`, in
    `platforms/android-agent/app/src/main/java/dev/atomyx/agent/control/router/CommonRoutes.kt`
    (or a new file in the same package).
 2. Register it in `HttpControlServer.buildRoutes()`.

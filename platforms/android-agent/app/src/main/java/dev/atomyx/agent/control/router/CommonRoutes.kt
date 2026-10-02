@@ -40,6 +40,7 @@ private fun parseBody(body: String): JsonObject =
  *
  */
 class PingRoute : Route {
+    override val mutates = false
     override val method = NanoHTTPD.Method.GET
     override val path = "/ping"
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
@@ -62,6 +63,7 @@ class PingRoute : Route {
 }
 
 class TreeRoute : Route {
+    override val mutates = false
     override val method = NanoHTTPD.Method.GET
     override val path = "/tree"
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
@@ -76,6 +78,7 @@ class TreeRoute : Route {
 }
 
 class KeyboardRoute : Route {
+    override val mutates = false
     override val method = NanoHTTPD.Method.GET
     override val path = "/keyboard"
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
@@ -101,6 +104,7 @@ class KeyboardRoute : Route {
 }
 
 class ScreenshotRoute : Route {
+    override val mutates = false
     override val method = NanoHTTPD.Method.GET
     override val path = "/screenshot"
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
@@ -112,6 +116,7 @@ class ScreenshotRoute : Route {
 }
 
 class CurrentActivityRoute : Route {
+    override val mutates = false
     override val method = NanoHTTPD.Method.GET
     override val path = "/current-activity"
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse =
@@ -119,6 +124,7 @@ class CurrentActivityRoute : Route {
 }
 
 class AppsRoute : Route {
+    override val mutates = false
     override val method = NanoHTTPD.Method.GET
     override val path = "/apps"
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
@@ -175,6 +181,7 @@ private fun dispatchResultToMap(
 }
 
 class TapCoordsRoute : Route {
+    override val mutates = true
     override val method = NanoHTTPD.Method.POST
     override val path = "/actions/tap_coords"
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
@@ -185,6 +192,7 @@ class TapCoordsRoute : Route {
 }
 
 class LongPressRoute : Route {
+    override val mutates = true
     override val method = NanoHTTPD.Method.POST
     override val path = "/actions/long_press"
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
@@ -200,6 +208,7 @@ class LongPressRoute : Route {
 }
 
 class ClearFocusedInputRoute : Route {
+    override val mutates = true
     override val method = NanoHTTPD.Method.POST
     override val path = "/actions/clear_focused_input"
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
@@ -209,6 +218,7 @@ class ClearFocusedInputRoute : Route {
 }
 
 class HideKeyboardRoute : Route {
+    override val mutates = true
     override val method = NanoHTTPD.Method.POST
     override val path = "/actions/hide_keyboard"
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
@@ -250,6 +260,7 @@ class HideKeyboardRoute : Route {
  *     runner's 30s latch budget).
  */
 class DispatchGestureRoute : Route {
+    override val mutates = true
     override val method = NanoHTTPD.Method.POST
     override val path = "/actions/dispatch_gesture"
 
@@ -301,6 +312,7 @@ class DispatchGestureRoute : Route {
 }
 
 class SwipeRoute : Route {
+    override val mutates = true
     override val method = NanoHTTPD.Method.POST
     override val path = "/actions/swipe"
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
@@ -317,6 +329,7 @@ class SwipeRoute : Route {
 }
 
 class TypeKeyboardRoute : Route {
+    override val mutates = true
     override val method = NanoHTTPD.Method.POST
     override val path = "/actions/type_keyboard"
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
@@ -335,6 +348,7 @@ class TypeKeyboardRoute : Route {
 }
 
 class KeyRoute : Route {
+    override val mutates = true
     override val method = NanoHTTPD.Method.POST
     override val path = "/actions/key"
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
@@ -350,6 +364,7 @@ class KeyRoute : Route {
 }
 
 class LaunchRoute : Route {
+    override val mutates = true
     override val method = NanoHTTPD.Method.POST
     override val path = "/actions/launch"
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
@@ -365,6 +380,7 @@ class LaunchRoute : Route {
 }
 
 class ForceStopRoute : Route {
+    override val mutates = true
     override val method = NanoHTTPD.Method.POST
     override val path = "/actions/force_stop"
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
