@@ -64,9 +64,8 @@ The layer-import gate reads `core/.go-arch-lint.yml`. See
 The comment gate forbids two things in production Go source:
 comments that anchor current behavior to a superseded implementation,
 and prose that uses a banned punctuation mark as a stand-in for a
-connecting word. The run folder layout gate parses production Go and rejects the
-names `runs`, `v1`, `artifacts`, `report`, and `screenshots` spelled
-as string literals outside `core/internal/runfolder`. The schema-freshness
+connecting word. The run folder layout gate rejects run folder layout names spelled outside
+`core/internal/runfolder`, and [`pitfalls.md`](./pitfalls.md) lists them. The schema-freshness
 gate confirms the committed JSON Schema files still match the Go structs that generate
 them.
 

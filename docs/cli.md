@@ -277,8 +277,8 @@ was misused.
 
 ### Migrating run records
 
-`atomyx doctor --migrate-runs` moves the run records that older
-versions kept as flat files, `<root>/runs/<id>.json`, into run folders,
+`atomyx doctor --migrate-runs` moves run records stored as flat files,
+`<root>/runs/<id>.json`, into run folders,
 `<root>/runs/v1/<id>/`. Every run keeps its id, and no field is lost:
 name, source, status, findings, summary, action count, and duration all
 land in the folder's `meta.json`. It never needs a device and cannot be
@@ -315,9 +315,9 @@ Safety:
   so no edit is lost and no deleted run comes back. When another run
   operation already holds the lock, the command prints one line to
   stderr, `waiting for another run operation to finish`, and waits.
-- Stop every `atomyx-mcp` server built before run folders existed
-  before you migrate. Those servers do not know the lock, so they can
-  delete or edit a flat record during the pass.
+- Rebuild and restart every `atomyx-mcp` server before you migrate. A
+  binary that does not take the run migration lock can delete or edit
+  a flat record during the pass.
 - Finding `screenshotPath` values are kept as they are. The screenshot
   files are not moved into the run's `artifacts` folder, and
   `delete_run` does not remove them.

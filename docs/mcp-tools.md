@@ -878,8 +878,8 @@ root directory can be overridden through an environment variable read
 at startup. Each run started by start_run or run_script is its own
 run folder under the root, named after its id, with a `meta.json` that
 carries `result` and `outcome`, and an `artifacts` folder that holds
-the screenshots taken during the run. Runs written by earlier versions
-as single files are still listed and read.
+the screenshots taken during the run. Runs stored as single flat
+files are listed and read too.
 
 ### start_run
 Begins a new active run.
@@ -1034,8 +1034,7 @@ its findings.
   and no `outcome`, and both fields are absent. A run that never
   recorded a completion and has no live writer reports result
   `cancelled` and outcome `interrupted`. `status` is kept for
-  callers that predate `result` and `outcome`, so prefer the two newer
-  fields.
+  compatibility, so prefer `result` and `outcome`.
 
 **Errors and recovery**
 - An empty `runs` array with `totalMatching: 0` means no runs match

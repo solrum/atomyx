@@ -431,8 +431,8 @@ Contract:
   further lines are dropped silently.
 - **Evidence.** One `artifacts/` directory holds every screenshot and
   piece of failure evidence. An MCP `screenshot` taken with no run open
-  goes to `LooseScreenshotsDir` under the root instead. The report lives in the sibling
-  `report/` directory and links files as `../artifacts/<file>`.
+  goes to `LooseScreenshotsDir` under the root instead. The report
+  lives in the sibling `report/` directory and links files as `../artifacts/<file>`.
 - **Failure evidence.** `runner.ScriptRunner` calls its optional
   `runner.FailureCapture` once for a failed top-level step. The
   implementation, `runner.FailureBundle`, takes the screenshot and the
@@ -453,7 +453,10 @@ Contract:
   screenshots reach `artifacts/` when they are taken. The CLI factory
   derives each scope with the same `report` scope functions the report
   writer uses and numbers files across the whole run, so live file names
-  equal the names the report links.
+  equal the names the report links. The MCP server names its evidence
+  `script-NNN-step-SSS-<kind>`, where `NNN` comes from a counter shared
+  by the whole run and `SSS` is the 1-based step number, so two scripts
+  in one run never share a name.
 - **Compatibility.** Readers accept `schemaVersion` values up to their
   own and ignore unknown fields. Writers never reshape a field within
   a major version.
