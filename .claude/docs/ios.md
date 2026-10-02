@@ -164,6 +164,14 @@ invocation:
   style without it fails with a signing error before `xcodebuild`
   runs.
 
+The CLI commands `run`, `suite`, and `doctor` decide whether an iOS
+`--device <udid>` is a simulator or a physical device by looking the
+udid up in the device probe (`device.ResolveDescriptor` in
+`core/internal/device/resolve.go`, scanning booted simulators through
+`xcrun simctl` and paired devices through `idevice_id -l`). A udid the
+scan does not find fails with `DEVICE_NOT_FOUND` and a remedy. Without
+`--device`, an iOS run targets the booted simulator.
+
 `IosDriver.Connect` (`core/internal/iosdriver/driver.go`) on a
 physical device first launches an `iproxy` USB tunnel as a background child process
 and waits for it to become reachable before dialing. `Disconnect` stops

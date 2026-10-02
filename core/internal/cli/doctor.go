@@ -30,7 +30,10 @@ func Doctor(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	deviceID := resolveDeviceID(flags, nil)
 	jsonOutput := flagBool(flags, "--json")
 
-	desc := descriptorFor(platform, deviceID)
+	desc, err := resolveDescriptor(ctx, deps.Probe, platform, deviceID)
+	if err != nil {
+		return reportUncaught(stderr, deps.Debug, err)
+	}
 	built, err := deps.Factory.Build(ctx, desc)
 	if err != nil {
 		return reportUncaught(stderr, deps.Debug, err)

@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +11,7 @@ import (
 
 	"dev.atomyx/internal/config"
 	"dev.atomyx/internal/device"
+	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/netcapture"
 	"dev.atomyx/internal/report"
 	"dev.atomyx/internal/runner"
@@ -91,7 +94,7 @@ func resolvePlatform(flags map[string]FlagValue, env *config.ResolvedEnvironment
 
 // resolveDeviceID picks the device a run targets, highest precedence
 // first: the --device flag, then the selected config environment's
-// own device. Empty when neither sets one, which descriptorFor maps
+// own device. Empty when neither sets one, which resolveDescriptor maps
 // to its own platform-specific default.
 func resolveDeviceID(flags map[string]FlagValue, env *config.ResolvedEnvironment) string {
 	if v, ok := flagString(flags, "--device"); ok {
@@ -125,21 +128,22 @@ func parseCaptureFlag(flag string) *netcapture.Config {
 	return netcapture.ParseConfigString(flag)
 }
 
-// descriptorFor builds the device.Descriptor a run targets. When
-// --device is omitted, Android defaults to "emulator-5554", the
-// serial adb assigns to a single booted emulator, and iOS defaults to
-// the empty device id. iOS runs always target a simulator-kind
-// device: there is no separate flag to select a physical iOS device
-// by kind, so descriptorFor cannot produce one.
-func descriptorFor(platform, deviceID string) device.Descriptor {
-	if platform == "ios" {
-		return device.Descriptor{ID: deviceID, Platform: device.PlatformIOS, Kind: device.KindSimulator}
+// resolveDescriptor builds the device.Descriptor a command targets
+// through device.ResolveDescriptor, so the device kind comes from the
+// device's identity as the probe sees it. An iOS --device that no
+// scan finds is reported as DEVICE_NOT_FOUND with a remedy.
+func resolveDescriptor(ctx context.Context, probe device.Probe, platform, deviceID string) (device.Descriptor, error) {
+	desc, err := device.ResolveDescriptor(ctx, probe, device.Platform(platform), deviceID)
+	var notFound *device.DeviceNotFoundError
+	if errors.As(err, &notFound) {
+		return device.Descriptor{}, diag.New(
+			diag.CodeDeviceNotFound,
+			notFound.Error(),
+			"Run `atomyx list-devices` to see the reachable iOS simulators and physical devices, then pass one of those ids with --device. A physical iPhone must be connected over USB, unlocked, and trusted.",
+			err,
+		)
 	}
-	id := deviceID
-	if id == "" {
-		id = "emulator-5554"
-	}
-	return device.Descriptor{ID: id, Platform: device.PlatformAndroid, Kind: device.KindEmulator}
+	return desc, err
 }
 
 // resolveCliPreconditionsFlag combines --preconditions and its

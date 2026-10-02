@@ -21,7 +21,9 @@ func main() {
 	background := process.NewExecBackground()
 	clock := orchestra.SystemClock{}
 	logger := logging.FromEnv()
-	// list-devices renders devices for a human to read, so it scans
+	// This scan backs list-devices and also resolves an iOS --device
+	// udid to a simulator or a physical device. list-devices renders
+	// devices for a human to read, so it scans
 	// iOS through IosBootedSimulatorProbe rather than IosProbe: the
 	// same probe the sidecar uses for device selection would filter by
 	// simulator availability, append a runtime-label suffix to each
