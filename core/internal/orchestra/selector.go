@@ -5,9 +5,11 @@ package orchestra
 // Compiling it into an ElementFilter with priority-broadening
 // policy is CompileSelector's job (see priority_broadening.go).
 //
-// All fields are optional. At least one content-matching field
-// (ID, Text, Label, Hint, Value) should be provided, otherwise the
-// selector matches every element in the tree.
+// Every field is optional, but a selector must set at least one field
+// (content, role, state, or nth). A selector that sets none is rejected
+// with EmptySelectorError by Orchestra's public entry points. A role
+// or state with no content field matches every element that satisfies
+// it, in document order.
 type Selector struct {
 	// ID matches the canonical "id" attribute.
 	ID *Pattern `json:"id,omitempty"`
@@ -45,3 +47,14 @@ type Selector struct {
 func (s Selector) HasContent() bool {
 	return s.ID != nil || s.Text != nil || s.Label != nil || s.Hint != nil || s.Value != nil
 }
+
+// IsEmpty reports whether s places no constraint on any element: no
+// content field, no role, no true state flag, and no position. Such a
+// selector would match the whole tree, so the root node would resolve
+// as if it were the caller's target.
+func (s Selector) IsEmpty() bool {
+	return !s.HasContent() && s.Role == nil && s.Nth == nil &&
+		!isTrue(s.Enabled) && !isTrue(s.Clickable) && !isTrue(s.Focused)
+}
+
+func isTrue(b *bool) bool { return b != nil && *b }

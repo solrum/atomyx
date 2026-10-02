@@ -716,3 +716,27 @@ func allTextOf(result *mcp.CallToolResult) string {
 	}
 	return b.String()
 }
+
+func TestFindElementRejectsASelectorNestedUnderTheWrongKey(t *testing.T) {
+	env := mockDeviceServer(t, gateScreen(), nil)
+	selectMockDevice(t, env.cs, env.ctx)
+
+	result, decoded := callTool(t, env.cs, env.ctx, "find_element", map[string]any{
+		"selector": map[string]any{"role": "text-field", "nth": 1},
+	})
+
+	if !result.IsError || decoded["code"] != "INVALID_ARGUMENT" {
+		t.Fatalf("find_element = %v, want an INVALID_ARGUMENT error instead of the tree root", decoded)
+	}
+}
+
+func TestFindElementResolvesARoleWithNthInDocumentOrder(t *testing.T) {
+	env := mockDeviceServer(t, gateScreen(), nil)
+	selectMockDevice(t, env.cs, env.ctx)
+
+	_, decoded := callTool(t, env.cs, env.ctx, "find_element", map[string]any{"role": "text-field", "nth": 0})
+
+	if decoded["found"] != true || decoded["role"] != "text-field" || decoded["id"] != "pw" {
+		t.Fatalf("find_element = %v, want the first text field", decoded)
+	}
+}

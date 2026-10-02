@@ -125,6 +125,11 @@ The working alternative is a regex that matches the prefix:
 { "label": { "regex": "^Products" } }
 ```
 
+`find_element` takes the selector fields at the top level of its
+arguments, while `tap`, `input_text`, and `wait_for_element` take them
+under a `selector` key. A selector that sets no field is rejected with
+an `INVALID_ARGUMENT` error instead of matching the whole screen.
+
 When no stable selector exists for an element, pass coordinates as
 `x` and `y` to `tap` or `input_text` instead of a selector. Take them
 from:

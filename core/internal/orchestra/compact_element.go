@@ -99,6 +99,9 @@ type ResolvedElementState struct {
 // role, enabled, clickable, and bounds state. Found is false when no
 // element matches selector; every other field is then zero.
 func (o *Orchestra) ResolveElementState(ctx context.Context, selector Selector) (ResolvedElementState, error) {
+	if selector.IsEmpty() {
+		return ResolvedElementState{Found: false}, nil
+	}
 	cursor, err := o.FindOne(ctx, selector)
 	if err != nil {
 		return ResolvedElementState{}, err

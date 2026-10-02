@@ -160,17 +160,26 @@ func (o *Orchestra) Hierarchy(ctx context.Context) (wire.TreeNodeWire, error) {
 // Find runs a single-shot find. Returns all matches of the compiled
 // selector.
 func (o *Orchestra) Find(ctx context.Context, selector Selector) ([]*TreeCursor, error) {
+	if err := requireNonEmpty(selector); err != nil {
+		return nil, err
+	}
 	return o.finder.Find(ctx, CompileSelector(selector))
 }
 
 // FindOne runs a single-shot find, returning the first match or nil.
 func (o *Orchestra) FindOne(ctx context.Context, selector Selector) (*TreeCursor, error) {
+	if err := requireNonEmpty(selector); err != nil {
+		return nil, err
+	}
 	return o.finder.FindOne(ctx, CompileSelector(selector))
 }
 
 // WaitFor polls for selector until it matches or opts.TimeoutMs
 // elapses. Returns FindTimeoutError on deadline miss.
 func (o *Orchestra) WaitFor(ctx context.Context, selector Selector, opts WaitOptions) ([]*TreeCursor, error) {
+	if err := requireNonEmpty(selector); err != nil {
+		return nil, err
+	}
 	return o.finder.WaitFor(ctx, CompileSelector(selector), opts)
 }
 
@@ -848,6 +857,9 @@ type preparedAction struct {
 // points into, and compute the tap-center coordinate from its
 // bounds.
 func (o *Orchestra) prepareSelectorForAction(ctx context.Context, selector Selector, scrollToFind bool) (preparedAction, error) {
+	if err := requireNonEmpty(selector); err != nil {
+		return preparedAction{}, err
+	}
 	filter := CompileSelector(selector)
 
 	var cursor *TreeCursor
