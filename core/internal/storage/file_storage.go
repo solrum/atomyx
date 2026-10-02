@@ -9,12 +9,11 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"dev.atomyx/internal/storageroot"
 )
 
 const (
-	homeStorageDirName = ".atomyx"
-	storageDirEnvVar   = "ATOMYX_STORAGE_DIR"
-
 	fileModeDir  = 0o755
 	fileModeFile = 0o644
 )
@@ -45,16 +44,9 @@ type FileStorage struct {
 // ATOMYX_STORAGE_DIR environment variable, or "~/.atomyx" in that
 // order of precedence.
 func NewFileStorage(opts FileStorageOptions) (*FileStorage, error) {
-	root := opts.Root
-	if root == "" {
-		root = os.Getenv(storageDirEnvVar)
-	}
-	if root == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, fmt.Errorf("storage: resolving home directory: %w", err)
-		}
-		root = filepath.Join(home, homeStorageDirName)
+	root, err := storageroot.Resolve(opts.Root)
+	if err != nil {
+		return nil, fmt.Errorf("storage: %w", err)
 	}
 	return &FileStorage{root: root}, nil
 }

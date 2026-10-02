@@ -73,6 +73,8 @@ components:
     in: internal/report
   flock:
     in: internal/flock
+  storageroot:
+    in: internal/storageroot
   lease:
     in: internal/lease
   attach:
@@ -232,12 +234,14 @@ deps:
       - inspector
       - lease
       - shutdown
+      - storageroot
   skills:
     anyVendorDeps: true
   storage:
     anyVendorDeps: true
     mayDependOn:
       - runfolder
+      - storageroot
   mcp:
     mayDependOn:
       - wire
@@ -264,6 +268,9 @@ deps:
   flock:
     mayDependOn:
       - flock
+  storageroot:
+    mayDependOn:
+      - storageroot
   lease:
     mayDependOn:
       - diag

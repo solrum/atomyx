@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"dev.atomyx/internal/storageroot"
 )
 
 func newTestFileStorage(t *testing.T) *FileStorage {
@@ -288,7 +290,7 @@ func TestFileStorageSaveFailureLeavesOriginalFileIntact(t *testing.T) {
 
 func TestFileStorageResolvesRootFromEnvThenHome(t *testing.T) {
 	envRoot := t.TempDir()
-	t.Setenv(storageDirEnvVar, envRoot)
+	t.Setenv(storageroot.EnvVar, envRoot)
 	fs, err := NewFileStorage(FileStorageOptions{})
 	if err != nil {
 		t.Fatalf("NewFileStorage: %v", err)
@@ -297,7 +299,7 @@ func TestFileStorageResolvesRootFromEnvThenHome(t *testing.T) {
 		t.Fatalf("root: got %q, want %q", fs.root, envRoot)
 	}
 
-	t.Setenv(storageDirEnvVar, "")
+	t.Setenv(storageroot.EnvVar, "")
 	fs, err = NewFileStorage(FileStorageOptions{})
 	if err != nil {
 		t.Fatalf("NewFileStorage: %v", err)
@@ -306,7 +308,7 @@ func TestFileStorageResolvesRootFromEnvThenHome(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UserHomeDir: %v", err)
 	}
-	if want := filepath.Join(home, homeStorageDirName); fs.root != want {
+	if want := filepath.Join(home, storageroot.HomeDirName); fs.root != want {
 		t.Fatalf("root: got %q, want %q", fs.root, want)
 	}
 }
