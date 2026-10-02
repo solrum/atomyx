@@ -67,7 +67,7 @@ type system enforces it.
 | `add_case_study` | `core/internal/mcp/case_study_tool.go` | `title`, `trigger`, `solution`, `example` | `{ok}` | `storage.Storage.Save` |
 | `get_case_studies` | `core/internal/mcp/case_study_tool.go` | `month`, `limit`, `offset` | paginated case-study bodies | `storage.Storage.List` then `storage.Storage.Load` |
 | **Script execution** | | | | |
-| `run_script` | `core/internal/mcp/run_script_tool.go` | `script` (YAML), `env` | structured per-step results: `{scriptName, ok, steps[], totalSteps, passedSteps, failedAtStep?, durationMs, deviceLost?}`, and each step carries its own `deviceLost?` | `script.ParseScript` then `runSession.RunScript`, which runs `runner.ScriptRunner.Run` inside the open run, or inside a run of its own finalized when the script ends |
+| `run_script` | `core/internal/mcp/run_script_tool.go` | `script` (YAML), `env` | structured per-step results: `{scriptName, ok, steps[], totalSteps, passedSteps, failedAtStep?, durationMs, deviceLost?}`, and each step carries its own `deviceLost?` | `script.ParseScript` then `runSession.RunScript`, which runs `runner.ScriptRunner.Run` inside the open run, or inside a run of its own finalized when the script ends. The handler passes the runner a `runner.NewFailureBundle` over the target's evidence writer, which writes `script-NNN-step-SSS-failure`, `-tree.json`, and `-log.jsonl` into the run's `artifacts` directory for a failed step. `NNN` is drawn from the run's shared artifact counter on the first write of each script execution |
 
 Run verdicts in `list_runs` and `get_run` depend on liveness. A run
 with no completion time and a live writer has status `running` and no

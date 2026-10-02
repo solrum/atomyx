@@ -134,6 +134,25 @@ Every `run` and `suite` command writes a run folder, with or without
 command ends. With `--json`, the printed result carries the same path
 in a top level `runFolder` field and the line is not printed.
 
+### Failure artifacts
+
+When a step of a script run fails, the run folder's `artifacts/`
+directory receives three files for that step, where `NNN` is the step's
+1-based position in the script, the same number the report prints as
+`Failed at step N`:
+
+- `step-NNN-failure.png`, the screenshot. The extension follows the
+  image the device returns, so a JPEG screenshot is `step-NNN-failure.jpg`.
+- `step-NNN-tree.json`, the UI hierarchy at the moment of failure.
+- `step-NNN-log.jsonl`, one JSON object per event of the failed step,
+  followed by a note object for each artifact that could not be captured.
+
+The capture is bounded at 5 seconds. When the bound is reached, the
+files that finished are kept and the log ends with a `truncated` note
+naming what is missing. A run that stops because the device became
+unreachable writes none of these files, and a capture problem never
+changes the exit code or the step result.
+
 The run folder is `<root>/runs/v1/<id>/`, and the root is the first of
 these that is set:
 

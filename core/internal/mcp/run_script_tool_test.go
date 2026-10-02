@@ -221,3 +221,48 @@ func TestBareScriptRunFinalizesAsCancelledWhenTheContextIsCanceled(t *testing.T)
 		t.Fatal("the canceled run still holds its lock")
 	}
 }
+
+func TestRunScriptFailuresInOneOpenRunWriteDistinctBundles(t *testing.T) {
+	root := t.TempDir()
+	drv := mockdriver.New()
+	drv.ScreenshotData = []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a, 1}
+	drv.StageHierarchy(sampleTree())
+	cs, ctx := testServer(t, ServerDeps{
+		Probe:      device.NewStaticProbe(),
+		Factory:    singleMockDriverFactory{driver: drv},
+		Storage:    storage.NewInMemoryStorage(),
+		RunStore:   storage.NewRunStore(),
+		RunStarter: testRunStarter(root),
+	})
+	selectMockDevice(t, cs, ctx)
+	started := func() string {
+		_, decoded := callTool(t, cs, ctx, "start_run", map[string]any{"name": "two", "source": "regression"})
+		id, _ := decoded["id"].(string)
+		return id
+	}()
+
+	script := "appId: com.example.app\nname: Smoke\nsteps:\n  - assertVisible: \"Does Not Exist\"\n"
+	for range 2 {
+		_, decoded := callTool(t, cs, ctx, "run_script", map[string]any{"script": script})
+		if decoded["ok"] != false {
+			t.Fatalf("run_script = %v, want a failure", decoded)
+		}
+	}
+
+	artifacts := runfolder.ArtifactsDir(runfolder.RunDir(root, started))
+	entries, err := os.ReadDir(artifacts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	want := []string{
+		"script-001-step-001-failure.png", "script-001-step-001-log.jsonl", "script-001-step-001-tree.json",
+		"script-002-step-001-failure.png", "script-002-step-001-log.jsonl", "script-002-step-001-tree.json",
+	}
+	if strings.Join(names, ",") != strings.Join(want, ",") {
+		t.Fatalf("artifacts = %v, want %v", names, want)
+	}
+}

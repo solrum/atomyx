@@ -22,11 +22,14 @@ const (
 // caller gives up or when the run is finalized, and the execution must
 // run under it. RunID correlates its log lines with the run folder, and
 // Artifacts writes each screenshot into that folder's artifacts
-// directory as it is taken.
+// directory as it is taken. Evidence writes failure bundle files into
+// the same directory under names that no other script execution of the
+// run reuses.
 type scriptTarget struct {
 	Ctx       context.Context
 	RunID     string
 	Artifacts runner.ScriptArtifacts
+	Evidence  runner.EvidenceWriter
 }
 
 // RunScript executes a script inside a run folder. When a run is open,
@@ -71,7 +74,8 @@ func (s *runSession) runInOpenRun(
 	if err != nil {
 		return runner.ScriptResult{}, err
 	}
-	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: open.ID(), Artifacts: newScriptArtifacts(dir, counter, s.logger)})
+	artifacts := newScriptArtifacts(dir, counter, s.logger)
+	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: open.ID(), Artifacts: artifacts, Evidence: artifacts})
 	if execErr == nil {
 		s.recordScriptTotals(open, result)
 	}
@@ -94,7 +98,8 @@ func (s *runSession) runAsOwnRun(
 	if err != nil {
 		return runner.ScriptResult{}, err
 	}
-	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: w.ID(), Artifacts: newScriptArtifacts(dir, &artifactCounter{}, s.logger)})
+	artifacts := newScriptArtifacts(dir, &artifactCounter{}, s.logger)
+	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: w.ID(), Artifacts: artifacts, Evidence: artifacts})
 	finalizeErr := w.Finalize(scriptOutcome(ctx, result, execErr), func(m *runfolder.Meta) {
 		m.TotalSteps = result.TotalSteps
 		m.FailedAtStep = result.FailedAtStep
@@ -140,13 +145,18 @@ func (c *artifactCounter) next() int {
 // screenshot into a run folder's artifacts directory the moment it is
 // added, so a run that is killed keeps every screenshot taken before it
 // stopped. A failed write is logged and the screenshot stays in memory.
+//
+// Evidence files take a script-NNN- prefix drawn from the run's shared
+// counter on the first write, so the failure bundles of several script
+// executions in one run never share a name.
 type scriptArtifacts struct {
 	dir     string
 	counter *artifactCounter
 	logger  logging.Logger
 
-	mu          sync.Mutex
-	screenshots []runner.Screenshot
+	mu             sync.Mutex
+	screenshots    []runner.Screenshot
+	evidencePrefix string
 }
 
 func newScriptArtifacts(dir string, counter *artifactCounter, logger logging.Logger) *scriptArtifacts {
@@ -172,4 +182,16 @@ func (a *scriptArtifacts) Screenshots() []runner.Screenshot {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return append([]runner.Screenshot(nil), a.screenshots...)
+}
+
+// WriteEvidence writes one evidence file into the artifacts directory
+// under the script's own prefix.
+func (a *scriptArtifacts) WriteEvidence(name string, data []byte) error {
+	a.mu.Lock()
+	if a.evidencePrefix == "" {
+		a.evidencePrefix = fmt.Sprintf("script-%03d-", a.counter.next())
+	}
+	prefix := a.evidencePrefix
+	a.mu.Unlock()
+	return os.WriteFile(filepath.Join(a.dir, prefix+name), data, artifactFileMode)
 }

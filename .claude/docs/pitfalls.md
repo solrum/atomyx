@@ -208,6 +208,15 @@ corresponding area. For the high-level map see
   running nor restarts the idle timer. `DeviceSession.CheckHealth` never
   calls `Ensure`, because a health check must not take a released device
   or wait for a build.
+- **Failure capture is bounded and skipped on device loss.**
+  `runner.FailureBundle` stops at `runner.FailureCaptureBoundMs` (5000
+  ms) on the injected clock, so a hung screenshot cannot hold a failed
+  run open. A step failure that the liveness probe classifies as
+  `RunAbortDeviceLost` captures nothing, because the screenshot of an
+  unreachable device cannot succeed. A test that exercises a capture
+  with real files injects `clock.ManualClock` or the system clock,
+  because a `FakeClock` sleep returns at once and would fire the bound
+  immediately.
 - **Give a test lease helper to `session/sessiontest`, never to a
   production package.** Only `_test.go` files import
   `core/internal/session/sessiontest`, which

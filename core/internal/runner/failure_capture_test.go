@@ -59,7 +59,7 @@ type captureRig struct {
 func newCaptureRig(d driver.Driver, mockDriver *mock.Driver, bundleClock orchestra.Clock) *captureRig {
 	evidence := newMemoryEvidence()
 	orch := orchestra.New(orchestra.OrchestraDeps{Driver: d, Clock: orchestra.NewFakeClock(0)})
-	bundle := NewFailureBundle(orch, bundleClock, noopLogger{}, evidence)
+	bundle := NewFailureBundle(FailureBundleDeps{Orchestra: orch, Clock: bundleClock, Logger: noopLogger{}, Sink: evidence})
 	r := NewScriptRunner(ScriptRunnerDeps{
 		Orchestra:      orch,
 		Clock:          orchestra.NewFakeClock(0),

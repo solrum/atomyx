@@ -211,6 +211,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	}
 	defer record.end(ctx, stderr)
 
+	artifacts := newLiveArtifacts(runfolder.ArtifactsDir(record.Dir()))
 	scriptRunner := runner.NewScriptRunner(runner.ScriptRunnerDeps{
 		Orchestra:             built.Orchestra,
 		Clock:                 deps.clock(),
@@ -220,7 +221,10 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		FlowLoader:            fsFlowLoader{},
 		PreconditionsOverride: preconditionsOverride,
 		NetworkCapture:        networkCapture,
-		Artifacts:             newLiveArtifacts(runfolder.ArtifactsDir(record.Dir())),
+		Artifacts:             artifacts,
+		FailureCapture: runner.NewFailureBundle(runner.FailureBundleDeps{
+			Orchestra: built.Orchestra, Clock: deps.clock(), Logger: deps.logger(), Sink: artifacts,
+		}),
 	})
 	result, err := scriptRunner.Run(runCtx, def)
 	finishedAt := time.Now()

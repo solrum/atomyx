@@ -18,6 +18,10 @@ import (
 // it rewrites the same screenshots at the end of the run and the report
 // links stay valid. A failed early write is not fatal because the
 // report writer repeats every write and reports its own failure.
+//
+// liveArtifacts is also the runner.EvidenceWriter of a single-script
+// run, so failure bundle files land beside the screenshots under their
+// own step-NNN names.
 type liveArtifacts struct {
 	dir         string
 	screenshots []runner.Screenshot
@@ -38,4 +42,13 @@ func (a *liveArtifacts) AddScreenshot(label string, data []byte, mimeType string
 
 func (a *liveArtifacts) Screenshots() []runner.Screenshot {
 	return a.screenshots
+}
+
+// WriteEvidence writes one evidence file, such as a failure bundle
+// entry, into the run folder's artifacts directory under name.
+func (a *liveArtifacts) WriteEvidence(name string, data []byte) error {
+	if err := os.MkdirAll(a.dir, 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(a.dir, name), data, 0o644)
 }

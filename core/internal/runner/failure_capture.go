@@ -72,18 +72,25 @@ type FailureBundle struct {
 	sink      EvidenceWriter
 }
 
-// NewFailureBundle constructs a FailureBundle that captures through o,
-// bounds the capture with clock, and writes through sink.
-func NewFailureBundle(o *orchestra.Orchestra, clock orchestra.Clock, logger logging.Logger, sink EvidenceWriter) *FailureBundle {
-	return &FailureBundle{orchestra: o, clock: clock, logger: logger, sink: sink}
+// FailureBundleDeps constructs a FailureBundle. Every field is
+// required.
+type FailureBundleDeps struct {
+	// Orchestra takes the screenshot and the UI tree.
+	Orchestra *orchestra.Orchestra
+	// Clock times the capture bound.
+	Clock orchestra.Clock
+	// Logger records evidence files that could not be written.
+	Logger logging.Logger
+	// Sink receives each evidence file.
+	Sink EvidenceWriter
 }
 
-type shotOutcome struct {
-	data []byte
-	err  error
+// NewFailureBundle constructs a FailureBundle from deps.
+func NewFailureBundle(deps FailureBundleDeps) *FailureBundle {
+	return &FailureBundle{orchestra: deps.Orchestra, clock: deps.Clock, logger: deps.Logger, sink: deps.Sink}
 }
 
-type treeOutcome struct {
+type captured struct {
 	data []byte
 	err  error
 }
@@ -122,41 +129,51 @@ func (b *FailureBundle) CaptureFailure(ctx context.Context, failure StepFailure)
 		<-timerDone
 	}()
 
-	shotCh := make(chan shotOutcome, 1)
-	treeCh := make(chan treeOutcome, 1)
+	shotCh := make(chan captured, 1)
+	treeCh := make(chan captured, 1)
 	go func() {
-		defer recoverInto(func(err error) { shotCh <- shotOutcome{err: err} })
+		defer recoverInto(shotCh)
 		data, err := b.orchestra.Screenshot(boundCtx)
-		shotCh <- shotOutcome{data: data, err: err}
+		shotCh <- captured{data: data, err: err}
 	}()
 	go func() {
-		defer recoverInto(func(err error) { treeCh <- treeOutcome{err: err} })
+		defer recoverInto(treeCh)
 		tree, err := b.orchestra.Hierarchy(boundCtx)
 		if err != nil {
-			treeCh <- treeOutcome{err: err}
+			treeCh <- captured{err: err}
 			return
 		}
 		data, err := json.Marshal(tree)
-		treeCh <- treeOutcome{data: data, err: err}
+		treeCh <- captured{data: data, err: err}
 	}()
 
-	var notes []logNote
-	shot, shotDone := shotOutcome{}, false
-	tree, treeDone := treeOutcome{}, false
+	var shot, tree captured
+	var shotDone, treeDone bool
+await:
 	for !shotDone || !treeDone {
 		select {
-		case shot = <-shotCh:
-			shotDone = true
-		case tree = <-treeCh:
-			treeDone = true
+		case out := <-shotCh:
+			if out.err != nil && boundCtx.Err() != nil {
+				break await
+			}
+			shot, shotDone = out, true
+		case out := <-treeCh:
+			if out.err != nil && boundCtx.Err() != nil {
+				break await
+			}
+			tree, treeDone = out, true
 		case <-boundCtx.Done():
-			shot, shotDone = drainShot(shotCh, shot, shotDone)
-			tree, treeDone = drainTree(treeCh, tree, treeDone)
-			goto collected
+			break await
 		}
 	}
-collected:
+	if !shotDone {
+		shot, shotDone = drain(shotCh)
+	}
+	if !treeDone {
+		tree, treeDone = drain(treeCh)
+	}
 
+	var notes []logNote
 	prefix := fmt.Sprintf("step-%03d-", failure.StepNumber)
 	if shotDone {
 		notes = b.writeShot(prefix, shot, notes)
@@ -170,37 +187,31 @@ collected:
 	b.writeLog(prefix, failure, notes)
 }
 
-func drainShot(ch <-chan shotOutcome, cur shotOutcome, done bool) (shotOutcome, bool) {
-	if done {
-		return cur, true
-	}
+// drain takes a successful result that is already waiting in ch without
+// blocking, so a capture that finished at the same instant the bound
+// fired is kept. A waiting error is the cancellation the bound itself
+// caused, so it counts as unfinished.
+func drain(ch <-chan captured) (captured, bool) {
 	select {
 	case out := <-ch:
+		if out.err != nil {
+			return captured{}, false
+		}
 		return out, true
 	default:
-		return cur, false
+		return captured{}, false
 	}
 }
 
-func drainTree(ch <-chan treeOutcome, cur treeOutcome, done bool) (treeOutcome, bool) {
-	if done {
-		return cur, true
-	}
-	select {
-	case out := <-ch:
-		return out, true
-	default:
-		return cur, false
-	}
-}
-
-func recoverInto(deliver func(error)) {
+// recoverInto turns a panic in a capture goroutine into a failed
+// result, so a misbehaving driver cannot crash the run.
+func recoverInto(ch chan<- captured) {
 	if rec := recover(); rec != nil {
-		deliver(fmt.Errorf("capture panicked: %v", rec))
+		ch <- captured{err: fmt.Errorf("capture panicked: %v", rec)}
 	}
 }
 
-func (b *FailureBundle) writeShot(prefix string, shot shotOutcome, notes []logNote) []logNote {
+func (b *FailureBundle) writeShot(prefix string, shot captured, notes []logNote) []logNote {
 	if shot.err != nil {
 		return append(notes, logNote{Type: "captureFailed", Artifact: "screenshot", Note: shot.err.Error()})
 	}
@@ -215,7 +226,7 @@ func (b *FailureBundle) writeShot(prefix string, shot shotOutcome, notes []logNo
 	return notes
 }
 
-func (b *FailureBundle) writeTree(prefix string, tree treeOutcome, notes []logNote) []logNote {
+func (b *FailureBundle) writeTree(prefix string, tree captured, notes []logNote) []logNote {
 	if tree.err != nil {
 		return append(notes, logNote{Type: "captureFailed", Artifact: "tree", Note: tree.err.Error()})
 	}

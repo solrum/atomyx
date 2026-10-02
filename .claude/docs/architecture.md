@@ -433,6 +433,17 @@ Contract:
   piece of failure evidence. An MCP `screenshot` taken with no run open
   goes to `LooseScreenshotsDir` under the root instead. The report lives in the sibling
   `report/` directory and links files as `../artifacts/<file>`.
+- **Failure evidence.** `runner.ScriptRunner` calls its optional
+  `runner.FailureCapture` once for a failed top-level step. The
+  implementation, `runner.FailureBundle`, takes the screenshot and the
+  UI tree through `Orchestra` and writes `step-NNN-failure.<ext>`,
+  `step-NNN-tree.json`, and `step-NNN-log.jsonl` through a
+  `runner.EvidenceWriter`, where `NNN` is the 1-based step number a
+  report shows and the extension follows the returned image bytes. The
+  whole capture is bounded by `runner.FailureCaptureBoundMs` (5000 ms) on
+  the injected clock, keeps what finished, and records a `truncated`
+  note in the log. A run aborted with `RunAbortDeviceLost` captures
+  nothing, and a capture never changes the step result or the outcome.
 - **Compatibility.** Readers accept `schemaVersion` values up to their
   own and ignore unknown fields. Writers never reshape a field within
   a major version.
