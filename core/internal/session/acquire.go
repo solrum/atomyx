@@ -55,6 +55,19 @@ func Acquire(ctx context.Context, deps Deps, req Request, acq Acquisition) (*Ses
 	if err := Prepare(ctx, deps, req.Descriptor); err != nil {
 		return nil, err
 	}
+	return OpenWithinBudget(ctx, deps, req, acq)
+}
+
+// OpenWithinBudget runs the Open half of Acquire for a host that
+// already ran Prepare itself, for example to keep the long build outside
+// a lock the open must hold. It reports PhaseLaunching and
+// PhaseConnected, and maps an elapsed budget like Acquire does.
+func OpenWithinBudget(ctx context.Context, deps Deps, req Request, acq Acquisition) (*Session, error) {
+	report := func(p Phase) {
+		if acq.Progress != nil {
+			acq.Progress(p)
+		}
+	}
 	report(PhaseLaunching)
 	budgetMs := acq.BudgetMs
 	if budgetMs <= 0 {

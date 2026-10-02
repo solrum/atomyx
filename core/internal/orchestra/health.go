@@ -23,9 +23,16 @@ const HealthCheckTimeoutMs = 5000
 // agent did not answer the liveness probe in time; Code and Remedy
 // then describe the failure the same way any other coded error on
 // this surface does.
+//
+// State names where the session stands: unselected, idle, running,
+// released or lost. A session in the released or lost state is not
+// probed, so Healthy is false there without meaning the device
+// failed. The orchestra itself leaves State empty because it does not
+// know the holder state.
 type HealthReport struct {
 	Selected bool   `json:"selected"`
 	Healthy  bool   `json:"healthy"`
+	State    string `json:"state,omitempty"`
 	Code     string `json:"code,omitempty"`
 	Message  string `json:"message,omitempty"`
 	Remedy   string `json:"remedy,omitempty"`

@@ -38,7 +38,6 @@ func TestAcquireBudgetExcludesRunnerBuild(t *testing.T) {
 }
 
 func TestCheckHealthDoesNotReacquireReleasedDevice(t *testing.T) {
-	t.Skip("removed by the session transitions step")
 	f := newLifecycleFixture(t)
 	if err := f.selectDevice(f.devices); err != nil {
 		t.Fatal(err)
@@ -58,7 +57,6 @@ func TestCheckHealthDoesNotReacquireReleasedDevice(t *testing.T) {
 }
 
 func TestSelectFailureKeepsCurrentDevice(t *testing.T) {
-	t.Skip("removed by the session transitions step")
 	f := newLifecycleFixture(t)
 	if err := f.selectDevice(f.devices); err != nil {
 		t.Fatal(err)

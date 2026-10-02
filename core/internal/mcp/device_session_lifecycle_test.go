@@ -541,34 +541,28 @@ func TestDeviceSession_TheLaunchedAppCarriesAcrossAReleaseAndReacquire(t *testin
 	}
 }
 
-func TestDeviceSession_CheckHealthTakesAReleasedDeviceAgainAndReportsAHeldOne(t *testing.T) {
+func TestDeviceSession_CheckHealthReportsTheStateWithoutTouchingTheDevice(t *testing.T) {
 	f := newLifecycleFixture(t)
-	if report := f.devices.CheckHealth(context.Background()); report.Selected {
-		t.Fatalf("report = %+v, want not selected before any select_device", report)
+	if report := f.devices.CheckHealth(context.Background()); report.Selected || report.State != "unselected" {
+		t.Fatalf("report = %+v, want not selected with state unselected before any select_device", report)
 	}
 	if err := f.selectDevice(f.devices); err != nil {
 		t.Fatal(err)
 	}
-	f.clk.AwaitSleepers(1)
-	f.clk.Advance(testIdleMs)
-	f.awaitRelease(f.devices)
-
-	if report := f.devices.CheckHealth(context.Background()); !report.Selected || !report.Healthy {
-		t.Fatalf("report = %+v, want the released device taken again and healthy", report)
+	if report := f.devices.CheckHealth(context.Background()); !report.Selected || !report.Healthy || report.State != "idle" {
+		t.Fatalf("report = %+v, want a healthy idle device", report)
 	}
 	f.clk.AwaitSleepers(1)
 	f.clk.Advance(testIdleMs)
 	f.awaitRelease(f.devices)
-	cli := f.newDevices("atomyx run", newLifecycleFactory())
-	t.Cleanup(cli.Close)
-	if err := f.selectDevice(cli); err != nil {
-		t.Fatal(err)
-	}
 
 	report := f.devices.CheckHealth(context.Background())
 
-	if !report.Selected || report.Healthy || report.Code != diag.CodeDeviceReleasedHeld {
-		t.Fatalf("report = %+v, want selected, unhealthy, DEVICE_RELEASED_HELD", report)
+	if !report.Selected || report.Healthy || report.State != "released" || report.Code != "" {
+		t.Fatalf("report = %+v, want selected, state released, not probed", report)
+	}
+	if got := f.factory.builds(); got != 1 {
+		t.Fatalf("builds = %d, want 1 because check_health must not take the device again", got)
 	}
 }
 

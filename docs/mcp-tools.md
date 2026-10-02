@@ -254,15 +254,16 @@ None
 
 **Behavior**
 - Never runs a flow, never touches app state, and never changes what device is bound.
-- A device released by an idle timeout is taken again for the check. If another process holds it meanwhile, the report is selected true, healthy false, with code DEVICE_RELEASED_HELD.
+- A device released by an idle timeout, or lost, is not taken again and not probed. The report names the state instead, so the check never acquires a device or waits for a runner build.
 - The liveness probe is bounded by a fixed five-second timeout, separate from and shorter than the overall per-call time budget.
 - An unresponsive device is a normal, successful check outcome, not a tool failure. This tool only reports isError:true when the check itself could not be attempted at all.
 
 **Returns**
-- selected: boolean, whether a device is currently bound. Every other field carries its zero value when this is false.
-- healthy: boolean, always present. True means the bound device answered the liveness probe in time. Meaningless when selected is false.
-- code: string, present only when healthy is false, a stable failure code.
-- message: string, present only when healthy is false, a human-readable description of the failure.
+- selected: boolean, whether the session has a device, held or remembered. Every other field carries its zero value except state when this is false.
+- state: string, one of unselected, idle, running, released or lost. Released and lost mean the device is remembered but not held, and the next tool that needs a device takes it again.
+- healthy: boolean, always present. True means the bound device answered the liveness probe in time. False with state released or lost means the device was not probed. Meaningless when selected is false.
+- code: string, present only when a probe of a held device failed, a stable failure code.
+- message: string, present only when healthy is false, a human-readable description of the failure or of the state.
 - remedy: string, present only when healthy is false and the failure carries an actionable next step.
 
 **Errors and recovery**

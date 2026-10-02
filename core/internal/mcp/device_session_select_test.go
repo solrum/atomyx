@@ -32,7 +32,7 @@ func (f *sequencedFactory) Build(ctx context.Context, desc device.Descriptor) (d
 	return singleMockDriverFactory{driver: f.drivers[n]}.Build(ctx, desc)
 }
 
-func TestConcurrentSelectDisconnectsTheDriverItDisplaces(t *testing.T) {
+func TestConcurrentSelectsRunOneAfterAnotherAndTheLaterOneWins(t *testing.T) {
 	first, second := mockdriver.New(), mockdriver.New()
 	factory := &sequencedFactory{
 		drivers: []*mockdriver.Driver{first, second},
@@ -47,28 +47,32 @@ func TestConcurrentSelectDisconnectsTheDriverItDisplaces(t *testing.T) {
 		firstDone <- err
 	}()
 	<-factory.started
-
-	if _, err := session.Select(context.Background(), androidInput()); err != nil {
-		t.Fatalf("second Select: %v", err)
-	}
+	secondDone := make(chan error, 1)
+	go func() {
+		_, err := session.Select(context.Background(), androidInput())
+		secondDone <- err
+	}()
 	close(factory.release)
-	select {
-	case err := <-firstDone:
-		if err != nil {
-			t.Fatalf("first Select: %v", err)
+
+	for _, done := range []chan error{firstDone, secondDone} {
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Fatalf("Select: %v", err)
+			}
+		case <-time.After(selectTestTimeout):
+			t.Fatal("a Select did not finish")
 		}
-	case <-time.After(selectTestTimeout):
-		t.Fatal("first Select did not finish")
 	}
 
-	if second.IsConnected() {
-		t.Fatal("driver displaced by the later-finishing Select is still connected")
+	if first.IsConnected() {
+		t.Fatal("the driver the later Select displaced is still connected")
 	}
-	if !first.IsConnected() {
+	if !second.IsConnected() {
 		t.Fatal("the current driver was disconnected")
 	}
-	if current := session.Current(); current == nil || current.Driver != first {
-		t.Fatalf("current device = %+v, want the first driver", current)
+	if current := session.Current(); current == nil || current.Driver != second {
+		t.Fatalf("current device = %+v, want the second driver", current)
 	}
 }
 

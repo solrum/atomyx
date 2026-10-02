@@ -165,13 +165,18 @@ type expiredRun struct {
 // those of holderState: a held device is idle or running, a given-up one
 // is released or lost, and the descriptor is kept for the last two.
 type DeviceSession struct {
-	// acquireMu serializes acquisitions and idle releases, so a re-acquire
-	// never overlaps the teardown of the session it replaces.
+	// acquireMu serializes every transition of sess: Select, Ensure,
+	// Disconnect, onTimer and watchLost each hold it from the moment they
+	// decide on a transition until it is installed or torn down. The slow
+	// runner build runs before the lock is taken, and each transition
+	// re-reads the state under the lock, so a change made while it built
+	// is seen. mu alone guards reads of the fields below.
 	acquireMu sync.Mutex
 
-	mu         sync.Mutex
-	closed     bool
-	state      holderState
+	mu     sync.Mutex
+	closed bool
+	state  holderState
+	// sess is the held session. Writing it requires acquireMu and mu.
 	sess       *session.Session
 	active     *ActiveDevice
 	remembered *rememberedDevice
@@ -187,10 +192,14 @@ type DeviceSession struct {
 	// timerBase is the parent of every idle timer's context. It is never
 	// canceled, so only a replaced or stopped timer ends early.
 	timerBase context.Context
-	logger    logging.Logger
-	deps      session.Deps
-	timeouts  session.Timeouts
-	runs      *runTracker
+	// life ends when Close runs, so an acquisition in flight stops
+	// instead of delaying shutdown.
+	life       context.Context
+	cancelLife context.CancelCauseFunc
+	logger     logging.Logger
+	deps       session.Deps
+	timeouts   session.Timeouts
+	runs       *runTracker
 }
 
 // errSessionClosed is returned by Select once the session has been
@@ -242,7 +251,9 @@ func NewDeviceSession(deps DeviceSessionDeps) *DeviceSession {
 	if sessionDeps.Role == "" {
 		sessionDeps.Role = "mcp"
 	}
+	life, cancelLife := context.WithCancelCause(context.Background())
 	return &DeviceSession{
+		life: life, cancelLife: cancelLife,
 		state: holderUnselected, probe: deps.Probe, runners: deps.Runners, clock: nowClock, timers: timers, timerBase: context.Background(), logger: logger,
 		deps: sessionDeps, timeouts: deps.Timeouts.WithDefaults(), runs: deps.Runs,
 	}
@@ -257,27 +268,45 @@ func (s *DeviceSession) Current() *ActiveDevice {
 	return s.active
 }
 
-// Select tears down any previously-active driver, acquires the device
-// named by input through session.Open, and marks it current. The
-// acquisition runs outside the tool call's time budget and within the
-// acquisition timeout, because a first iOS launch compiles the runner.
-// A disconnect failure on the previous driver is logged and does not
-// block the new selection. A failed acquisition leaves the session
-// unselected and is returned, so select_device can report a structured
-// failure, for example DEVICE_HELD when another process drives the
-// device. A Select that finishes on a closed session releases what it
-// acquired.
+// Select acquires the device named by input through session.Open and
+// marks it current. The new device is resolved, prepared and opened
+// before the current one is torn down, so a failed selection keeps the
+// working device. The one exception is a request for the device already
+// held, whose lease must be given up before it can be taken again. The
+// acquisition runs outside the tool call's time budget, and the runner
+// build runs outside acquireMu, so an idle release or a lost device is
+// not delayed by it. A disconnect failure on the previous driver is
+// logged and does not block the new selection. A failed acquisition is
+// returned, so select_device can report a structured failure, for
+// example DEVICE_HELD when another process drives the device. A canceled
+// ctx returns its own error. A Select that finishes on a closed session
+// releases what it acquired.
 func (s *DeviceSession) Select(ctx context.Context, input SelectDeviceInput) (*ActiveDevice, error) {
 	if s.isClosed() {
 		return nil, errSessionClosed
 	}
 	defer pauseToolBudget(ctx)()
 
-	s.releasePrevious(s.detach(true)) //nolint:contextcheck // teardown is bounded by its own grace timer, not by a call context
-
 	desc, err := s.resolveDescriptor(ctx, input)
 	if err != nil {
 		return nil, err
+	}
+	ctx, stop := s.withLife(ctx)
+	defer stop()
+	if err := s.prepare(ctx, desc); err != nil {
+		return nil, fmt.Errorf("session.select: driver.connect failed for %s/%s: %w", input.Platform, input.ID, err)
+	}
+
+	s.acquireMu.Lock()
+	defer s.acquireMu.Unlock()
+	if s.isClosed() {
+		return nil, errSessionClosed
+	}
+	s.mu.Lock()
+	held := s.sess
+	s.mu.Unlock()
+	if held != nil && sameDevice(held.Descriptor(), desc) {
+		s.releasePrevious(s.detach(true)) //nolint:contextcheck // teardown is bounded by its own grace timer, not by a call context
 	}
 	sess, err := s.open(ctx, session.Request{Descriptor: desc})
 	if err != nil {
@@ -293,48 +322,72 @@ func (s *DeviceSession) Select(ctx context.Context, input SelectDeviceInput) (*A
 	return active, nil
 }
 
+// sameDevice reports whether two descriptors may name one device. An
+// empty id may resolve to any device of its platform, so it counts as
+// the same.
+func sameDevice(a, b device.Descriptor) bool {
+	return a.Platform == b.Platform && (a.ID == b.ID || a.ID == "" || b.ID == "")
+}
+
 // Ensure returns the bound device, taking the remembered device again
 // first when the session released or lost it. The re-acquire runs
-// outside the tool call's time budget. A device another process now
+// outside the tool call's time budget, and its runner build runs
+// outside acquireMu. A build that finishes after another call already
+// took the device, or after a selection replaced the remembered device,
+// is not used: the first case returns the held device and the second
+// starts over for the new descriptor. A device another process now
 // holds fails with DEVICE_RELEASED_HELD. With no device ever selected it
-// fails with the no-active-device error.
+// fails with the no-active-device error. A canceled ctx returns its own
+// error.
 func (s *DeviceSession) Ensure(ctx context.Context) (*ActiveDevice, error) {
-	s.mu.Lock()
-	if s.closed {
-		s.mu.Unlock()
-		return nil, errSessionClosed
-	}
-	if s.active != nil {
-		active := s.active
-		s.mu.Unlock()
-		return active, nil
-	}
-	remembered := s.remembered
-	s.mu.Unlock()
-	if remembered == nil {
-		return nil, errNoActiveDevice
-	}
-
 	defer pauseToolBudget(ctx)()
+	ctx, stop := s.withLife(ctx)
+	defer stop()
+	for {
+		active, remembered, err := s.heldOrRemembered()
+		if active != nil || err != nil {
+			return active, err
+		}
+		if err := s.prepare(ctx, remembered.desc); err != nil {
+			return nil, err
+		}
+		active, retry, err := s.reacquire(ctx, remembered)
+		if retry {
+			continue
+		}
+		return active, err
+	}
+}
+
+// heldOrRemembered snapshots what Ensure needs: the bound device, or
+// else the remembered one to take again.
+func (s *DeviceSession) heldOrRemembered() (*ActiveDevice, *rememberedDevice, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	switch {
+	case s.closed:
+		return nil, nil, errSessionClosed
+	case s.active != nil:
+		return s.active, nil, nil
+	case s.remembered == nil:
+		return nil, nil, errNoActiveDevice
+	}
+	return nil, s.remembered, nil
+}
+
+// reacquire opens the remembered device under acquireMu once its
+// runner is prepared. retry is true when a selection replaced the
+// remembered device while it prepared.
+func (s *DeviceSession) reacquire(ctx context.Context, prepared *rememberedDevice) (active *ActiveDevice, retry bool, err error) {
 	s.acquireMu.Lock()
 	defer s.acquireMu.Unlock()
-
-	s.mu.Lock()
-	if s.closed {
-		s.mu.Unlock()
-		return nil, errSessionClosed
+	current, remembered, err := s.heldOrRemembered()
+	if current != nil || err != nil {
+		return current, false, err
 	}
-	if s.active != nil {
-		active := s.active
-		s.mu.Unlock()
-		return active, nil
+	if remembered != prepared {
+		return nil, true, nil
 	}
-	remembered = s.remembered
-	s.mu.Unlock()
-	if remembered == nil {
-		return nil, errNoActiveDevice
-	}
-
 	req := session.Request{Descriptor: remembered.desc, Reacquire: true}
 	if remembered.launch != (session.LaunchState{}) {
 		launch := remembered.launch
@@ -342,27 +395,60 @@ func (s *DeviceSession) Ensure(ctx context.Context) (*ActiveDevice, error) {
 	}
 	sess, err := s.open(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	active, err := s.install(ctx, sess, remembered.desc.Platform, remembered.desc.ID, remembered.desc)
+	active, err = s.install(ctx, sess, remembered.desc.Platform, remembered.desc.ID, remembered.desc)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	s.logger.Info("session.device_reacquired", logging.LogContext{
 		"platform": string(active.Platform), "id": active.ID,
 	})
-	return active, nil
+	return active, false, nil
 }
 
-// open acquires the device through session.Acquire, which prepares it
-// under the runner build timeout and then opens it within the
-// acquisition timeout. Phases are reported to the calling client.
+// withLife returns a context that ends when ctx ends or when the
+// session closes, whichever comes first. A close cancels it with
+// errSessionClosed as the cause.
+func (s *DeviceSession) withLife(ctx context.Context) (context.Context, func()) {
+	joined, cancel := context.WithCancelCause(ctx)
+	detach := context.AfterFunc(s.life, func() { cancel(context.Cause(s.life)) })
+	return joined, func() {
+		detach()
+		cancel(context.Canceled)
+	}
+}
+
+// prepare runs the lease-free runner build for desc. It must run
+// without acquireMu, because the build can take minutes.
+func (s *DeviceSession) prepare(ctx context.Context, desc device.Descriptor) error {
+	reportPhase(ctx, phaseBuilding)
+	return canceledOr(ctx, session.Prepare(ctx, s.deps, desc))
+}
+
+// open opens the prepared device within the acquisition timeout. Phases
+// are reported to the calling client. The caller holds acquireMu.
 func (s *DeviceSession) open(ctx context.Context, req session.Request) (*session.Session, error) {
-	return session.Acquire(ctx, s.deps, req, session.Acquisition{
+	sess, err := session.OpenWithinBudget(ctx, s.deps, req, session.Acquisition{
 		BudgetMs: s.timeouts.DeviceAcquireMs,
 		Clock:    s.timers,
 		Progress: func(p session.Phase) { reportPhase(ctx, acquirePhaseFor(p)) },
 	})
+	return sess, canceledOr(ctx, err)
+}
+
+// canceledOr returns the cancellation cause when ctx ended, because an
+// acquisition that a canceled caller or a closing session killed fails
+// with whatever the killed child reported, such as an unreachable agent,
+// which would mislead the caller.
+func canceledOr(ctx context.Context, err error) error {
+	if err == nil || ctx.Err() == nil {
+		return err
+	}
+	if cause := context.Cause(ctx); cause != nil {
+		return cause
+	}
+	return ctx.Err()
 }
 
 func acquirePhaseFor(p session.Phase) acquirePhase {
@@ -622,22 +708,36 @@ func (s *DeviceSession) watchLost(sess *session.Session) {
 	s.closeAndRemember(sess, remembered, "session.lost")
 }
 
-// CheckHealth reports whether a device is currently bound and, when
-// one is, whether its agent answers a bounded liveness probe. It
-// never returns an error: no device ever selected is a normal report
-// with Selected false, an unresponsive agent or a device another
-// process now holds is a normal report with Healthy false, since a
-// failed probe is a check outcome, not a failure of the check itself.
+// CheckHealth reports the session state and, when a device is bound,
+// whether its agent answers a bounded liveness probe. It never returns
+// an error and never takes a device: no device ever selected is a
+// normal report with Selected false, a released or lost device is
+// reported by its state without being touched, and an unresponsive
+// agent is a normal report with Healthy false, since a failed probe is a
+// check outcome, not a failure of the check itself.
 func (s *DeviceSession) CheckHealth(ctx context.Context) orchestra.HealthReport {
-	active, err := s.Ensure(ctx)
-	if errors.Is(err, errNoActiveDevice) {
-		return orchestra.HealthReport{Selected: false}
+	s.mu.Lock()
+	active, state, remembered := s.active, s.state, s.remembered
+	s.mu.Unlock()
+	switch {
+	case active != nil:
+		report := active.Orchestra.CheckHealth(ctx)
+		report.State = string(state)
+		return report
+	case remembered == nil:
+		return orchestra.HealthReport{Selected: false, State: string(holderUnselected)}
+	case state == holderLost:
+		return orchestra.HealthReport{
+			Selected: true, State: string(state),
+			Message: "the session lost its device and has not probed it",
+			Remedy:  "Call a device tool to take the device again, or select_device to pick another one.",
+		}
 	}
-	if err != nil {
-		code, message, remedy := diag.Describe(err)
-		return orchestra.HealthReport{Selected: true, Healthy: false, Code: code, Message: message, Remedy: remedy}
+	return orchestra.HealthReport{
+		Selected: true, State: string(holderReleased),
+		Message: "the session released its device after an idle timeout and has not probed it",
+		Remedy:  "Call a device tool to take the device again.",
 	}
-	return active.Orchestra.CheckHealth(ctx)
 }
 
 // Close disconnects the active driver and makes every later Select
@@ -648,6 +748,7 @@ func (s *DeviceSession) Close() {
 	s.mu.Lock()
 	s.closed = true
 	s.mu.Unlock()
+	s.cancelLife(errSessionClosed)
 	s.Disconnect()
 }
 
@@ -661,6 +762,8 @@ func (s *DeviceSession) isClosed() bool {
 // the session unselected. It is a no-op when the session is already
 // unselected.
 func (s *DeviceSession) Disconnect() {
+	s.acquireMu.Lock()
+	defer s.acquireMu.Unlock()
 	previous := s.detach(true)
 	if previous == nil {
 		return

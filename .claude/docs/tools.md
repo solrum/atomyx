@@ -34,7 +34,7 @@ type system enforces it.
 | `list_devices` | `core/internal/mcp/list_devices_tool.go` | `platform` (`ios`, `android`, `all`) | `{count, devices[], hint?}` | `device.Probe.Scan` |
 | `select_device` | `core/internal/mcp/select_device_tool.go` | `platform`, `id`, `kind` (accepted and ignored), `port` | `{ok, active}` or `{ok:false, reason}` | `DeviceSession.Select`, which resolves the descriptor through `device.ResolveDescriptor` |
 | `disconnect_device` | `core/internal/mcp/select_device_tool.go` | none | `{ok:true, wasActive?}` | `DeviceSession.Current` and `DeviceSession.Disconnect` |
-| `check_health` | `core/internal/mcp/check_health_tool.go` | none | `HealthReport` (selected, healthy, code, remedy) | `DeviceSession.CheckHealth` |
+| `check_health` | `core/internal/mcp/check_health_tool.go` | none | `HealthReport` (selected, healthy, state, code, remedy) | `DeviceSession.CheckHealth` |
 | `list_apps` | `core/internal/mcp/list_apps_tool.go` | none | `{count, apps[], note?}` | `Orchestra.ListApps` |
 | `launch_app` | `core/internal/mcp/launch_app_tool.go` | `appId` | `{ok, appId}` | `Orchestra.LaunchApp` |
 | **Screen** | | | | |

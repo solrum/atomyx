@@ -70,7 +70,11 @@ func TestServerCloseDuringSelectReleasesTheLateDriver(t *testing.T) {
 	}()
 	<-factory.started
 
-	server.Close()
+	closed := make(chan struct{})
+	go func() {
+		server.Close()
+		close(closed)
+	}()
 	close(factory.release)
 
 	select {
@@ -80,6 +84,11 @@ func TestServerCloseDuringSelectReleasesTheLateDriver(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("Select did not return after the build was released")
+	}
+	select {
+	case <-closed:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Close did not return after the build was released")
 	}
 	if drv.IsConnected() {
 		t.Fatal("driver built after Close was left connected")
