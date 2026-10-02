@@ -16,6 +16,7 @@ import (
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/session"
+	"dev.atomyx/internal/session/sessiontest"
 	"dev.atomyx/internal/storage"
 )
 
@@ -93,7 +94,7 @@ func (f *lifecycleFactory) driver(i int) *lifecycleDriver {
 type lifecycleFixture struct {
 	t        *testing.T
 	clk      *clock.ManualClock
-	leases   *session.FakeLeases
+	leases   *sessiontest.Leases
 	factory  *lifecycleFactory
 	runStore *storage.RunStore
 	store    storage.Storage
@@ -103,7 +104,7 @@ type lifecycleFixture struct {
 
 func newLifecycleFixture(t *testing.T) *lifecycleFixture {
 	t.Helper()
-	leases, err := session.NewFakeLeases(t.TempDir())
+	leases, err := sessiontest.NewLeases(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}

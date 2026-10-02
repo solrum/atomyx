@@ -91,7 +91,8 @@ atomyx/
 | `scenario` | Runs ordered groups of scripts and ordered sets of scripts or scenarios against a shared Orchestra. |
 | `script` | Owns the test-script schema, parser, and expression engine. |
 | `core/internal/script/expression` | Implements the test-script expression language: tokenizing, parsing, and evaluating. |
-| `session` | Opens a device for one process: identity, lease, orphaned runner reaping, then the driver, and the owner's lifecycle of the result. |
+| `session` | Opens a device for one process: a lease-free prepare phase that builds the runner, then identity, lease, orphaned runner and tunnel reaping, then the driver, and the owner's lifecycle of the result. |
+| `core/internal/session/sessiontest` | Test-only helpers for a session host, such as a lease manager over a throwaway directory. Only `_test.go` files import it. |
 | `sidecar` | Implements the host-side control process: a JSON-RPC bridge, method dispatcher, session, and event bus. |
 | `skills` | Embeds and copies the Atomyx skill and agent markdown files a consumer project installs. |
 | `storage` | Persistence primitives the MCP tool layer builds on: a JSON and markdown record store plus the in-flight run tracker. |
@@ -106,7 +107,9 @@ Dev tooling `make -C core check` runs (see
 [`development.md`](./development.md) for the exact commands):
 `core/scripts/check-comments.sh` (the comment-style gate),
 `core/scripts/check-no-raw-syscall-open.sh` (rejects a bare
-`syscall.Open(` or `unix.Open(` outside `core/internal/lease`), and
+`syscall.Open(` or `unix.Open(` outside `core/internal/lease`),
+`core/scripts/check-sessiontest-imports.sh` (rejects a non-test file
+that imports `core/internal/session/sessiontest`), and
 `core/scripts/check-schema-fresh.sh` (the schema-freshness gate), plus
 their allowlist files.
 

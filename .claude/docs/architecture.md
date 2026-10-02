@@ -291,12 +291,21 @@ the key down.
 
 `session` reaches the lease manager through its narrow `LeaseAcquirer`
 interface, which `*lease.Manager` satisfies, so `mcp` does not import
-`lease`. A host test passes `session.FakeLeases` instead of a manager.
+`lease`. A host test passes a `sessiontest.Leases` from
+`core/internal/session/sessiontest` instead of a manager. Only test
+files import that package, and `core/scripts/check-sessiontest-imports.sh`
+fails the build when a production file does.
 
 ## Session ownership
 
 `core/internal/session` is the one path by which a process takes a
-device. `session.Open(ctx, deps, req)` does these steps in this order:
+device. It has two phases. `session.Prepare(ctx, deps, desc, buildMs)`
+runs first and takes no lease: it does the slow work a device needs,
+such as building the iOS runner, under the fixed runner build bound of
+300 seconds, and fails with `RUNNER_BUILD_TIMEOUT` when that elapses.
+`session.Open(ctx, deps, req)` then runs under the acquisition budget
+and does these steps in this order. `session.Acquire` runs both phases
+for a host that does not need to split them.
 
 1. Resolves the canonical identity through `device.IdentityResolver`.
    An identity failure returns a coded error before any lease is taken:
@@ -306,8 +315,9 @@ device. `session.Open(ctx, deps, req)` does these steps in this order:
 2. Acquires the lease for that identity. A conflict is `DEVICE_HELD`,
    or `DEVICE_RELEASED_HELD` when the request is a `Reacquire`, and in
    both cases no driver is built.
-3. For an iOS target, ends an orphaned runner a crashed earlier holder
-   left behind, through `device.RunnerReaper`. This runs only after the
+3. For an iOS target, ends an orphaned runner, and the `iproxy` tunnel of
+   a physical device, that a crashed earlier holder left behind, through
+   `device.RunnerReaper`. This runs only after the
    lease is held, because that is what proves the previous holder is
    gone. A failure to end the orphan is logged and does not block the
    open.
@@ -316,7 +326,9 @@ device. `session.Open(ctx, deps, req)` does these steps in this order:
    driver carries `deviceId` and `hardwareId`.
 5. Offers the previous driver's launched-app state to the new driver.
    The iOS drivers apply it only when the runner they reached reports the
-   same launch id as the one that launched the app.
+   same launch id as the one that launched the app. When the new driver
+   could not take it, the session reports `Relaunched`, and the MCP
+   server tells the agent that the app was relaunched on a new runner.
 
 The returned `Session` owns the lease, the driver and a goroutine that
 runs `Lease.Watch`. A replaced lock file that cannot be re-acquired
@@ -326,8 +338,9 @@ runner the factory launched, and then releases the lease. The lock-file
 metadata follows the holder through `SetRunning` and `SetIdle`, so a
 second process that finds the device held can report why.
 
-The CLI commands `run`, `suite` and `doctor` and the MCP server's device
-selection all go through `session.Open`. A nil `Deps.Leases` disables
+The CLI commands `run`, `suite` and `doctor` go through `session.Acquire`,
+and the MCP server's device selection and re-acquire go through
+`session.Prepare` and `session.Open`. A nil `Deps.Leases` disables
 exclusion for a single-process host such as a test, and every production
 composition root sets it.
 
@@ -339,11 +352,15 @@ The two hosts own a session differently. A CLI command holds it for the
 length of the command and cancels its run when `Session.Lost()` closes.
 The MCP server holds it through `DeviceSession`, which releases the
 device after an idle timeout, takes it again on the next call that needs
-it, and runs acquisition outside the tool call budget. The idle timeouts
-and the acquisition budget come from the `session` block of the project
+it, and runs acquisition outside the tool call budget. Every transition
+of its held session happens under one lock, a failed selection keeps the
+working device, and the health report carries the holder state. The idle
+timeouts and the acquisition budget come from the `session` block of the project
 config (`mcpIdleTimeoutMs`, `openRunIdleTimeoutMs`,
 `deviceAcquireTimeoutMs`), with `ATOMYX_MCP_IDLE_TIMEOUT_MS` and
-`ATOMYX_DEVICE_ACQUIRE_TIMEOUT_MS` overriding the first and last.
+`ATOMYX_DEVICE_ACQUIRE_TIMEOUT_MS` overriding the first and last. The
+runner build bound has no key, so it is fixed. Both binaries read the
+project config from the working directory.
 `cmd/internal/sessionwire` resolves them. The holder state machine is
 documented in [`tools.md`](./tools.md).
 
@@ -366,7 +383,8 @@ The shape the config encodes:
 - **`transport`** may depend only on `wire` and `diag`.
 - **`lease`** may depend only on `diag` and the common leaves.
 - **`session`** may depend on `device`, `lease`, `orchestra`, `driver`,
-  `diag` and `shutdown`. `cli` and `mcp` may depend on `session`, and it
+  `diag` and `shutdown`. `session/sessiontest` may depend only on `lease`,
+  and `mcp` may depend on it for tests. `cli` and `mcp` may depend on `session`, and it
   may not depend on either of them.
 - **`driver`** may depend only on `wire` and `transport`. The three
   concrete implementers (`androiddriver`, `iosdriver`,

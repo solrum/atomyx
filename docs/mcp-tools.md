@@ -178,15 +178,16 @@ Bind the session to one device so every other device-driving tool operates on it
 | port | integer, positive | No | the platform's default control connection | Overrides the device's control connection port. Only honored on platforms whose driver exposes a configurable port, and ignored otherwise |
 
 **Behavior**
-- Calling select_device again, whether or not a device is already bound, first disconnects the previously-bound device cleanly, then connects the new one. A failure disconnecting the previous device is logged but does not block the new selection.
+- Calling select_device again, whether or not a device is already bound, resolves, prepares and opens the new device first, and only then releases the previously-bound device. A failed selection therefore leaves the previously-bound device bound and working. A failure disconnecting the previous device is logged but does not block the new selection.
+  - The exception is a selection that reaches the hardware the session already holds, for example through a second serial of the same phone. Its ownership cannot be taken twice, so the held device is released first. If taking it again fails, the device stays remembered and the next tool call that needs a device takes it again.
 - Every other device-driving tool reads the currently-bound device on each call, so a mid-session select_device call takes effect immediately for the very next tool call.
 - The device kind is resolved from the id, the same way the command line resolves it. On iOS the id must name a simulator or physical device that list_devices currently reports, and the match is case-insensitive. An iOS id that is not listed fails with code DEVICE_NOT_FOUND before any connection is attempted. On Android the id is used as given.
 - The returned kind reports the kind of the device actually bound, taken from the driver, not an echo of the kind argument the caller passed. It is always present in the response, even when the caller omitted kind. On Android it is "emulator" when the device id starts with "emulator-" and "device" otherwise. On iOS it is "simulator" or "device". The value "emulator" can appear in the response even though the kind argument only accepts "simulator" or "device" as input.
 - connectedAt is a timestamp in milliseconds, recorded at the moment the new connection was established.
 - Binding takes exclusive ownership of the device. Only one Atomyx process, whether the CLI or another MCP server, can drive a device at a time, and a second one fails with DEVICE_HELD.
-- Acquiring the device does not count against the 30 second tool call budget. It runs in two phases, each with its own budget. The worst case is 300 seconds for the first phase and then 120 seconds for the second.
-  - First the iOS runner is built when it is missing or stale. This also covers waiting for another Atomyx process that is building it, and no device ownership is held meanwhile. The build has a timeout of 300 seconds by default. When it elapses the call fails with code RUNNER_BUILD_TIMEOUT.
-  - Then the device is acquired. Acquisition has its own budget of 120 seconds by default, which excludes the build. When it is exhausted the call fails with code TOOL_TIMEOUT. Configure it with `session.deviceAcquireTimeoutMs` in the project config or the `ATOMYX_DEVICE_ACQUIRE_TIMEOUT_MS` environment variable. The environment variable wins.
+- Acquiring the device does not count against the 30 second tool call budget. It runs in two phases, each with its own budget. The worst case is 300 seconds for the first phase and then 120 seconds for the second. These are the bounds of the two phases. They do not include the device identity lookup that runs before them, or the wait for another selection or re-acquire already in flight in the same server.
+  - First the iOS runner is built when it is missing or stale. This also covers waiting for another Atomyx process that is building it, and no device ownership is held meanwhile. The build timeout is a fixed 300 seconds and is not configurable. When it elapses the call fails with code RUNNER_BUILD_TIMEOUT.
+  - Then the device is acquired. Acquisition has its own budget of 120 seconds by default, which excludes the build. When it is exhausted the call fails with code TOOL_TIMEOUT. Configure it with `session.deviceAcquireTimeoutMs` in the project config or the `ATOMYX_DEVICE_ACQUIRE_TIMEOUT_MS` environment variable. The environment variable wins. The server reads the project config from its working directory, looking in each parent directory when it finds none there.
 - When the call carries a progress token, the server sends three progress notifications as the device comes up, with progress 1, 2 and 3 of a total of 3. They announce in order that the device is being prepared, that the runner is launching, and that the device is connected. The connected notification is sent only after the device is installed in the session. Without a progress token no notifications are sent.
 - A bound device is released automatically when the session sits idle. See Device ownership and idle release.
 
@@ -198,7 +199,7 @@ Bind the session to one device so every other device-driving tool operates on it
 - Missing platform or id, an id that is empty, a non-positive port, or a platform, kind, or id outside the accepted values all fail argument validation before a connection is attempted. Correct the arguments and retry.
 - ok false with code DEVICE_NOT_FOUND means an iOS id is not among the reachable devices. Other reasons typically mean the id does not currently match a reachable device, or the device toolchain rejected the connection. Call list_devices again to confirm the id is still valid and the device is online, then retry.
 - ok false with code DEVICE_HELD means another Atomyx process is driving the device. The reason names that process and its state. Wait for it to finish or ask the operator to stop it, then call select_device again.
-- ok false with code TOOL_TIMEOUT means the device did not become ready within the acquisition budget. Check that the device is connected, unlocked and trusted, then retry.
+- ok false with code TOOL_TIMEOUT means the device did not become ready within the acquisition budget. Check that the device is connected and unlocked, then retry.
 - ok false with code RUNNER_BUILD_TIMEOUT means building the iOS runner, or waiting for another process that is building it, did not finish within the build timeout. This is a different failure from TOOL_TIMEOUT. Wait for any other Atomyx process that is building the runner to finish, check that Xcode is installed and responsive, then call select_device again.
 
 **Example**
@@ -231,14 +232,16 @@ None
 **Behavior**
 - Idempotent. Calling it with no device currently bound still succeeds.
 - After this call, every tool that needs a bound device fails until select_device is called again.
+- Calling it is not session activity. It does not restart the idle timer or move a held idle device to running.
+- When a selection or a re-acquire is in flight, the call waits for it only until the call's own budget ends. If it ends first, nothing changes and the result is ok false with the reason and code of the interruption. Call it again afterward.
 - A failure tearing down the underlying connection is logged internally but never changes this tool's result. The session is always left idle and the call always reports success, whether or not the teardown underneath actually succeeded cleanly.
 
 **Returns**
-- ok: boolean, always true.
+- ok: boolean, true once the session is left idle. False only when the call ended while it waited for a selection or a re-acquire in flight, with reason, code and, when present, hint beside it.
 - wasActive: object with platform and id describing the device that was bound before this call, or null when no device was bound.
 
 **Errors and recovery**
-- This tool has no failure outcome to recover from. If a subsequent tool reports that no device is bound, call select_device with a platform and id from list_devices.
+- ok false means the call ended before the device could be released, and the session is unchanged. Call disconnect_device again. If a subsequent tool reports that no device is bound, call select_device with a platform and id from list_devices.
 
 **Example**
 ```json

@@ -200,8 +200,12 @@ the driver you serve yourself on the default port, 22087, which device it
 belongs to, and runs against that device. A driver that names no device
 is taken to serve the one connected iPhone. When no driver answers, or
 several iPhones are connected, the command fails with DEVICE_NOT_FOUND,
-so serve the driver or pass `--device`. The first launch on a machine compiles the driver, which can
-take several minutes, and progress lines are written to stderr.
+so serve the driver or pass `--device`.
+
+The first launch on a machine compiles the driver, which can take
+several minutes, and progress lines are written to stderr. The compile
+happens before the command takes the device, and it is bounded at 300
+seconds. A compile that outlasts that fails with `RUNNER_BUILD_TIMEOUT`.
 
 Driving a physical iPhone this way needs signing settings in the
 environment, because the `atomyx` binary does not read

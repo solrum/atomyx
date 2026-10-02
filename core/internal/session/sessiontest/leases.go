@@ -1,4 +1,7 @@
-package session
+// Package sessiontest holds helpers that only tests use to exercise a
+// session host. Production code never imports it, which
+// scripts/check-sessiontest-imports.sh enforces.
+package sessiontest
 
 import (
 	"context"
@@ -8,17 +11,17 @@ import (
 	"dev.atomyx/internal/lease"
 )
 
-// FakeLeases is a LeaseAcquirer over a real lease directory, with a
+// Leases is a session.LeaseAcquirer over a real lease directory, with a
 // clock a test steps by hand, so a host's tests exercise exclusion
 // between several sessions without importing the lease package.
-type FakeLeases struct {
+type Leases struct {
 	*lease.Manager
 	clk *clock.GatedClock
 }
 
-// NewFakeLeases creates a FakeLeases whose lease directory lives under
-// root, which must be a directory only the test uses.
-func NewFakeLeases(root string) (*FakeLeases, error) {
+// NewLeases creates Leases whose lease directory lives under root, which
+// must be a directory only the test uses.
+func NewLeases(root string) (*Leases, error) {
 	clk := clock.NewGatedClock(lease.InodeRecheckPeriod.Milliseconds())
 	manager, err := lease.NewManager(lease.Environment{
 		GOOS:          "linux",
@@ -32,21 +35,21 @@ func NewFakeLeases(root string) (*FakeLeases, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &FakeLeases{Manager: manager, clk: clk}, nil
+	return &Leases{Manager: manager, clk: clk}, nil
 }
 
 // Held reports whether any holder has the lease of the device with the
 // given platform and hardware id.
-func (f *FakeLeases) Held(ctx context.Context, platform, hardwareID string) (bool, error) {
+func (f *Leases) Held(ctx context.Context, platform, hardwareID string) (bool, error) {
 	status, err := f.Probe(ctx, lease.KeyFor(platform, hardwareID))
 	return status.Held, err
 }
 
 // FireRecheck lets every lease watcher run one inode check now.
-func (f *FakeLeases) FireRecheck() { f.clk.Fire() }
+func (f *Leases) FireRecheck() { f.clk.Fire() }
 
 // LockPathFor reports the lock file of the device with the given
 // platform and hardware id.
-func (f *FakeLeases) LockPathFor(platform, hardwareID string) string {
+func (f *Leases) LockPathFor(platform, hardwareID string) string {
 	return f.LockPath(lease.KeyFor(platform, hardwareID))
 }

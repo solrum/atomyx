@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"testing"
 
-	"dev.atomyx/internal/iosdriver"
 	"dev.atomyx/internal/session"
 )
 
@@ -28,7 +27,7 @@ func TestDocumentedDefaultTimeoutsMatchTheCode(t *testing.T) {
 		want   int64
 	}{
 		{"acquisition budget", `(?i)acquisition has its own budget of (\d+) seconds`, msPerSecond, session.DefaultDeviceAcquireTimeoutMs},
-		{"runner build timeout", `(?i)\bbuild[^.\n]*?(\d+) seconds`, msPerSecond, iosdriver.DefaultBuildTimeoutMs},
+		{"runner build timeout", `(?i)\bbuild[^.\n]*?(\d+) seconds`, msPerSecond, session.DefaultRunnerBuildTimeoutMs},
 		{"MCP idle timeout", `(?i)MCP idle timeout, (\d+) minutes`, msPerMinute, session.DefaultMcpIdleTimeoutMs},
 		{"open-run idle timeout", `(?i)open-run idle timeout, (\d+) minutes`, msPerMinute, session.DefaultOpenRunIdleTimeoutMs},
 	}

@@ -6,6 +6,7 @@ import (
 
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/diag"
+	"dev.atomyx/internal/session"
 	"dev.atomyx/internal/storage"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -25,7 +26,7 @@ func TestSelectReportsRunnerBuildTimeoutNotToolTimeout(t *testing.T) {
 	t.Cleanup(hung.Close)
 	go func() {
 		f.clk.AwaitSleepers(1)
-		f.clk.Advance(device.DefaultRunnerBuildTimeoutMs)
+		f.clk.Advance(session.DefaultRunnerBuildTimeoutMs)
 	}()
 
 	_, err := hung.Select(context.Background(), SelectDeviceInput{Platform: device.PlatformAndroid, ID: "A"})

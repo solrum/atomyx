@@ -1,10 +1,6 @@
 package device
 
-import (
-	"context"
-
-	"dev.atomyx/internal/iosdriver"
-)
+import "context"
 
 // RunnerPreparer does the slow, lease-free work a device needs before it
 // can be driven, such as compiling the iOS runner. It is separate from
@@ -18,8 +14,3 @@ import (
 type RunnerPreparer interface {
 	Prepare(ctx context.Context, desc Descriptor) error
 }
-
-// DefaultRunnerBuildTimeoutMs is the default time a caller allows
-// Prepare, including the wait for another process's build of the same
-// runner.
-const DefaultRunnerBuildTimeoutMs = iosdriver.DefaultBuildTimeoutMs

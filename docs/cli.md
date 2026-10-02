@@ -220,8 +220,9 @@ an `atomyx-mcp` server, can drive a device at a time.
 - On iOS, a runner that is missing or stale is built before ownership is
   taken, so a long build never holds the device. The command prints
   `building runner` to stderr while it builds. The build has a timeout
-  of 300 seconds, which also covers waiting for another Atomyx process
-  that is building the same runner. When it elapses the command fails
+  of 300 seconds, fixed and not configurable, which also covers waiting
+  for another Atomyx process that is building the same runner. When it
+  elapses the command fails
   with code `RUNNER_BUILD_TIMEOUT`, which is distinct from the codes of
   a lease conflict.
 - After the build, taking the device and launching its driver has its
@@ -231,11 +232,20 @@ an `atomyx-mcp` server, can drive a device at a time.
   `TOOL_TIMEOUT`. Configure it with `session.deviceAcquireTimeoutMs` in
   the project config or the `ATOMYX_DEVICE_ACQUIRE_TIMEOUT_MS`
   environment variable. The environment variable wins.
+- The two bounds are the build timeout of 300 seconds and the acquisition
+  budget of 120 seconds, so a command waits at most 300 seconds plus 120
+  seconds for them. That total does not include the device identity
+  lookup that runs before them.
+- The CLI reads the project config for these settings from the working
+  directory, looking in each parent directory when it finds none there.
+  It does not read the file named by `--config` for them, so run the
+  command from inside the project or set the environment variable.
 - Ownership is released when the command ends, including on an
   interrupt.
 - If a command crashes or is killed with `kill -9`, the next command
   for an iOS device ends the runner process the crashed command left
-  behind, then continues.
+  behind, and on a physical iPhone the `iproxy` tunnel it left behind,
+  then continues.
 - If the device lease is lost while a run is in progress, the run is
   stopped and the command reports it.
 

@@ -12,6 +12,10 @@ const (
 	// DefaultDeviceAcquireTimeoutMs bounds one device acquisition,
 	// including the launch of an iOS runner, but not a runner build.
 	DefaultDeviceAcquireTimeoutMs int64 = 120_000
+	// DefaultRunnerBuildTimeoutMs bounds one runner build, including the
+	// wait for another process's build of the same runner. It is a fixed
+	// bound, not a configuration key.
+	DefaultRunnerBuildTimeoutMs int64 = 300_000
 )
 
 // Timeouts are the time budgets a long-lived session host applies.
@@ -22,6 +26,9 @@ type Timeouts struct {
 	OpenRunIdleMs int64
 	// DeviceAcquireMs bounds one device acquisition.
 	DeviceAcquireMs int64
+	// RunnerBuildMs bounds the runner build that Prepare runs before the
+	// lease is taken.
+	RunnerBuildMs int64
 }
 
 // DefaultTimeouts returns the default budgets.
@@ -30,6 +37,7 @@ func DefaultTimeouts() Timeouts {
 		McpIdleMs:       DefaultMcpIdleTimeoutMs,
 		OpenRunIdleMs:   DefaultOpenRunIdleTimeoutMs,
 		DeviceAcquireMs: DefaultDeviceAcquireTimeoutMs,
+		RunnerBuildMs:   DefaultRunnerBuildTimeoutMs,
 	}
 }
 
@@ -45,6 +53,9 @@ func (t Timeouts) WithDefaults() Timeouts {
 	}
 	if t.DeviceAcquireMs <= 0 {
 		t.DeviceAcquireMs = d.DeviceAcquireMs
+	}
+	if t.RunnerBuildMs <= 0 {
+		t.RunnerBuildMs = d.RunnerBuildMs
 	}
 	return t
 }

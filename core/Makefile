@@ -101,6 +101,8 @@ check:
 	bash scripts/check-comments.sh
 	@echo "Raw syscall.Open gate ..."
 	bash scripts/check-no-raw-syscall-open.sh
+	@echo "Session test-helper import gate ..."
+	bash scripts/check-sessiontest-imports.sh
 	@echo "Schema freshness gate ..."
 	bash scripts/check-schema-fresh.sh
 	@echo "Test ..."

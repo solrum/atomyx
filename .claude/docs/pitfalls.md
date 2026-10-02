@@ -179,6 +179,12 @@ corresponding area. For the high-level map see
   fall back to `simctl terminate` when it does.
 - **Take the lease before `EnsureIOSAgent`.** Two launches for one device
   share `build/run-<udid>`, so the lease is what serializes them.
+- **Build the runner in `session.Prepare`, before the lease, and never
+  under `DeviceSession.acquireMu`.** The build is the one slow step that
+  needs no ownership of the device. Run under the lease or the lock, it
+  blocks other processes from the device, and in the MCP server it also
+  blocks the idle timer and the lost-lease watcher for up to the build
+  bound.
 - **Run the provisioner's `kill` once.** It stops the runner and releases
   the reserved port. A second call must not release a port a later
   launch has since reserved.
@@ -186,8 +192,22 @@ corresponding area. For the high-level map see
   iOS launch compiles the runner and a re-acquire waits for a lease, so
   both can run far longer than the 30 second tool call budget.
   `DeviceSession.Select` and `DeviceSession.Ensure` pause the call's
-  budget with `pauseToolBudget` and bound the acquisition by
-  `session.deviceAcquireTimeoutMs` instead.
+  budget with `pauseToolBudget`, bound the build by the fixed
+  `session.Timeouts.RunnerBuildMs` (300 seconds, `RUNNER_BUILD_TIMEOUT`),
+  and bound the acquisition by `session.deviceAcquireTimeoutMs` (120
+  seconds by default, `TOOL_TIMEOUT`) instead. The build never spends
+  the acquisition budget.
+- **A tool that only observes registers through `addObserveOnlyTool`.**
+  The call middleware reads that declaration, not a list of tool names,
+  so a polling tool such as `check_health` neither marks the device
+  running nor restarts the idle timer. `DeviceSession.CheckHealth` never
+  calls `Ensure`, because a health check must not take a released device
+  or wait for a build.
+- **Give a test lease helper to `session/sessiontest`, never to a
+  production package.** Only `_test.go` files import
+  `core/internal/session/sessiontest`, which
+  `core/scripts/check-sessiontest-imports.sh` enforces, so `mcp` keeps no
+  direct edge to `lease` in production.
 - **Drive timers from the injected timer clock.** The acquisition budget,
   the tool call budget, and the idle timers use `ServerDeps.TimerClock`,
   not the orchestra clock. A test clock whose sleeps return at once would

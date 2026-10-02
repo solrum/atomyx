@@ -258,9 +258,14 @@ Build and run layout, both under `platforms/ios-agent/build`:
   `xcodebuild test-without-building -xctestrun <file from the shared
   build>` with that directory as its `-derivedDataPath` and a result
   bundle inside it, so concurrent targets never share mutable state.
-- The build timeout is 300 s. The launch wait for the runner to answer
-  `ping` is 90 s. A first launch on a fresh machine compiles the Swift
-  runner.
+- The build is bounded at 300 s, a fixed bound that is not
+  configurable. A host runs it before it takes the device lease, through
+  `session.Prepare`, which calls `DriverProvisioner.Prepare` and so
+  `XctestLauncher.EnsureBuilt` under `session.Timeouts.RunnerBuildMs`. A
+  build that outlasts the bound fails with `RUNNER_BUILD_TIMEOUT`. The
+  launch wait for the runner to answer `ping` is 90 s and runs inside the
+  acquisition budget. A first launch on a fresh machine compiles the
+  Swift runner.
 - The launcher reports `building runner` before a build and `starting
   runner` before each launch through the logger in
   `DriverProvisionerDeps`. The CLI and the MCP server write both lines to
@@ -282,6 +287,8 @@ Build and run layout, both under `platforms/ios-agent/build`:
 | `processStartTime` | Start time of that process, read from the kernel, in UTC |
 | `hostBootTime` | Host boot time, read from the kernel, in UTC |
 | `startedAt` | Time the record was written, in UTC |
+| `tunnelPid` | Process id of the `iproxy` tunnel of a physical device, absent for a simulator |
+| `tunnelStartTime` | Start time of the tunnel process, read from the kernel, in UTC |
 
 `kill` removes the file only while it still names its own `runnerId`. A
 record that survives means the launching process ended without stopping

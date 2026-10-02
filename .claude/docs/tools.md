@@ -34,7 +34,7 @@ type system enforces it.
 | `list_devices` | `core/internal/mcp/list_devices_tool.go` | `platform` (`ios`, `android`, `all`) | `{count, devices[], hint?}` | `device.Probe.Scan` |
 | `select_device` | `core/internal/mcp/select_device_tool.go` | `platform`, `id`, `kind` (accepted and ignored), `port` | `{ok, active}` or `{ok:false, reason}` | `DeviceSession.Select`, which resolves the descriptor through `device.ResolveDescriptor` |
 | `disconnect_device` | `core/internal/mcp/select_device_tool.go` | none | `{ok:true, wasActive?}` | `DeviceSession.Current` and `DeviceSession.Disconnect` |
-| `check_health` | `core/internal/mcp/check_health_tool.go` | none | `HealthReport` (selected, healthy, state, code, remedy) | `DeviceSession.CheckHealth` |
+| `check_health` | `core/internal/mcp/check_health_tool.go` | none | `HealthReport` (selected, healthy, state, code, remedy), never takes or probes a released or lost device | `DeviceSession.CheckHealth` |
 | `list_apps` | `core/internal/mcp/list_apps_tool.go` | none | `{count, apps[], note?}` | `Orchestra.ListApps` |
 | `launch_app` | `core/internal/mcp/launch_app_tool.go` | `appId` | `{ok, appId}` | `Orchestra.LaunchApp` |
 | **Screen** | | | | |
@@ -77,7 +77,7 @@ above). Registration is never auto-discovered, so adding a file under
 
 - **`ToolContext`** (`core/internal/mcp/tool_context.go`): the
   dependency bundle every handler closes over: `Session`
-  (`*DeviceSession`), `Logger`, `Storage`, `RunStore`, and `Clock`. A
+  (`*DeviceSession`), `Traits`, `Logger`, `Storage`, `RunStore`, and `Clock`. A
   handler reads only the fields its own logic needs. There is no
   `Driver` field, so a handler cannot bypass `Orchestra`.
 - **`orchestraOrFail`** (`core/internal/mcp/tool_context.go`):
@@ -111,7 +111,9 @@ above). Registration is never auto-discovered, so adding a file under
   with `RUN_EXPIRED`. A tool registered through `addObserveOnlyTool`
   (`core/internal/mcp/tool_traits.go`) is not reported, so it neither
   marks the device running nor restarts the idle timer. `check_health`,
-  `list_devices` and `disconnect_device` register this way.
+  `list_devices` and `disconnect_device` register this way, and so does
+  `select_device`, which settles the holder state itself when it
+  installs the new session.
   The middleware also appends the notices raised during a call
   (`core/internal/mcp/call_notices.go`) as extra text content blocks
   after the tool's own content. `DeviceSession.Ensure` raises one when a
@@ -122,17 +124,20 @@ above). Registration is never auto-discovered, so adding a file under
   acquisition and restarts it in full afterwards. Never count device
   acquisition against a tool budget: `DeviceSession.Select` and
   `DeviceSession.Ensure` pause it, then run `session.Prepare` under the
-  runner build timeout (300 seconds, code `RUNNER_BUILD_TIMEOUT`), then
+  runner build timeout (`session.Timeouts.RunnerBuildMs`, a fixed 300
+  seconds that is not configurable, code `RUNNER_BUILD_TIMEOUT`), then
   `session.Open` within the acquisition timeout
   (`session.deviceAcquireTimeoutMs`, 120 seconds by default, runner
   build excluded, code `TOOL_TIMEOUT`). The worst case is the two
-  phases added together. `session.Prepare` takes no lease, so waiting
-  on another process's build never spends the acquisition budget.
+  phases added together, which excludes the identity lookup that runs
+  first and the wait for a transition already in flight.
+  `session.Prepare` takes no lease, so waiting on another process's
+  build never spends the acquisition budget.
 - **Acquisition progress** (`core/internal/mcp/device_progress.go`): the
   tool call middleware puts a phase reporter on the call context when
   the request carries a progress token. `DeviceSession` reports
-  preparing, launching and connected through it, connected only after the session is installed, as MCP progress
-  notifications, so a handler never emits progress itself. A call with
+  preparing, launching and connected through it, connected only after
+  the session is installed, as MCP progress notifications, so a handler never emits progress itself. A call with
   no token reports nothing.
 - **Run tracker** (`core/internal/mcp/run_tracker.go`): lets the
   `DeviceSession` see the open run and close it when the open-run
@@ -148,8 +153,11 @@ order shown in the table above. `Serve` (same file) runs the
 constructed server over stdio until the context is done or the
 client disconnects.
 
-`DeviceSession` is a holder state machine over `session.Open`. The
-states are unselected, idle, running, released and lost.
+`DeviceSession` is a holder state machine over `session.Prepare` and
+`session.Open`. Every transition of the held session happens under one
+lock, and `select_device` opens the new device before it releases the
+current one, so a failed selection keeps the working device. The states
+are unselected, idle, running, released and lost.
 
 | From | Event | To |
 |---|---|---|

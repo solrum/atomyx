@@ -27,12 +27,12 @@ func TestResolveTimeouts_ConfigOverridesDefaultsAndEnvironmentOverridesConfig(t 
 	}}
 
 	fromConfigOnly := ResolveTimeouts(cfg, env(nil), logging.NoopLogger{})
-	if fromConfigOnly != (session.Timeouts{McpIdleMs: 1000, OpenRunIdleMs: 2000, DeviceAcquireMs: 3000}) {
+	if fromConfigOnly != (session.Timeouts{McpIdleMs: 1000, OpenRunIdleMs: 2000, DeviceAcquireMs: 3000, RunnerBuildMs: session.DefaultRunnerBuildTimeoutMs}) {
 		t.Fatalf("config only = %+v", fromConfigOnly)
 	}
 
 	withEnv := ResolveTimeouts(cfg, env(map[string]string{McpIdleEnvVar: "20000", DeviceAcquireEnvVar: "90000"}), logging.NoopLogger{})
-	if withEnv != (session.Timeouts{McpIdleMs: 20000, OpenRunIdleMs: 2000, DeviceAcquireMs: 90000}) {
+	if withEnv != (session.Timeouts{McpIdleMs: 20000, OpenRunIdleMs: 2000, DeviceAcquireMs: 90000, RunnerBuildMs: session.DefaultRunnerBuildTimeoutMs}) {
 		t.Fatalf("with environment = %+v, want the environment to beat config and leave the open-run timeout alone", withEnv)
 	}
 }

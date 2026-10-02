@@ -274,16 +274,16 @@ func (s *DeviceSession) Current() *ActiveDevice {
 // working device. The one exception is a request that reaches the
 // hardware already held, even through another id such as a second serial
 // of one phone, whose lease must be given up before it can be taken
-// again. The// acquisition runs outside the tool call's time budget, and the runner
-// build runs outside acquireMu, so an idle release or a lost device is
-// not delayed by it. A disconnect failure on the previous driver is
-// logged and does not block the new selection. A failed re-take of the
-// held hardware leaves it remembered, so the next call that needs it
-// takes it again. A failed acquisition is
-// returned, so select_device can report a structured failure, for
-// example DEVICE_HELD when another process drives the device. A canceled
-// ctx returns its own error. A Select that finishes on a closed session
-// releases what it acquired.
+// again. The acquisition runs outside the tool call's time budget, and
+// the runner build runs outside acquireMu, so an idle release or a lost
+// device is not delayed by it. A disconnect failure on the previous
+// driver is logged and does not block the new selection. A failed
+// re-take of the held hardware leaves it remembered, so the next call
+// that needs it takes it again. A failed acquisition is returned, so
+// select_device can report a structured failure, for example DEVICE_HELD
+// when another process drives the device. A canceled ctx returns its own
+// error. A Select that finishes on a closed session releases what it
+// acquired.
 func (s *DeviceSession) Select(ctx context.Context, input SelectDeviceInput) (*ActiveDevice, error) {
 	if s.isClosed() {
 		return nil, errSessionClosed
@@ -438,7 +438,7 @@ func (s *DeviceSession) withLife(ctx context.Context) (context.Context, func()) 
 // without acquireMu, because the build can take minutes.
 func (s *DeviceSession) prepare(ctx context.Context, desc device.Descriptor) error {
 	reportPhase(ctx, phaseBuilding)
-	return canceledOr(ctx, session.Prepare(ctx, s.deps, desc))
+	return canceledOr(ctx, session.Prepare(ctx, s.deps, desc, s.timeouts.RunnerBuildMs))
 }
 
 // open opens the prepared device within the acquisition timeout. Phases

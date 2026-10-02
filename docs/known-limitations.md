@@ -180,13 +180,16 @@ checkout. See `getting-started.md`.
 ## An iOS run without --device is not provisioned
 
 **Symptom**: `atomyx driver run --platform ios` with no `--device`
-does not launch a runner. It dials the default runner port, 22087, and
-fails with an unreachable agent when nothing serves there.
+does not launch a runner. It asks the runner served on the default
+port, 22087, which device it belongs to, and fails with
+`DEVICE_NOT_FOUND` when nothing serves there, or when the served runner
+names no device and the number of connected iPhones is not exactly one.
 
 **Where**: iOS, `run`, `suite`, and `doctor` without `--device`.
 
 **Why**: a launched runner is keyed on a device udid, and no udid
-means nothing to key it on.
+means nothing to key it on. The command can only take over a runner
+that is already served.
 
 **Workaround**: pass `--device <udid>`, or start a runner yourself
 with `make serve` before the command.

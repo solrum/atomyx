@@ -32,6 +32,9 @@ type Acquisition struct {
 	// BudgetMs bounds Open. Non-positive means
 	// DefaultDeviceAcquireTimeoutMs.
 	BudgetMs int64
+	// BuildBudgetMs bounds the Prepare half of Acquire. Non-positive
+	// means DefaultRunnerBuildTimeoutMs.
+	BuildBudgetMs int64
 	// Clock times the acquisition budget. Defaults to deps.Clock, then
 	// to the system clock.
 	Clock clock.Clock
@@ -52,7 +55,7 @@ func Acquire(ctx context.Context, deps Deps, req Request, acq Acquisition) (*Ses
 		}
 	}
 	report(PhaseBuilding)
-	if err := Prepare(ctx, deps, req.Descriptor); err != nil {
+	if err := Prepare(ctx, deps, req.Descriptor, acq.BuildBudgetMs); err != nil {
 		return nil, err
 	}
 	return OpenWithinBudget(ctx, deps, req, acq)
@@ -86,8 +89,8 @@ func OpenWithinBudget(ctx context.Context, deps Deps, req Request, acq Acquisiti
 	}
 	if ctx.Err() == nil && errors.Is(context.Cause(acquireCtx), errAcquireBudget) {
 		return nil, diag.New(diag.CodeToolTimeout,
-			fmt.Sprintf("acquiring the device did not finish within %d seconds", budgetMs/1000),
-			"Check that the device is connected, unlocked and trusted, then try again.", err)
+			fmt.Sprintf("acquiring the device did not finish within %s", formatBudget(budgetMs)),
+			"Check that the device is connected and unlocked, then try again.", err)
 	}
 	return nil, err
 }

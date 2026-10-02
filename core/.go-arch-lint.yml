@@ -79,6 +79,8 @@ components:
     in: internal/runfolder
   session:
     in: internal/session
+  sessiontest:
+    in: internal/session/sessiontest
   inspector:
     in: internal/inspector
   cmd:
@@ -246,6 +248,7 @@ deps:
       - diag
       - netcapture
       - session
+      - sessiontest
       - runfolder
   config:
     anyVendorDeps: true
@@ -281,6 +284,9 @@ deps:
       - shutdown
       - session
       - drivermock
+  sessiontest:
+    mayDependOn:
+      - lease
   inspector:
     mayDependOn:
       - wire

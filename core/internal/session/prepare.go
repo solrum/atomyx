@@ -19,16 +19,20 @@ var errBuildBudget = errors.New("runner build timeout elapsed")
 // Run it before Open so a long build neither blocks other processes
 // from the device nor spends Open's acquisition budget.
 //
-// It is bounded by device.DefaultRunnerBuildTimeoutMs on deps.Clock,
-// which covers the wait for another process's build of the same runner.
-// When that time elapses it fails with RUNNER_BUILD_TIMEOUT. A canceled
-// ctx returns its own error. With no Preparer in deps it does nothing.
-func Prepare(ctx context.Context, deps Deps, desc device.Descriptor) error {
+// It is bounded by buildMs on deps.Clock, which covers the wait for
+// another process's build of the same runner. A non-positive buildMs
+// means DefaultRunnerBuildTimeoutMs. When the time elapses it fails with
+// RUNNER_BUILD_TIMEOUT. A canceled ctx returns its own error. With no
+// Preparer in deps it does nothing.
+func Prepare(ctx context.Context, deps Deps, desc device.Descriptor, buildMs int64) error {
 	if deps.Preparer == nil {
 		return nil
 	}
+	if buildMs <= 0 {
+		buildMs = DefaultRunnerBuildTimeoutMs
+	}
 	deps = deps.withDefaults()
-	budget, stop := withClockTimeout(ctx, deps.Clock, device.DefaultRunnerBuildTimeoutMs, errBuildBudget)
+	budget, stop := withClockTimeout(ctx, deps.Clock, buildMs, errBuildBudget)
 	err := deps.Preparer.Prepare(budget, desc)
 	elapsed := errors.Is(context.Cause(budget), errBuildBudget)
 	stop()
@@ -36,7 +40,7 @@ func Prepare(ctx context.Context, deps Deps, desc device.Descriptor) error {
 		return err
 	}
 	return diag.New(diag.CodeRunnerBuildTimeout,
-		fmt.Sprintf("building the device runner did not finish within %d seconds", device.DefaultRunnerBuildTimeoutMs/1000),
+		fmt.Sprintf("building the device runner did not finish within %s", formatBudget(buildMs)),
 		"Wait for any other Atomyx process that is building the runner to finish, check that Xcode is installed and responsive, then try again.", err)
 }
 
