@@ -289,6 +289,10 @@ queries with no side effect on the device:
 import `device`, so the caller resolves the identity first and passes
 the key down.
 
+`session` reaches the lease manager through its narrow `LeaseAcquirer`
+interface, which `*lease.Manager` satisfies, so `mcp` does not import
+`lease`. A host test passes `session.FakeLeases` instead of a manager.
+
 ## Session ownership
 
 `core/internal/session` is the one path by which a process takes a

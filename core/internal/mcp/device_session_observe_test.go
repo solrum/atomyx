@@ -74,7 +74,7 @@ func TestDeviceSession_DisconnectDuringAReacquireWaitsForItAndTearsDownTheResult
 
 	returnedAfterRelease := make(chan bool, 1)
 	go func() {
-		ds.Disconnect()
+		_ = ds.Disconnect(context.Background())
 		returnedAfterRelease <- pf.released.Load()
 	}()
 	pf.let()

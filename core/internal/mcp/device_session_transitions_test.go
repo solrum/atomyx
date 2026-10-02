@@ -113,7 +113,7 @@ func TestEnsureSeesADisconnectMadeWhileItBuilt(t *testing.T) {
 	}()
 	gate.awaitStarted(t)
 
-	ds.Disconnect()
+	_ = ds.Disconnect(context.Background())
 	close(gate.release)
 
 	if err := awaitResult(t, done); !errors.Is(err, errNoActiveDevice) {

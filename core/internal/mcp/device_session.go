@@ -171,7 +171,7 @@ type DeviceSession struct {
 	// runner build runs before the lock is taken, and each transition
 	// re-reads the state under the lock, so a change made while it built
 	// is seen. mu alone guards reads of the fields below.
-	acquireMu sync.Mutex
+	acquireMu transitionLock
 
 	mu     sync.Mutex
 	closed bool
@@ -271,12 +271,15 @@ func (s *DeviceSession) Current() *ActiveDevice {
 // Select acquires the device named by input through session.Open and
 // marks it current. The new device is resolved, prepared and opened
 // before the current one is torn down, so a failed selection keeps the
-// working device. The one exception is a request for the device already
-// held, whose lease must be given up before it can be taken again. The
-// acquisition runs outside the tool call's time budget, and the runner
+// working device. The one exception is a request that reaches the
+// hardware already held, even through another id such as a second serial
+// of one phone, whose lease must be given up before it can be taken
+// again. The// acquisition runs outside the tool call's time budget, and the runner
 // build runs outside acquireMu, so an idle release or a lost device is
 // not delayed by it. A disconnect failure on the previous driver is
-// logged and does not block the new selection. A failed acquisition is
+// logged and does not block the new selection. A failed re-take of the
+// held hardware leaves it remembered, so the next call that needs it
+// takes it again. A failed acquisition is
 // returned, so select_device can report a structured failure, for
 // example DEVICE_HELD when another process drives the device. A canceled
 // ctx returns its own error. A Select that finishes on a closed session
@@ -290,6 +293,10 @@ func (s *DeviceSession) Select(ctx context.Context, input SelectDeviceInput) (*A
 	desc, err := s.resolveDescriptor(ctx, input)
 	if err != nil {
 		return nil, err
+	}
+	identity, err := s.deps.ResolveIdentity(ctx, desc)
+	if err != nil {
+		return nil, fmt.Errorf("session.select: driver.connect failed for %s/%s: %w", input.Platform, input.ID, err)
 	}
 	ctx, stop := s.withLife(ctx)
 	defer stop()
@@ -305,8 +312,10 @@ func (s *DeviceSession) Select(ctx context.Context, input SelectDeviceInput) (*A
 	s.mu.Lock()
 	held := s.sess
 	s.mu.Unlock()
-	if held != nil && sameDevice(held.Descriptor(), desc) {
-		s.releasePrevious(s.detach(true)) //nolint:contextcheck // teardown is bounded by its own grace timer, not by a call context
+	if held != nil && held.Identity() == identity {
+		previous := s.detach(false)
+		s.releasePrevious(previous) //nolint:contextcheck // teardown is bounded by its own grace timer, not by a call context
+		s.rememberLaunch(previous)
 	}
 	sess, err := s.open(ctx, session.Request{Descriptor: desc})
 	if err != nil {
@@ -322,11 +331,14 @@ func (s *DeviceSession) Select(ctx context.Context, input SelectDeviceInput) (*A
 	return active, nil
 }
 
-// sameDevice reports whether two descriptors may name one device. An
-// empty id may resolve to any device of its platform, so it counts as
-// the same.
-func sameDevice(a, b device.Descriptor) bool {
-	return a.Platform == b.Platform && (a.ID == b.ID || a.ID == "" || b.ID == "")
+// rememberLaunch stores the launched-app state of a session this one gave
+// up on purpose, so a later re-acquire can offer it to the next driver.
+func (s *DeviceSession) rememberLaunch(previous *session.Session) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if previous != nil && s.remembered != nil {
+		s.remembered.launch = previous.LaunchState()
+	}
 }
 
 // Ensure returns the bound device, taking the remembered device again
@@ -502,8 +514,9 @@ func (s *DeviceSession) install(ctx context.Context, sess *session.Session, plat
 }
 
 // detach removes the bound session and returns it for the caller to
-// close. forget also drops the remembered descriptor, which an explicit
-// selection or disconnect does and an idle release does not.
+// close. forget also drops the remembered descriptor, which a disconnect
+// does. Without it the descriptor stays remembered and the state is
+// released, so a later Ensure can take the device again.
 func (s *DeviceSession) detach(forget bool) *session.Session {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -514,6 +527,8 @@ func (s *DeviceSession) detach(forget bool) *session.Session {
 	if forget {
 		s.remembered = nil
 		s.state = holderUnselected
+	} else {
+		s.state = holderReleased
 	}
 	return prev
 }
@@ -758,7 +773,7 @@ func (s *DeviceSession) Close() {
 	s.closed = true
 	s.mu.Unlock()
 	s.cancelLife(errSessionClosed)
-	s.Disconnect()
+	_ = s.Disconnect(context.Background())
 }
 
 func (s *DeviceSession) isClosed() bool {
@@ -769,24 +784,28 @@ func (s *DeviceSession) isClosed() bool {
 
 // Disconnect tears down the active driver, forgets the device and marks
 // the session unselected. It is a no-op when the session is already
-// unselected.
-func (s *DeviceSession) Disconnect() {
-	s.acquireMu.Lock()
+// unselected. It waits for a transition in flight only until ctx ends,
+// then returns the context error and changes nothing.
+func (s *DeviceSession) Disconnect(ctx context.Context) error {
+	if err := s.acquireMu.LockContext(ctx); err != nil {
+		return err
+	}
 	defer s.acquireMu.Unlock()
 	previous := s.detach(true)
 	if previous == nil {
-		return
+		return nil
 	}
 	desc := previous.Descriptor()
-	if err := previous.Close(); err != nil {
+	if err := previous.Close(); err != nil { //nolint:contextcheck // teardown is bounded by its own grace timer, not by a call context
 		s.logger.Warn("session.disconnect_failed", logging.LogContext{
 			"id": desc.ID, "platform": string(desc.Platform), "error": err.Error(),
 		})
-		return
+		return nil
 	}
 	s.logger.Info("session.disconnected", logging.LogContext{
 		"id": desc.ID, "platform": string(desc.Platform),
 	})
+	return nil
 }
 
 // resolveDescriptor builds the device.Descriptor Factory builds from

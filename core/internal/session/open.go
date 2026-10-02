@@ -37,7 +37,7 @@ type Deps struct {
 	// Leases arbitrates which process drives a device. Nil disables
 	// exclusion entirely, which only a single-process host such as a test
 	// wants. Every production composition root sets it.
-	Leases *lease.Manager
+	Leases LeaseAcquirer
 	// Preparer does the lease-free work Prepare runs before Open, such as
 	// building the iOS runner. Nil makes Prepare a no-op.
 	Preparer device.RunnerPreparer
@@ -99,9 +99,9 @@ func Open(ctx context.Context, deps Deps, req Request) (*Session, error) {
 	deps = deps.withDefaults()
 	desc := req.Descriptor
 
-	identity, err := deps.resolveIdentity(ctx, desc)
+	identity, err := deps.ResolveIdentity(ctx, desc)
 	if err != nil {
-		return nil, mapIdentityError(err)
+		return nil, err
 	}
 
 	var held *lease.Lease
@@ -168,11 +168,19 @@ func (d Deps) withDefaults() Deps {
 	return d
 }
 
-func (d Deps) resolveIdentity(ctx context.Context, desc device.Descriptor) (device.Identity, error) {
+// ResolveIdentity reports the canonical identity Open keys the lease
+// on for desc, as a coded error when the device cannot be identified.
+// A host compares it with the identity of a session it holds to tell
+// whether two descriptors reach one device.
+func (d Deps) ResolveIdentity(ctx context.Context, desc device.Descriptor) (device.Identity, error) {
 	if d.Identity == nil {
 		return device.Identity{Platform: desc.Platform, HardwareID: desc.ID}, nil
 	}
-	return d.Identity.Resolve(ctx, desc)
+	identity, err := d.Identity.Resolve(ctx, desc)
+	if err != nil {
+		return device.Identity{}, mapIdentityError(err)
+	}
+	return identity, nil
 }
 
 // reapOrphan ends a runner a crashed earlier holder of an iOS device

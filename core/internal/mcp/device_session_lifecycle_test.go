@@ -13,7 +13,6 @@ import (
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/diag"
 	mockdriver "dev.atomyx/internal/driver/mock"
-	"dev.atomyx/internal/lease"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/session"
@@ -91,46 +90,10 @@ func (f *lifecycleFactory) driver(i int) *lifecycleDriver {
 	return f.drivers[i]
 }
 
-// gatedLeaseClock is the clock a lease manager runs on in these tests.
-// A short sleep, the acquire retry, returns at once. The long sleep of
-// the inode watch waits for fire, so a test decides when the watch
-// looks at the lock file.
-type gatedLeaseClock struct {
-	mu   sync.Mutex
-	now  int64
-	gate chan struct{}
-}
-
-func newGatedLeaseClock() *gatedLeaseClock { return &gatedLeaseClock{gate: make(chan struct{})} }
-
-func (c *gatedLeaseClock) NowMs() int64 {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.now
-}
-
-func (c *gatedLeaseClock) Sleep(ctx context.Context, ms int64) error {
-	if ms >= lease.InodeRecheckPeriod.Milliseconds() {
-		select {
-		case <-c.gate:
-			return nil
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-	c.mu.Lock()
-	c.now += ms
-	c.mu.Unlock()
-	return ctx.Err()
-}
-
-func (c *gatedLeaseClock) fire() { c.gate <- struct{}{} }
-
 type lifecycleFixture struct {
 	t        *testing.T
 	clk      *clock.ManualClock
-	leaseClk *gatedLeaseClock
-	leases   *lease.Manager
+	leases   *session.FakeLeases
 	factory  *lifecycleFactory
 	runStore *storage.RunStore
 	store    storage.Storage
@@ -140,22 +103,12 @@ type lifecycleFixture struct {
 
 func newLifecycleFixture(t *testing.T) *lifecycleFixture {
 	t.Helper()
-	root := t.TempDir()
-	leaseClk := newGatedLeaseClock()
-	leases, err := lease.NewManager(lease.Environment{
-		GOOS:          "linux",
-		Getenv:        func(k string) string { return map[string]string{"XDG_RUNTIME_DIR": root}[k] },
-		UserCacheDir:  func() (string, error) { return root, nil },
-		Getuid:        os.Getuid,
-		IsLocalFS:     func(string) (bool, error) { return true, nil },
-		FallbackRoot:  root,
-		MaxSocketPath: 4096,
-	}, leaseClk)
+	leases, err := session.NewFakeLeases(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 	f := &lifecycleFixture{
-		t: t, clk: clock.NewManualClock(0), leaseClk: leaseClk, leases: leases,
+		t: t, clk: clock.NewManualClock(0), leases: leases,
 		factory: newLifecycleFactory(), runStore: storage.NewRunStore(), store: storage.NewInMemoryStorage(),
 	}
 	f.runs = &runTracker{runs: f.runStore, storage: f.store, clock: f.clk, logger: logging.NoopLogger{}}
@@ -210,11 +163,11 @@ func (f *lifecycleFixture) state(ds *DeviceSession) holderState {
 
 func (f *lifecycleFixture) leaseHeld() bool {
 	f.t.Helper()
-	status, err := f.leases.Probe(context.Background(), lease.KeyFor("android", "A"))
+	held, err := f.leases.Held(context.Background(), "android", "A")
 	if err != nil {
 		f.t.Fatal(err)
 	}
-	return status.Held
+	return held
 }
 
 func codeOfErr(err error) string {
@@ -326,7 +279,7 @@ func TestDeviceSession_AReleasedSessionThatFindsTheDeviceHeldReportsDeviceReleas
 		t.Fatalf("state = %s, want it unchanged by the failed re-acquire", got)
 	}
 
-	cli.Disconnect()
+	_ = cli.Disconnect(context.Background())
 	if _, err := f.devices.Ensure(context.Background()); err != nil {
 		t.Fatalf("Ensure() error = %v after the other process let go", err)
 	}
@@ -338,7 +291,7 @@ func TestDeviceSession_AnExplicitDisconnectForgetsTheDevice(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	f.devices.Disconnect()
+	_ = f.devices.Disconnect(context.Background())
 	<-f.factory.disconnected
 
 	if _, err := f.devices.Ensure(context.Background()); codeOfErr(err) != diag.CodeDeviceNotFound {
@@ -483,7 +436,7 @@ func TestDeviceSession_ALostLeaseMovesTheSessionToLostAndTheNextCallRecovers(t *
 	}
 	f.runStore.Start(storage.StartOptions{Name: "smoke"})
 
-	lockPath := f.leases.LockPath(lease.KeyFor("android", "A"))
+	lockPath := f.leases.LockPathFor("android", "A")
 	replacement := filepath.Join(filepath.Dir(lockPath), "replacement")
 	if err := os.WriteFile(replacement, nil, 0o600); err != nil {
 		t.Fatal(err)
@@ -499,7 +452,7 @@ func TestDeviceSession_ALostLeaseMovesTheSessionToLostAndTheNextCallRecovers(t *
 		t.Fatal(err)
 	}
 
-	f.leaseClk.fire()
+	f.leases.FireRecheck()
 	f.awaitRelease(f.devices)
 
 	if got := f.state(f.devices); got != holderLost || f.devices.Current() != nil {
