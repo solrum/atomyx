@@ -30,6 +30,7 @@
         "id": "b1",
         "title": "t",
         "description": "d",
+        "screenshotPath": "artifacts/b1.png",
         "timestamp": 1790000001000
       }
     ],

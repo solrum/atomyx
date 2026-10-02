@@ -5,12 +5,16 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
+	"strings"
 	"testing"
 )
 
 func fullMeta() Meta {
 	completed := int64(1_790_000_005_000)
 	failedAt := 3
+	summary := "done"
 	return Meta{
 		SchemaVersion: SchemaVersion,
 		RunID:         "20261002-101500-pixel-7-a1b2",
@@ -27,8 +31,8 @@ func fullMeta() Meta {
 		FailedAtStep:  &failedAt,
 		TotalSteps:    9,
 		MCP: &MCPInfo{
-			Name: "smoke", Source: "mcp", ActionCount: 4, DurationMs: 5000, Summary: "done",
-			Findings: []Finding{{ID: "b1", Title: "t", Description: "d", Timestamp: 1_790_000_001_000}},
+			Name: "smoke", Source: "mcp", ActionCount: 4, DurationMs: 5000, Summary: &summary,
+			Findings: []Finding{{ID: "b1", Title: "t", Description: "d", ScreenshotPath: "artifacts/b1.png", Timestamp: 1_790_000_001_000}},
 		},
 	}
 }
@@ -117,5 +121,75 @@ func TestRunDirLayout(t *testing.T) {
 	}
 	if LooseScreenshotsDir("/r") != filepath.Join("/r", "screenshots") {
 		t.Fatal("loose screenshots dir drifted")
+	}
+}
+
+func TestMCPInfoOmitsNilFindingsAndKeepsEmptySummary(t *testing.T) {
+	empty := ""
+	withEmpty, err := json.Marshal(MCPInfo{Name: "n", Source: "s", Summary: &empty})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(withEmpty, []byte(`"findings"`)) {
+		t.Errorf("nil findings encoded: %s", withEmpty)
+	}
+	if !bytes.Contains(withEmpty, []byte(`"summary":""`)) {
+		t.Errorf("empty summary dropped: %s", withEmpty)
+	}
+	missing, err := json.Marshal(MCPInfo{Name: "n", Source: "s"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(missing, []byte(`"summary"`)) {
+		t.Errorf("absent summary encoded: %s", missing)
+	}
+}
+
+// jsonFields lists the json property names of a struct type and which
+// of them are required, meaning tagged without omitempty.
+func jsonFields(t reflect.Type) (all, required []string) {
+	for i := 0; i < t.NumField(); i++ {
+		name, opts, _ := strings.Cut(t.Field(i).Tag.Get("json"), ",")
+		all = append(all, name)
+		if !strings.Contains(opts, "omitempty") {
+			required = append(required, name)
+		}
+	}
+	sort.Strings(all)
+	sort.Strings(required)
+	return all, required
+}
+
+func TestSchemaMatchesJSONTags(t *testing.T) {
+	defs := GenerateJSONSchema()["definitions"].(map[string]any)
+	types := map[string]reflect.Type{
+		"RunMeta": reflect.TypeOf(Meta{}),
+		"Device":  reflect.TypeOf(Device{}),
+		"Host":    reflect.TypeOf(Host{}),
+		"MCPInfo": reflect.TypeOf(MCPInfo{}),
+		"Finding": reflect.TypeOf(Finding{}),
+	}
+	if len(defs) != len(types) {
+		t.Fatalf("schema has %d definitions, test covers %d", len(defs), len(types))
+	}
+	for name, typ := range types {
+		def := defs[name].(map[string]any)
+		var props []string
+		for p := range def["properties"].(map[string]any) {
+			props = append(props, p)
+		}
+		sort.Strings(props)
+		var req []string
+		if r, ok := def["required"].([]string); ok {
+			req = append(req, r...)
+		}
+		sort.Strings(req)
+		wantAll, wantReq := jsonFields(typ)
+		if !reflect.DeepEqual(props, wantAll) {
+			t.Errorf("%s properties = %v, json tags = %v", name, props, wantAll)
+		}
+		if !reflect.DeepEqual(req, wantReq) {
+			t.Errorf("%s required = %v, tags without omitempty = %v", name, req, wantReq)
+		}
 	}
 }

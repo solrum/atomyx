@@ -55,7 +55,7 @@ the repo-wide lints alongside it, runs these steps in order:
 | Comment gate | `bash scripts/check-comments.sh` |
 | Raw syscall.Open gate | `bash scripts/check-no-raw-syscall-open.sh` |
 | Session test-helper import gate | `bash scripts/check-sessiontest-imports.sh` |
-| Run folder layout gate | `bash scripts/check-runfolder-layout.sh` |
+| Run folder layout gate | `go run ./scripts/check-runfolder-layout .` |
 | Schema freshness gate | `bash scripts/check-schema-fresh.sh` |
 | Test | `go test -race ./...` |
 
@@ -64,9 +64,9 @@ The layer-import gate reads `core/.go-arch-lint.yml`. See
 The comment gate forbids two things in production Go source:
 comments that anchor current behavior to a superseded implementation,
 and prose that uses a banned punctuation mark as a stand-in for a
-connecting word. The run folder layout gate rejects the names `runs`, `v1`,
-`artifacts`, `report`, and `screenshots` as quoted path segments in
-production Go outside `core/internal/runfolder`. The schema-freshness
+connecting word. The run folder layout gate parses production Go and rejects the
+names `runs`, `v1`, `artifacts`, `report`, and `screenshots` spelled
+as string literals outside `core/internal/runfolder`. The schema-freshness
 gate confirms the committed JSON Schema files still match the Go structs that generate
 them.
 

@@ -85,6 +85,8 @@ components:
     in: internal/inspector
   cmd:
     in: cmd/**
+  scripttools:
+    in: scripts/**
 
 deps:
   diag:
@@ -261,10 +263,6 @@ deps:
     mayDependOn:
       - diag
   attach:
-    mayDependOn:
-      - wire
-      - diag
-  runfolder:
     mayDependOn:
       - wire
       - diag

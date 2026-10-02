@@ -16,8 +16,8 @@
 // Invariants callers rely on:
 //
 //   - The layout names live in layout.go and nowhere else in production
-//     Go code. The check-runfolder-layout gate rejects a quoted copy of
-//     them outside this package.
+//     Go code. The check-runfolder-layout gate rejects a string literal
+//     that spells one of them outside this package.
 //   - Times in meta.json are epoch milliseconds.
 //   - Readers accept any schemaVersion up to SchemaVersion and ignore
 //     unknown fields. Writers never reshape a field within a major

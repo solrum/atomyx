@@ -65,8 +65,8 @@ release:
 	@cat $(GO_DIST_DIR)/SHA256SUMS
 
 # Regenerate the checked-in JSON Schema files from the Go types that
-# define them. Run after any change to internal/script's or
-# internal/config's or internal/runfolder's field or schema-generation types.
+# define them. Run after any change to a field or schema-generation
+# type in internal/script, internal/config, or internal/runfolder.
 gen-schema:
 	go run ./cmd/gen-script-schema -out internal/script/atomyx-script.schema.json
 	go run ./cmd/gen-config-schema -out internal/config/atomyx-config.schema.json
@@ -80,12 +80,14 @@ check-schema:
 
 # The full local gate for the core module: format, build, vet, the
 # layer-import gate, the lint gate, the comment gate, the raw-open
-# gate, the run folder layout gate, the schema freshness gate, and the race-enabled test suite, in
-# that order, each one failing the target the moment it fails.
-# go-arch-lint and golangci-lint must already be on PATH (see CONTRIBUTING.md for the
-# install commands); golangci-lint must be v2.13.2, the version this
-# module's .golangci.yml is authored and verified against, because a
-# different version can load the config differently or reject it.
+# gate, the run folder layout gate, the schema freshness gate, and the
+# race-enabled test suite, in that order, each one failing the target
+# the moment it fails.
+# go-arch-lint and golangci-lint must already be on PATH (see
+# CONTRIBUTING.md for the install commands). golangci-lint must be v2.13.2,
+# the version this module's .golangci.yml is authored and verified
+# against, because a different version can load the config differently
+# or reject it.
 check:
 	@echo "Format gate ..."
 	@unformatted=$$(gofmt -l .); \
@@ -105,7 +107,7 @@ check:
 	@echo "Session test-helper import gate ..."
 	bash scripts/check-sessiontest-imports.sh
 	@echo "Run folder layout gate ..."
-	bash scripts/check-runfolder-layout.sh
+	go run ./scripts/check-runfolder-layout .
 	@echo "Schema freshness gate ..."
 	bash scripts/check-schema-fresh.sh
 	@echo "Test ..."

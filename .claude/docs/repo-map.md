@@ -112,9 +112,10 @@ Dev tooling `make -C core check` runs (see
 `syscall.Open(` or `unix.Open(` outside `core/internal/lease`),
 `core/scripts/check-sessiontest-imports.sh` (rejects a non-test file
 that imports `core/internal/session/sessiontest`),
-`core/scripts/check-runfolder-layout.sh` (rejects a quoted run folder
-layout name outside `core/internal/runfolder`, with an allowlist of
-files not yet moved onto it), and `core/scripts/check-schema-fresh.sh` (the schema-freshness gate), plus
+`core/scripts/check-runfolder-layout/` (a Go program that rejects a
+run folder layout name spelled as a string literal outside
+`core/internal/runfolder`, with an allowlist of files that still
+spell one), and `core/scripts/check-schema-fresh.sh` (the schema-freshness gate), plus
 their allowlist files.
 
 ## `platforms/`

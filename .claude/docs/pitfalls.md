@@ -223,20 +223,24 @@ corresponding area. For the high-level map see
   names `runs`, `v1`, `artifacts`, `report`, and `screenshots` are the
   on-disk contract of a run folder. Call `runfolder.RunDir`,
   `ArtifactsDir`, `ReportDir`, or `LooseScreenshotsDir` instead.
-  `core/scripts/check-runfolder-layout.sh` flags a quoted name used as
-  a call argument, as a whole assignment value, inside a join with
-  `report`, inside a slashed path such as `"runs/v1"`, or in a link
-  format such as `screenshots/%s`. Struct tags, config keys, and
-  index expressions are not flagged. The gate carries an explicit
+  The Go program in `core/scripts/check-runfolder-layout` parses
+  each production file and flags a string literal, interpreted or
+  raw, that equals `runs`, `artifacts`, or `screenshots`, that has
+  one of the five names as a whole segment of a slashed path such as
+  `"runs/v1"` or `screenshots/%s`, or that is exactly `v1` or
+  `report` as an argument of a `filepath`, `path`, or `os` call.
+  Struct tags, import paths, prose, URLs, and format identifiers such
+  as `atomyx/v1` are not flagged. The gate carries an explicit
   allowlist of files that still spell a name. Remove an entry when its
   file moves onto `runfolder`, and never add one for new code.
 - **A new field in `meta.json` needs a schema regeneration.** Change
   the `runfolder` types, then run `make -C core gen-schema`. The
   schema-freshness gate fails on a stale `atomyx-run.schema.json`.
-- **A reshaped field breaks external readers.** Studio and run-folder
-  consumers parse `meta.json` with unknown fields ignored, so adding a
-  field is safe and renaming or retyping one is not. Treat that as a
-  breaking change that needs an ADR.
+- **A reshaped field breaks external readers.** Readers of
+  `meta.json` ignore unknown fields, so adding a field is safe and
+  renaming or retyping one is not. Treat that as a breaking change
+  that needs an ADR. Studio keeps its own run root and does not read
+  this folder.
 
 ## Tool layer (cross-platform)
 

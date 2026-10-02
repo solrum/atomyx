@@ -42,15 +42,11 @@ func ArtifactsDir(runDir string) string {
 }
 
 // ReportDir returns the directory inside a run folder that holds the
-// rendered report. Its sibling ArtifactsDir is reachable from it as
-// ReportArtifactsLink.
+// rendered report. Its sibling ArtifactsDir is reachable from it with
+// filepath.Rel.
 func ReportDir(runDir string) string {
 	return filepath.Join(runDir, reportDirName)
 }
-
-// ReportArtifactsLink is the relative path from a file in ReportDir to
-// the sibling artifacts directory, ready to prefix a file name.
-const ReportArtifactsLink = "../" + artifactsDirName + "/"
 
 // LooseScreenshotsDir returns the directory under root that receives a
 // screenshot taken while no run is open.

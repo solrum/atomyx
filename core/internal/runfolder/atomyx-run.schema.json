@@ -96,7 +96,6 @@
         "name",
         "source",
         "actionCount",
-        "findings",
         "durationMs"
       ],
       "type": "object"

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Confirms the committed JSON Schema files still match the Go
-# structs they are generated from. Studio copies these files at build
-# time to validate scripts and config in its Monaco editor, so a
-# struct changed without regenerating the schema would ship a stale
-# contract to Studio silently.
+# structs they are generated from. Studio copies the script and config
+# schemas at build time to validate scripts and config in its Monaco
+# editor, so a struct changed without regenerating one of them would
+# ship a stale contract to Studio silently. The run schema is read by
+# external consumers of run folders.
 #
 # Generation writes to a temporary path first, then that output is
 # compared byte for byte against the committed file. Regenerating

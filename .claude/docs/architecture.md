@@ -388,10 +388,20 @@ Contract:
   `outcome`, `failedAtStep`, `totalSteps`, and an optional `mcp` block
   for the fields only an MCP run has.
 - **Result and outcome.** `result` is `passed`, `failed`, or
-  `cancelled`, the set Studio already understands. `outcome` refines
-  it with `passed`, `failed`, `error`, `cancelled`, `deviceLost`, or
-  `interrupted`, and each outcome belongs to exactly one result. A
-  meta with no `completedAt` is a run that never finished.
+  `cancelled`. `outcome` refines it with `passed`, `failed`, `error`,
+  `cancelled`, `deviceLost`, or `interrupted`, and each outcome belongs
+  to exactly one result. `result` and `outcome` are written only
+  together with `completedAt`. A meta with no `completedAt` is a run
+  that never finished, and a reader reports it as result `cancelled`
+  with outcome `interrupted`. A migrated legacy running record
+  therefore carries no `completedAt`, no `result`, and no `outcome`.
+- **Kind.** `script` is a CLI run of one script, `suite` is a CLI
+  suite or scenario run, and `mcp` is a run driven through the MCP
+  server. A `run_script` call inside an open MCP run writes into that
+  run, and a bare `run_script` call is its own run of kind `mcp`.
+- **Failed step.** `failedAtStep` is the zero-based index of the
+  failed step, matching `ScriptResult.FailedAtStep` in the runner.
+  Display code adds one.
 - **Run id.** The schema puts no pattern on it, because a migrated run
   keeps its legacy id.
 - **Evidence.** One `artifacts/` directory holds every screenshot and
@@ -409,8 +419,9 @@ Contract:
   schema-freshness gate.
 
 `runfolder` depends on the standard library only, so every consumer may
-import it. `core/scripts/check-runfolder-layout.sh` keeps the layout
-names out of every other package.
+import it. The arch-lint rules give it no dependency on any other
+project package. The Go program in `core/scripts/check-runfolder-layout`
+keeps the layout names out of every other package.
 
 ## Dependency direction and its enforcement
 

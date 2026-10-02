@@ -1,8 +1,5 @@
 package runfolder
 
-// SchemaFileName is the committed JSON Schema generated from Meta.
-const SchemaFileName = "atomyx-run.schema.json"
-
 // GenerateJSONSchema returns the JSON Schema of meta.json. The run id
 // has no pattern, because a migrated run keeps its legacy id.
 func GenerateJSONSchema() map[string]any {
@@ -84,7 +81,7 @@ func mcpInfoSchema() map[string]any {
 		"findings":    map[string]any{"type": "array", "items": ref("Finding")},
 		"summary":     str(),
 		"durationMs":  map[string]any{"type": "integer", "minimum": 0},
-	}, []string{"name", "source", "actionCount", "findings", "durationMs"})
+	}, []string{"name", "source", "actionCount", "durationMs"})
 }
 
 // Readers ignore unknown fields, so every object stays open
