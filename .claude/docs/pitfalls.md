@@ -142,6 +142,11 @@ corresponding area. For the high-level map see
   descriptor in a spawned child keeps the device held after the owner
   exits. `core/scripts/check-no-raw-syscall-open.sh` fails the build on
   a raw open outside `core/internal/lease`.
+- **Take a file lock through `core/internal/flock` only.** The package
+  is a leaf, so it must not import another project package. It never
+  switches the descriptor to blocking mode and it retries on a signal.
+  A lock lives on an open file description, so open the file with
+  `os.OpenFile` and keep it open for as long as the lock must hold.
 - **Never conflate `DEVICE_HELD` with `DEVICE_BUSY`.** `DEVICE_HELD`
   means another Atomyx process holds the lease. `DEVICE_BUSY` is
   reserved for a foreign, non-Atomyx automation session found driving

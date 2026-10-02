@@ -11,6 +11,7 @@ import (
 
 	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/diag"
+	"dev.atomyx/internal/flock"
 )
 
 func testHolder(pid int, command string) Holder {
@@ -255,7 +256,7 @@ func TestRecheck_FailedReacquireReportsLost(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = other.Close() }()
-	if err := flock(other, syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+	if err := flock.TryExclusive(other); err != nil {
 		t.Fatal(err)
 	}
 
@@ -298,7 +299,7 @@ func TestWatch_ReportsLossAfterOnePeriod(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = blocker.Close() }()
-	if err := flock(blocker, syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+	if err := flock.TryExclusive(blocker); err != nil {
 		t.Fatal(err)
 	}
 

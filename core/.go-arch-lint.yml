@@ -71,6 +71,8 @@ components:
     in: internal/config
   report:
     in: internal/report
+  flock:
+    in: internal/flock
   lease:
     in: internal/lease
   attach:
@@ -259,9 +261,16 @@ deps:
       - runner
       - scenario
       - config
+  flock:
+    mayDependOn:
+      - flock
   lease:
     mayDependOn:
       - diag
+      - flock
+  runfolder:
+    mayDependOn:
+      - flock
   attach:
     mayDependOn:
       - wire

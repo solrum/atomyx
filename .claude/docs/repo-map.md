@@ -81,6 +81,7 @@ atomyx/
 | `core/internal/driver/mock` | An in-memory Driver implementation for tests. |
 | `iosdriver` | Implements the Driver port over the Swift XCUITest runner's line-delimited JSON TCP protocol. |
 | `iossimdriver` | Implements the Driver port over the iOS Simulator's direct-HID input path. |
+| `flock` | The advisory file lock primitive: a non-blocking exclusive flock on an open file, unlock, a contention check, and a descriptor-versus-path identity check. Depends on the standard library only. |
 | `lease` | Gives each physical device at most one driving process through a per-device flock, and probes it without writing. |
 | `logging` | The structured logging port every layer writes through, so the host chooses the destination. |
 | `mcp` | Builds the Atomyx MCP server: server construction, tool registration, the tool handlers themselves, and the `DeviceSession` holder state machine with its idle timers and clock-driven tool budget. |
@@ -88,7 +89,7 @@ atomyx/
 | `orchestra` | Composes Driver calls into selector resolution, priority broadening, scroll-into-view, obscurement, and retry. |
 | `process` | Abstracts external command execution (adb, xcrun, and similar) behind Runner and BackgroundRunner interfaces, carries extra child environment on the context, and reads process and host start times. |
 | `report` | Renders a run's result into a persisted report bundle: HTML, versioned JSON, and referenced screenshots. |
-| `runfolder` | Defines the run folder contract: the layout names, the `meta.json` record with its result and outcome enums, the legacy status mapping, and the generated JSON Schema. Depends on the standard library only. |
+| `runfolder` | Defines the run folder contract: the layout names, the `meta.json` record with its result and outcome enums, the legacy status mapping, and the generated JSON Schema. Depends on the standard library and `flock`. |
 | `runner` | Defines the command execution contract and the ScriptRunner that dispatches a parsed script's steps. |
 | `scenario` | Runs ordered groups of scripts and ordered sets of scripts or scenarios against a shared Orchestra. |
 | `script` | Owns the test-script schema, parser, and expression engine. |

@@ -10,10 +10,10 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"syscall"
 	"time"
 
 	"dev.atomyx/internal/clock"
+	"dev.atomyx/internal/flock"
 )
 
 const (
@@ -137,13 +137,13 @@ func (m *Manager) lockFile(ctx context.Context, path string) (*os.File, error) {
 		}
 		if err := m.flockWithRetry(ctx, f); err != nil {
 			_ = f.Close()
-			if errors.Is(err, syscall.EWOULDBLOCK) {
+			if flock.IsContended(err) {
 				h, known := readHolder(path)
 				return nil, newHeldError(h, known)
 			}
 			return nil, err
 		}
-		if sameAsPath(f, path) {
+		if flock.SameFile(f, path) {
 			return f, nil
 		}
 		_ = f.Close()
@@ -154,11 +154,11 @@ func (m *Manager) lockFile(ctx context.Context, path string) (*os.File, error) {
 func (m *Manager) flockWithRetry(ctx context.Context, f *os.File) error {
 	deadline := m.clock.NowMs() + AcquireRetryWindow.Milliseconds()
 	for {
-		err := flock(f, syscall.LOCK_EX|syscall.LOCK_NB)
+		err := flock.TryExclusive(f)
 		if err == nil {
 			return nil
 		}
-		if !errors.Is(err, syscall.EWOULDBLOCK) {
+		if !flock.IsContended(err) {
 			return fmt.Errorf("flock lease file: %w", err)
 		}
 		if m.clock.NowMs() >= deadline {
@@ -168,18 +168,6 @@ func (m *Manager) flockWithRetry(ctx context.Context, f *os.File) error {
 			return err
 		}
 	}
-}
-
-func sameAsPath(f *os.File, path string) bool {
-	fi, err := f.Stat()
-	if err != nil {
-		return false
-	}
-	pi, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return os.SameFile(fi, pi)
 }
 
 // Key reports the lease key.
@@ -227,7 +215,7 @@ func (l *Lease) Verify() (intact bool, err error) {
 	if l.file == nil {
 		return false, ErrReleased
 	}
-	return sameAsPath(l.file, l.path), nil
+	return flock.SameFile(l.file, l.path), nil
 }
 
 // Recheck verifies the lock file is still the one this lease holds. On
@@ -318,13 +306,13 @@ func (m *Manager) Probe(ctx context.Context, key Key) (Status, error) {
 	}
 	defer func() { _ = f.Close() }()
 	if err := m.flockWithRetry(ctx, f); err != nil {
-		if errors.Is(err, syscall.EWOULDBLOCK) {
+		if flock.IsContended(err) {
 			h, known := readHolder(path)
 			return Status{Held: true, Holder: h, HolderKnown: known}, nil
 		}
 		return Status{}, err
 	}
-	if err := flock(f, syscall.LOCK_UN); err != nil {
+	if err := flock.Unlock(f); err != nil {
 		return Status{}, fmt.Errorf("unlock probed lease file: %w", err)
 	}
 	return Status{}, nil

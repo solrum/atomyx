@@ -25,6 +25,6 @@
 //   - The run id carries no format constraint, because a run migrated
 //     from a flat record keeps its original id.
 //
-// The package depends only on the standard library, so it can sit
-// below every consumer of a run folder.
+// The package depends only on the standard library and the flock leaf
+// package, so it can sit below every consumer of a run folder.
 package runfolder
