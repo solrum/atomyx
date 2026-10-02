@@ -173,7 +173,7 @@ func iosDesc(id string) device.Descriptor {
 	return device.Descriptor{ID: id, Platform: device.PlatformIOS, Kind: device.KindSimulator, State: device.StateOnline}
 }
 
-func baseDeps(t *testing.T, f device.Factory, m *lease.Manager) session.Deps {
+func baseDeps(t *testing.T, f device.WrappingFactory, m *lease.Manager) session.Deps {
 	t.Helper()
 	return session.Deps{Factory: f, Leases: m, Command: "atomyx run", Role: "cli", PID: os.Getpid()}
 }

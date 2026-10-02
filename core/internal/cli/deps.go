@@ -18,7 +18,7 @@ type Deps struct {
 	Probe device.Probe
 	// Factory builds a connected driver and orchestra for the
 	// platform and device a run targets.
-	Factory device.Factory
+	Factory device.WrappingFactory
 	// Runners identifies the iOS runner already served on the default
 	// control port, so a run without --device targets that runner's
 	// device. A nil value means no runner is ever found.

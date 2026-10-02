@@ -97,7 +97,7 @@ type ActiveDevice struct {
 // their defaults. Runs lets the session see and close the server's open
 // run, and may be nil for a host with no run tracking.
 type DeviceSessionDeps struct {
-	Factory    device.Factory
+	Factory    device.WrappingFactory
 	Probe      device.Probe
 	Runners    device.RunnerIdentifier
 	Clock      orchestra.Clock

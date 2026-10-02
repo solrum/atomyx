@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"dev.atomyx/internal/device"
+	"dev.atomyx/internal/driver"
 	mockdriver "dev.atomyx/internal/driver/mock"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/session/sessiontest"
@@ -23,7 +24,9 @@ type clockedMockDriverFactory struct {
 }
 
 func (f clockedMockDriverFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
-	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
+	return sessiontest.WrappingWith(f, func(d driver.Driver) *orchestra.Orchestra {
+		return orchestra.New(orchestra.OrchestraDeps{Driver: d, Clock: f.clock})
+	}).WithDriverWrap(wrap)
 }
 
 func (f clockedMockDriverFactory) Build(ctx context.Context, _ device.Descriptor) (device.Built, error) {

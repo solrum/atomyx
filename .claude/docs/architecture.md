@@ -335,9 +335,10 @@ for a host that does not need to split them.
 4. Builds the driver through `device.Factory`, with the device tagged on
    the context through `logging.WithDevice` so every log line from the
    driver carries `deviceId` and `hardwareId`. The factory must implement
-   `device.WrappingFactory`, and `Open` fails with `session.ErrNotWrappable`
-   before it takes the lease when it does not, so no session runs without
-   its viewers' hub. The factory builds the driver inside an observing
+   `device.WrappingFactory`, which the type of `session.Deps.Factory`
+   enforces at compile time, so no session runs without its viewers' hub.
+   `Open` fails with `session.ErrNoFactory` before it takes the lease when
+   the factory is nil. The factory builds the driver inside an observing
    decorator, `session.NewObservingDriver`, before it builds the
    Orchestra. Built.Driver, the Orchestra, the runner, the MCP tool
    handlers and failure capture all therefore act through it. The
@@ -623,7 +624,7 @@ The shape the config encodes:
 - **`lease`** may depend only on `diag` and the common leaves.
 - **`session`** may depend on `device`, `lease`, `orchestra`, `driver`,
   `diag` and `shutdown`. `session/sessiontest` may depend only on `lease`,
-  and `mcp` may depend on it for tests. `cli` and `mcp` may depend on `session`, and it
+  `device`, `driver` and `orchestra`, and `mcp` may depend on it for tests. `cli` and `mcp` may depend on `session`, and it
   may not depend on either of them.
 - **`driver`** may depend only on `wire` and `transport`. The three
   concrete implementers (`androiddriver`, `iosdriver`,

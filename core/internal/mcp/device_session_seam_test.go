@@ -42,7 +42,7 @@ func (f *failNextBuildFactory) Build(ctx context.Context, desc device.Descriptor
 	return f.inner.Build(ctx, desc)
 }
 
-func (f *lifecycleFixture) newDevicesWith(factory device.Factory, deps session.Deps) *DeviceSession {
+func (f *lifecycleFixture) newDevicesWith(factory device.WrappingFactory, deps session.Deps) *DeviceSession {
 	deps.Leases = f.leases
 	deps.Clock = clock.SystemClock{}
 	return NewDeviceSession(DeviceSessionDeps{

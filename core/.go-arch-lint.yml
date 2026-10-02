@@ -308,6 +308,7 @@ deps:
       - lease
       - device
       - driver
+      - orchestra
   inspector:
     mayDependOn:
       - wire

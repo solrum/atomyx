@@ -41,7 +41,7 @@ type Info struct {
 type ServerDeps struct {
 	Probe    device.Probe
 	Runners  device.RunnerIdentifier
-	Factory  device.Factory
+	Factory  device.WrappingFactory
 	Storage  storage.Storage
 	RunStore *storage.RunStore
 	// RunStarter creates the run folder of each run the server starts.

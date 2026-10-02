@@ -153,23 +153,12 @@ func TestSession_CloseEndsSubscriptions(t *testing.T) {
 	}
 }
 
-type plainFactory struct{ builds int }
-
-func (f *plainFactory) Build(context.Context, device.Descriptor) (device.Built, error) {
-	f.builds++
-	return device.Built{}, errors.New("must not build")
-}
-
-func TestOpen_RefusesAFactoryThatCannotWrapItsDriverAndHoldsNothing(t *testing.T) {
-	factory := &plainFactory{}
+func TestOpen_RefusesDepsWithoutAFactoryAndHoldsNothing(t *testing.T) {
 	m := newManager(t, clock.SystemClock{})
 
-	_, err := session.Open(context.Background(), baseDeps(t, factory, m), session.Request{Descriptor: androidDesc("A")})
-	if !errors.Is(err, session.ErrNotWrappable) {
-		t.Fatalf("Open() error = %v, want ErrNotWrappable", err)
-	}
-	if factory.builds != 0 {
-		t.Fatalf("the factory built %d times, want none", factory.builds)
+	_, err := session.Open(context.Background(), baseDeps(t, nil, m), session.Request{Descriptor: androidDesc("A")})
+	if !errors.Is(err, session.ErrNoFactory) {
+		t.Fatalf("Open() error = %v, want ErrNoFactory", err)
 	}
 	status, err := m.Probe(context.Background(), lease.KeyFor("android", "A"))
 	if err != nil || status.Held {

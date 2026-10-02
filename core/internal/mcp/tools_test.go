@@ -45,6 +45,14 @@ func (f singleMockDriverFactory) Build(ctx context.Context, _ device.Descriptor)
 // and registers cleanup on t.
 func testServer(t *testing.T, deps ServerDeps) (*mcp.ClientSession, context.Context) {
 	t.Helper()
+	_, cs, ctx := testServerHandle(t, deps)
+	return cs, ctx
+}
+
+// testServerHandle is testServer that also returns the server, for a
+// test that inspects the state a tool call left behind.
+func testServerHandle(t *testing.T, deps ServerDeps) (*Server, *mcp.ClientSession, context.Context) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	t.Cleanup(cancel)
 
@@ -64,7 +72,7 @@ func testServer(t *testing.T, deps ServerDeps) (*mcp.ClientSession, context.Cont
 	}
 	t.Cleanup(func() { _ = clientSession.Close() })
 
-	return clientSession, ctx
+	return server, clientSession, ctx
 }
 
 // callTool invokes name over cs and decodes its first text content

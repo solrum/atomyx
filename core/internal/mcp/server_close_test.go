@@ -12,7 +12,7 @@ import (
 	"dev.atomyx/internal/storage"
 )
 
-func newCloseTestServer(t *testing.T, factory device.Factory) *Server {
+func newCloseTestServer(t *testing.T, factory device.WrappingFactory) *Server {
 	return mustNewServer(t, ServerDeps{
 		Probe:   device.NewStaticProbe(),
 		Factory: factory,

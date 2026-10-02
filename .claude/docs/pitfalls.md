@@ -269,11 +269,13 @@ corresponding area. For the high-level map see
   way would show secrets. Treat every slice and map in a `Snapshot` as
   read-only, because the masked tree shares its unmasked attribute maps
   with the stored one.
-- **A session factory must implement `device.WrappingFactory`.** A test
-  factory gets it from `sessiontest.Wrapping`. That helper wraps
-  `Built.Driver` only, so a test that needs the Orchestra's captures to
-  reach the hub builds its Orchestra over the wrapped driver, as the mock
-  factory in `core/internal/device` does.
+- **A session factory must implement `device.WrappingFactory`.** The type
+  of `session.Deps.Factory`, `mcp.ServerDeps.Factory` and `cli.Deps.Factory`
+  requires it. A test factory gets it from `sessiontest.Wrapping`, which
+  wraps `Built.Driver` and rebuilds the Orchestra over the wrapped driver
+  on the system clock, so the runner and the tool handlers publish
+  captures like production. A test whose Orchestra needs another clock
+  passes a builder to `sessiontest.WrappingWith`.
 - **Drive timers from the injected timer clock.** The acquisition budget,
   the tool call budget, and the idle timers use `ServerDeps.TimerClock`,
   not the orchestra clock. A test clock whose sleeps return at once would

@@ -138,7 +138,7 @@ func newLifecycleFixture(t *testing.T) *lifecycleFixture {
 
 // newDevices builds another DeviceSession over the same lease directory,
 // standing in for another Atomyx process.
-func (f *lifecycleFixture) newDevices(command string, factory device.Factory) *DeviceSession {
+func (f *lifecycleFixture) newDevices(command string, factory device.WrappingFactory) *DeviceSession {
 	return NewDeviceSession(DeviceSessionDeps{
 		Factory: factory, Probe: device.NewStaticProbe(), Clock: f.clk, TimerClock: f.clk, Logger: logging.NoopLogger{},
 		Session:  session.Deps{Leases: f.leases, Clock: clock.SystemClock{}, Command: command},
@@ -149,7 +149,7 @@ func (f *lifecycleFixture) newDevices(command string, factory device.Factory) *D
 
 // newDevicesPreparing is newDevices with a runner preparer, timed on the
 // fixture clock so a test decides when the build budget elapses.
-func (f *lifecycleFixture) newDevicesPreparing(command string, factory device.Factory, preparer device.RunnerPreparer) *DeviceSession {
+func (f *lifecycleFixture) newDevicesPreparing(command string, factory device.WrappingFactory, preparer device.RunnerPreparer) *DeviceSession {
 	return NewDeviceSession(DeviceSessionDeps{
 		Factory: factory, Probe: device.NewStaticProbe(), Clock: f.clk, TimerClock: f.clk, Logger: logging.NoopLogger{},
 		Session:  session.Deps{Leases: f.leases, Clock: f.clk, Command: command, Preparer: preparer},

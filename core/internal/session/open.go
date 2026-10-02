@@ -29,8 +29,10 @@ type RunnerReaper interface {
 
 // Deps configures Open.
 type Deps struct {
-	// Factory builds the driver once the lease is held. Required.
-	Factory device.Factory
+	// Factory builds the driver once the lease is held. Required. It must
+	// be a device.WrappingFactory so every session's driver is built
+	// inside the observing decorator that feeds its viewers.
+	Factory device.WrappingFactory
 	// Identity resolves the canonical identity. Nil keys the lease on the
 	// descriptor's own platform and id, which suits a host whose device
 	// ids are already canonical, such as an iOS udid.
@@ -92,23 +94,16 @@ type launchedAppCarrier interface {
 	RestoreLaunchedApp(ctx context.Context, bundleID, fromRunnerID string) error
 }
 
-// ErrNotWrappable reports a device factory that cannot build its driver
-// inside a decorator. A session needs the decorator to publish every
-// capture to its viewers, so it refuses such a factory instead of
-// running unobserved.
-var ErrNotWrappable = errors.New("the device factory cannot wrap its driver in the capture observer")
+// ErrNoFactory reports an Open whose Deps carry no device factory.
+var ErrNoFactory = errors.New("session deps carry no device factory")
 
 // observingFactory makes factory build every driver inside an observing
 // decorator that publishes to hub, so the Orchestra, the runner, the
 // tool handlers and failure capture all act through it.
-func observingFactory(factory device.Factory, hub *Hub) (device.Factory, error) {
-	wrapping, ok := factory.(device.WrappingFactory)
-	if !ok {
-		return nil, fmt.Errorf("%w: %T", ErrNotWrappable, factory)
-	}
-	return wrapping.WithDriverWrap(func(d driver.Driver) driver.Driver {
+func observingFactory(factory device.WrappingFactory, hub *Hub) device.Factory {
+	return factory.WithDriverWrap(func(d driver.Driver) driver.Driver {
 		return NewObservingDriver(d, hub)
-	}), nil
+	})
 }
 
 // Open takes ownership of the device named by req.
@@ -124,11 +119,11 @@ func Open(ctx context.Context, deps Deps, req Request) (*Session, error) {
 	deps = deps.withDefaults()
 	desc := req.Descriptor
 
-	hub := NewHub()
-	factory, err := observingFactory(deps.Factory, hub)
-	if err != nil {
-		return nil, err
+	if deps.Factory == nil {
+		return nil, ErrNoFactory
 	}
+	hub := NewHub()
+	factory := observingFactory(deps.Factory, hub)
 
 	identity, err := deps.ResolveIdentity(ctx, desc)
 	if err != nil {
