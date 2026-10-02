@@ -45,6 +45,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "atomyx: %v\n", err)
 		os.Exit(1)
 	}
+	sessionDeps.Preparer = provisioner
 
 	deps := cli.Deps{
 		Probe:   probe,

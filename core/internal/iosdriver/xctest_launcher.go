@@ -363,32 +363,10 @@ func (l *XctestLauncher) EnsureRunning(ctx context.Context) (kill func() error, 
 		}
 	}
 
-	projectFileName := l.cfg.projectFileName()
-	xcodeprojPath := filepath.Join(l.cfg.ProjectDir, projectFileName)
-	if _, err := os.Stat(xcodeprojPath); err != nil {
-		return noopKill, &XctestLauncherError{
-			Code: XctestErrNoProject,
-			Message: fmt.Sprintf(
-				"%s not found at %s. Run `cd %s && make setup` first.",
-				projectFileName, xcodeprojPath, l.cfg.ProjectDir,
-			),
-		}
-	}
-
-	if _, err := l.signOverrides(); err != nil {
+	if err := l.EnsureBuilt(ctx); err != nil {
 		return noopKill, err
 	}
-
-	buildConfig := xctestConfigSimulator
-	if l.cfg.Kind == KindDevice {
-		buildConfig = xctestConfigDevice
-	}
-	buildDir := filepath.Join(l.cfg.ProjectDir, "build")
-	runnerApp := filepath.Join(buildDir, "Build", "Products", buildConfig, l.cfg.runnerAppName())
-
-	if err := l.ensureBuilt(ctx, xcodeprojPath, buildDir, runnerApp); err != nil {
-		return noopKill, err
-	}
+	buildDir := l.buildDir()
 	xctestrun, err := l.findXctestrun(buildDir)
 	if err != nil {
 		return noopKill, err
@@ -397,6 +375,41 @@ func (l *XctestLauncher) EnsureRunning(ctx context.Context) (kill func() error, 
 	l.progress(XctestProgressStarting)
 	return l.launchWithRetry(ctx, xctestrun, filepath.Join(buildDir, xctestRunDirPrefix+l.cfg.UDID))
 }
+
+// EnsureBuilt makes sure the compiled test runner exists and is newer
+// than the project file and every Swift source, building it when it is
+// missing or stale. It does not start the runner. The build is
+// serialized across launches and processes by a lock on the shared
+// build directory, so a call that waits for another process's build
+// returns once that build finishes, and builds nothing when the
+// product is then fresh. It returns an *XctestLauncherError for a
+// missing project, a signing problem or a failed build, and ctx's
+// error when ctx ends while waiting for the lock.
+func (l *XctestLauncher) EnsureBuilt(ctx context.Context) error {
+	projectFileName := l.cfg.projectFileName()
+	xcodeprojPath := filepath.Join(l.cfg.ProjectDir, projectFileName)
+	if _, err := os.Stat(xcodeprojPath); err != nil {
+		return &XctestLauncherError{
+			Code: XctestErrNoProject,
+			Message: fmt.Sprintf(
+				"%s not found at %s. Run `cd %s && make setup` first.",
+				projectFileName, xcodeprojPath, l.cfg.ProjectDir,
+			),
+		}
+	}
+	if _, err := l.signOverrides(); err != nil {
+		return err
+	}
+	buildConfig := xctestConfigSimulator
+	if l.cfg.Kind == KindDevice {
+		buildConfig = xctestConfigDevice
+	}
+	buildDir := l.buildDir()
+	runnerApp := filepath.Join(buildDir, "Build", "Products", buildConfig, l.cfg.runnerAppName())
+	return l.ensureBuilt(ctx, xcodeprojPath, buildDir, runnerApp)
+}
+
+func (l *XctestLauncher) buildDir() string { return filepath.Join(l.cfg.ProjectDir, "build") }
 
 func (l *XctestLauncher) progress(message string) {
 	if l.cfg.Progress != nil {

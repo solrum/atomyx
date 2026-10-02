@@ -187,7 +187,7 @@ func newToolCallMiddleware(logger logging.Logger, clk clock.Clock, sess *DeviceS
 			defer stop()
 
 			startedAt := clk.NowMs()
-			result, err := next(callCtx, method, req)
+			result, err := next(withProgress(callCtx, req, params), method, req)
 			if !errors.Is(callCtx.Err(), context.DeadlineExceeded) {
 				return result, err
 			}

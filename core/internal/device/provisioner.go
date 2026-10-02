@@ -295,6 +295,54 @@ func (p *DriverProvisioner) releasePorts(ports ...int) {
 // the reserved port. It runs its work once however many times it is
 // called.
 func (p *DriverProvisioner) EnsureIOSAgent(ctx context.Context, udid string, kind IosAgentKind) (int, func() error, error) {
+	cfg := p.iosLaunchConfig(udid, kind)
+	if !p.deps.FixedIosPort {
+		cfg.RunnerID = p.newRunnerID()
+		cfg.AllocatePort = p.reservePort
+		cfg.ReleasePort = func(port int) { p.releasePorts(port) }
+		cfg.AfterSpawn = p.afterSpawn(udid, kind, cfg.RunnerID)
+	}
+
+	launcher := iosdriver.NewXctestLauncher(p.runner, p.background, p.clock, cfg)
+	kill, err := launcher.EnsureRunning(ctx)
+	if err != nil {
+		return 0, kill, err
+	}
+	if p.deps.FixedIosPort {
+		return launcher.Port(), kill, nil
+	}
+	port := launcher.Port()
+	stop := sync.OnceValue(func() error {
+		err := kill()
+		p.releasePorts(port)
+		return err
+	})
+	return port, stop, nil
+}
+
+// Prepare implements RunnerPreparer. It builds the iOS runner when it is
+// missing or stale, under the shared build lock, and starts nothing. An
+// Android device, a descriptor with no id, and a descriptor that carries
+// a port, which means its runner is already served, need no build and
+// return nil at once.
+func (p *DriverProvisioner) Prepare(ctx context.Context, desc Descriptor) error {
+	if desc.Platform != PlatformIOS || desc.ID == "" || desc.Port != 0 {
+		return nil
+	}
+	kind := IosAgentKindDevice
+	if desc.Kind == KindSimulator {
+		kind = IosAgentKindSimulator
+	}
+	err := iosdriver.NewXctestLauncher(p.runner, p.background, p.clock, p.iosLaunchConfig(desc.ID, kind)).EnsureBuilt(ctx)
+	return iosdriver.ProvisionFailure(desc.ID, err)
+}
+
+var _ RunnerPreparer = (*DriverProvisioner)(nil)
+
+// iosLaunchConfig is the launch configuration shared by building and
+// launching the runner for udid, so both phases agree on the project,
+// the signing identity and the build products they look at.
+func (p *DriverProvisioner) iosLaunchConfig(udid string, kind IosAgentKind) iosdriver.LaunchConfig {
 	driverKind := iosdriver.KindSimulator
 	if kind == IosAgentKindDevice {
 		driverKind = iosdriver.KindDevice
@@ -327,29 +375,7 @@ func (p *DriverProvisioner) EnsureIOSAgent(ctx context.Context, udid string, kin
 		OnlyTestingTarget:            p.deps.IosOnlyTesting,
 		Progress:                     func(message string) { progress.Info(message, nil) },
 	}
-
-	if !p.deps.FixedIosPort {
-		cfg.RunnerID = p.newRunnerID()
-		cfg.AllocatePort = p.reservePort
-		cfg.ReleasePort = func(port int) { p.releasePorts(port) }
-		cfg.AfterSpawn = p.afterSpawn(udid, kind, cfg.RunnerID)
-	}
-
-	launcher := iosdriver.NewXctestLauncher(p.runner, p.background, p.clock, cfg)
-	kill, err := launcher.EnsureRunning(ctx)
-	if err != nil {
-		return 0, kill, err
-	}
-	if p.deps.FixedIosPort {
-		return launcher.Port(), kill, nil
-	}
-	port := launcher.Port()
-	stop := sync.OnceValue(func() error {
-		err := kill()
-		p.releasePorts(port)
-		return err
-	})
-	return port, stop, nil
+	return cfg
 }
 
 // afterSpawn builds the launcher hook that runs once the runner process

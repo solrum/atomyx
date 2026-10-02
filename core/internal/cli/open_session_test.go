@@ -153,3 +153,54 @@ func TestOpenDeviceReleasesTheLeaseOnClose(t *testing.T) {
 		t.Fatalf("a second process could not take the released device: %v", err)
 	}
 }
+
+type leaseProbingPreparer struct {
+	manager  *lease.Manager
+	err      error
+	heldSeen *bool
+}
+
+func (p leaseProbingPreparer) Prepare(ctx context.Context, desc device.Descriptor) error {
+	status, err := p.manager.Probe(ctx, lease.KeyFor(string(desc.Platform), desc.ID))
+	if err != nil {
+		return err
+	}
+	*p.heldSeen = status.Held
+	return p.err
+}
+
+func TestOpenDevicePreparesBeforeTakingTheLease(t *testing.T) {
+	manager := newLeaseManager(t)
+	var out, errOut bytes.Buffer
+	deps := leaseDeps(t, manager, &out, &errOut)
+	heldSeen := true
+	deps.Session.Preparer = leaseProbingPreparer{manager: manager, heldSeen: &heldSeen}
+
+	opened, err := openDevice(context.Background(), deps, "atomyx run", device.Descriptor{Platform: device.PlatformAndroid, ID: "emulator-5554"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(opened.Close)
+
+	if heldSeen {
+		t.Fatal("the device lease was already held while the runner was being prepared")
+	}
+}
+
+func TestOpenDeviceFailedPrepareTakesNoLease(t *testing.T) {
+	manager := newLeaseManager(t)
+	var out, errOut bytes.Buffer
+	deps := leaseDeps(t, manager, &out, &errOut)
+	heldSeen := false
+	deps.Session.Preparer = leaseProbingPreparer{manager: manager, heldSeen: &heldSeen, err: diag.New(diag.CodeRunnerBuildTimeout, "build timed out", "retry", nil)}
+
+	_, err := openDevice(context.Background(), deps, "atomyx run", device.Descriptor{Platform: device.PlatformAndroid, ID: "emulator-5554"})
+
+	if code, _, _ := diag.Describe(err); code != diag.CodeRunnerBuildTimeout {
+		t.Fatalf("openDevice() code = %q, want %s", code, diag.CodeRunnerBuildTimeout)
+	}
+	status, probeErr := manager.Probe(context.Background(), lease.KeyFor("android", "emulator-5554"))
+	if probeErr != nil || status.Held {
+		t.Fatalf("lease held = %v, probe error = %v, want a failed prepare to leave the device free", status.Held, probeErr)
+	}
+}

@@ -175,6 +175,17 @@ func (f *lifecycleFixture) newDevices(command string, factory device.Factory) *D
 	})
 }
 
+// newDevicesPreparing is newDevices with a runner preparer, timed on the
+// fixture clock so a test decides when the build budget elapses.
+func (f *lifecycleFixture) newDevicesPreparing(command string, factory device.Factory, preparer device.RunnerPreparer) *DeviceSession {
+	return NewDeviceSession(DeviceSessionDeps{
+		Factory: factory, Probe: device.NewStaticProbe(), Clock: f.clk, TimerClock: f.clk, Logger: logging.NoopLogger{},
+		Session:  session.Deps{Leases: f.leases, Clock: f.clk, Command: command, Preparer: preparer},
+		Timeouts: session.Timeouts{McpIdleMs: testIdleMs, OpenRunIdleMs: testOpenRunMs, DeviceAcquireMs: 120_000},
+		Runs:     f.runs,
+	})
+}
+
 func (f *lifecycleFixture) selectDevice(ds *DeviceSession) error {
 	f.t.Helper()
 	_, err := ds.Select(context.Background(), SelectDeviceInput{Platform: device.PlatformAndroid, ID: "A"})

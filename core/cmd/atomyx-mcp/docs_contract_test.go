@@ -16,7 +16,6 @@ const (
 )
 
 func TestDocumentedDefaultTimeoutsMatchTheCode(t *testing.T) {
-	t.Skip("removed by the separate prepare phase step")
 	raw, err := os.ReadFile("../../../docs/mcp-tools.md")
 	if err != nil {
 		t.Fatal(err)

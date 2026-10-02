@@ -184,7 +184,10 @@ Bind the session to one device so every other device-driving tool operates on it
 - The returned kind reports the kind of the device actually bound, taken from the driver, not an echo of the kind argument the caller passed. It is always present in the response, even when the caller omitted kind. On Android it is "emulator" when the device id starts with "emulator-" and "device" otherwise. On iOS it is "simulator" or "device". The value "emulator" can appear in the response even though the kind argument only accepts "simulator" or "device" as input.
 - connectedAt is a timestamp in milliseconds, recorded at the moment the new connection was established.
 - Binding takes exclusive ownership of the device. Only one Atomyx process, whether the CLI or another MCP server, can drive a device at a time, and a second one fails with DEVICE_HELD.
-- Acquiring the device does not count against the 30 second tool call budget. Acquisition has its own budget of 120 seconds by default, which excludes the one-time build of the iOS runner. When it is exhausted the call fails with code TOOL_TIMEOUT. Configure it with `session.deviceAcquireTimeoutMs` in the project config or the `ATOMYX_DEVICE_ACQUIRE_TIMEOUT_MS` environment variable. The environment variable wins.
+- Acquiring the device does not count against the 30 second tool call budget. It runs in two phases, each with its own budget. The worst case is 300 seconds for the first phase and then 120 seconds for the second.
+  - First the iOS runner is built when it is missing or stale. This also covers waiting for another Atomyx process that is building it, and no device ownership is held meanwhile. The build has a timeout of 300 seconds by default. When it elapses the call fails with code RUNNER_BUILD_TIMEOUT.
+  - Then the device is acquired. Acquisition has its own budget of 120 seconds by default, which excludes the build. When it is exhausted the call fails with code TOOL_TIMEOUT. Configure it with `session.deviceAcquireTimeoutMs` in the project config or the `ATOMYX_DEVICE_ACQUIRE_TIMEOUT_MS` environment variable. The environment variable wins.
+- When the call carries a progress token, the server sends three progress notifications as the device comes up, with progress 1, 2 and 3 of a total of 3. They announce in order that the runner is being prepared, building it when needed, that it is launching, and that the device is connected. Without a progress token no notifications are sent.
 - A bound device is released automatically when the session sits idle. See Device ownership and idle release.
 
 **Returns**
@@ -196,6 +199,7 @@ Bind the session to one device so every other device-driving tool operates on it
 - ok false with code DEVICE_NOT_FOUND means an iOS id is not among the reachable devices. Other reasons typically mean the id does not currently match a reachable device, or the device toolchain rejected the connection. Call list_devices again to confirm the id is still valid and the device is online, then retry.
 - ok false with code DEVICE_HELD means another Atomyx process is driving the device. The reason names that process and its state. Wait for it to finish or ask the operator to stop it, then call select_device again.
 - ok false with code TOOL_TIMEOUT means the device did not become ready within the acquisition budget. Check that the device is connected, unlocked and trusted, then retry.
+- ok false with code RUNNER_BUILD_TIMEOUT means building the iOS runner, or waiting for another process that is building it, did not finish within the build timeout. This is a different failure from TOOL_TIMEOUT. Wait for any other Atomyx process that is building the runner to finish, check that Xcode is installed and responsive, then call select_device again.
 
 **Example**
 ```json

@@ -96,6 +96,12 @@ const (
 	// the host running it has no network capture adapter configured,
 	// so the run was refused before any step executed.
 	CodeProxyRequired = "PROXY_REQUIRED"
+	// CodeRunnerBuildTimeout means building the on-device runner, or
+	// waiting for another Atomyx process that is building it, did not
+	// finish within the build timeout. It is distinct from
+	// CodeToolTimeout, which bounds a call, and from the device
+	// acquisition budget, which excludes the build.
+	CodeRunnerBuildTimeout = "RUNNER_BUILD_TIMEOUT"
 )
 
 // Coded is implemented by an error that carries a stable code and an

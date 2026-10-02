@@ -354,14 +354,23 @@ func (s *DeviceSession) Ensure(ctx context.Context) (*ActiveDevice, error) {
 	return active, nil
 }
 
-// open runs session.Open within the acquisition timeout. The timeout is
-// reported as TOOL_TIMEOUT with a remedy for the acquisition, never as a
-// bare context error.
+// open prepares the device, then runs session.Open. Preparing, which
+// builds an iOS runner that needs it, runs under the runner build
+// timeout and reports RUNNER_BUILD_TIMEOUT when that elapses. Opening
+// then runs within the acquisition timeout, which excludes the build,
+// and reports TOOL_TIMEOUT with a remedy for the acquisition when it
+// elapses, never a bare context error.
 func (s *DeviceSession) open(ctx context.Context, req session.Request) (*session.Session, error) {
+	reportPhase(ctx, phaseBuilding)
+	if err := session.Prepare(ctx, s.deps, req.Descriptor); err != nil {
+		return nil, err
+	}
+	reportPhase(ctx, phaseLaunching)
 	acquireCtx, stop := newBudgetContext(ctx, s.timers, s.timeouts.DeviceAcquireMs)
 	defer stop()
 	sess, err := session.Open(acquireCtx, s.deps, req)
 	if err == nil {
+		reportPhase(ctx, phaseConnected)
 		return sess, nil
 	}
 	if ctx.Err() == nil && errors.Is(acquireCtx.Err(), context.DeadlineExceeded) {

@@ -38,6 +38,9 @@ type Deps struct {
 	// exclusion entirely, which only a single-process host such as a test
 	// wants. Every production composition root sets it.
 	Leases *lease.Manager
+	// Preparer does the lease-free work Prepare runs before Open, such as
+	// building the iOS runner. Nil makes Prepare a no-op.
+	Preparer device.RunnerPreparer
 	// Reaper ends orphaned iOS runners after the lease is acquired. Nil
 	// skips reaping.
 	Reaper RunnerReaper

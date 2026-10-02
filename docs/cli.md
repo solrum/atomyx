@@ -217,6 +217,13 @@ an `atomyx-mcp` server, can drive a device at a time.
   code `DEVICE_HELD`. The message names the holder's process id,
   command, and state. Stop that process or wait for it to finish, then
   run the command again.
+- On iOS, a runner that is missing or stale is built before ownership is
+  taken, so a long build never holds the device. The command prints
+  `building runner` to stderr while it builds. The build has a timeout
+  of 300 seconds, which also covers waiting for another Atomyx process
+  that is building the same runner. When it elapses the command fails
+  with code `RUNNER_BUILD_TIMEOUT`, which is distinct from the codes of
+  a lease conflict.
 - Ownership is released when the command ends, including on an
   interrupt.
 - If a command crashes or is killed with `kill -9`, the next command

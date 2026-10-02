@@ -114,9 +114,19 @@ above). Registration is never auto-discovered, so adding a file under
   `pauseToolBudget(ctx)` stops the budget for the rest of a device
   acquisition and restarts it in full afterwards. Never count device
   acquisition against a tool budget: `DeviceSession.Select` and
-  `DeviceSession.Ensure` pause it and run `session.Open` within the
-  acquisition timeout instead (`session.deviceAcquireTimeoutMs`,
-  120 seconds by default, runner build excluded).
+  `DeviceSession.Ensure` pause it, then run `session.Prepare` under the
+  runner build timeout (300 seconds, code `RUNNER_BUILD_TIMEOUT`), then
+  `session.Open` within the acquisition timeout
+  (`session.deviceAcquireTimeoutMs`, 120 seconds by default, runner
+  build excluded, code `TOOL_TIMEOUT`). The worst case is the two
+  phases added together. `session.Prepare` takes no lease, so waiting
+  on another process's build never spends the acquisition budget.
+- **Acquisition progress** (`core/internal/mcp/device_progress.go`): the
+  tool call middleware puts a phase reporter on the call context when
+  the request carries a progress token. `DeviceSession` reports
+  building, launching and connected through it as MCP progress
+  notifications, so a handler never emits progress itself. A call with
+  no token reports nothing.
 - **Run tracker** (`core/internal/mcp/run_tracker.go`): lets the
   `DeviceSession` see the open run and close it when the open-run
   idle timeout or a lost lease ends the session's ownership.

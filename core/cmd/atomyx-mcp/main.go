@@ -86,6 +86,7 @@ func run() int {
 		fmt.Fprintf(os.Stderr, "atomyx-mcp: %v\n", err)
 		return 1
 	}
+	sessionDeps.Preparer = provisioner
 
 	server := mcp.NewServer(mcp.Info{Name: serverName, Version: serverVersion}, mcp.ServerDeps{
 		Probe:    probe,

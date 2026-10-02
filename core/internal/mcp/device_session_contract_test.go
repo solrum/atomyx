@@ -13,27 +13,21 @@ import (
 
 const contractAcquireBudgetMs int64 = 120_000
 
-// slowBuildFactory models a device build that outlasts whatever time
-// budget its context carries, such as a cold runner compile.
-type slowBuildFactory struct {
-	inner device.Factory
-	clk   *clock.ManualClock
+// slowPreparer models a runner build, or the wait for another process's
+// build, that outlasts the acquisition budget.
+type slowPreparer struct {
+	clk *clock.ManualClock
 }
 
-func (f slowBuildFactory) Build(ctx context.Context, desc device.Descriptor) (device.Built, error) {
-	f.clk.AwaitSleepers(1)
-	f.clk.Advance(contractAcquireBudgetMs + 1)
-	<-ctx.Done()
-	if err := ctx.Err(); err != nil {
-		return device.Built{}, err
-	}
-	return f.inner.Build(ctx, desc)
+func (p slowPreparer) Prepare(ctx context.Context, _ device.Descriptor) error {
+	p.clk.AwaitSleepers(1)
+	p.clk.Advance(contractAcquireBudgetMs + 1)
+	return ctx.Err()
 }
 
 func TestAcquireBudgetExcludesRunnerBuild(t *testing.T) {
-	t.Skip("removed by the separate prepare phase step")
 	f := newLifecycleFixture(t)
-	slow := f.newDevices("atomyx-mcp", slowBuildFactory{inner: f.factory, clk: f.clk})
+	slow := f.newDevicesPreparing("atomyx-mcp", f.factory, slowPreparer{clk: f.clk})
 	t.Cleanup(slow.Close)
 
 	_, err := slow.Select(context.Background(), SelectDeviceInput{Platform: device.PlatformAndroid, ID: "A"})
