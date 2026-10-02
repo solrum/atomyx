@@ -174,12 +174,13 @@ Bind the session to one device so every other device-driving tool operates on it
 |---|---|---|---|---|
 | platform | string, one of "ios", "android" | Yes | none | The platform the device belongs to |
 | id | string, non-empty | Yes | none | Device identifier, exactly as reported by list_devices |
-| kind | string, one of "simulator", "device" | No | iOS defaults to simulator, Android defaults to emulator | Hints whether id names a virtual device or a physical one |
+| kind | string, one of "simulator", "device" | No | none | Accepted for compatibility and ignored. The device kind is resolved from the id, so the hint cannot change which device is bound |
 | port | integer, positive | No | the platform's default control connection | Overrides the device's control connection port. Only honored on platforms whose driver exposes a configurable port, and ignored otherwise |
 
 **Behavior**
 - Calling select_device again, whether or not a device is already bound, first disconnects the previously-bound device cleanly, then connects the new one. A failure disconnecting the previous device is logged but does not block the new selection.
 - Every other device-driving tool reads the currently-bound device on each call, so a mid-session select_device call takes effect immediately for the very next tool call.
+- The device kind is resolved from the id, the same way the command line resolves it. On iOS the id must name a simulator or physical device that list_devices currently reports, and the match is case-insensitive. An iOS id that is not listed fails with code DEVICE_NOT_FOUND before any connection is attempted. On Android the id is used as given.
 - The returned kind reports the kind of the device actually bound, taken from the driver, not an echo of the kind argument the caller passed. It is always present in the response, even when the caller omitted kind. On Android it is "emulator" when the device id starts with "emulator-" and "device" otherwise. On iOS it is "simulator" or "device". The value "emulator" can appear in the response even though the kind argument only accepts "simulator" or "device" as input.
 - connectedAt is a timestamp in milliseconds, recorded at the moment the new connection was established.
 - Connecting to a device, especially a physical one, can take longer than a quick call. This tool call is bounded by the same overall time budget as any other tool call (30 seconds by default), so a slow physical-device connection can time out. See Errors and recovery.
@@ -190,7 +191,7 @@ Bind the session to one device so every other device-driving tool operates on it
 
 **Errors and recovery**
 - Missing platform or id, an id that is empty, a non-positive port, or a platform, kind, or id outside the accepted values all fail argument validation before a connection is attempted. Correct the arguments and retry.
-- ok false with a reason typically means the id does not currently match a reachable device, or the device toolchain rejected the connection. Call list_devices again to confirm the id is still valid and the device is online, then retry.
+- ok false with code DEVICE_NOT_FOUND means an iOS id is not among the reachable devices. Other reasons typically mean the id does not currently match a reachable device, or the device toolchain rejected the connection. Call list_devices again to confirm the id is still valid and the device is online, then retry.
 - If the call itself times out (for example, a slow physical-device connection), the result reports a timeout with the elapsed time and the budget. Retry, or pass a larger timeoutMs argument alongside the call to raise the budget.
 
 **Example**

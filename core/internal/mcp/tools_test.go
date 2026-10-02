@@ -207,11 +207,15 @@ func (d *stubKindDriver) DeviceInfo(ctx context.Context) (driver.DeviceInfo, err
 // DeviceSession.Select's kind-resolution path for a device kind a
 // serial-agnostic mock cannot otherwise model.
 type kindStubFactory struct {
-	kind driver.DeviceKind
-	err  error
+	kind  driver.DeviceKind
+	err   error
+	built *[]device.Descriptor
 }
 
-func (f kindStubFactory) Build(ctx context.Context, _ device.Descriptor) (device.Built, error) {
+func (f kindStubFactory) Build(ctx context.Context, desc device.Descriptor) (device.Built, error) {
+	if f.built != nil {
+		*f.built = append(*f.built, desc)
+	}
 	drv := &stubKindDriver{Driver: mockdriver.New(), kind: f.kind, err: f.err}
 	if err := drv.Connect(ctx); err != nil {
 		return device.Built{}, err
@@ -220,6 +224,71 @@ func (f kindStubFactory) Build(ctx context.Context, _ device.Descriptor) (device
 		Driver:    drv,
 		Orchestra: orchestra.New(orchestra.OrchestraDeps{Driver: drv, Clock: orchestra.SystemClock{}}),
 	}, nil
+}
+
+// stubProbe is a device.Probe that reports a fixed device list.
+type stubProbe struct{ devices []device.Descriptor }
+
+func (p stubProbe) Scan(context.Context) []device.Descriptor { return p.devices }
+
+// TestSelectDeviceResolvesKindFromProbe asserts Select builds its
+// descriptor through the shared device resolver: a physical iPhone gets
+// the device kind even when the caller's kind hint says simulator, and a
+// listed simulator gets the simulator kind even when the hint says
+// device.
+func TestSelectDeviceResolvesKindFromProbe(t *testing.T) {
+	probe := stubProbe{devices: []device.Descriptor{
+		{ID: "PHONE-UDID", Platform: device.PlatformIOS, Kind: device.KindDevice},
+		{ID: "SIM-UDID", Platform: device.PlatformIOS, Kind: device.KindSimulator},
+	}}
+	cases := []struct {
+		name string
+		id   string
+		hint SelectKind
+		want device.Kind
+	}{
+		{name: "physical iPhone with simulator hint", id: "PHONE-UDID", hint: SelectKindSimulator, want: device.KindDevice},
+		{name: "physical iPhone without hint", id: "phone-udid", want: device.KindDevice},
+		{name: "simulator with device hint", id: "SIM-UDID", hint: SelectKindDevice, want: device.KindSimulator},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var built []device.Descriptor
+			session := NewDeviceSession(DeviceSessionDeps{
+				Factory: kindStubFactory{kind: driver.DeviceKindDevice, built: &built},
+				Probe:   probe,
+			})
+			if _, err := session.Select(context.Background(), SelectDeviceInput{Platform: device.PlatformIOS, ID: tc.id, Kind: tc.hint, Port: 4242}); err != nil {
+				t.Fatalf("Select: %v", err)
+			}
+			if len(built) != 1 || built[0].Kind != tc.want {
+				t.Fatalf("Factory descriptors = %+v, want one with kind %q", built, tc.want)
+			}
+			if built[0].Port != 4242 {
+				t.Fatalf("Factory descriptor port = %d, want 4242", built[0].Port)
+			}
+		})
+	}
+}
+
+// TestSelectDeviceRejectsUnlistedIOSDevice asserts an iOS id the probe
+// does not find fails with DEVICE_NOT_FOUND before any driver is built.
+func TestSelectDeviceRejectsUnlistedIOSDevice(t *testing.T) {
+	var built []device.Descriptor
+	session := NewDeviceSession(DeviceSessionDeps{
+		Factory: kindStubFactory{kind: driver.DeviceKindSimulator, built: &built},
+		Probe:   stubProbe{},
+	})
+	_, err := session.Select(context.Background(), SelectDeviceInput{Platform: device.PlatformIOS, ID: "GHOST"})
+	if err == nil {
+		t.Fatal("Select: expected an error for an unlisted iOS id")
+	}
+	if code, _, _ := diag.Describe(err); code != diag.CodeDeviceNotFound {
+		t.Fatalf("Select error code = %q, want %q", code, diag.CodeDeviceNotFound)
+	}
+	if len(built) != 0 {
+		t.Fatalf("Factory built %d drivers, want none", len(built))
+	}
 }
 
 // TestSelectDeviceReportsBoundDriverKind asserts DeviceSession.Select
@@ -242,7 +311,10 @@ func TestSelectDeviceReportsBoundDriverKind(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			session := NewDeviceSession(DeviceSessionDeps{Factory: kindStubFactory{kind: tc.driverKind}})
+			session := NewDeviceSession(DeviceSessionDeps{
+				Factory: kindStubFactory{kind: tc.driverKind},
+				Probe:   stubProbe{devices: []device.Descriptor{{ID: "SIM-BOOTED", Platform: device.PlatformIOS, Kind: device.KindSimulator}}},
+			})
 			active, err := session.Select(context.Background(), SelectDeviceInput{Platform: tc.platform, ID: tc.id})
 			if err != nil {
 				t.Fatalf("Select: unexpected error: %v", err)

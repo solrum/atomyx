@@ -53,7 +53,7 @@ func NewServer(info Info, deps ServerDeps) *Server {
 		runStore = storage.NewRunStore()
 	}
 
-	session := NewDeviceSession(DeviceSessionDeps{Factory: deps.Factory, Clock: clock, Logger: logger})
+	session := NewDeviceSession(DeviceSessionDeps{Factory: deps.Factory, Probe: deps.Probe, Clock: clock, Logger: logger})
 	tc := &ToolContext{
 		Session:  session,
 		Logger:   logger,

@@ -7,21 +7,20 @@ import (
 	"sync"
 
 	"dev.atomyx/internal/device"
+	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/driver"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
 )
 
-// SelectKind is the transport hint select_device accepts for
-// platforms that distinguish a virtual device from a physical one,
-// and also the resolved value select_device reports back once a
-// driver is built. An empty SelectKind on input means the caller did
-// not pass one, but the reported value is never empty, because
-// Select always resolves one before returning. SelectKindEmulator can
-// appear in the result even though input never accepts it, because
-// Android's own device kind distinguishes an emulator from a physical
-// device where the input argument only ever chooses between a
-// virtual and a physical target.
+// SelectKind is the device kind select_device reports back once a
+// driver is built, and the legacy hint it still accepts on input. The
+// input hint never influences resolution, because the device kind
+// comes from the device's identity. The reported value is never
+// empty, because Select always resolves one before returning.
+// SelectKindEmulator can appear in the result even though input never
+// accepts it, because Android distinguishes an emulator from a
+// physical device.
 type SelectKind string
 
 const (
@@ -83,10 +82,11 @@ type ActiveDevice struct {
 	ConnectedAt int64
 }
 
-// DeviceSessionDeps constructs a DeviceSession. Factory is required;
-// Clock and Logger default to the system clock and a no-op logger.
+// DeviceSessionDeps constructs a DeviceSession. Factory and Probe are
+// required: Probe resolves a requested id to a device kind. Clock and Logger default to the system clock and a no-op logger.
 type DeviceSessionDeps struct {
 	Factory device.Factory
+	Probe   device.Probe
 	Clock   orchestra.Clock
 	Logger  logging.Logger
 }
@@ -102,6 +102,7 @@ type DeviceSession struct {
 	active  *ActiveDevice
 	closed  bool
 	factory device.Factory
+	probe   device.Probe
 	clock   orchestra.Clock
 	logger  logging.Logger
 }
@@ -120,7 +121,7 @@ func NewDeviceSession(deps DeviceSessionDeps) *DeviceSession {
 	if logger == nil {
 		logger = logging.NoopLogger{}
 	}
-	return &DeviceSession{factory: deps.Factory, clock: clock, logger: logger}
+	return &DeviceSession{factory: deps.Factory, probe: deps.Probe, clock: clock, logger: logger}
 }
 
 // Current returns the currently-bound device, or nil when none is
@@ -150,7 +151,10 @@ func (s *DeviceSession) Select(ctx context.Context, input SelectDeviceInput) (*A
 	s.mu.Unlock()
 	s.releasePrevious(previous)
 
-	desc := descriptorFor(input)
+	desc, err := s.resolveDescriptor(ctx, input)
+	if err != nil {
+		return nil, err
+	}
 	built, err := s.factory.Build(ctx, desc)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -260,18 +264,26 @@ func (s *DeviceSession) Disconnect() {
 	})
 }
 
-// descriptorFor maps a select_device input to the device.Descriptor
-// its Factory builds from. Kind resolution: an explicit "device" hint
-// always maps to device.KindDevice; otherwise iOS defaults to
-// device.KindSimulator and Android to device.KindEmulator, matching
-// the CLI's own default per platform.
-func descriptorFor(input SelectDeviceInput) device.Descriptor {
-	kind := device.KindSimulator
-	switch {
-	case input.Kind == SelectKindDevice:
-		kind = device.KindDevice
-	case input.Platform == device.PlatformAndroid:
-		kind = device.KindEmulator
+// resolveDescriptor builds the device.Descriptor Factory builds from
+// by resolving the platform and id through device.ResolveDescriptor,
+// the same path the CLI uses, so the device kind comes from the
+// device's identity as the probe sees it. input.Kind is a legacy hint
+// that is accepted on the wire and deliberately not consulted. An iOS
+// id no scan finds is reported as DEVICE_NOT_FOUND with a remedy.
+func (s *DeviceSession) resolveDescriptor(ctx context.Context, input SelectDeviceInput) (device.Descriptor, error) {
+	desc, err := device.ResolveDescriptor(ctx, s.probe, input.Platform, input.ID)
+	var notFound *device.DeviceNotFoundError
+	if errors.As(err, &notFound) {
+		return device.Descriptor{}, diag.New(
+			diag.CodeDeviceNotFound,
+			notFound.Error(),
+			"Call list_devices to see the reachable iOS simulators and physical devices, then pass one of those ids. A physical iPhone must be connected over USB, unlocked, and trusted.",
+			err,
+		)
 	}
-	return device.Descriptor{ID: input.ID, Platform: input.Platform, Kind: kind, Port: input.Port}
+	if err != nil {
+		return device.Descriptor{}, err
+	}
+	desc.Port = input.Port
+	return desc, nil
 }
