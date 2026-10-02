@@ -2,6 +2,7 @@ package runner
 
 import (
 	"fmt"
+	"unicode/utf8"
 
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/script"
@@ -33,7 +34,7 @@ func (TypeCommand) Execute(step script.ScriptStep, ctx *CommandContext) CommandR
 		if !result.Ok {
 			return CommandResult{Ok: false, Detail: strPtr(result.Reason)}
 		}
-		return CommandResult{Ok: true, Detail: strPtr(fmt.Sprintf("Typed \"%s\"", s.Text))}
+		return CommandResult{Ok: true, Detail: strPtr(typedDetail(s.Text, ""))}
 	}
 
 	if err := ctx.Orchestra.TypeText(ctx.Context, s.Text); err != nil {
@@ -42,5 +43,12 @@ func (TypeCommand) Execute(step script.ScriptStep, ctx *CommandContext) CommandR
 		}
 		panic(err)
 	}
-	return CommandResult{Ok: true, Detail: strPtr(fmt.Sprintf("Typed \"%s\" into focused field", s.Text))}
+	return CommandResult{Ok: true, Detail: strPtr(typedDetail(s.Text, " into focused field"))}
+}
+
+// typedDetail reports how many characters a type step entered and never
+// the text itself, because the text can be a secret and the detail
+// flows into run logs, results, failure bundles and reports.
+func typedDetail(text, suffix string) string {
+	return fmt.Sprintf("Typed %d characters%s", utf8.RuneCountInString(text), suffix)
 }

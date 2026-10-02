@@ -281,7 +281,7 @@ func TestTypeCommand_IntoField(t *testing.T) {
 	if !result.Ok {
 		t.Fatalf("got Ok=false: %s", debugSteps(result.Steps))
 	}
-	if got := detail(lastStep(t, result)); got != `Typed "hello"` {
+	if got := detail(lastStep(t, result)); got != "Typed 5 characters" {
 		t.Fatalf("got detail %q", got)
 	}
 }
@@ -296,7 +296,7 @@ func TestTypeCommand_BareIntoFocused(t *testing.T) {
 	if !result.Ok {
 		t.Fatalf("got Ok=false: %s", debugSteps(result.Steps))
 	}
-	if got := detail(lastStep(t, result)); got != `Typed "hello" into focused field` {
+	if got := detail(lastStep(t, result)); got != "Typed 5 characters into focused field" {
 		t.Fatalf("got detail %q", got)
 	}
 }
@@ -556,4 +556,15 @@ type cancelPanicCommand struct{}
 func (cancelPanicCommand) Command() string { return script.CommandBack }
 func (cancelPanicCommand) Execute(script.ScriptStep, *CommandContext) CommandResult {
 	panic(context.Canceled)
+}
+
+func TestTypedDetail_CountsRunesAndNeverEchoesText(t *testing.T) {
+	const secret = "pässwörd🙂"
+	got := typedDetail(secret, "")
+	if got != "Typed 9 characters" {
+		t.Fatalf("got %q, want the rune count", got)
+	}
+	if strings.Contains(got, "ss") {
+		t.Fatalf("detail %q echoes the typed text", got)
+	}
 }

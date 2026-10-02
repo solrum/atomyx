@@ -148,7 +148,7 @@ func toJSONScript(result runner.ScriptResult, byScope ScreenshotsByScope, scope 
 			StepIndex:  step.StepIndex,
 			Command:    step.Command,
 			Ok:         step.Ok,
-			Detail:     redactStepDetail(step.Command, step.Ok, step.Detail),
+			Detail:     step.Detail,
 			DurationMs: step.DurationMs,
 		}
 	}

@@ -337,6 +337,11 @@ corresponding area. For the high-level map see
   tool handler, not pasted into the handler itself. Selector
   compilation lives in `core/internal/orchestra/priority_broadening.go`
   and the raw filter primitives in `core/internal/orchestra/filter.go`.
+- **Never log or return typed text.** A `type` step may enter a
+  secret, so its result detail states a character count only
+  (`core/internal/runner/type_command.go`). Any new step result, log
+  line or evidence file that would carry the typed value must carry its
+  length instead.
 
 ## Observation-driven input and waits
 

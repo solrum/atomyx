@@ -268,7 +268,7 @@
     {
       "command": "type",
       "depth": 0,
-      "detail": "Typed \"user@test.com\"",
+      "detail": "Typed 13 characters",
       "durationMs": 0,
       "line": 7,
       "ok": true,
@@ -342,7 +342,7 @@
     {
       "command": "type",
       "depth": 0,
-      "detail": "Typed \"hi\" into focused field",
+      "detail": "Typed 2 characters into focused field",
       "durationMs": 0,
       "line": 10,
       "ok": true,
@@ -966,14 +966,14 @@
     },
     {
       "command": "type",
-      "detail": "Typed \"user@test.com\"",
+      "detail": "Typed 13 characters",
       "durationMs": 0,
       "ok": true,
       "stepIndex": 2
     },
     {
       "command": "type",
-      "detail": "Typed \"hi\" into focused field",
+      "detail": "Typed 2 characters into focused field",
       "durationMs": 0,
       "ok": true,
       "stepIndex": 3

@@ -135,8 +135,8 @@ func renderStepsTable(steps []runner.StepResult) string {
 			rowClass, status = "step-passed", "PASS"
 		}
 		detail := ""
-		if stepDetail := redactStepDetail(step.Command, step.Ok, step.Detail); stepDetail != nil && *stepDetail != "" {
-			detail = escapeHTML(*stepDetail)
+		if step.Detail != nil && *step.Detail != "" {
+			detail = escapeHTML(*step.Detail)
 		}
 		rows[i] = fmt.Sprintf(
 			"<tr class=\"%s\">\n      <td>%d</td>\n      <td>%s</td>\n      <td>%s</td>\n      <td>%s</td>\n      <td>%d ms</td>\n    </tr>",

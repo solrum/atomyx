@@ -285,6 +285,11 @@ Type text into an input field.
     text: user@test.com
 ```
 
+A type step reports only how many characters it entered, for example
+`Typed 13 characters`. The typed text never appears in the step
+result, the run log, the failure bundle or the report, so a value that
+is a secret stays out of them.
+
 ### waitFor
 
 Wait for an element to appear. Throws on timeout.
