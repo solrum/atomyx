@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -39,64 +41,102 @@ func (c *fakeClock) Sleep(ctx context.Context, ms int64) error {
 
 var _ clock.Clock = (*fakeClock)(nil)
 
-// fakeXcodebuildRunner is a process.Runner test double for
-// XctestLauncher. It records every invocation for argv assertions and
-// answers "build-for-testing" with a canned Result/err. For
-// "test-without-building" it either opens a real listener on the
-// configured port that answers the same ping handshake
-// startFakeTunnelListener uses (modeling a driver that came up),
-// returns spawnExitErr immediately (modeling an early crash), or
-// blocks on ctx without ever listening (modeling a driver that never
-// becomes reachable) until the launcher cancels it.
+// fakeXcodebuildRunner is the process.Runner and
+// process.BackgroundRunner test double for XctestLauncher. It records
+// every invocation, from either entry point, in dispatch order for
+// argv assertions. Run answers "build-for-testing" with a canned
+// Result and error, and refuses "test-without-building" (recording
+// it in spawnViaRun) because that long-lived process must go through
+// Start. For "test-without-building", Start either returns
+// spawnStartErr (modeling a missing binary), starts a process that
+// opens a real listener on the configured port that answers the same
+// ping handshake startFakeTunnelListener uses (modeling a driver that
+// came up), exits immediately with spawnExitStderr (modeling an early
+// crash), or blocks without ever listening (modeling a driver that
+// never becomes reachable) until the launcher kills it.
 type fakeXcodebuildRunner struct {
 	mu          sync.Mutex
 	invocations []process.Invocation
+	spawnViaRun bool
 
 	buildResult process.Result
 	buildErr    error
 
-	port         int
-	spawnReady   bool
-	spawnExitErr error
+	port            int
+	spawnReady      bool
+	spawnStartErr   error
+	spawnExit       bool
+	spawnExitStderr string
 
-	// spawnReturned, when non-nil, is closed just before runSpawn
-	// returns on the spawnReady path, so a test can observe that
-	// canceling the launcher's runCtx actually made the simulated
-	// xcodebuild process exit instead of only asserting that the
-	// caller's Kill call returned.
+	// spawnChatterBytes is how much the process writes to its stdout
+	// before doing anything else. The pipe is unbuffered, so the write
+	// blocks until the launcher drains it, modeling a verbose xcodebuild.
+	spawnChatterBytes int
+
+	// spawnReturned, when non-nil, is closed just before the spawned
+	// process body returns on the spawnReady path, so a test can
+	// observe that Kill actually made the simulated xcodebuild
+	// process exit instead of only asserting that the caller's kill
+	// call returned.
 	spawnReturned chan struct{}
 }
 
-func (r *fakeXcodebuildRunner) Run(ctx context.Context, name string, args ...string) (process.Result, error) {
+func (r *fakeXcodebuildRunner) record(name string, args []string) {
 	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.invocations = append(r.invocations, process.Invocation{Name: name, Args: append([]string(nil), args...)})
-	r.mu.Unlock()
-
-	if len(args) == 0 {
-		return process.Result{}, nil
-	}
-	switch args[0] {
-	case "build-for-testing":
-		return r.buildResult, r.buildErr
-	case "test-without-building":
-		return r.runSpawn(ctx)
-	default:
-		return process.Result{}, nil
-	}
 }
 
-func (r *fakeXcodebuildRunner) runSpawn(ctx context.Context) (process.Result, error) {
-	if r.spawnExitErr != nil {
-		return process.Result{}, r.spawnExitErr
+func (r *fakeXcodebuildRunner) Run(_ context.Context, name string, args ...string) (process.Result, error) {
+	r.record(name, args)
+	if len(args) > 0 && args[0] == "test-without-building" {
+		r.mu.Lock()
+		r.spawnViaRun = true
+		r.mu.Unlock()
+		return process.Result{}, errors.New("test-without-building must be started through the BackgroundRunner")
+	}
+	if len(args) > 0 && args[0] == "build-for-testing" {
+		return r.buildResult, r.buildErr
+	}
+	return process.Result{}, nil
+}
+
+func (r *fakeXcodebuildRunner) Start(ctx context.Context, name string, args ...string) (process.BackgroundProcess, error) {
+	r.record(name, args)
+	if r.spawnStartErr != nil {
+		return nil, r.spawnStartErr
+	}
+	ctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	pr, pw := io.Pipe()
+	proc := &tunnelProcess{cancel: cancel, stdout: pr, done: make(chan struct{})}
+	go func() {
+		defer close(proc.done)
+		defer func() { _ = pw.Close() }()
+		proc.err = r.runSpawn(ctx, proc, pw)
+	}()
+	return proc, nil
+}
+
+func (r *fakeXcodebuildRunner) runSpawn(ctx context.Context, proc *tunnelProcess, stdout io.Writer) error {
+	if r.spawnChatterBytes > 0 {
+		_, _ = stdout.Write(make([]byte, r.spawnChatterBytes))
+	}
+	if r.spawnExit {
+		proc.exitCode = 65
+		proc.stderr = r.spawnExitStderr
+		return errors.New("exit status 65")
 	}
 	if !r.spawnReady {
 		<-ctx.Done()
-		return process.Result{}, ctx.Err()
+		if r.spawnReturned != nil {
+			close(r.spawnReturned)
+		}
+		return ctx.Err()
 	}
 
 	listener, err := new(net.ListenConfig).Listen(ctx, "tcp", fmt.Sprintf("127.0.0.1:%d", r.port))
 	if err != nil {
-		return process.Result{}, err
+		return err
 	}
 	done := make(chan struct{})
 	go func() {
@@ -116,7 +156,7 @@ func (r *fakeXcodebuildRunner) runSpawn(ctx context.Context) (process.Result, er
 	if r.spawnReturned != nil {
 		close(r.spawnReturned)
 	}
-	return process.Result{}, ctx.Err()
+	return ctx.Err()
 }
 
 func (r *fakeXcodebuildRunner) Invocations() []process.Invocation {
@@ -125,7 +165,16 @@ func (r *fakeXcodebuildRunner) Invocations() []process.Invocation {
 	return append([]process.Invocation(nil), r.invocations...)
 }
 
-var _ process.Runner = (*fakeXcodebuildRunner)(nil)
+func (r *fakeXcodebuildRunner) SpawnedViaRun() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.spawnViaRun
+}
+
+var (
+	_ process.Runner           = (*fakeXcodebuildRunner)(nil)
+	_ process.BackgroundRunner = (*fakeXcodebuildRunner)(nil)
+)
 
 // answerPingHandshake answers the same ping handshake
 // probeIproxyPing sends, on a single already-accepted connection.
@@ -245,7 +294,7 @@ func TestXctestLauncher_EnsureRunning_ProbeAnswers_SkipsBuildAndSpawn(t *testing
 	defer cleanup()
 
 	runner := &fakeXcodebuildRunner{}
-	l := iosdriver.NewXctestLauncher(runner, &fakeClock{}, iosdriver.LaunchConfig{
+	l := iosdriver.NewXctestLauncher(runner, runner, &fakeClock{}, iosdriver.LaunchConfig{
 		ProjectDir: t.TempDir(),
 		Port:       port,
 		Kind:       iosdriver.KindSimulator,
@@ -267,7 +316,7 @@ func TestXctestLauncher_EnsureRunning_ProbeAnswers_SkipsBuildAndSpawn(t *testing
 func TestXctestLauncher_EnsureRunning_NoProjectDirectory_ReturnsNoProjectError(t *testing.T) {
 	port := freeTCPPort(t)
 	runner := &fakeXcodebuildRunner{}
-	l := iosdriver.NewXctestLauncher(runner, &fakeClock{}, iosdriver.LaunchConfig{
+	l := iosdriver.NewXctestLauncher(runner, runner, &fakeClock{}, iosdriver.LaunchConfig{
 		ProjectDir: t.TempDir(),
 		Port:       port,
 		Kind:       iosdriver.KindSimulator,
@@ -291,7 +340,7 @@ func TestXctestLauncher_EnsureRunning_BuildsThenSpawnsWithExactArgv_Simulator(t 
 	projectDir, _ := newTestProjectDir(t)
 	port := freeTCPPort(t)
 	runner := &fakeXcodebuildRunner{port: port, spawnReady: true}
-	l := iosdriver.NewXctestLauncher(runner, &fakeClock{}, iosdriver.LaunchConfig{
+	l := iosdriver.NewXctestLauncher(runner, runner, &fakeClock{}, iosdriver.LaunchConfig{
 		ProjectDir: projectDir,
 		Port:       port,
 		Kind:       iosdriver.KindSimulator,
@@ -302,6 +351,9 @@ func TestXctestLauncher_EnsureRunning_BuildsThenSpawnsWithExactArgv_Simulator(t 
 		t.Fatalf("EnsureRunning() error = %v", err)
 	}
 
+	if runner.SpawnedViaRun() {
+		t.Fatal("test-without-building went through Runner.Run, want the BackgroundRunner so the fallback timeout cannot kill it")
+	}
 	invocations := runner.Invocations()
 	if len(invocations) != 2 {
 		t.Fatalf("invocations = %+v, want exactly one build then one spawn", invocations)
@@ -333,7 +385,7 @@ func TestXctestLauncher_EnsureRunning_KillStopsTheSpawnedXcodebuildProcess(t *te
 	port := freeTCPPort(t)
 	spawnReturned := make(chan struct{})
 	runner := &fakeXcodebuildRunner{port: port, spawnReady: true, spawnReturned: spawnReturned}
-	l := iosdriver.NewXctestLauncher(runner, &fakeClock{}, iosdriver.LaunchConfig{
+	l := iosdriver.NewXctestLauncher(runner, runner, &fakeClock{}, iosdriver.LaunchConfig{
 		ProjectDir: projectDir,
 		Port:       port,
 		Kind:       iosdriver.KindSimulator,
@@ -367,11 +419,54 @@ func TestXctestLauncher_EnsureRunning_KillStopsTheSpawnedXcodebuildProcess(t *te
 	}
 }
 
+func TestXctestLauncher_EnsureRunning_VerboseStdoutDoesNotStallReadiness(t *testing.T) {
+	projectDir, _ := newTestProjectDir(t)
+	createFreshRunnerApp(t, projectDir, iosdriver.KindSimulator, time.Now())
+	port := freeTCPPort(t)
+	runner := &fakeXcodebuildRunner{port: port, spawnReady: true, spawnChatterBytes: 4 << 20}
+	l := iosdriver.NewXctestLauncher(runner, runner, &fakeClock{}, iosdriver.LaunchConfig{
+		ProjectDir: projectDir,
+		Port:       port,
+		Kind:       iosdriver.KindSimulator,
+		UDID:       "SIM-1",
+	})
+
+	kill, err := l.EnsureRunning(context.Background())
+	if err != nil {
+		t.Fatalf("EnsureRunning() error = %v, want readiness despite 4 MiB of stdout", err)
+	}
+	if err := kill(); err != nil {
+		t.Fatalf("kill() error = %v", err)
+	}
+}
+
+func TestXctestLauncher_EnsureRunning_EmptyStderr_ReturnsSpawnExitError(t *testing.T) {
+	projectDir, _ := newTestProjectDir(t)
+	createFreshRunnerApp(t, projectDir, iosdriver.KindSimulator, time.Now())
+	port := freeTCPPort(t)
+	runner := &fakeXcodebuildRunner{port: port, spawnExit: true}
+	l := iosdriver.NewXctestLauncher(runner, runner, &fakeClock{}, iosdriver.LaunchConfig{
+		ProjectDir: projectDir,
+		Port:       port,
+		Kind:       iosdriver.KindSimulator,
+		UDID:       "SIM-1",
+	})
+
+	_, err := l.EnsureRunning(context.Background())
+	var launchErr *iosdriver.XctestLauncherError
+	if !errors.As(err, &launchErr) || launchErr.Code != iosdriver.XctestErrSpawnExit {
+		t.Fatalf("EnsureRunning() error = %v, want an XctestErrSpawnExit launcher error", err)
+	}
+	if !strings.Contains(launchErr.Message, "stderr: (empty)") {
+		t.Fatalf("Message = %q, want the empty-stderr marker", launchErr.Message)
+	}
+}
+
 func TestXctestLauncher_EnsureRunning_PhysicalDevice_UsesDeviceDestinationAndSigningArgv(t *testing.T) {
 	projectDir, _ := newTestProjectDir(t)
 	port := freeTCPPort(t)
 	runner := &fakeXcodebuildRunner{port: port, spawnReady: true}
-	l := iosdriver.NewXctestLauncher(runner, &fakeClock{}, iosdriver.LaunchConfig{
+	l := iosdriver.NewXctestLauncher(runner, runner, &fakeClock{}, iosdriver.LaunchConfig{
 		ProjectDir: projectDir,
 		Port:       port,
 		Kind:       iosdriver.KindDevice,
@@ -409,7 +504,7 @@ func TestXctestLauncher_EnsureRunning_PhysicalDeviceWithoutDevTeam_ReturnsSignin
 	projectDir, _ := newTestProjectDir(t)
 	port := freeTCPPort(t)
 	runner := &fakeXcodebuildRunner{port: port, spawnReady: true}
-	l := iosdriver.NewXctestLauncher(runner, &fakeClock{}, iosdriver.LaunchConfig{
+	l := iosdriver.NewXctestLauncher(runner, runner, &fakeClock{}, iosdriver.LaunchConfig{
 		ProjectDir: projectDir,
 		Port:       port,
 		Kind:       iosdriver.KindDevice,
@@ -429,6 +524,71 @@ func TestXctestLauncher_EnsureRunning_PhysicalDeviceWithoutDevTeam_ReturnsSignin
 	}
 }
 
+func TestXctestLauncher_EnsureRunning_PhysicalDevice_ManualSigningPassesProfile(t *testing.T) {
+	projectDir, _ := newTestProjectDir(t)
+	port := freeTCPPort(t)
+	runner := &fakeXcodebuildRunner{port: port, spawnReady: true}
+	l := iosdriver.NewXctestLauncher(runner, runner, &fakeClock{}, iosdriver.LaunchConfig{
+		ProjectDir:                   projectDir,
+		Port:                         port,
+		Kind:                         iosdriver.KindDevice,
+		UDID:                         "DEV-1",
+		DevTeam:                      "TEAM123",
+		CodeSignStyle:                "Manual",
+		ProvisioningProfileSpecifier: "match Development *",
+	})
+
+	if _, err := l.EnsureRunning(context.Background()); err != nil {
+		t.Fatalf("EnsureRunning() error = %v", err)
+	}
+
+	manual := []string{
+		"CODE_SIGN_STYLE=Manual",
+		"CODE_SIGNING_REQUIRED=YES",
+		"CODE_SIGNING_ALLOWED=YES",
+		"DEVELOPMENT_TEAM=TEAM123",
+		"PROVISIONING_PROFILE_SPECIFIER=match Development *",
+	}
+	invocations := runner.Invocations()
+	if len(invocations) != 2 {
+		t.Fatalf("invocations = %+v, want one build then one spawn", invocations)
+	}
+	wantBuild := substituteProjectPaths(wantBuildArgs("platform=iOS,id=DEV-1", manual...), projectDir)
+	if !equalArgs(invocations[0].Args, wantBuild) {
+		t.Fatalf("build args = %+v, want %v", invocations[0].Args, wantBuild)
+	}
+	wantSpawn := substituteProjectPaths(wantSpawnArgs("platform=iOS,id=DEV-1", manual...), projectDir)
+	if !equalArgs(invocations[1].Args, wantSpawn) {
+		t.Fatalf("spawn args = %+v, want %v", invocations[1].Args, wantSpawn)
+	}
+}
+
+func TestXctestLauncher_EnsureRunning_PhysicalDevice_ManualSigningWithoutProfile_ReturnsSigningError(t *testing.T) {
+	projectDir, _ := newTestProjectDir(t)
+	port := freeTCPPort(t)
+	runner := &fakeXcodebuildRunner{port: port, spawnReady: true}
+	l := iosdriver.NewXctestLauncher(runner, runner, &fakeClock{}, iosdriver.LaunchConfig{
+		ProjectDir:    projectDir,
+		Port:          port,
+		Kind:          iosdriver.KindDevice,
+		UDID:          "DEV-1",
+		DevTeam:       "TEAM123",
+		CodeSignStyle: "Manual",
+	})
+
+	_, err := l.EnsureRunning(context.Background())
+	var launchErr *iosdriver.XctestLauncherError
+	if !errors.As(err, &launchErr) || launchErr.Code != iosdriver.XctestErrSigning {
+		t.Fatalf("EnsureRunning() error = %v, want an XctestErrSigning launcher error", err)
+	}
+	if !strings.Contains(launchErr.Message, "ATOMYX_PROVISIONING_PROFILE_SPECIFIER") {
+		t.Fatalf("Message = %q, want the remedy naming the profile setting", launchErr.Message)
+	}
+	if len(runner.Invocations()) != 0 {
+		t.Fatalf("invocations = %+v, want no xcodebuild call", runner.Invocations())
+	}
+}
+
 func TestXctestLauncher_EnsureRunning_SkipsBuildWhenRunnerAppIsFresh(t *testing.T) {
 	projectDir, pbxproj := newTestProjectDir(t)
 	if err := os.Chtimes(pbxproj, time.Now().Add(-time.Hour), time.Now().Add(-time.Hour)); err != nil {
@@ -438,7 +598,7 @@ func TestXctestLauncher_EnsureRunning_SkipsBuildWhenRunnerAppIsFresh(t *testing.
 
 	port := freeTCPPort(t)
 	runner := &fakeXcodebuildRunner{port: port, spawnReady: true}
-	l := iosdriver.NewXctestLauncher(runner, &fakeClock{}, iosdriver.LaunchConfig{
+	l := iosdriver.NewXctestLauncher(runner, runner, &fakeClock{}, iosdriver.LaunchConfig{
 		ProjectDir: projectDir,
 		Port:       port,
 		Kind:       iosdriver.KindSimulator,
@@ -464,7 +624,7 @@ func TestXctestLauncher_EnsureRunning_RebuildsWhenPbxprojNewerThanRunnerApp(t *t
 
 	port := freeTCPPort(t)
 	runner := &fakeXcodebuildRunner{port: port, spawnReady: true}
-	l := iosdriver.NewXctestLauncher(runner, &fakeClock{}, iosdriver.LaunchConfig{
+	l := iosdriver.NewXctestLauncher(runner, runner, &fakeClock{}, iosdriver.LaunchConfig{
 		ProjectDir: projectDir,
 		Port:       port,
 		Kind:       iosdriver.KindSimulator,
@@ -502,7 +662,7 @@ func TestXctestLauncher_EnsureRunning_RebuildsWhenSwiftSourceNewerThanRunnerApp(
 
 	port := freeTCPPort(t)
 	runner := &fakeXcodebuildRunner{port: port, spawnReady: true}
-	l := iosdriver.NewXctestLauncher(runner, &fakeClock{}, iosdriver.LaunchConfig{
+	l := iosdriver.NewXctestLauncher(runner, runner, &fakeClock{}, iosdriver.LaunchConfig{
 		ProjectDir: projectDir,
 		Port:       port,
 		Kind:       iosdriver.KindSimulator,
@@ -523,8 +683,8 @@ func TestXctestLauncher_EnsureRunning_ProcessExitsEarly_ReturnsSpawnExitError(t 
 	projectDir, _ := newTestProjectDir(t)
 	createFreshRunnerApp(t, projectDir, iosdriver.KindSimulator, time.Now())
 	port := freeTCPPort(t)
-	runner := &fakeXcodebuildRunner{port: port, spawnExitErr: errors.New("xcodebuild: no matching destination")}
-	l := iosdriver.NewXctestLauncher(runner, &fakeClock{}, iosdriver.LaunchConfig{
+	runner := &fakeXcodebuildRunner{port: port, spawnExit: true, spawnExitStderr: "xcodebuild: no matching destination"}
+	l := iosdriver.NewXctestLauncher(runner, runner, &fakeClock{}, iosdriver.LaunchConfig{
 		ProjectDir: projectDir,
 		Port:       port,
 		Kind:       iosdriver.KindSimulator,
@@ -539,14 +699,17 @@ func TestXctestLauncher_EnsureRunning_ProcessExitsEarly_ReturnsSpawnExitError(t 
 	if launchErr.Code != iosdriver.XctestErrSpawnExit {
 		t.Fatalf("Code = %q, want %q", launchErr.Code, iosdriver.XctestErrSpawnExit)
 	}
+	if !strings.Contains(launchErr.Message, "no matching destination") {
+		t.Fatalf("Message = %q, want the captured xcodebuild stderr tail", launchErr.Message)
+	}
 }
 
 func TestXctestLauncher_EnsureRunning_ProcessNotFound_ReturnsNoXcodeError(t *testing.T) {
 	projectDir, _ := newTestProjectDir(t)
 	createFreshRunnerApp(t, projectDir, iosdriver.KindSimulator, time.Now())
 	port := freeTCPPort(t)
-	runner := &fakeXcodebuildRunner{port: port, spawnExitErr: &exec.Error{Name: "xcodebuild", Err: exec.ErrNotFound}}
-	l := iosdriver.NewXctestLauncher(runner, &fakeClock{}, iosdriver.LaunchConfig{
+	runner := &fakeXcodebuildRunner{port: port, spawnStartErr: &exec.Error{Name: "xcodebuild", Err: exec.ErrNotFound}}
+	l := iosdriver.NewXctestLauncher(runner, runner, &fakeClock{}, iosdriver.LaunchConfig{
 		ProjectDir: projectDir,
 		Port:       port,
 		Kind:       iosdriver.KindSimulator,
@@ -577,7 +740,7 @@ func TestXctestLauncher_EnsureRunning_BuildsThenSpawnsWithExactArgv_CustomIdenti
 	projectDir, _ := newTestProjectDir(t)
 	port := freeTCPPort(t)
 	runner := &fakeXcodebuildRunner{port: port, spawnReady: true}
-	l := iosdriver.NewXctestLauncher(runner, &fakeClock{}, iosdriver.LaunchConfig{
+	l := iosdriver.NewXctestLauncher(runner, runner, &fakeClock{}, iosdriver.LaunchConfig{
 		ProjectDir:        projectDir,
 		Port:              port,
 		Kind:              iosdriver.KindSimulator,
@@ -644,7 +807,7 @@ func TestXctestLauncher_EnsureRunning_TimesOutWhenDriverNeverBecomesReachable(t 
 	createFreshRunnerApp(t, projectDir, iosdriver.KindSimulator, time.Now())
 	port := freeTCPPort(t)
 	runner := &fakeXcodebuildRunner{port: port, spawnReady: false}
-	l := iosdriver.NewXctestLauncher(runner, &fakeClock{}, iosdriver.LaunchConfig{
+	l := iosdriver.NewXctestLauncher(runner, runner, &fakeClock{}, iosdriver.LaunchConfig{
 		ProjectDir:      projectDir,
 		Port:            port,
 		Kind:            iosdriver.KindSimulator,
@@ -659,5 +822,47 @@ func TestXctestLauncher_EnsureRunning_TimesOutWhenDriverNeverBecomesReachable(t 
 	}
 	if launchErr.Code != iosdriver.XctestErrLaunchTimeout {
 		t.Fatalf("Code = %q, want %q", launchErr.Code, iosdriver.XctestErrLaunchTimeout)
+	}
+}
+
+// cancelOnSleepClock cancels a context the first time the readiness
+// loop sleeps, so a test cancels the wait at a deterministic point
+// instead of racing a timer.
+type cancelOnSleepClock struct {
+	cancel context.CancelFunc
+}
+
+func (c *cancelOnSleepClock) NowMs() int64 { return 0 }
+
+func (c *cancelOnSleepClock) Sleep(ctx context.Context, _ int64) error {
+	c.cancel()
+	return ctx.Err()
+}
+
+var _ clock.Clock = (*cancelOnSleepClock)(nil)
+
+func TestXctestLauncher_EnsureRunning_CanceledDuringReadinessWait_KillsSpawnedXcodebuild(t *testing.T) {
+	projectDir, _ := newTestProjectDir(t)
+	createFreshRunnerApp(t, projectDir, iosdriver.KindSimulator, time.Now())
+	port := freeTCPPort(t)
+	spawnReturned := make(chan struct{})
+	runner := &fakeXcodebuildRunner{port: port, spawnReady: false, spawnReturned: spawnReturned}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l := iosdriver.NewXctestLauncher(runner, runner, &cancelOnSleepClock{cancel: cancel}, iosdriver.LaunchConfig{
+		ProjectDir: projectDir,
+		Port:       port,
+		Kind:       iosdriver.KindSimulator,
+		UDID:       "SIM-1",
+	})
+
+	_, err := l.EnsureRunning(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("EnsureRunning() error = %v, want context.Canceled", err)
+	}
+	select {
+	case <-spawnReturned:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the spawned xcodebuild process was still running after the launch was canceled")
 	}
 }

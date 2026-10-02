@@ -60,15 +60,15 @@ type IproxyError struct {
 func (e *IproxyError) Error() string { return e.Message }
 
 // launchIproxy starts the USB tunnel for a physical device by running
-// "iproxy <port>:<port> -u <udid>" through the injected Runner, and
+// "iproxy <port>:<port> -u <udid>", and
 // does not return until the tunnel is confirmed reachable or one of
 // the IproxyErrorCode failure modes is confirmed instead. iproxy is a
-// long-running tunnel process, not a command that completes, so a
-// successful launch keeps it running on a driver-owned goroutine
-// bound to its own cancelable context, independent of ctx: canceling
-// that context (via stopIproxy, or this function's own cleanup on
-// failure) is how the Runner's underlying process is asked to stop.
-// Calling launchIproxy while a tunnel is already running replaces it,
+// long-running tunnel process, not a command that completes, so it is
+// started through the injected BackgroundRunner. Runner.Run applies a
+// fallback timeout to a deadline-less context, which would kill the
+// tunnel mid-session. A successful launch keeps the process running,
+// independent of ctx, until stopIproxy (or this function's own
+// cleanup on failure) kills its process group. Calling launchIproxy while a tunnel is already running replaces it,
 // matching Disconnect followed by a fresh Connect.
 //
 // Two guards make it safe for Connect to dial immediately after this
@@ -84,14 +84,14 @@ func (e *IproxyError) Error() string { return e.Message }
 //   - Poll for real tunnel connectivity after spawn. iproxy emits no
 //     "ready" signal on stdout or stderr, so this polls the port on
 //     iproxyTunnelPollInterval until a fresh TCP connect succeeds,
-//     racing that poll against the Runner call returning early (a bad
+//     racing that poll against the process exiting early (a bad
 //     UDID, iproxy missing from PATH, a device-trust failure, or any
 //     other spawn failure) so a caller never dials a tunnel that has
 //     already failed. The poll cadence and the iproxyTunnelUpTimeout
 //     deadline both run against d.opts.Clock, so a test can drive
 //     IproxyErrTunnelTimeout deterministically with a fake clock
 //     instead of waiting on real time.
-func (d *IosDriver) launchIproxy(ctx context.Context) error { //nolint:contextcheck // the spawned tunnel outlives this call by design; see the doc comment above
+func (d *IosDriver) launchIproxy(ctx context.Context) error {
 	if canConnectTCP(ctx, d.opts.Port, iproxyPortProbeTimeout) {
 		if probeIproxyPing(ctx, d.opts.Port, iproxyPingProbeTimeout) {
 			return nil
@@ -106,13 +106,14 @@ func (d *IosDriver) launchIproxy(ctx context.Context) error { //nolint:contextch
 		}
 	}
 
-	runCtx, cancel := context.WithCancel(context.Background())
 	portMapping := fmt.Sprintf("%d:%d", d.opts.Port, d.opts.Port)
-	exited := make(chan error, 1)
-	go func() {
-		_, err := d.proc.Run(runCtx, "iproxy", portMapping, "-u", d.opts.UDID)
-		exited <- classifyIproxyExit(err)
-	}()
+	proc, startErr := d.background.Start(context.WithoutCancel(ctx), "iproxy", portMapping, "-u", d.opts.UDID)
+	if startErr != nil {
+		return classifyIproxyExit(startErr)
+	}
+	exited, stop := superviseBackground(proc, func(_ process.BackgroundResult, err error) error {
+		return classifyIproxyExit(err)
+	})
 
 	probe := func() (bool, error) {
 		return canConnectTCP(ctx, d.opts.Port, iproxyPortProbeTimeout), nil
@@ -123,14 +124,13 @@ func (d *IosDriver) launchIproxy(ctx context.Context) error { //nolint:contextch
 	)
 	switch outcome {
 	case process.ReadinessReady:
-		d.iproxyCancel = cancel
+		d.iproxyStop = stop
 		return nil
 	case process.ReadinessExited:
-		cancel()
+		stop()
 		return err
 	case process.ReadinessTimeout:
-		cancel()
-		<-exited
+		stop()
 		return &IproxyError{
 			Code: IproxyErrTunnelTimeout,
 			Message: fmt.Sprintf(
@@ -140,18 +140,17 @@ func (d *IosDriver) launchIproxy(ctx context.Context) error { //nolint:contextch
 			),
 		}
 	default: // process.ReadinessCtxDone
-		cancel()
-		<-exited
+		stop()
 		return err
 	}
 }
 
-// classifyIproxyExit turns the error returned by the Runner call
-// backing a failed iproxy launch into a named IproxyError. A missing
-// binary is detected via exec.ErrNotFound, the sentinel os/exec's
-// Cmd.Run wraps and returns when PATH lookup fails; every other exit
-// is reported generically, since the Runner abstraction carries no
-// stderr classification of its own beyond that sentinel.
+// classifyIproxyExit turns the error from starting or waiting on a
+// failed iproxy launch into a named IproxyError. A missing binary is
+// detected via exec.ErrNotFound, the sentinel os/exec returns when
+// PATH lookup fails at start. Every other exit is reported
+// generically, since the BackgroundRunner carries no stderr
+// classification of its own beyond that sentinel.
 func classifyIproxyExit(err error) *IproxyError {
 	if err != nil && errors.Is(err, exec.ErrNotFound) {
 		return &IproxyError{
@@ -211,13 +210,13 @@ func probeIproxyPing(ctx context.Context, port int, timeout time.Duration) bool 
 	return frame.Ok != nil && *frame.Ok && frame.Data.Pong
 }
 
-// stopIproxy asks a running iproxy tunnel to stop by canceling its
-// context, then forgets it. It is a no-op when no tunnel was
+// stopIproxy kills a running iproxy tunnel's process group and waits
+// for it to exit, then forgets it. It is a no-op when no tunnel was
 // launched.
 func (d *IosDriver) stopIproxy() {
-	if d.iproxyCancel == nil {
+	if d.iproxyStop == nil {
 		return
 	}
-	d.iproxyCancel()
-	d.iproxyCancel = nil
+	d.iproxyStop()
+	d.iproxyStop = nil
 }

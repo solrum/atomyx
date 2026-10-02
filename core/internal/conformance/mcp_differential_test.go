@@ -13,6 +13,7 @@ import (
 
 	"dev.atomyx/internal/device"
 	atomcp "dev.atomyx/internal/mcp"
+	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/storage"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -24,6 +25,13 @@ var mcpToolSchemaGoldenRelPath = filepath.Join("mcp", "tool-schema.json")
 
 const mcpConformanceTimeout = 15 * time.Second
 
+// mcpConformanceEpoch is the instant the server under test sees as
+// "now". add_case_study derives its "case-studies/<year>-<month>"
+// storage key from the server clock, and the golden records that key,
+// so the test must pin the clock instead of reading the host's wall
+// time, or the golden goes stale at every month boundary.
+var mcpConformanceEpoch = time.Date(2026, time.September, 15, 12, 0, 0, 0, time.UTC)
+
 // newGoMcpClientSession wires an in-process Go MCP server against a
 // mcpScriptedMockFactory seeded with program and connects a client
 // session to it over an in-memory transport.
@@ -33,6 +41,7 @@ func newGoMcpClientSession(t *testing.T, ctx context.Context, program *McpDriver
 		Probe:   device.NewStaticProbe(),
 		Factory: &mcpScriptedMockFactory{program: program},
 		Storage: storage.NewInMemoryStorage(),
+		Clock:   orchestra.NewFakeClock(mcpConformanceEpoch.UnixMilli()),
 	})
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 	serverSession, err := server.Connect(ctx, serverTransport, nil)

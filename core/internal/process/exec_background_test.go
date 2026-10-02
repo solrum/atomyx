@@ -207,7 +207,7 @@ func TestExecBackground_Start_OutlivesRunFallbackTimeout(t *testing.T) {
 	}
 }
 
-func TestCappedBuffer_Write_DiscardsBytesBeyondLimit(t *testing.T) {
+func TestCappedBuffer_Write_DiscardsBytesBeforeTheLimit(t *testing.T) {
 	w := newCappedBuffer(8)
 	if _, err := w.Write([]byte("hello ")); err != nil {
 		t.Fatalf("Write() error = %v", err)
@@ -215,7 +215,61 @@ func TestCappedBuffer_Write_DiscardsBytesBeyondLimit(t *testing.T) {
 	if _, err := w.Write([]byte("world")); err != nil {
 		t.Fatalf("Write() error = %v", err)
 	}
-	if got := w.String(); got != "hello wo" {
-		t.Fatalf("String() = %q, want %q", got, "hello wo")
+	if got := w.String(); got != "lo world" {
+		t.Fatalf("String() = %q, want %q", got, "lo world")
+	}
+}
+
+func TestCappedBufferKeepsTheTailOfOversizedOutput(t *testing.T) {
+	const limit = 16
+	buf := newCappedBuffer(limit)
+	_, _ = buf.Write([]byte(strings.Repeat("a", 40)))
+	_, _ = buf.Write([]byte("b"))
+	_, _ = buf.Write([]byte("final error line"))
+	got := buf.String()
+	if len(got) != limit {
+		t.Fatalf("retained %d bytes, want %d", len(got), limit)
+	}
+	if got != "final error line" {
+		t.Fatalf("retained %q, want the last %d bytes written", got, limit)
+	}
+}
+
+func TestExecBackground_Wait_StderrKeepsTheFinalLineOfVerboseOutput(t *testing.T) {
+	r := NewExecBackground()
+	script := "i=0; while [ $i -lt 4000 ]; do echo 'noise line padding padding padding' >&2; i=$((i+1)); done; echo 'FINAL-ERROR' >&2; exit 3"
+	proc, err := r.Start(context.Background(), "sh", "-c", script)
+	if err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	result, _ := proc.Wait()
+	if !strings.Contains(result.Stderr, "FINAL-ERROR") {
+		t.Fatalf("Stderr tail lost the final line: %q", result.Stderr[max(0, len(result.Stderr)-80):])
+	}
+	if len(result.Stderr) > stderrCaptureLimit {
+		t.Fatalf("Stderr is %d bytes, over the %d cap", len(result.Stderr), stderrCaptureLimit)
+	}
+}
+
+func TestExecBackground_Wait_ReturnsWhenADescendantHoldsStderrOpen(t *testing.T) {
+	r := ExecBackground{waitDelay: 100 * time.Millisecond}
+	proc, err := r.Start(context.Background(), "sh", "-c", "sleep 30 & echo 'boom' >&2; exit 4")
+	if err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	defer func() { _ = proc.Kill() }()
+
+	waited := make(chan BackgroundResult, 1)
+	go func() {
+		result, _ := proc.Wait()
+		waited <- result
+	}()
+	select {
+	case result := <-waited:
+		if result.ExitCode != 4 || !strings.Contains(result.Stderr, "boom") {
+			t.Fatalf("Wait() = %+v, want exit 4 with the stderr text", result)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Wait() stayed blocked on a descendant holding stderr")
 	}
 }

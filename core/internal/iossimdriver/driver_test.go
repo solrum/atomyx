@@ -211,7 +211,7 @@ func newContractSimDriver(t *testing.T) (driver.Driver, *fakeConn) {
 
 	conn := newDefaultFakeConn()
 	d, err := iossimdriver.New(conn, newSimContractRunner(), &fakeDialer{conn: clientConn}, iossimdriver.Options{
-		Options: iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator},
+		Options: iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator},
 		HidPort: 1,
 	})
 	if err != nil {
@@ -250,7 +250,7 @@ func TestIosSimDriver_CurrentForeground_DelegatesUnsupportedToXCUITest(t *testin
 
 func TestNew_RequiresHidPort(t *testing.T) {
 	_, err := iossimdriver.New(newFakeConn(), process.NewFake(), iossimdriver.NewDialer(), iossimdriver.Options{
-		Options: iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator},
+		Options: iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator},
 	})
 	if err == nil {
 		t.Fatal("New() error = nil, want an error when HidPort is zero")
@@ -265,7 +265,7 @@ func TestIosSimDriver_Tap_RoutesThroughHidNotXCUITest(t *testing.T) {
 	defer func() { _ = clientConn.Close() }()
 
 	d, err := iossimdriver.New(conn, process.NewFake(), &fakeDialer{conn: clientConn}, iossimdriver.Options{
-		Options: iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator},
+		Options: iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator},
 		HidPort: 1,
 	})
 	if err != nil {
@@ -319,7 +319,7 @@ func TestIosSimDriver_Tap_RefetchesScreenSizeAfterTTLElapses(t *testing.T) {
 
 	fakeClock := clock.NewFakeClock(0)
 	d, err := iossimdriver.New(conn, process.NewFake(), &fakeDialer{conn: clientConn}, iossimdriver.Options{
-		Options: iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator, Clock: fakeClock},
+		Options: iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator, Clock: fakeClock},
 		HidPort: 1,
 	})
 	if err != nil {
@@ -374,7 +374,7 @@ func TestIosSimDriver_LongPress_UsesDurationAsHoldMs(t *testing.T) {
 	defer func() { _ = clientConn.Close() }()
 
 	d, err := iossimdriver.New(conn, process.NewFake(), &fakeDialer{conn: clientConn}, iossimdriver.Options{
-		Options: iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator},
+		Options: iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator},
 		HidPort: 1,
 	})
 	if err != nil {
@@ -400,7 +400,7 @@ func TestIosSimDriver_Swipe_NormalizesBothEndpoints(t *testing.T) {
 	defer func() { _ = clientConn.Close() }()
 
 	d, err := iossimdriver.New(conn, process.NewFake(), &fakeDialer{conn: clientConn}, iossimdriver.Options{
-		Options: iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator},
+		Options: iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator},
 		HidPort: 1,
 	})
 	if err != nil {
@@ -431,7 +431,7 @@ func TestIosSimDriver_DispatchGesture_DelegatesToXCUITest(t *testing.T) {
 	defer func() { _ = clientConn.Close() }()
 
 	d, err := iossimdriver.New(conn, process.NewFake(), &fakeDialer{conn: clientConn}, iossimdriver.Options{
-		Options: iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator},
+		Options: iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator},
 		HidPort: 1,
 	})
 	if err != nil {
@@ -470,7 +470,7 @@ func TestIosSimDriver_DispatchGesture_ForwardsCaptureThroughDelegate(t *testing.
 	defer func() { _ = clientConn.Close() }()
 
 	d, err := iossimdriver.New(conn, process.NewFake(), &fakeDialer{conn: clientConn}, iossimdriver.Options{
-		Options: iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator},
+		Options: iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator},
 		HidPort: 1,
 	})
 	if err != nil {
@@ -506,7 +506,7 @@ func TestIosSimDriver_StreamingTouch_RoutesThroughHid(t *testing.T) {
 	defer func() { _ = clientConn.Close() }()
 
 	d, err := iossimdriver.New(conn, process.NewFake(), &fakeDialer{conn: clientConn}, iossimdriver.Options{
-		Options: iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator},
+		Options: iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator},
 		HidPort: 1,
 	})
 	if err != nil {
@@ -553,7 +553,7 @@ func TestIosSimDriver_Hierarchy_DelegatesToXCUITest(t *testing.T) {
 	defer func() { _ = clientConn.Close() }()
 
 	d, err := iossimdriver.New(conn, process.NewFake(), &fakeDialer{conn: clientConn}, iossimdriver.Options{
-		Options: iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator},
+		Options: iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator},
 		HidPort: 1,
 	})
 	if err != nil {

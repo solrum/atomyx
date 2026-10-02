@@ -100,7 +100,10 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 	deviceID := resolveDeviceID(flags, resolvedEnvironment)
 	proxyFlag := resolveProxyFlag(flags, resolvedEnvironment)
 
-	desc := descriptorFor(platform, deviceID)
+	desc, err := resolveDescriptor(ctx, deps.Probe, platform, deviceID)
+	if err != nil {
+		return reportUncaught(stderr, deps.Debug, err)
+	}
 	built, err := deps.Factory.Build(ctx, desc)
 	if err != nil {
 		return reportUncaught(stderr, deps.Debug, err)

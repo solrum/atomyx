@@ -35,9 +35,10 @@ func TestIosDriver_E2E(t *testing.T) {
 	drivertest.Run(t, func() driver.Driver {
 		conn := transport.NewTCPClient("127.0.0.1", iosE2EControlPort)
 		return iosdriver.New(conn, process.NewExec(), iosdriver.Options{
-			UDID: udid,
-			Kind: iosdriver.KindDevice,
-			Port: iosE2EControlPort,
+			Background: process.NewExecBackground(),
+			UDID:       udid,
+			Kind:       iosdriver.KindDevice,
+			Port:       iosE2EControlPort,
 		})
 	}, drivertest.Hooks{})
 }

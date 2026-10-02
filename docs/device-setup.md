@@ -64,6 +64,11 @@ atomyx run \
 
 ## iOS Physical Device
 
+`--device <UDID>` selects either a booted simulator or a paired
+physical device: the CLI looks the UDID up through the same scan
+`atomyx list-devices` prints, so no separate flag marks a device as
+physical. A UDID that scan does not list fails with `DEVICE_NOT_FOUND`.
+
 ### One-time setup
 
 1. **Create config file:**

@@ -2,6 +2,8 @@ package device
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"os"
 	"runtime"
 	"testing"
@@ -75,7 +77,7 @@ func TestDriverFactory_CreateDriver_SimHidOptInUnset_BuildsIosDriverWithoutStart
 	setEnv(t, simHidOptInEnv, "")
 	starter := &fakeSimHidStarter{port: 4242}
 	runner := process.NewFake()
-	f := NewDriverFactory(DriverFactoryDeps{Runner: runner, SimHid: starter})
+	f := NewDriverFactory(DriverFactoryDeps{Runner: runner, Background: process.NewFakeBackground(), SimHid: starter})
 
 	drv, err := f.createDriver(context.Background(), Descriptor{ID: "sim-1", Platform: PlatformIOS, Kind: KindSimulator})
 	if err != nil {
@@ -100,7 +102,7 @@ func TestDriverFactory_CreateDriver_SimHidOptInSetAndSupported_StartsHelperAndBu
 	runner := process.NewFake()
 	stubArm64XcodeFloor(t, runner)
 	starter := &fakeSimHidStarter{port: 19876}
-	f := NewDriverFactory(DriverFactoryDeps{Runner: runner, SimHid: starter})
+	f := NewDriverFactory(DriverFactoryDeps{Runner: runner, Background: process.NewFakeBackground(), SimHid: starter})
 
 	drv, err := f.createDriver(context.Background(), Descriptor{ID: "sim-1", Platform: PlatformIOS, Kind: KindSimulator})
 	if err != nil {
@@ -122,7 +124,7 @@ func TestDriverFactory_CreateDriver_SimHidStartFails_FallsBackToIosDriver(t *tes
 	runner := process.NewFake()
 	stubArm64XcodeFloor(t, runner)
 	starter := &fakeSimHidStarter{err: context.DeadlineExceeded}
-	f := NewDriverFactory(DriverFactoryDeps{Runner: runner, SimHid: starter})
+	f := NewDriverFactory(DriverFactoryDeps{Runner: runner, Background: process.NewFakeBackground(), SimHid: starter})
 
 	drv, err := f.createDriver(context.Background(), Descriptor{ID: "sim-1", Platform: PlatformIOS, Kind: KindSimulator})
 	if err != nil {
@@ -139,7 +141,7 @@ func TestDriverFactory_CreateDriver_SimHidStartFails_FallsBackToIosDriver(t *tes
 func TestDriverFactory_CreateDriver_NoSimHidManagerInjected_BuildsIosDriverEvenWithOptIn(t *testing.T) {
 	setEnv(t, simHidOptInEnv, "1")
 	runner := process.NewFake()
-	f := NewDriverFactory(DriverFactoryDeps{Runner: runner})
+	f := NewDriverFactory(DriverFactoryDeps{Runner: runner, Background: process.NewFakeBackground()})
 
 	drv, err := f.createDriver(context.Background(), Descriptor{ID: "sim-1", Platform: PlatformIOS, Kind: KindSimulator})
 	if err != nil {
@@ -152,7 +154,7 @@ func TestDriverFactory_CreateDriver_NoSimHidManagerInjected_BuildsIosDriverEvenW
 
 func TestDriverFactory_CreateDriver_ExplicitHidPort_BuildsIosSimDriverWithoutStarter(t *testing.T) {
 	starter := &fakeSimHidStarter{}
-	f := NewDriverFactory(DriverFactoryDeps{Runner: process.NewFake(), SimHid: starter})
+	f := NewDriverFactory(DriverFactoryDeps{Runner: process.NewFake(), Background: process.NewFakeBackground(), SimHid: starter})
 
 	drv, err := f.createDriver(context.Background(), Descriptor{ID: "sim-1", Platform: PlatformIOS, Kind: KindSimulator, HidPort: 7777})
 	if err != nil {
@@ -164,4 +166,72 @@ func TestDriverFactory_CreateDriver_ExplicitHidPort_BuildsIosSimDriverWithoutSta
 	if len(starter.calls) != 0 {
 		t.Fatalf("StartSimHid calls = %v, want none when the descriptor already carries a HidPort", starter.calls)
 	}
+}
+
+// listeningBackground is a BackgroundRunner whose Start binds a
+// listener that drops every connection, modeling an iproxy tunnel
+// that comes up but forwards to an agent that never answers.
+type listeningBackground struct {
+	t    *testing.T
+	port int
+	proc *process.FakeBackgroundProcess
+}
+
+func (b *listeningBackground) Start(ctx context.Context, _ string, _ ...string) (process.BackgroundProcess, error) {
+	l, err := new(net.ListenConfig).Listen(ctx, "tcp", fmt.Sprintf("127.0.0.1:%d", b.port))
+	if err != nil {
+		return nil, err
+	}
+	b.t.Cleanup(func() { _ = l.Close() })
+	go func() {
+		for {
+			c, err := l.Accept()
+			if err != nil {
+				return
+			}
+			_ = c.Close()
+		}
+	}()
+	return b.proc, nil
+}
+
+func TestDriverFactory_Build_ConnectFailsAfterTunnelStarted_StopsTheTunnel(t *testing.T) {
+	probe, err := new(net.ListenConfig).Listen(context.Background(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("reserve port: %v", err)
+	}
+	port := probe.Addr().(*net.TCPAddr).Port
+	_ = probe.Close()
+
+	proc := process.NewFakeBackgroundProcess()
+	f := NewDriverFactory(DriverFactoryDeps{
+		Runner:     process.NewFake(),
+		Background: &listeningBackground{t: t, port: port, proc: proc},
+	})
+
+	_, err = f.Build(context.Background(), Descriptor{ID: "DEV-1", Platform: PlatformIOS, Kind: KindDevice, Port: port})
+	if err == nil {
+		t.Fatal("Build() succeeded against an agent that never answers the handshake")
+	}
+	if !proc.Killed() {
+		t.Fatal("the tunnel process was left running after Build failed")
+	}
+}
+
+func TestNewDriverFactoryPanicsWithoutABackgroundRunner(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("NewDriverFactory accepted a nil Background")
+		}
+	}()
+	NewDriverFactory(DriverFactoryDeps{Runner: process.NewFake()})
+}
+
+func TestNewDriverProvisionerPanicsWithoutABackgroundRunner(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("NewDriverProvisioner accepted a nil Background")
+		}
+	}()
+	NewDriverProvisioner(DriverProvisionerDeps{Runner: process.NewFake()})
 }

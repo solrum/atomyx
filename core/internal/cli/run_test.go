@@ -766,7 +766,7 @@ func TestRunScriptConfigEnvThreadsPlatformDeviceVars(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	deps := Deps{
-		Probe:   device.NewStaticProbe(nil),
+		Probe:   configEnvDeviceProbe(),
 		Factory: device.NewMockDriverFactory(),
 		Stdout:  &stdout,
 		Stderr:  &stderr,
@@ -796,7 +796,7 @@ func TestRunScriptCliVarOverridesConfigEnvVar(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	deps := Deps{
-		Probe:   device.NewStaticProbe(nil),
+		Probe:   configEnvDeviceProbe(),
 		Factory: device.NewMockDriverFactory(),
 		Stdout:  &stdout,
 		Stderr:  &stderr,
@@ -825,7 +825,7 @@ func TestRunScriptConfigReportBlockProducesReportWithNoReportFlag(t *testing.T) 
 
 	var stdout, stderr bytes.Buffer
 	deps := Deps{
-		Probe:   device.NewStaticProbe(nil),
+		Probe:   configEnvDeviceProbe(),
 		Factory: device.NewMockDriverFactory(),
 		Stdout:  &stdout,
 		Stderr:  &stderr,

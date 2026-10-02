@@ -41,7 +41,7 @@ func TestIosSimDriver_Tap_HidTimeout_SurfacesTypedTimeout(t *testing.T) {
 	defer func() { _ = clientConn.Close() }()
 
 	d, err := iossimdriver.New(conn, process.NewFake(), &fakeDialer{conn: clientConn}, iossimdriver.Options{
-		Options:            iosdriver.Options{UDID: "SIM-1", Kind: iosdriver.KindSimulator},
+		Options:            iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator},
 		HidPort:            1,
 		HidDispatchTimeout: hidFaultInjectionDispatchTimeout,
 	})
@@ -187,7 +187,7 @@ func TestIosSimDriver_BoundaryTranslation_CoversEveryDriverMethod(t *testing.T) 
 func deadHidSimDriver(t *testing.T) *iossimdriver.IosSimDriver {
 	t.Helper()
 	d, err := iossimdriver.New(newDefaultFakeConn(), process.NewFake(), &fakeDialer{}, iossimdriver.Options{
-		Options: iosdriver.Options{UDID: "fault-injection", Kind: iosdriver.KindSimulator},
+		Options: iosdriver.Options{Background: process.NewFakeBackground(), UDID: "fault-injection", Kind: iosdriver.KindSimulator},
 		HidPort: 1,
 	})
 	if err != nil {
@@ -220,7 +220,7 @@ func rejectingHidSimDriverWithMessage(t *testing.T, message string) *iossimdrive
 	t.Cleanup(func() { _ = clientConn.Close() })
 
 	d, err := iossimdriver.New(newDefaultFakeConn(), process.NewFake(), &fakeDialer{conn: clientConn}, iossimdriver.Options{
-		Options: iosdriver.Options{UDID: "fault-injection", Kind: iosdriver.KindSimulator},
+		Options: iosdriver.Options{Background: process.NewFakeBackground(), UDID: "fault-injection", Kind: iosdriver.KindSimulator},
 		HidPort: 1,
 	})
 	if err != nil {
@@ -329,7 +329,7 @@ var _ iossimdriver.Dialer = erroringDialer{}
 func TestIosSimDriver_Connect_HidRejected_SurfacesTypedRejection(t *testing.T) {
 	dialer := erroringDialer{err: errors.New("dial tcp 127.0.0.1:1: connect: connection refused")}
 	d, err := iossimdriver.New(newDefaultFakeConn(), process.NewFake(), dialer, iossimdriver.Options{
-		Options: iosdriver.Options{UDID: "fault-injection", Kind: iosdriver.KindSimulator},
+		Options: iosdriver.Options{Background: process.NewFakeBackground(), UDID: "fault-injection", Kind: iosdriver.KindSimulator},
 		HidPort: 1,
 	})
 	if err != nil {

@@ -11,12 +11,14 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/process"
+	"dev.atomyx/internal/shutdown"
 	"dev.atomyx/internal/sidecar"
 	"dev.atomyx/internal/version"
 )
@@ -52,6 +54,7 @@ func versionLine() string {
 // after run itself has returned and every defer inside it has fired.
 func run() int {
 	procRunner := process.NewExec()
+	background := process.NewExecBackground()
 	clock := orchestra.SystemClock{}
 	logger := logging.FromEnv()
 	probe := device.NewCompositeProbe(
@@ -59,9 +62,9 @@ func run() int {
 		device.NewAndroidAdbProbe(procRunner),
 		device.NewIosProbe(procRunner),
 	)
-	simHid := device.NewSimHidManager(process.NewExecBackground())
-	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Clock: clock, SimHid: simHid, Logger: logger})
-	provisioner := device.NewDriverProvisioner(device.DriverProvisionerDeps{Runner: procRunner, Clock: clock})
+	simHid := device.NewSimHidManager(background)
+	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Background: background, Clock: clock, SimHid: simHid, Logger: logger})
+	provisioner := device.NewDriverProvisioner(device.DriverProvisionerDeps{Runner: procRunner, Background: background, Clock: clock})
 
 	dispatcher := sidecar.NewDispatcher()
 	events := sidecar.NewEventBus()
@@ -94,6 +97,8 @@ func run() int {
 	unsubscribe := events.Subscribe(func(event sidecar.Event) { transport.Emit(event) })
 	defer unsubscribe()
 
+	disposeOnce := sync.OnceFunc(func() { dispose(handles, session, simHid) })
+
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
@@ -109,18 +114,25 @@ func run() int {
 	}()
 
 	select {
-	case <-sigCh:
-		cancel()
+	case sig := <-sigCh:
 		// Run's ReadString blocks on stdin regardless of ctx, so
 		// cancellation alone never unblocks it: closing stdin makes
 		// the pending read return, which lets Run observe ctx.Err()
-		// and drain every in-flight dispatch before done closes.
-		_ = os.Stdin.Close()
+		// and drain every in-flight dispatch before done closes. The
+		// watchdog bounds the drain and the dispose together to one
+		// grace period, disposing before it forces the exit.
+		shutdown.HandleStop(clock, sig, shutdown.StopHooks{
+			Cancel:     cancel,
+			CloseInput: os.Stdin.Close,
+			Cleanup:    disposeOnce,
+			Exit:       os.Exit,
+		})
 		<-done
-		dispose(handles, session, simHid)
 	case <-done:
 		cancel()
-		dispose(handles, session, simHid)
+	}
+	if !shutdown.Bounded(clock, shutdown.GracePeriod, disposeOnce) {
+		writeSidecarErrorLine("device cleanup did not finish in time")
 	}
 	return 0
 }

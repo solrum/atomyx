@@ -13,13 +13,17 @@ import (
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/process"
+	"dev.atomyx/internal/shutdown"
 )
 
 func main() {
 	procRunner := process.NewExec()
+	background := process.NewExecBackground()
 	clock := orchestra.SystemClock{}
 	logger := logging.FromEnv()
-	// list-devices renders devices for a human to read, so it scans
+	// This scan backs list-devices and also resolves an iOS --device
+	// udid to a simulator or a physical device. list-devices renders
+	// devices for a human to read, so it scans
 	// iOS through IosBootedSimulatorProbe rather than IosProbe: the
 	// same probe the sidecar uses for device selection would filter by
 	// simulator availability, append a runtime-label suffix to each
@@ -30,7 +34,7 @@ func main() {
 		device.NewAndroidAdbProbe(procRunner),
 		device.NewIosBootedSimulatorProbe(procRunner),
 	)
-	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Clock: clock, Logger: logger})
+	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Background: background, Clock: clock, Logger: logger})
 
 	deps := cli.Deps{
 		Probe:   probe,
@@ -47,13 +51,21 @@ func main() {
 	// Disconnect and adb-forward, XCUITest, or netcapture teardown a
 	// command has already started. Trapping SIGINT and SIGTERM here
 	// and threading the cancelable context through RunContext instead
-	// lets those defers run on the way out.
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
+	// lets those defers run on the way out. The command writes its
+	// report and flushes its logs before RunContext returns, and the
+	// watchdog only fires once the whole grace period has lapsed, so
+	// a flush that finishes in time is never cut short.
+	ctx, cancel := context.WithCancel(context.Background())
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		sig := <-sigCh
+		shutdown.HandleStop(clock, sig, shutdown.StopHooks{Cancel: cancel, Exit: os.Exit})
+	}()
 
-	// stop deliberately does not run before this os.Exit: the process
-	// is terminating either way, and stop only releases in-process
-	// signal and context bookkeeping the OS reclaims regardless.
+	// cancel deliberately does not run before this os.Exit: the process
+	// is terminating either way, and cancel only releases in-process
+	// context bookkeeping the OS reclaims regardless.
 	//nolint:gocritic // see the comment above
 	os.Exit(cli.RunContext(ctx, os.Args[1:], deps))
 }

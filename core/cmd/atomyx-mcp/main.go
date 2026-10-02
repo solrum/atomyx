@@ -15,6 +15,7 @@ import (
 	"dev.atomyx/internal/mcp"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/process"
+	"dev.atomyx/internal/shutdown"
 	"dev.atomyx/internal/storage"
 	"dev.atomyx/internal/version"
 )
@@ -57,6 +58,7 @@ func versionLine() string {
 // after run itself has returned and every defer inside it has fired.
 func run() int {
 	procRunner := process.NewExec()
+	background := process.NewExecBackground()
 	clock := orchestra.SystemClock{}
 	logger := logging.FromEnv()
 	probe := device.NewCompositeProbe(
@@ -64,7 +66,7 @@ func run() int {
 		device.NewAndroidAdbProbe(procRunner),
 		device.NewIosProbe(procRunner),
 	)
-	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Clock: clock, Logger: logger})
+	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Background: background, Clock: clock, Logger: logger})
 
 	// storage.NewFileStorage resolves its root as opts.Root, then the
 	// ATOMYX_STORAGE_DIR environment variable, then "~/.atomyx". An
@@ -88,12 +90,31 @@ func run() int {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		<-sigCh
-		cancel()
+		sig := <-sigCh
+		// Serve blocks in the stdin read and its session close waits
+		// for in-flight tool calls, whose contexts are not canceled by
+		// the session closing. Closing stdin fails the read so those
+		// calls are canceled, and the watchdog releases the device
+		// and ends the process if they still do not return in time.
+		shutdown.HandleStop(clock, sig, shutdown.StopHooks{
+			Cancel:     cancel,
+			CloseInput: os.Stdin.Close,
+			Cleanup:    server.Close,
+			Exit:       os.Exit,
+		})
 	}()
 
-	if err := mcp.Serve(ctx, server); err != nil {
-		fmt.Fprintf(os.Stderr, "atomyx-mcp: %v\n", err)
+	serveErr := mcp.Serve(ctx, server)
+
+	// Serve returns on a stop signal and on the client closing stdin
+	// alike. Either way the active device must be released here, because
+	// its helper processes run in their own process group and a terminal
+	// Ctrl-C does not reach them.
+	if !shutdown.Bounded(clock, shutdown.GracePeriod, server.Close) {
+		fmt.Fprintln(os.Stderr, "atomyx-mcp: device cleanup did not finish in time")
+	}
+	if serveErr != nil {
+		fmt.Fprintf(os.Stderr, "atomyx-mcp: %v\n", serveErr)
 		return 1
 	}
 	return 0

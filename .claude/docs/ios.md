@@ -126,7 +126,9 @@ make serve   # runs the driver, blocks the terminal
 `iosdriver.XctestLauncher` (`core/internal/iosdriver/xctest_launcher.go`)
 is reuse-first: when a driver is already answering `ping` on the
 target port, it skips `xcodebuild` entirely. Otherwise it spawns
-`xcodebuild test-without-building` as a child process.
+`xcodebuild test-without-building` as a background child process
+(`process.BackgroundRunner`), which stays up until the launcher's kill
+function stops it.
 
 **Physical device**:
 
@@ -150,12 +152,30 @@ On the Go side, `DriverProvisioner.EnsureIOSAgent` in
 `core/internal/device` resolves the project directory from an
 explicit option, then `ATOMYX_IOS_DRIVER_DIR`, then an upward search
 for a `platforms/ios-agent` directory from the running binary and the
-working directory. `ATOMYX_DEV_TEAM` supplies the signing team the
-same way `device.env` does for a manual `make` invocation.
+working directory. Device builds read their signing settings from
+the environment, mirroring `device.env` for a manual `make`
+invocation:
+
+- `ATOMYX_DEV_TEAM` supplies the signing team and is required.
+- `ATOMYX_CODE_SIGN_STYLE` is `Automatic` (the default when unset) or
+  `Manual`.
+- `ATOMYX_PROVISIONING_PROFILE_SPECIFIER` names the provisioning
+  profile and is required when the style is `Manual`. A `Manual`
+  style without it fails with a signing error before `xcodebuild`
+  runs.
+
+The CLI commands `run`, `suite`, and `doctor` decide whether an iOS
+`--device <udid>` is a simulator or a physical device by looking the
+udid up in the device probe (`device.ResolveDescriptor` in
+`core/internal/device/resolve.go`, scanning booted simulators through
+`xcrun simctl` and paired devices through `idevice_id -l`). A udid the
+scan does not find fails with `DEVICE_NOT_FOUND` and a remedy. Without
+`--device`, an iOS run targets the booted simulator.
 
 `IosDriver.Connect` (`core/internal/iosdriver/driver.go`) on a
-physical device first launches an `iproxy` USB tunnel and waits for
-it to become reachable before dialing. On a simulator it dials
+physical device first launches an `iproxy` USB tunnel as a background child process
+and waits for it to become reachable before dialing. `Disconnect` stops
+the tunnel. On a simulator it dials
 `127.0.0.1:22087` directly, because the simulator shares the host's
 network namespace.
 

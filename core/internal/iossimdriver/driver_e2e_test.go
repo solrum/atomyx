@@ -46,7 +46,7 @@ func TestIosSimDriver_E2E(t *testing.T) {
 
 		conn := transport.NewTCPClient("127.0.0.1", iosSimE2EControlPort)
 		d, err := iossimdriver.New(conn, process.NewExec(), iossimdriver.NewDialer(), iossimdriver.Options{
-			Options: iosdriver.Options{UDID: udid, Kind: iosdriver.KindSimulator, Port: iosSimE2EControlPort},
+			Options: iosdriver.Options{Background: process.NewExecBackground(), UDID: udid, Kind: iosdriver.KindSimulator, Port: iosSimE2EControlPort},
 			HidPort: result.Port,
 		})
 		if err != nil {

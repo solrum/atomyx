@@ -57,6 +57,11 @@ type Options struct {
 	// test that wants deterministic timing over IproxyErrTunnelTimeout
 	// needs to set it.
 	Clock clock.Clock
+
+	// Background starts the long-lived iproxy tunnel process. It is
+	// required: New panics when it is nil, because a default would
+	// spawn real processes from a caller that never asked for them.
+	Background process.BackgroundRunner
 }
 
 // IosDriver implements driver.Driver over the Swift XCUITest runner's
@@ -79,11 +84,14 @@ type IosDriver struct {
 	opts Options
 	conn Conn
 	proc process.Runner
+	// background starts processes that outlive a single command, so
+	// they are not subject to Runner.Run's fallback timeout.
+	background process.BackgroundRunner
 
 	capabilities         driver.Capabilities
 	lastLaunchedBundleID string
 
-	iproxyCancel context.CancelFunc
+	iproxyStop func()
 }
 
 // New constructs an IosDriver bound to opts.UDID. conn and proc are
@@ -96,10 +104,15 @@ func New(conn Conn, proc process.Runner, opts Options) *IosDriver {
 	if opts.Clock == nil {
 		opts.Clock = clock.SystemClock{}
 	}
+	background := opts.Background
+	if background == nil {
+		panic("iosdriver.New: Options.Background is required")
+	}
 	return &IosDriver{
-		opts: opts,
-		conn: conn,
-		proc: proc,
+		opts:       opts,
+		conn:       conn,
+		proc:       proc,
+		background: background,
 		capabilities: driver.Capabilities{
 			CanScreenshot:      true,
 			CanEraseText:       true,

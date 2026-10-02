@@ -52,7 +52,11 @@ type Factory interface {
 // building drivers and an Orchestra that log nothing.
 type DriverFactoryDeps struct {
 	Runner process.Runner
-	Clock  orchestra.Clock
+	// Background starts the long-lived processes an iOS driver
+	// supervises, such as the USB tunnel to a physical device. It is
+	// required: NewDriverFactory panics when it is nil.
+	Background process.BackgroundRunner
+	Clock      orchestra.Clock
 	// SimHid starts the atomyx-sim-hid helper for an iOS simulator
 	// target that opts into the direct-HID path (see simHidOptInEnv).
 	// *SimHidManager implements this.
@@ -71,10 +75,11 @@ type DriverFactoryDeps struct {
 // means editing this type; Probe and its callers never learn a new
 // family exists.
 type DriverFactory struct {
-	runner process.Runner
-	clock  orchestra.Clock
-	simHid simHidStarter
-	logger logging.Logger
+	runner     process.Runner
+	background process.BackgroundRunner
+	clock      orchestra.Clock
+	simHid     simHidStarter
+	logger     logging.Logger
 }
 
 // NewDriverFactory constructs a DriverFactory from deps.
@@ -87,7 +92,11 @@ func NewDriverFactory(deps DriverFactoryDeps) *DriverFactory {
 	if logger == nil {
 		logger = logging.NoopLogger{}
 	}
-	return &DriverFactory{runner: deps.Runner, clock: clock, simHid: deps.SimHid, logger: logger}
+	background := deps.Background
+	if background == nil {
+		panic("device.NewDriverFactory: Background runner is required")
+	}
+	return &DriverFactory{runner: deps.Runner, background: background, clock: clock, simHid: deps.SimHid, logger: logger}
 }
 
 var _ Factory = (*DriverFactory)(nil)
@@ -99,6 +108,11 @@ func (f *DriverFactory) Build(ctx context.Context, desc Descriptor) (Built, erro
 		return Built{}, err
 	}
 	if err := drv.Connect(ctx); err != nil {
+		// Connect can fail after it has already started a long-lived
+		// child, such as the USB tunnel, and the caller never receives
+		// the driver to disconnect. Disconnect is idempotent, so
+		// releasing here is always safe.
+		_ = drv.Disconnect()
 		return Built{}, err
 	}
 	return Built{
@@ -139,7 +153,7 @@ func (f *DriverFactory) createDriver(ctx context.Context, desc Descriptor) (driv
 		port = desc.Port
 	}
 	conn := transport.NewTCPClient("127.0.0.1", port, transport.WithTCPLogger(f.logger))
-	iosOpts := iosdriver.Options{UDID: desc.ID, Kind: kind, Port: port}
+	iosOpts := iosdriver.Options{UDID: desc.ID, Kind: kind, Port: port, Background: f.background}
 
 	hidPort := desc.HidPort
 	if desc.Kind == KindSimulator && hidPort == 0 && f.simHid != nil &&
