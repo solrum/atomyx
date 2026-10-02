@@ -349,6 +349,25 @@ corresponding area. For the high-level map see
   Scratch folders named `.import-*` under `runs/v1` are interrupted
   work and are not runs.
 
+## Local HTTP surfaces
+
+- **Never bind a non-loopback address.** A listener reachable from the
+  network hands device control to other machines. Listen on a loopback
+  literal such as `127.0.0.1:0`. The Go program in
+  `core/scripts/check-listen-loopback` fails the build on an empty
+  host, `0.0.0.0`, `[::]`, any other host, a computed address it cannot
+  resolve, and the `ListenTCP` family. A new listener passes the gate
+  by spelling its address as a literal or a constant in the same file.
+- **Never let the inspector take the built driver or the Orchestra.**
+  It reaches the device only through `session.Viewer` and
+  `session.Controller`, because anything else runs device operations
+  outside the activity gate. `core/scripts/check-inspector-boundary.sh`
+  enforces it.
+- **Never accept the token anywhere but the `X-Atomyx-Token` header.**
+  A token in a URL path or query lands in history, logs and referrers.
+  Only `GET /` is exempt from the token, because it delivers the page
+  that performs the exchange.
+
 ## Tool layer (cross-platform)
 
 - **Never branch on the session's platform inside a tool handler.**

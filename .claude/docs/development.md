@@ -56,6 +56,8 @@ the repo-wide lints alongside it, runs these steps in order:
 | Raw syscall.Open gate | `bash scripts/check-no-raw-syscall-open.sh` |
 | Test-support import gate | `bash scripts/check-test-support-imports.sh` |
 | Run folder layout gate | `go run ./scripts/check-runfolder-layout .` |
+| Loopback listener gate | `go run ./scripts/check-listen-loopback .` |
+| Inspector boundary gate | `bash scripts/check-inspector-boundary.sh` |
 | Schema freshness gate | `bash scripts/check-schema-fresh.sh` |
 | Test | `go test -race ./...` |
 

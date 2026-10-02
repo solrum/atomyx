@@ -80,7 +80,8 @@ check-schema:
 
 # The full local gate for the core module: format, build, vet, the
 # layer-import gate, the lint gate, the comment gate, the raw-open
-# gate, the run folder layout gate, the schema freshness gate, and the
+# gate, the run folder layout gate, the loopback listener gate, the
+# inspector boundary gate, the schema freshness gate, and the
 # race-enabled test suite, in that order, each one failing the target
 # the moment it fails.
 # go-arch-lint and golangci-lint must already be on PATH (see
@@ -108,6 +109,10 @@ check:
 	bash scripts/check-test-support-imports.sh
 	@echo "Run folder layout gate ..."
 	go run ./scripts/check-runfolder-layout .
+	@echo "Loopback listener gate ..."
+	go run ./scripts/check-listen-loopback .
+	@echo "Inspector boundary gate ..."
+	bash scripts/check-inspector-boundary.sh
 	@echo "Schema freshness gate ..."
 	bash scripts/check-schema-fresh.sh
 	@echo "Test ..."

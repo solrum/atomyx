@@ -117,7 +117,12 @@ that imports `core/internal/session/sessiontest` or
 `core/internal/driver/drivertest`),
 `core/scripts/check-runfolder-layout/` (a Go program that rejects a
 run folder layout name spelled as a string literal outside
-`core/internal/runfolder`), and `core/scripts/check-schema-fresh.sh` (the schema-freshness gate), plus
+`core/internal/runfolder`), `core/scripts/check-listen-loopback/` (a Go
+program that rejects any production listen address it cannot prove
+loopback), `core/scripts/check-inspector-boundary.sh` (rejects the
+`.Built(` and `.Orchestra(` accessors, `orchestra.Orchestra` and any
+`driver` import under `core/internal/inspector`), and
+`core/scripts/check-schema-fresh.sh` (the schema-freshness gate), plus
 their allowlist files.
 
 ## `platforms/`
