@@ -99,7 +99,7 @@ atomyx/
 | `sidecar` | Implements the host-side control process: a JSON-RPC bridge, method dispatcher, session, and event bus. |
 | `skills` | Embeds and copies the Atomyx skill and agent markdown files a consumer project installs. |
 | `storage` | Persistence primitives the MCP tool layer builds on: a JSON and markdown record store, the in-flight run tracker, and the run catalog that reads versioned run folders and flat records. |
-| `storageroot` | Resolves the storage root shared by the CLI and the MCP server: an explicit path, then `ATOMYX_STORAGE_DIR`, then `~/.atomyx`. |
+| `storageroot` | Resolves the storage root shared by the CLI and the MCP server: an explicit path, then `ATOMYX_STORAGE_DIR`, then `~/.atomyx`. A relative path is made absolute against the working directory when it is resolved. |
 | `suite` | Discovers the ordered set of script and scenario files a suite selector resolves to. |
 | `transport` | Implements the device-facing clients: HTTP for the Android agent, TCP JSON for the iOS agent. |
 | `version` | Reports one binary's build identity: release version, VCS commit, and build date. |

@@ -21,7 +21,6 @@ func newFlightSession(t *testing.T) (*runSession, string) {
 		Store:   storage.NewRunStore(),
 		Catalog: testRunCatalog(storage.NewInMemoryStorage(), root),
 		Starter: testRunStarter(root),
-		Root:    root,
 		Clock:   orchestra.NewFakeClock(0),
 		Logger:  logging.NoopLogger{},
 	}), root

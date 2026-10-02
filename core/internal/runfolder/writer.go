@@ -41,6 +41,10 @@ type Starter struct {
 	rnd  io.Reader
 }
 
+// Root returns the directory under which the Starter creates runs, as
+// given to NewStarter.
+func (s *Starter) Root() string { return s.root }
+
 // NewStarter returns a Starter that stamps runs with now and draws id
 // suffixes from rnd.
 func NewStarter(root string, now func() time.Time, rnd io.Reader) *Starter {

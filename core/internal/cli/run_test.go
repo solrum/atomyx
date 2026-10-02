@@ -453,13 +453,24 @@ func TestResolveReportOptionsNoFlagsNoConfigWritesFolderWithoutReport(t *testing
 	}
 }
 
+// absPath returns the absolute form of a relative path against the
+// working directory, which is how a storage root is resolved.
+func absPath(t *testing.T, rel string) string {
+	t.Helper()
+	abs, err := filepath.Abs(rel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return abs
+}
+
 func TestResolveReportOptionsReportDirOnlyDefaultsToHTML(t *testing.T) {
 	got, err := resolveReportOptions(map[string]FlagValue{"--report-dir": "out"}, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(got.Formats) != 1 || got.Formats[0] != report.FormatHTML || got.Root != "out" {
-		t.Errorf("got %#v, want HTML formats and root out", got)
+	if len(got.Formats) != 1 || got.Formats[0] != report.FormatHTML || got.Root != absPath(t, "out") {
+		t.Errorf("got %#v, want HTML formats and the absolute root of out", got)
 	}
 }
 
@@ -482,7 +493,7 @@ func TestResolveReportOptionsUsesConfigReportBlockWhenCliOmitsFlags(t *testing.T
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(got.Formats) != 1 || got.Formats[0] != "json" || got.Root != "from-config" {
+	if len(got.Formats) != 1 || got.Formats[0] != "json" || got.Root != absPath(t, "from-config") {
 		t.Errorf("got %#v, want a report built from configReport", got)
 	}
 }
@@ -493,8 +504,8 @@ func TestResolveReportOptionsReportDirFlagOverridesConfigOutDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got.Root != "from-cli" {
-		t.Errorf("got %#v, want Root overridden to \"from-cli\"", got)
+	if got.Root != absPath(t, "from-cli") {
+		t.Errorf("got %#v, want Root overridden to the absolute path of from-cli", got)
 	}
 	if len(got.Formats) != 1 || got.Formats[0] != "json" {
 		t.Errorf("got %#v, want Formats kept from configReport since --report was not given", got)

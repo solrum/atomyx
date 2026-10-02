@@ -142,6 +142,9 @@ these that is set:
 3. The `ATOMYX_STORAGE_DIR` environment variable.
 4. `~/.atomyx`, the same default root the MCP server uses.
 
+A relative path in any of these is made absolute when the root is
+resolved, so every path the tools print is absolute.
+
 The id has the form `<yyyymmdd-hhmmss>-<label>-<4 hex>`, where the
 label comes from the script name for `run` and the suite name for
 `suite`. The report is at `<root>/runs/v1/<id>/report/report.html`, and

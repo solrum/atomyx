@@ -19,16 +19,24 @@ const (
 	HomeDirName = ".atomyx"
 )
 
-// Resolve returns the storage root. An explicit non-empty path wins,
-// then the EnvVar environment variable, then HomeDirName under the
-// user's home directory. It fails only when the home directory is
-// needed and cannot be determined.
+// Resolve returns the storage root as an absolute path. An explicit
+// non-empty path wins, then the EnvVar environment variable, then
+// HomeDirName under the user's home directory. A relative path is made
+// absolute against the working directory at the moment of resolution, so
+// every path derived from the root stays valid after the process changes
+// directory and can be handed to a caller in another working directory.
+// It fails when the home directory is needed and cannot be determined,
+// or when the working directory is needed and cannot be read.
 func Resolve(explicit string) (string, error) {
-	if explicit != "" {
-		return explicit, nil
+	if explicit == "" {
+		explicit = os.Getenv(EnvVar)
 	}
-	if fromEnv := os.Getenv(EnvVar); fromEnv != "" {
-		return fromEnv, nil
+	if explicit != "" {
+		abs, err := filepath.Abs(explicit)
+		if err != nil {
+			return "", fmt.Errorf("making the storage root absolute: %w", err)
+		}
+		return abs, nil
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {

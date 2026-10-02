@@ -73,10 +73,13 @@ Run verdicts in `list_runs` and `get_run` depend on liveness. A run
 with no completion time and a live writer has status `running` and no
 `result` or `outcome`. A run with no completion time and no live writer
 has status `cancelled`, result `cancelled`, and outcome `interrupted`.
-`NewServer` requires the catalog through `ServerDeps.Runs` and the run
-folder creator through `ServerDeps.RunStarter`, and returns an error
-when either is missing. `cmd/atomyx-mcp` builds the catalog over the
-storage root with `runfolder.LockLiveness`. The lock covers the writers
+`NewServer` requires `ServerDeps.RunStarter`, the run folder creator, and
+returns an error when it is missing or names no root. The starter's
+`Root()` is the only root value the server holds: the run catalog and
+the loose screenshots directory derive from it, so they cannot disagree.
+`cmd/atomyx-mcp` builds the starter over the storage root, and the
+catalog reads liveness from `runfolder.LockLiveness` unless a test sets
+`ServerDeps.RunLiveness`. The lock covers the writers
 of this process and of every other one, so a run held by a CLI run lists
 as running, and `delete_run` refuses it with `RUN_BUSY`. A
 `list_runs` call also reports `skipped`, the count of stored runs that

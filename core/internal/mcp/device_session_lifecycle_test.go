@@ -117,7 +117,6 @@ func newLifecycleFixture(t *testing.T) *lifecycleFixture {
 		Store:   runStore,
 		Catalog: testRunCatalog(storage.NewInMemoryStorage(), f.root),
 		Starter: testRunStarter(f.root),
-		Root:    f.root,
 		Clock:   f.clk,
 		Logger:  logging.NoopLogger{},
 	})

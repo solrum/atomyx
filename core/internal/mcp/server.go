@@ -8,6 +8,7 @@ import (
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
+	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/session"
 	"dev.atomyx/internal/storage"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -20,15 +21,18 @@ type Info struct {
 }
 
 // ServerDeps are the services NewServer wires into every tool
-// handler. Probe, Factory, Storage, Runs, RunStarter, and RunRoot are required.
+// handler. Probe, Factory, Storage, and RunStarter are required.
 // Probe backs list_devices, Factory backs select_device, Storage holds
-// bug reports and case studies, and Runs reads every stored run. Runs
-// is built by the composition root over the run directory with a
-// runfolder.Liveness that covers every writer it knows of, so a run
-// another process is writing lists as running. RunStarter creates the
-// run folders of new runs under RunRoot, the same directory. RunStore, Clock,
-// and Logger default to a fresh in-memory RunStore, the system clock,
-// and a no-op logger when left zero-valued.
+// bug reports, case studies, and flat run records, and RunStarter
+// creates the run folders of new runs. RunStarter also names the storage
+// root, and the run catalog that reads every stored run and the
+// directory of screenshots taken with no run open both derive from it,
+// so the server never holds a second root. RunLiveness decides which
+// unfinished runs are still running, and defaults to the lock every run
+// writer holds under that root, so a run another process is writing
+// lists as running. RunStore, Clock, and Logger default to a fresh
+// in-memory RunStore, the system clock, and a no-op logger when left
+// zero-valued.
 //
 // Session carries the identity resolver, lease manager and orphan reaper
 // device selection goes through, and a composition root sets all three.
@@ -40,13 +44,10 @@ type ServerDeps struct {
 	Factory  device.Factory
 	Storage  storage.Storage
 	RunStore *storage.RunStore
-	Runs     *storage.RunCatalog
 	// RunStarter creates the run folder of each run the server starts.
-	RunStarter RunStarter
-	// RunRoot is the storage root that holds the run folders RunStarter
-	// creates and the screenshots taken with no run open.
-	RunRoot string
-	Clock   orchestra.Clock
+	RunStarter  RunStarter
+	RunLiveness runfolder.Liveness
+	Clock       orchestra.Clock
 	// TimerClock drives tool call budgets, the device acquisition
 	// budget and the idle timers. It defaults to the system clock, and
 	// only a test that controls time injects another.
@@ -61,8 +62,8 @@ type ServerDeps struct {
 // pass it to Serve to run it over stdio. It returns an error when a
 // required dependency is missing.
 func NewServer(info Info, deps ServerDeps) (*Server, error) {
-	if deps.Runs == nil || deps.RunStarter == nil || deps.RunRoot == "" {
-		return nil, errors.New("mcp: ServerDeps needs Runs, RunStarter, and RunRoot")
+	if deps.RunStarter == nil || deps.RunStarter.Root() == "" {
+		return nil, errors.New("mcp: ServerDeps needs a RunStarter that names its storage root")
 	}
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    info.Name,
@@ -85,10 +86,15 @@ func NewServer(info Info, deps ServerDeps) (*Server, error) {
 	if runStore == nil {
 		runStore = storage.NewRunStore()
 	}
+	runRoot := deps.RunStarter.Root()
+	liveness := deps.RunLiveness
+	if liveness == nil {
+		liveness = runfolder.NewLockLiveness(runRoot)
+	}
+	runs := storage.NewRunCatalog(deps.Storage, runRoot, liveness)
 
 	runSession := newRunSession(runSessionDeps{
-		Store: runStore, Catalog: deps.Runs, Starter: deps.RunStarter,
-		Root: deps.RunRoot, Clock: clk, Logger: logger,
+		Store: runStore, Catalog: runs, Starter: deps.RunStarter, Clock: clk, Logger: logger,
 	})
 	devices := NewDeviceSession(DeviceSessionDeps{
 		Factory: deps.Factory, Probe: deps.Probe, Runners: deps.Runners, Clock: clk, TimerClock: timers, Logger: logger,
@@ -100,7 +106,7 @@ func NewServer(info Info, deps ServerDeps) (*Server, error) {
 		Traits:     traits,
 		Logger:     logger,
 		Storage:    deps.Storage,
-		Runs:       deps.Runs,
+		Runs:       runs,
 		RunSession: runSession,
 		RunStore:   runStore,
 		Clock:      clk,

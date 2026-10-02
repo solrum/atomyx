@@ -26,9 +26,13 @@ const (
 	runDrainTimeout = 5 * time.Second
 )
 
-// RunStarter creates the run folder of a new run. *runfolder.Starter
+// RunStarter creates the run folder of a new run and names the storage
+// root those folders live under. The root it returns is the single
+// source for everything the server reads or writes beneath the storage
+// root, so no second root value can disagree with it. *runfolder.Starter
 // satisfies it.
 type RunStarter interface {
+	Root() string
 	Start(label string, base runfolder.Meta) (*runfolder.Writer, error)
 }
 
@@ -71,7 +75,6 @@ type runSession struct {
 	store        *storage.RunStore
 	catalog      *storage.RunCatalog
 	starter      RunStarter
-	root         string
 	clock        orchestra.Clock
 	logger       logging.Logger
 	drainTimeout time.Duration
@@ -87,7 +90,6 @@ type runSessionDeps struct {
 	Store   *storage.RunStore
 	Catalog *storage.RunCatalog
 	Starter RunStarter
-	Root    string
 	Clock   orchestra.Clock
 	Logger  logging.Logger
 }
@@ -95,7 +97,7 @@ type runSessionDeps struct {
 func newRunSession(deps runSessionDeps) *runSession {
 	return &runSession{
 		store: deps.Store, catalog: deps.Catalog, starter: deps.Starter,
-		root: deps.Root, clock: deps.Clock, logger: deps.Logger, artifacts: &artifactCounter{},
+		clock: deps.Clock, logger: deps.Logger, artifacts: &artifactCounter{},
 		drainTimeout: runDrainTimeout, bare: newScriptFlight(), flight: newScriptFlight(),
 	}
 }
@@ -218,7 +220,7 @@ func (s *runSession) SaveScreenshot(data []byte) (string, error) {
 			return "", err
 		}
 	} else {
-		dir = runfolder.LooseScreenshotsDir(s.root)
+		dir = runfolder.LooseScreenshotsDir(s.starter.Root())
 		if err := os.MkdirAll(dir, screenshotDirMode); err != nil {
 			return "", err
 		}

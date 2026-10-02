@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"dev.atomyx/internal/device"
@@ -78,5 +79,32 @@ func TestScreenshotSurfacesDriverError(t *testing.T) {
 	}
 	if decoded["message"] != "capture failed" {
 		t.Fatalf("screenshot (driver error) message: got %v, want %q", decoded["message"], "capture failed")
+	}
+}
+
+func TestScreenshotPathsDeriveFromTheRootOfTheRunStarter(t *testing.T) {
+	root := t.TempDir()
+	drv := mockdriver.New()
+	cs, ctx := testServer(t, ServerDeps{
+		Probe:      device.NewStaticProbe(),
+		Factory:    singleMockDriverFactory{driver: drv},
+		Storage:    storage.NewInMemoryStorage(),
+		RunStarter: testRunStarter(root),
+	})
+	selectMockDevice(t, cs, ctx)
+	shot := func() string {
+		_, decoded := callTool(t, cs, ctx, "screenshot", map[string]any{})
+		path, _ := decoded["path"].(string)
+		return path
+	}
+
+	loose := shot()
+	callTool(t, cs, ctx, "start_run", map[string]any{"name": "smoke"})
+	inRun := shot()
+
+	for _, path := range []string{loose, inRun} {
+		if !filepath.IsAbs(path) || !strings.HasPrefix(path, root) {
+			t.Fatalf("screenshot path %q, want a path under the starter root %q", path, root)
+		}
 	}
 }

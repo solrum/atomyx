@@ -198,7 +198,7 @@ func TestBareScriptRunFinalizesAsCancelledWhenTheContextIsCanceled(t *testing.T)
 	runStore := storage.NewRunStore()
 	session := newRunSession(runSessionDeps{
 		Store: runStore, Catalog: testRunCatalog(storage.NewInMemoryStorage(), root),
-		Starter: testRunStarter(root), Root: root, Clock: orchestra.NewFakeClock(0), Logger: logging.NoopLogger{},
+		Starter: testRunStarter(root), Clock: orchestra.NewFakeClock(0), Logger: logging.NoopLogger{},
 	})
 	ctx, cancel := context.WithCancel(context.Background())
 

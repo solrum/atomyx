@@ -31,9 +31,7 @@ func newRunServer(t *testing.T) runServer {
 		Factory:    singleMockDriverFactory{driver: drv},
 		Storage:    store,
 		RunStore:   runStore,
-		Runs:       testRunCatalog(store, root),
 		RunStarter: testRunStarter(root),
-		RunRoot:    root,
 	})
 	return runServer{root: root, store: store, cs: cs, call: func(name string, args map[string]any) map[string]any {
 		_, decoded := callTool(t, cs, ctx, name, args)
@@ -273,5 +271,16 @@ func TestFinishRunReportsAFolderThatCannotBeFinalizedAsAToolError(t *testing.T) 
 
 	if got["ok"] == true || got["code"] == nil || !strings.Contains(got["message"].(string), id) {
 		t.Fatalf("finish_run = %v, want a tool error naming the run", got)
+	}
+}
+
+func TestNewServerRequiresARunStarterThatNamesItsRoot(t *testing.T) {
+	deps := ServerDeps{Probe: device.NewStaticProbe(), Factory: device.NewMockDriverFactory(), Storage: storage.NewInMemoryStorage()}
+	if _, err := NewServer(Info{Name: "t", Version: "0"}, deps); err == nil {
+		t.Fatal("NewServer accepted deps with no RunStarter")
+	}
+	deps.RunStarter = testRunStarter("")
+	if _, err := NewServer(Info{Name: "t", Version: "0"}, deps); err == nil {
+		t.Fatal("NewServer accepted a RunStarter with no root")
 	}
 }

@@ -41,14 +41,8 @@ func withRunDeps(t testing.TB, deps ServerDeps) ServerDeps {
 	if deps.RunStore == nil {
 		deps.RunStore = storage.NewRunStore()
 	}
-	if deps.Runs == nil {
-		deps.Runs = testRunCatalog(deps.Storage, root)
-	}
 	if deps.RunStarter == nil {
 		deps.RunStarter = testRunStarter(root)
-	}
-	if deps.RunRoot == "" {
-		deps.RunRoot = root
 	}
 	return deps
 }

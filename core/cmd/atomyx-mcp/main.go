@@ -83,14 +83,10 @@ func run() int {
 		return 1
 	}
 
-	// Run folders and the catalog share the directory the store
-	// resolved. An unfinished run counts as running while this process
-	// holds it as the active run, and while any process on the machine
-	// holds the lock of its run folder.
-	runRoot := store.Root()
-	runStore := storage.NewRunStore()
-	runs := storage.NewRunCatalog(store, runRoot, runfolder.NewLockLiveness(runRoot))
-	runStarter := runfolder.NewStarter(runRoot, time.Now, rand.Reader)
+	// Run folders live under the directory the store resolved. The
+	// server derives its run catalog and its loose screenshots directory
+	// from the starter, so the root is stated once.
+	runStarter := runfolder.NewStarter(store.Root(), time.Now, rand.Reader)
 
 	sessionDeps, err := sessionwire.Deps(procRunner, clock, logger, binaryName, "mcp")
 	if err != nil {
@@ -104,10 +100,7 @@ func run() int {
 		Runners:    device.PingRunnerIdentifier{},
 		Factory:    factory,
 		Storage:    store,
-		RunStore:   runStore,
-		Runs:       runs,
 		RunStarter: runStarter,
-		RunRoot:    runRoot,
 		Clock:      clock,
 		Logger:     logger,
 		Session:    sessionDeps,

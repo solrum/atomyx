@@ -29,3 +29,20 @@ func TestResolvePrecedence(t *testing.T) {
 		t.Errorf("explicit root = %q, want %q", got, explicit)
 	}
 }
+
+func TestResolveMakesARelativeRootAbsolute(t *testing.T) {
+	cwd := t.TempDir()
+	t.Chdir(cwd)
+	wantEnv := filepath.Join(cwd, "from-env")
+
+	t.Setenv(EnvVar, "from-env")
+	fromEnv, err := Resolve("")
+	if err != nil || fromEnv != wantEnv {
+		t.Fatalf("relative env root = %q, %v, want %q", fromEnv, err, wantEnv)
+	}
+
+	fromFlag, err := Resolve("from-flag")
+	if want := filepath.Join(cwd, "from-flag"); err != nil || fromFlag != want {
+		t.Fatalf("relative explicit root = %q, %v, want %q", fromFlag, err, want)
+	}
+}
