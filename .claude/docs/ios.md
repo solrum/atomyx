@@ -396,6 +396,20 @@ data path, `RUN_DERIVED`, which defaults to `build/run-<udid>`.
 
 ## Platform-specific quirks
 
+**A runner that exits on its own moves the session to lost.** The
+provisioner supervises the `xcodebuild` process that hosts the runner
+and, for a physical iPhone, the `iproxy` tunnel. When either exits
+after the runner answered ready and before the session stopped it, the
+provisioner ends the remaining process group through its single kill
+path and reports a `device.ProcessExitError` naming which process
+ended. The driver factory hands it to `session.Session` through
+`device.Built.Lost`, and the session moves to lost with a cause that
+wraps `session.ErrDeviceLost`. This costs no polling, because it reads
+the exit verdict `process.BackgroundProcess.Wait` already returns. A
+runner that dies without its process exiting, or a cable pull that
+leaves both processes alive, is not signaled, and surfaces as a failed
+step that the liveness probe classifies as `RunAbortDeviceLost`.
+
 **No system-wide foreground query.** `XCUIApplication()` with no
 bundle id returns the test target, not whatever is on screen. The
 Swift side tracks `DriverState.currentApp` (set by `launchApp`,

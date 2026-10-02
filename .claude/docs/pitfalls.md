@@ -217,6 +217,17 @@ corresponding area. For the high-level map see
   with real files injects `clock.ManualClock` or the system clock,
   because a `FakeClock` sleep returns at once and would fire the bound
   immediately.
+- **A lost device is signaled by a typed cause, never by a string.**
+  Every cause `session.Session.LostErr` reports wraps
+  `session.ErrDeviceLost`, so a call that holds only a cancellation
+  cause tells a lost device from a user stop with `errors.Is`. The MCP
+  server cancels running scripts with that cause before it closes the
+  open run, and `scriptOutcome` checks the cause before it checks for a
+  plain cancellation, because a loss that cancels the call context
+  would otherwise record `cancelled`. The runner-exit watcher lives in
+  the provisioner and the session, never in a tool handler or a CLI
+  command, and it ends the remaining runner and tunnel itself through
+  the one kill function, which runs once however many paths reach it.
 - **Give a test lease helper to `session/sessiontest`, never to a
   production package.** Only `_test.go` files import
   `core/internal/session/sessiontest`, which

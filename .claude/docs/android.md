@@ -174,6 +174,16 @@ covered in `android-device-setup.md`, not here.
 
 ## Platform-specific quirks
 
+**A lost Android agent has no exit signal.** The host supervises no
+Android process. The control plane is an `AccessibilityService` inside
+the device's app process, reached through an `adb forward` that the
+adb server owns, so the host observes neither the agent exiting nor the
+forward breaking without probing the device. `device.Built.Lost` stays
+nil for Android. A lost agent or device surfaces as a failed step that
+the liveness probe classifies as `RunAbortDeviceLost`, which the CLI and
+the MCP server both record as outcome `deviceLost`. A lost lease still
+moves the session to lost.
+
 **No pressure injection.** The `AccessibilityService` gesture surface
 has no per-touch pressure API at any current Android level.
 `GestureRunner.GestureCapabilities.DEFAULT.canPressure` is

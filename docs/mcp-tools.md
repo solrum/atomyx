@@ -219,7 +219,7 @@ A session owns its device for as long as it is selected and active, and gives it
 - If another process took the device in the meantime, the call fails with DEVICE_RELEASED_HELD. Retry shortly, and ask the operator to release the device if it keeps failing.
 - After the open-run idle timeout closed a run, finish_run and report_bug fail with RUN_EXPIRED until start_run is called. The first tool that needs a device after the expiry also fails once with RUN_EXPIRED so the agent learns the run is gone. Start a new run and repeat the lost work.
 - disconnect_device releases the device and forgets it, so nothing is taken again until select_device is called.
-- If the device lease is lost while the session holds it, the session behaves as released, and the open run is closed with status error.
+- If the device is lost while the session holds it, the session behaves as released. The device is lost when its lease is taken away, or when the runner process of an iOS device, or the USB tunnel to a physical iPhone, exits on its own. Every script running at that moment is cancelled, and the open run is closed with result `cancelled` and outcome `deviceLost`. A run_script call that is its own run is finalized as `deviceLost`, not `cancelled`. An Android device reports no such signal, so a lost Android agent shows up as a failed step that the liveness probe classifies as deviceLost.
 
 ### disconnect_device
 Release the currently-bound device and leave the session idle.

@@ -238,7 +238,7 @@ are unselected, idle, running, released and lost.
 | running | the last in-flight call ends with a run open | running, open-run idle timer starts |
 | idle | MCP idle timeout (10 minutes by default) | released |
 | running with a run open | open-run idle timeout (10 minutes by default) | released, the run is closed as cancelled |
-| idle, running | the lease watcher reports the lease lost | lost, an open run is closed with status error |
+| idle, running | the lease is lost, or the iOS runner or its tunnel exits on its own | lost, running scripts are cancelled with the loss as cause, and an open run is closed with outcome `deviceLost` |
 | released, lost | a tool that needs a device runs | running again, or the call fails with `DEVICE_RELEASED_HELD` when another process holds the device |
 | any | `disconnect_device` | unselected, the remembered device is forgotten |
 

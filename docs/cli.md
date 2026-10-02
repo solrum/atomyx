@@ -190,7 +190,8 @@ files in the run folder's `report` directory. The flat
 `meta.json` ends with a result and an outcome. A passing run is
 `passed`, a run that ran and failed is `failed`, a run that ended in an
 error before it produced a result is `failed` with outcome `error`, a
-run that lost its device is `cancelled` with outcome `deviceLost`, and
+run that lost its device is `cancelled` with outcome `deviceLost` and
+exits with code `1`, and
 a run stopped by SIGINT or SIGTERM is `cancelled`. The meta is
 finalized before the process exits.
 
@@ -383,8 +384,14 @@ an `atomyx-mcp` server, can drive a device at a time.
   for an iOS device ends the runner process the crashed command left
   behind, and on a physical iPhone the `iproxy` tunnel it left behind,
   then continues.
-- If the device lease is lost while a run is in progress, the run is
-  stopped and the command reports it.
+- If the device is lost while a run is in progress, the run is stopped
+  and the command reports it. The device is lost when its lease is
+  taken away, or when the runner process of an iOS device, or the USB
+  tunnel to a physical iPhone, exits on its own. The command then ends
+  the remaining runner and tunnel processes itself, finalizes the run
+  as `cancelled` with outcome `deviceLost`, writes no failure bundle,
+  and exits with code `1`. A script that stops because its liveness
+  probe found the device or agent unreachable ends the same way.
 
 A run on iOS without `--device` is not provisioned by the CLI. It asks
 the runner served on the default port, 22087, which device it belongs
