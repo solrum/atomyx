@@ -145,6 +145,9 @@ func TestSession_CloseEndsSubscriptions(t *testing.T) {
 	if err := s.Close(); err != nil {
 		t.Fatal(err)
 	}
+	if got := <-ch; got.Kind != session.ObservedClosed {
+		t.Fatalf("a subscription got %+v at Close, want ObservedClosed", got)
+	}
 	if _, ok := <-ch; ok {
 		t.Fatal("a subscription survived Close")
 	}

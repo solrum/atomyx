@@ -210,6 +210,20 @@ func drain(ch <-chan session.Observation) (received int, closed bool) {
 	}
 }
 
+func drainObservations(ch <-chan session.Observation) (got []session.Observation, closed bool) {
+	for {
+		select {
+		case o, ok := <-ch:
+			if !ok {
+				return got, true
+			}
+			got = append(got, o)
+		default:
+			return got, false
+		}
+	}
+}
+
 func TestHub_ASubscriberThatNeverReadsIsDroppedAndNeverBlocksThePublisher(t *testing.T) {
 	hub := session.NewHub()
 	slow, err := hub.Subscribe(context.Background())
@@ -232,12 +246,15 @@ func TestHub_ASubscriberThatNeverReadsIsDroppedAndNeverBlocksThePublisher(t *tes
 	if healthyGot != publishes {
 		t.Fatalf("the healthy subscriber got %d of %d notifications", healthyGot, publishes)
 	}
-	received, closed := drain(slow)
+	kept, closed := drainObservations(slow)
 	if !closed {
 		t.Fatalf("the slow subscriber was not dropped after %d unread notifications", publishes)
 	}
-	if received == 0 || received >= publishes {
-		t.Fatalf("the slow subscriber kept %d notifications, want a bounded buffer", received)
+	if len(kept) == 0 || len(kept) >= publishes {
+		t.Fatalf("the slow subscriber kept %d notifications, want a bounded buffer", len(kept))
+	}
+	if last := kept[len(kept)-1].Kind; last != session.ObservedDropped {
+		t.Fatalf("the slow subscriber ended with kind %v, want ObservedDropped", last)
 	}
 	if hub.Latest().TreeEpoch != publishes-1 {
 		t.Fatal("the hub does not hold the newest tree after dropping a subscriber")
@@ -282,6 +299,9 @@ func TestHub_SubscriptionsEndWhenTheirContextEndsOrTheHubCloses(t *testing.T) {
 		t.Fatal("a canceled subscription delivered a value instead of closing")
 	}
 	hub.Close()
+	if got := <-open; got.Kind != session.ObservedClosed {
+		t.Fatalf("a subscription on a closed hub got %+v, want ObservedClosed", got)
+	}
 	if _, ok := <-open; ok {
 		t.Fatal("a subscription on a closed hub stayed open")
 	}
@@ -335,5 +355,41 @@ func TestHub_AnUnstableCaptureNeverPairs(t *testing.T) {
 	hub.ObserveScreenshot(encodedPNG(t, 10, 20), 2, false)
 	if hub.Latest().Paired {
 		t.Fatal("an unstable screenshot paired")
+	}
+}
+
+func TestHub_AScaleNeedsAScreenSizeWithTheScreenshotsAspectRatio(t *testing.T) {
+	hub := session.NewHub()
+	hub.ObserveTree(rootTree("r"), 2, true)
+	hub.ObserveScreenSize(wire.Size{Width: 430, Height: 932}, 2, true)
+	hub.ObserveScreenshot(encodedPNG(t, 860, 1864), 2, true)
+	if snap := hub.Latest(); snap.Scale != 2 || !snap.Highlightable {
+		t.Fatalf("scale = %v, highlightable = %v, want a portrait size to scale a portrait screenshot", snap.Scale, snap.Highlightable)
+	}
+
+	hub.ObserveScreenshot(encodedPNG(t, 1864, 860), 2, true)
+	if snap := hub.Latest(); snap.Scale != 0 || snap.Highlightable {
+		t.Fatalf("scale = %v, highlightable = %v, want a portrait size not to scale a landscape screenshot", snap.Scale, snap.Highlightable)
+	}
+
+	hub.ObserveScreenSize(wire.Size{Width: 932, Height: 430}, 2, true)
+	if snap := hub.Latest(); snap.Scale != 2 || !snap.Highlightable {
+		t.Fatalf("scale = %v, highlightable = %v, want a landscape size to scale a landscape screenshot", snap.Scale, snap.Highlightable)
+	}
+}
+
+func TestHub_ASubscriberCanTellAClosedHubFromBeingDropped(t *testing.T) {
+	hub := session.NewHub()
+	ch, err := hub.Subscribe(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range 3 {
+		hub.ObserveTree(rootTree("r"), uint64(i), true)
+	}
+	hub.Close()
+	got, closed := drainObservations(ch)
+	if !closed || len(got) != 4 || got[3].Kind != session.ObservedClosed {
+		t.Fatalf("got %+v closed = %v, want three captures then ObservedClosed then a closed channel", got, closed)
 	}
 }

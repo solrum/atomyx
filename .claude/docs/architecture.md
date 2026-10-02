@@ -399,20 +399,28 @@ sees only what the runner, a tool call or failure capture already
 fetched, and any number of viewers cost the driver nothing. Each
 subscriber has a buffer of 16 notifications. A subscriber that leaves
 the buffer full is dropped, its channel is closed, and the publisher
-never waits. A dropped subscriber re-subscribes and reads `Latest()`.
+never waits. The last value a subscriber reads before its channel closes
+says why: `ObservedDropped` means it fell behind, so it re-subscribes and
+reads `Latest()`, and `ObservedClosed` means the session closed, so
+subscribing again fails. A subscriber that ended through its own context
+reads no terminal value.
 
 The tree `Latest()` returns has every secret masked by
 `orchestra.MaskSecure`. The masked copy is made on the first read after
 a tree is stored and shared by every later read of that tree, so
 polling never copies the tree again. The Orchestra keeps resolving
-selectors against the real tree.
+selectors against the real tree. `Snapshot.Tree` is the whole masked
+tree, and a client must not filter or prune it before it indexes nodes,
+because a node path is a position in that exact tree.
 
 `Scale` is the screenshot pixel width divided by the width of the newest
 `ScreenSize` the driver reported, for every platform. The width comes
 from the image header, which is read without decoding the pixels, and the
 format (`png` or `jpeg`) is read from the bytes. `Paired` is true when the
 tree and the screenshot were fetched in the same action epoch and neither
-capture was unstable. An unstable screen size gives no scale.
+capture was unstable. An unstable screen size, or one whose aspect ratio
+differs from the screenshot's by more than two percent, as after a
+rotation, gives no scale.
 `Highlightable` is true when they are paired and a scale is known.
 Without a paired capture a viewer shows the tree alone.
 

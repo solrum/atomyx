@@ -26,6 +26,14 @@ const (
 	ObservedTree ObservationKind = iota + 1
 	ObservedScreenshot
 	ObservedScreenSize
+	// ObservedDropped is the last notification of a subscriber that left
+	// too many unread. The channel closes right after it, and the
+	// subscriber may subscribe again and read Latest.
+	ObservedDropped
+	// ObservedClosed is the last notification of a subscriber whose
+	// session closed. The channel closes right after it, and
+	// subscribing again fails.
+	ObservedClosed
 )
 
 // Observation announces that a new capture is available. It carries no
@@ -48,7 +56,11 @@ type Observation struct {
 // Every slice and map in it is shared and must be treated as read-only.
 type Snapshot struct {
 	// Tree is the newest hierarchy with every secret masked. It is the
-	// zero value while HasTree is false.
+	// raw masked tree, with every node the device reported, so a client
+	// must not filter or prune it before it indexes nodes. A node path is
+	// a position in this exact tree, and a path computed over a pruned
+	// copy addresses a different node. It is the zero value while
+	// HasTree is false.
 	Tree    wire.TreeNodeWire
 	HasTree bool
 	// TreeEpoch is the action epoch the tree was fetched in. Several
@@ -104,8 +116,10 @@ type Viewer interface {
 	// Latest returns the newest capture of each kind. The tree has its
 	// secrets masked.
 	Latest() Snapshot
-	// Subscribe reports every new capture until ctx ends or the
-	// subscriber falls behind, and then closes the channel.
+	// Subscribe reports every new capture until ctx ends, the session
+	// closes, or the subscriber falls behind. The last value is
+	// ObservedClosed or ObservedDropped, then the channel closes. Ending
+	// through ctx sends no terminal value.
 	Subscribe(ctx context.Context) (<-chan Observation, error)
 }
 

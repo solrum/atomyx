@@ -7,15 +7,23 @@ import (
 	"image"
 	_ "image/jpeg" // registers the JPEG header decoder
 	_ "image/png"  // registers the PNG header decoder
+	"math"
 	"sync"
 
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/wire"
 )
 
-// subscriberBuffer is how many notifications a subscriber may leave
-// unread before the hub drops it.
+// subscriberBuffer is how many capture notifications a subscriber may
+// leave unread before the hub drops it. Its channel holds one more, the
+// slot the terminal notification always finds free.
 const subscriberBuffer = 16
+
+// aspectTolerance is how far the aspect ratio of the screenshot and of
+// the reported screen size may differ, as a fraction, before the two are
+// taken to describe different orientations. It absorbs the rounding of a
+// scaled image.
+const aspectTolerance = 0.02
 
 // ErrHubClosed reports a subscription to a hub that was closed.
 var ErrHubClosed = errors.New("the capture hub is closed")
@@ -44,6 +52,7 @@ type Hub struct {
 	shotStable bool
 	shotFormat ImageFormat
 	shotWidth  int
+	shotHeight int
 	hasShot    bool
 
 	size       wire.Size
@@ -76,11 +85,11 @@ func (h *Hub) ObserveTree(tree wire.TreeNodeWire, epoch uint64, stable bool) {
 
 // ObserveScreenshot implements Observer.
 func (h *Hub) ObserveScreenshot(img []byte, epoch uint64, stable bool) {
-	format, width := sniffImage(img)
+	format, width, height := sniffImage(img)
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.shot, h.shotEpoch, h.shotStable, h.hasShot = img, epoch, stable, true
-	h.shotFormat, h.shotWidth = format, width
+	h.shotFormat, h.shotWidth, h.shotHeight = format, width, height
 	h.shotSeq++
 	h.notifyLocked(Observation{Kind: ObservedScreenshot, Epoch: epoch, Revision: h.shotSeq, Stable: stable})
 }
@@ -104,7 +113,7 @@ func (h *Hub) Latest() Snapshot {
 		Screenshot: h.shot, HasScreenshot: h.hasShot, ScreenshotFormat: h.shotFormat,
 		ScreenshotEpoch: h.shotEpoch, ScreenshotRevision: h.shotSeq,
 	}
-	if h.hasShot && h.hasSize && h.sizeStable && h.shotWidth > 0 && h.size.Width > 0 {
+	if h.sizeMatchesShotLocked() {
 		snap.Scale = float64(h.shotWidth) / h.size.Width
 	}
 	snap.Paired = h.hasTree && h.hasShot && h.treeStable && h.shotStable && h.treeEpoch == h.shotEpoch
@@ -131,6 +140,23 @@ func (h *Hub) Latest() Snapshot {
 	return snap
 }
 
+// sizeMatchesShotLocked reports whether the newest screen size can scale
+// the newest screenshot. The size may have been read before the device
+// rotated, so it counts only when it is stable and has the aspect ratio
+// of the screenshot. A rotated device flips the ratio, and a stale size
+// would then draw every highlight in the wrong place.
+func (h *Hub) sizeMatchesShotLocked() bool {
+	if !h.hasShot || !h.hasSize || !h.sizeStable {
+		return false
+	}
+	if h.shotWidth <= 0 || h.shotHeight <= 0 || h.size.Width <= 0 || h.size.Height <= 0 {
+		return false
+	}
+	shot := float64(h.shotWidth) / float64(h.shotHeight)
+	screen := h.size.Width / h.size.Height
+	return math.Abs(shot-screen) <= aspectTolerance*screen
+}
+
 // sizeCurrent reports whether a stable screen size was read in the epoch
 // of the newest tree.
 func (h *Hub) sizeCurrent() bool {
@@ -140,13 +166,16 @@ func (h *Hub) sizeCurrent() bool {
 }
 
 // Subscribe reports every capture until ctx ends, the hub closes, or
-// the subscriber leaves subscriberBuffer notifications unread. The hub
-// then closes the channel, and the subscriber re-reads Latest.
+// the subscriber leaves subscriberBuffer notifications unread. A hub
+// that ends the subscription sends ObservedClosed or ObservedDropped as
+// the last notification and then closes the channel, so the subscriber
+// can tell a closed session from falling behind, and re-reads Latest
+// only in the second case. Ending through ctx sends nothing.
 func (h *Hub) Subscribe(ctx context.Context) (<-chan Observation, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	sub := &subscriber{ch: make(chan Observation, subscriberBuffer), done: make(chan struct{})}
+	sub := &subscriber{ch: make(chan Observation, subscriberBuffer+1), done: make(chan struct{})}
 	h.mu.Lock()
 	if h.closed {
 		h.mu.Unlock()
@@ -172,18 +201,25 @@ func (h *Hub) Close() {
 	defer h.mu.Unlock()
 	h.closed = true
 	for sub := range h.subs {
-		h.dropLocked(sub)
+		h.endLocked(sub, ObservedClosed)
 	}
 }
 
 func (h *Hub) notifyLocked(o Observation) {
 	for sub := range h.subs {
-		select {
-		case sub.ch <- o:
-		default:
-			h.dropLocked(sub)
+		if len(sub.ch) >= subscriberBuffer {
+			h.endLocked(sub, ObservedDropped)
+			continue
 		}
+		sub.ch <- o
 	}
+}
+
+// endLocked sends the terminal notification and then drops sub. Capture
+// notifications stop at subscriberBuffer, so the slot is always free.
+func (h *Hub) endLocked(sub *subscriber, kind ObservationKind) {
+	sub.ch <- Observation{Kind: kind}
+	h.dropLocked(sub)
 }
 
 func (h *Hub) dropLocked(sub *subscriber) {
@@ -195,19 +231,19 @@ func (h *Hub) dropLocked(sub *subscriber) {
 	close(sub.done)
 }
 
-// sniffImage reads the format and pixel width from the image header
-// without decoding the pixels. It reports ImageUnknown and zero for
+// sniffImage reads the format and pixel size from the image header
+// without decoding the pixels. It reports ImageUnknown and zeros for
 // bytes that are neither a PNG nor a JPEG.
-func sniffImage(img []byte) (ImageFormat, int) {
+func sniffImage(img []byte) (format ImageFormat, width, height int) {
 	cfg, name, err := image.DecodeConfig(bytes.NewReader(img))
 	if err != nil {
-		return ImageUnknown, 0
+		return ImageUnknown, 0, 0
 	}
 	switch name {
 	case "png":
-		return ImagePNG, cfg.Width
+		return ImagePNG, cfg.Width, cfg.Height
 	case "jpeg":
-		return ImageJPEG, cfg.Width
+		return ImageJPEG, cfg.Width, cfg.Height
 	}
-	return ImageUnknown, 0
+	return ImageUnknown, 0, 0
 }
