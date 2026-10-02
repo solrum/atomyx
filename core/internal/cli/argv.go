@@ -26,6 +26,7 @@ const (
 	CommandRun         Command = "run"
 	CommandSuite       Command = "suite"
 	CommandDoctor      Command = "doctor"
+	CommandInspect     Command = "inspect"
 	CommandVersion     Command = "version"
 	CommandHelp        Command = "help"
 )
@@ -66,7 +67,7 @@ type flagDef struct {
 // validCommands lists the commands this build recognizes. The order
 // here is the order shown in the "Valid commands: ..." error message,
 // so keep it stable rather than reordering for convenience.
-var validCommands = []Command{CommandListDevices, CommandRun, CommandSuite, CommandDoctor, CommandVersion, CommandHelp}
+var validCommands = []Command{CommandListDevices, CommandRun, CommandSuite, CommandDoctor, CommandInspect, CommandVersion, CommandHelp}
 
 // commandFlags lists every flag each command accepts, in the order
 // shown in the "Valid flags: ..." error message, and how each flag
@@ -115,6 +116,13 @@ var commandFlags = map[Command][]flagDef{
 		{"--json", flagBoolean},
 		{"--migrate-runs", flagBoolean},
 		{"--report-dir", flagValue},
+		{"--help", flagBoolean},
+		{"-h", flagBoolean},
+	},
+	CommandInspect: {
+		{"--platform", flagValue},
+		{"--device", flagValue},
+		{"--no-open", flagBoolean},
 		{"--help", flagBoolean},
 		{"-h", flagBoolean},
 	},

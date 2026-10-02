@@ -120,6 +120,39 @@ EXAMPLES
   atomyx driver list-devices
   atomyx driver list-devices --json
 `)
+	case CommandInspect:
+		_, _ = io.WriteString(w, `atomyx driver inspect
+  Open the browser inspector for a device: its live UI tree and
+  screenshot, with selector suggestions and a selector tester. The
+  server listens on 127.0.0.1 only and the device is released when
+  the command ends or sits idle.
+
+USAGE
+  atomyx driver inspect [flags]
+
+FLAGS
+  --platform <ios|android> Target platform. Defaults to android.
+  --device <id>            Device identifier, as reported by
+                           atomyx driver list-devices.
+  --no-open                Print the URL without opening a browser.
+  --help, -h               Show this message.
+
+The command prints one URL on stdout. Press Enter in the terminal
+for a fresh URL, for example after reloading the page. The device is
+released after session.mcpIdleTimeoutMs without an action in the
+page, and the page can take it again with its reconnect button.
+
+EXAMPLES
+  atomyx inspect --platform android
+  atomyx driver inspect --platform ios --device <UDID> --no-open
+
+EXIT CODES
+  0    the inspector stopped
+  1    the device could not be reached or held, or the server failed
+  2    the command was misused
+  130  stopped by Ctrl-C
+  143  stopped by SIGTERM
+`)
 	case CommandDoctor:
 		_, _ = io.WriteString(w, `atomyx driver doctor
   Connect to a device and report its health: whether the connection
@@ -200,6 +233,7 @@ COMMANDS
                            scenarios selected by name, tag, or glob.
   list-devices [--json]    Enumerate connected devices.
   doctor [flags]           Connect to a device and report its health.
+  inspect [flags]          Open the browser inspector for a device.
   version                  Print the driver module's version and exit.
   help                     Print this usage and exit.
 
@@ -211,6 +245,7 @@ SHORTCUTS
   atomyx suite ...          same as atomyx driver suite ...
   atomyx devices            same as atomyx driver list-devices
   atomyx doctor ...         same as atomyx driver doctor ...
+  atomyx inspect ...        same as atomyx driver inspect ...
 
 SEE ALSO
   https://atomyx.dev (documentation)

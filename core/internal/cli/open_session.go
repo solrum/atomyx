@@ -42,6 +42,16 @@ func (d *deviceSession) cancelOnLost(cancel context.CancelCauseFunc) {
 // the acquisition runs within deps.Timeouts.DeviceAcquireMs. The command is the name other
 // processes see when they find the device held, for example "atomyx run".
 func openDevice(ctx context.Context, deps Deps, command string, desc device.Descriptor) (*deviceSession, error) {
+	opened, err := acquireSession(ctx, deps, command, desc)
+	if err != nil {
+		return nil, err
+	}
+	return &deviceSession{Session: opened}, nil
+}
+
+// acquireSession is the acquisition openDevice performs, returning the
+// bare session for a command that manages its release itself.
+func acquireSession(ctx context.Context, deps Deps, command string, desc device.Descriptor) (*session.Session, error) {
 	sessionDeps := deps.Session
 	sessionDeps.Factory = deps.Factory
 	if sessionDeps.Command == "" {
@@ -53,11 +63,7 @@ func openDevice(ctx context.Context, deps Deps, command string, desc device.Desc
 	if sessionDeps.Logger == nil {
 		sessionDeps.Logger = deps.logger()
 	}
-	opened, err := session.Acquire(ctx, sessionDeps, session.Request{Descriptor: desc}, session.Acquisition{BudgetMs: deps.Timeouts.DeviceAcquireMs, BuildBudgetMs: deps.Timeouts.RunnerBuildMs})
-	if err != nil {
-		return nil, err
-	}
-	return &deviceSession{Session: opened}, nil
+	return session.Acquire(ctx, sessionDeps, session.Request{Descriptor: desc}, session.Acquisition{BudgetMs: deps.Timeouts.DeviceAcquireMs, BuildBudgetMs: deps.Timeouts.RunnerBuildMs})
 }
 
 // reportLost tells the operator that a run stopped because the device

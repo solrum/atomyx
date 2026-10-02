@@ -363,6 +363,18 @@ corresponding area. For the high-level map see
   `session.Controller`, because anything else runs device operations
   outside the activity gate. `core/scripts/check-inspector-boundary.sh`
   enforces it.
+- **Never fetch for a viewer while a run executes.** The inspector
+  asks the device for a capture only through `FreshTree`, which the
+  activity gate refuses with `HOLDER_BUSY` while a tool call runs. Do
+  not add a route that captures through another path.
+- **Never count a read as inspector activity.** Only a route declared
+  `Operator` resets the idle timer of `inspector.Host`, so polling the
+  session, tree, screenshot or event routes never keeps the device. A
+  new route that acts on behalf of the operator sets `Operator`, and a
+  route that only reads what the session holds leaves it false.
+- **Never re-acquire the device without the operator.** After an idle
+  release, only `POST /api/v1/reconnect` takes it again, because an
+  automatic re-acquire would let an open page hold the device forever.
 - **Never accept the token anywhere but the `X-Atomyx-Token` header.**
   A token in a URL path or query lands in history, logs and referrers.
   Only `GET /` is exempt from the token, because it delivers the page

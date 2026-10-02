@@ -234,7 +234,7 @@ uses, and it never sits between the CLI and `Orchestra`.
 
 `core/internal/cli` implements the `atomyx` binary: argument parsing,
 command routing, and the driver module's commands (`run`, `suite`,
-`list-devices`, `doctor`, `version`, `help`) plus the skills module's
+`list-devices`, `doctor`, `inspect`, `version`, `help`) plus the skills module's
 commands (`init`, `update-skills`) that install the bundled skill and
 agent markdown files from `core/internal/skills` into a consumer
 project.
@@ -374,7 +374,7 @@ runner the factory launched, and then releases the lease. The lock-file
 metadata follows the holder through `SetRunning` and `SetIdle`, so a
 second process that finds the device held can report why.
 
-The CLI commands `run`, `suite` and `doctor` go through `session.Acquire`,
+The CLI commands `run`, `suite`, `doctor` and `inspect` go through `session.Acquire`,
 and the MCP server's device selection and re-acquire go through
 `session.Prepare` and `session.Open`. A nil `Deps.Leases` disables
 exclusion for a single-process host such as a test, and every production

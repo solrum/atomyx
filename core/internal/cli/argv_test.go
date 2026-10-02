@@ -295,3 +295,13 @@ func assertStringSlice(t *testing.T, v FlagValue, want []string) {
 		}
 	}
 }
+
+func TestParseArgvInspectAcceptsItsFlagsAndRejectsOthers(t *testing.T) {
+	result := mustParseArgv(t, []string{"inspect", "--platform", "ios", "--device", "UDID", "--no-open"})
+	if result.Command != CommandInspect || !isTruthy(result.Flags["--no-open"]) || result.Flags["--device"] != "UDID" {
+		t.Fatalf("parsed = %+v", result)
+	}
+	if _, err := ParseArgv([]string{"inspect", "--file", "x.yml"}); err == nil {
+		t.Fatal("inspect accepted --file")
+	}
+}

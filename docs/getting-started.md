@@ -227,6 +227,10 @@ instead of failing. See [`cli.md`](./cli.md) for the details.
 To check that a device is reachable and healthy without running a
 script, use `atomyx doctor --platform android --device <serial>`.
 
+To look at a device's live UI tree and test selectors in a browser, run
+`atomyx inspect --platform android --device <serial>` and open the URL it
+prints. See [`cli.md`](./cli.md) for the idle release and Ctrl-C behavior.
+
 Scripts can also express any W3C-style pointer gesture, including
 long-press, drag, press-and-drag, and multi-finger pinch, through the
 `pointer` command:

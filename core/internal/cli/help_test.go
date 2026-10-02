@@ -37,3 +37,13 @@ func TestPrintCommandHelpDoctorDocumentsExitCodes(t *testing.T) {
 		t.Errorf("doctor help: got %q, want an EXIT CODES section", text)
 	}
 }
+
+func TestInspectHelpDocumentsFlagsEnterAndExitCodes(t *testing.T) {
+	var out bytes.Buffer
+	PrintCommandHelp(CommandInspect, &out)
+	for _, want := range []string{"--platform", "--device", "--no-open", "Enter", "130", "143"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("inspect help lacks %q", want)
+		}
+	}
+}

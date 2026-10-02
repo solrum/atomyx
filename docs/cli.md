@@ -32,15 +32,16 @@ atomyx <module> <command> [flags]
 | `atomyx driver run` | Runs a single YML test script against a device. |
 | `atomyx driver suite` | Runs a named suite or an ad-hoc selection of flows. |
 | `atomyx driver doctor` | Checks that a device is reachable and healthy, or migrates flat run records into run folders. |
+| `atomyx driver inspect` | Serves a browser inspector for a device: its live UI tree and screenshot, with selector suggestions. |
 | `atomyx driver list-devices` | Lists Android, iOS simulator, and iOS physical devices. |
 | `atomyx driver version` | Prints the driver module's version. |
 | `atomyx skills init` | Copies the bundled skill and agent files into a project. |
 | `atomyx skills update-skills` | Updates an existing skills install to the bundled version. |
 
-Four shortcuts skip the `driver` module name: `atomyx run`, `atomyx
-suite`, `atomyx doctor`, and `atomyx devices` map to `atomyx driver
-run`, `atomyx driver suite`, `atomyx driver doctor`, and `atomyx driver
-list-devices`. Two shortcuts skip
+Five shortcuts skip the `driver` module name: `atomyx run`, `atomyx
+suite`, `atomyx doctor`, `atomyx inspect`, and `atomyx devices` map to
+`atomyx driver run`, `atomyx driver suite`, `atomyx driver doctor`,
+`atomyx driver inspect`, and `atomyx driver list-devices`. Two shortcuts skip
 the `skills` module name: `atomyx init` and `atomyx update-skills`.
 
 The CLI ships exactly two modules: `driver` and `skills`. The MCP
@@ -53,6 +54,7 @@ launches directly instead of going through the `atomyx` binary.
 atomyx driver run [flags]
 atomyx driver suite [name] [flags]
 atomyx driver doctor [flags]
+atomyx driver inspect [flags]
 atomyx driver list-devices [flags]
 atomyx driver version
 atomyx driver help
@@ -345,9 +347,68 @@ error, and exits `1`.
 Exit codes: `0` when no record is conflicting or damaged, `1` when one
 is or when storage failed, and `2` when the command was misused.
 
+## driver inspect
+
+Serves a browser inspector for one device until it is stopped. The page
+shows the live UI tree and screenshot of the device and tests selectors
+against the tree.
+
+Usage:
+
+```
+atomyx driver inspect [flags]
+```
+
+Flags:
+
+| Flag | Meaning | Default | Repeatable |
+|---|---|---|---|
+| `--platform <ios\|android>` | Target platform. | `android` | no |
+| `--device <id>` | Device identifier, as reported by `atomyx driver list-devices`. | none | no |
+| `--no-open` | Prints the URL without opening a browser. | off | no |
+| `--help`, `-h` | Prints this command's usage and exits. | off | no |
+
+The command takes the device like `run` does, then listens on
+`127.0.0.1` with a system-chosen port and nothing else. It prints one
+line to stdout, the URL, which names `127.0.0.1` and carries a
+single-use code in the fragment:
+
+```
+http://127.0.0.1:<port>/#<code>
+```
+
+Unless `--no-open` is set, the command also opens the URL in the
+default browser. The code then appears in the browser's process
+arguments, where another local account can read it, so every code
+exchange is logged to stderr. A code that is used twice, or a wrong
+one, is logged as refused.
+
+- **A fresh URL.** A reload loses the page's token. Press Enter in the
+  terminal to print a fresh URL, which the command also opens unless
+  `--no-open` is set. The end of stdin does not stop the server.
+- **Idle release.** The command keeps the device until
+  `session.mcpIdleTimeoutMs` passes without an action taken in the page,
+  such as asking for a fresh capture, suggesting a selector, testing a
+  selector or copying a step. Reading what the session already holds
+  does not count, so an open page that only polls does not keep the
+  device. After the timeout the command releases the device, so another
+  Atomyx process can take it, and the page shows that it is released.
+- **Reconnect.** The page's reconnect button takes the device again.
+  The command never does so on its own. When another process holds the
+  device by then, reconnect fails with `DEVICE_HELD` and the device
+  stays released. The server and the token keep working across a
+  release and a reconnect.
+- **Stopping.** Ctrl-C and SIGTERM stop the server and release the
+  device.
+
+Exit codes: `0` when the inspector stopped without a signal, `1` when
+the device could not be reached or held or the server failed, `2` when
+the command was misused, `130` when Ctrl-C stopped it, and `143` when
+SIGTERM did.
+
 ## Device ownership
 
-`run`, `suite`, and `doctor` take exclusive ownership of the device for
+`run`, `suite`, `doctor`, and `inspect` take exclusive ownership of the device for
 the length of the command. Only one Atomyx process, whether this CLI or
 an `atomyx-mcp` server, can drive a device at a time.
 
@@ -498,6 +559,7 @@ atomyx skills update-skills
 | `atomyx run [flags]` | `atomyx driver run [flags]` |
 | `atomyx suite [name] [flags]` | `atomyx driver suite [name] [flags]` |
 | `atomyx doctor [flags]` | `atomyx driver doctor [flags]` |
+| `atomyx inspect [flags]` | `atomyx driver inspect [flags]` |
 | `atomyx devices [flags]` | `atomyx driver list-devices [flags]` |
 | `atomyx init [flags]` | `atomyx skills init [flags]` |
 | `atomyx update-skills [flags]` | `atomyx skills update-skills [flags]` |

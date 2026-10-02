@@ -44,6 +44,12 @@ type Deps struct {
 	// Timeouts bounds a device acquisition. A zero DeviceAcquireMs means
 	// session.DefaultDeviceAcquireTimeoutMs.
 	Timeouts session.Timeouts
+	// Browser opens the inspector page. Nil means the inspect command
+	// only prints the URL.
+	Browser BrowserOpener
+	// Stdin is read by the inspect command for the Enter key that asks
+	// for a fresh URL. Nil means no key is read.
+	Stdin io.Reader
 	// Debug, when true, appends a stack trace to an unhandled error
 	// reported on Stderr, matching ATOMYX_DEBUG=1.
 	Debug bool

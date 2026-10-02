@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 
+	"dev.atomyx/cmd/internal/browseropen"
 	"dev.atomyx/cmd/internal/runnerprovision"
 	"dev.atomyx/cmd/internal/sessionwire"
 	"dev.atomyx/internal/cli"
@@ -55,6 +57,8 @@ func main() {
 		Logger:   logger,
 		Stdout:   os.Stdout,
 		Stderr:   os.Stderr,
+		Browser:  browseropen.New(procRunner, runtime.GOOS),
+		Stdin:    os.Stdin,
 		Session:  sessionDeps,
 		Timeouts: sessionwire.ResolveTimeouts(sessionwire.LoadConfigBestEffort(logger), os.Getenv, logger),
 		Debug:    os.Getenv("ATOMYX_DEBUG") == "1",

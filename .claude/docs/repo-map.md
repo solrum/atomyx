@@ -62,6 +62,7 @@ atomyx/
 | `core/cmd/gen-config-schema` | `gen-config-schema` | Regenerates the checked-in JSON Schema for the project config type from `core/internal/config`'s Go types. |
 | `core/cmd/gen-run-schema` | `gen-run-schema` | Regenerates the checked-in JSON Schema for the run folder `meta.json` from `core/internal/runfolder`'s Go types. |
 | `core/cmd/gen-script-schema` | `gen-script-schema` | Regenerates the checked-in JSON Schema for the script definition type from `core/internal/script`'s Go types. |
+| `core/cmd/internal/browseropen` | none | Opens a URL in the platform's default browser through the platform's own opener command, the real browser opener `atomyx inspect` is given. |
 | `core/cmd/internal/runnerprovision` | none | Builds the iOS runner provisioner that `atomyx` and `atomyx-mcp` wire into their driver factory, including where runner records live. |
 | `core/cmd/internal/sessionwire` | none | Builds the lease manager, identity resolver, orphaned runner reaper and session timeouts that `atomyx` and `atomyx-mcp` hand to `session.Open`, so both arbitrate devices the same way. |
 
@@ -70,7 +71,7 @@ atomyx/
 | Package | Responsibility |
 |---|---|
 | `androiddriver` | Implements the Driver port over the Android agent's HTTP control server. |
-| `cli` | Implements the `atomyx` command-line binary: argument parsing, command routing, driver and skills commands. |
+| `cli` | Implements the `atomyx` command-line binary: argument parsing, command routing, driver and skills commands, including `inspect.go`, which hosts the inspector through an injected browser opener and stdin reader. |
 | `clock` | Time-source abstraction every polling loop, timeout, and retry uses instead of calling the standard library directly. |
 | `config` | Owns the project config schema, including the `session` timeouts block, its file-discovery and YAML loader, schema validation, and environment reference resolution. |
 | `conformance` | Drives the Go runtime's implementation of an operation and asserts its output against a frozen golden fixture. |
@@ -82,7 +83,7 @@ atomyx/
 | `iosdriver` | Implements the Driver port over the Swift XCUITest runner's line-delimited JSON TCP protocol. |
 | `iossimdriver` | Implements the Driver port over the iOS Simulator's direct-HID input path. |
 | `flock` | The advisory file lock primitive: a non-blocking exclusive flock on an open file, unlock, a contention check, and a descriptor-versus-path identity check. Depends on the standard library only. |
-| `inspector` | Serves the browser inspector of a held device from a loopback-only HTTP server with a Host check, an Origin check on writes, a per-session token on every `/api/` request, a single-use bootstrap code, and a route registry that features extend with route groups. |
+| `inspector` | Serves the browser inspector of a held device, releasing it after an idle timeout and taking it again on request, from a loopback-only HTTP server with a Host check, an Origin check on writes, a per-session token on every `/api/` request, a single-use bootstrap code, and a route registry that features extend with route groups. |
 | `lease` | Gives each physical device at most one driving process through a per-device flock, and probes it without writing. |
 | `logging` | The structured logging port every layer writes through, so the host chooses the destination. |
 | `mcp` | Builds the Atomyx MCP server: server construction, tool registration, the tool handlers themselves, the run session that owns the open run and its run folder, and the `DeviceSession` holder state machine with its idle timers and clock-driven tool budget. |

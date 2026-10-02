@@ -29,6 +29,9 @@ var Shortcuts = map[string]Shortcut{
 	"doctor": func(args []string) (string, []string) {
 		return "driver", append([]string{"doctor"}, args...)
 	},
+	"inspect": func(args []string) (string, []string) {
+		return "driver", append([]string{"inspect"}, args...)
+	},
 	"init": func(args []string) (string, []string) {
 		return "skills", append([]string{"init"}, args...)
 	},
