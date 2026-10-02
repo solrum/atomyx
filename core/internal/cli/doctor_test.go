@@ -11,6 +11,7 @@ import (
 	"dev.atomyx/internal/diag"
 	mockdriver "dev.atomyx/internal/driver/mock"
 	"dev.atomyx/internal/orchestra"
+	"dev.atomyx/internal/session/sessiontest"
 )
 
 // singleMockDriverFactory is a device.Factory that always connects
@@ -18,6 +19,10 @@ import (
 // what CheckHealth observes before Doctor runs.
 type singleMockDriverFactory struct {
 	driver *mockdriver.Driver
+}
+
+func (f singleMockDriverFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
 }
 
 func (f singleMockDriverFactory) Build(ctx context.Context, _ device.Descriptor) (device.Built, error) {

@@ -9,6 +9,7 @@ import (
 	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/session"
+	"dev.atomyx/internal/session/sessiontest"
 	"dev.atomyx/internal/storage"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -26,6 +27,10 @@ type pausingFactory struct {
 
 func newPausingFactory(inner *lifecycleFactory) *pausingFactory {
 	return &pausingFactory{inner: inner, paused: make(chan struct{}), release: make(chan struct{})}
+}
+
+func (p *pausingFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	return sessiontest.Wrapping(p).WithDriverWrap(wrap)
 }
 
 func (p *pausingFactory) Build(ctx context.Context, desc device.Descriptor) (device.Built, error) {

@@ -35,6 +35,7 @@ type Session struct {
 	identity device.Identity
 	lease    *lease.Lease
 	built    device.Built
+	hub      *Hub
 
 	watchCancel context.CancelFunc
 	watchers    sync.WaitGroup
@@ -52,9 +53,9 @@ type Session struct {
 	closed    chan struct{}
 }
 
-func newSession(ctx context.Context, deps Deps, desc device.Descriptor, identity device.Identity, held *lease.Lease, built device.Built) *Session {
+func newSession(ctx context.Context, deps Deps, desc device.Descriptor, identity device.Identity, held *lease.Lease, built device.Built, hub *Hub) *Session {
 	s := &Session{
-		deps: deps, desc: desc, identity: identity, lease: held, built: built,
+		deps: deps, desc: desc, identity: identity, lease: held, built: built, hub: hub,
 		lost:   make(chan struct{}),
 		closed: make(chan struct{}),
 	}
@@ -197,6 +198,7 @@ func (s *Session) Close() error {
 		} else {
 			disconnectErr = ErrDisconnectTimeout
 		}
+		s.hub.Close()
 		var releaseErr error
 		if s.lease != nil {
 			releaseErr = s.lease.Release()

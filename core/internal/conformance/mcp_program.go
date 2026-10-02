@@ -76,9 +76,25 @@ type McpDriverProgram struct {
 // behavior regardless of which platform the corpus case targets.
 type mcpScriptedMockFactory struct {
 	program *McpDriverProgram
+	wrap    device.DriverWrap
 }
 
-var _ device.Factory = (*mcpScriptedMockFactory)(nil)
+var _ device.WrappingFactory = (*mcpScriptedMockFactory)(nil)
+
+// WithDriverWrap implements device.WrappingFactory. The wrap sits
+// between the Orchestra and the mock, so the Orchestra's captures
+// reach whatever the wrap observes.
+func (f *mcpScriptedMockFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	wrapped := *f
+	previous := f.wrap
+	wrapped.wrap = func(d driver.Driver) driver.Driver {
+		if previous != nil {
+			d = previous(d)
+		}
+		return wrap(d)
+	}
+	return &wrapped
+}
 
 func (f *mcpScriptedMockFactory) Build(ctx context.Context, _ device.Descriptor) (device.Built, error) {
 	drv := mock.New()
@@ -115,8 +131,12 @@ func (f *mcpScriptedMockFactory) Build(ctx context.Context, _ device.Descriptor)
 			drv.StageHierarchyRepeated(f.program.Hierarchy, repeat)
 		}
 	}
+	var built driver.Driver = drv
+	if f.wrap != nil {
+		built = f.wrap(drv)
+	}
 	return device.Built{
-		Driver:    drv,
-		Orchestra: orchestra.New(orchestra.OrchestraDeps{Driver: drv, Clock: orchestra.SystemClock{}}),
+		Driver:    built,
+		Orchestra: orchestra.New(orchestra.OrchestraDeps{Driver: built, Clock: orchestra.SystemClock{}}),
 	}, nil
 }

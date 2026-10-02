@@ -68,6 +68,10 @@ func newLifecycleFactory() *lifecycleFactory {
 	return &lifecycleFactory{disconnected: make(chan struct{}, 32)}
 }
 
+func (f *lifecycleFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
+}
+
 func (f *lifecycleFactory) Build(ctx context.Context, _ device.Descriptor) (device.Built, error) {
 	drv := &lifecycleDriver{Driver: mockdriver.New(), factory: f}
 	drv.StageHierarchy(sampleTree())

@@ -9,6 +9,7 @@ import (
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/diag"
 	mockdriver "dev.atomyx/internal/driver/mock"
+	"dev.atomyx/internal/session/sessiontest"
 )
 
 const (
@@ -32,6 +33,10 @@ func configEnvDeviceProbe() device.Probe {
 type recordingFactory struct {
 	inner device.Factory
 	got   []device.Descriptor
+}
+
+func (f *recordingFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
 }
 
 func (f *recordingFactory) Build(ctx context.Context, desc device.Descriptor) (device.Built, error) {

@@ -12,12 +12,17 @@ import (
 	"dev.atomyx/internal/driver/mock"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/runfolder"
+	"dev.atomyx/internal/session/sessiontest"
 	"dev.atomyx/internal/wire"
 )
 
 var failureScreenshot = []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a, 7, 7}
 
 type screenshotMockFactory struct{}
+
+func (f screenshotMockFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
+}
 
 func (screenshotMockFactory) Build(ctx context.Context, _ device.Descriptor) (device.Built, error) {
 	drv := mock.New()

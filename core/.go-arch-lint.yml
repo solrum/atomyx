@@ -212,6 +212,7 @@ deps:
       - expression
       - runner
       - scenario
+      - sessiontest
   cli:
     mayDependOn:
       - wire
@@ -236,6 +237,7 @@ deps:
       - shutdown
       - storageroot
       - storage
+      - sessiontest
   skills:
     anyVendorDeps: true
   storage:
@@ -300,9 +302,12 @@ deps:
       - session
       - drivermock
       - drivertest
+      - sessiontest
   sessiontest:
     mayDependOn:
       - lease
+      - device
+      - driver
   inspector:
     mayDependOn:
       - wire

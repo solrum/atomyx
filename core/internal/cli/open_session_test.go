@@ -14,6 +14,7 @@ import (
 	mockdriver "dev.atomyx/internal/driver/mock"
 	"dev.atomyx/internal/lease"
 	"dev.atomyx/internal/session"
+	"dev.atomyx/internal/session/sessiontest"
 )
 
 // leaseDeps returns Deps whose sessions arbitrate through a lease
@@ -206,6 +207,10 @@ func TestOpenDeviceFailedPrepareTakesNoLease(t *testing.T) {
 }
 
 type hangingFactory struct{}
+
+func (f hangingFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
+}
 
 func (hangingFactory) Build(ctx context.Context, _ device.Descriptor) (device.Built, error) {
 	<-ctx.Done()

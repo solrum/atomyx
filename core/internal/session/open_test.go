@@ -17,6 +17,7 @@ import (
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/session"
+	"dev.atomyx/internal/session/sessiontest"
 	"dev.atomyx/internal/wire"
 )
 
@@ -74,6 +75,10 @@ type recordingFactory struct {
 	ctxs    []context.Context
 	script  func(*recordingDriver)
 	lost    <-chan error
+}
+
+func (f *recordingFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
 }
 
 func (f *recordingFactory) Build(ctx context.Context, _ device.Descriptor) (device.Built, error) {

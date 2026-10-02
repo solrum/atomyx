@@ -14,6 +14,7 @@ import (
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/runfolder"
+	"dev.atomyx/internal/session/sessiontest"
 	"dev.atomyx/internal/shutdown"
 	"dev.atomyx/internal/storageroot"
 )
@@ -168,6 +169,10 @@ type cancelingFactory struct {
 	device.Factory
 	cancel context.CancelCauseFunc
 	sig    syscall.Signal
+}
+
+func (f cancelingFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
 }
 
 func (f cancelingFactory) Build(ctx context.Context, desc device.Descriptor) (device.Built, error) {

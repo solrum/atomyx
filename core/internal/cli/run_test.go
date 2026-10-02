@@ -20,6 +20,7 @@ import (
 	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/runner"
 	"dev.atomyx/internal/script"
+	"dev.atomyx/internal/session/sessiontest"
 	"dev.atomyx/internal/storageroot"
 	"dev.atomyx/internal/wire"
 )
@@ -34,6 +35,10 @@ func intPtr(i int) *int       { return &i }
 // test constructs directly.
 type stagedMockFactory struct {
 	tree wire.TreeNodeWire
+}
+
+func (f stagedMockFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
 }
 
 func (f stagedMockFactory) Build(ctx context.Context, _ device.Descriptor) (device.Built, error) {

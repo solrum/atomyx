@@ -87,17 +87,23 @@ type launchedAppCarrier interface {
 	RestoreLaunchedApp(ctx context.Context, bundleID, fromRunnerID string) error
 }
 
+// ErrNotWrappable reports a device factory that cannot build its driver
+// inside a decorator. A session needs the decorator to publish every
+// capture to its viewers, so it refuses such a factory instead of
+// running unobserved.
+var ErrNotWrappable = errors.New("the device factory cannot wrap its driver in the capture observer")
+
 // observingFactory makes factory build every driver inside an observing
-// decorator, so the Orchestra, the runner, the tool handlers and failure
-// capture all act through it. A factory that cannot wrap is used as is.
-func observingFactory(factory device.Factory) device.Factory {
+// decorator that publishes to hub, so the Orchestra, the runner, the
+// tool handlers and failure capture all act through it.
+func observingFactory(factory device.Factory, hub *Hub) (device.Factory, error) {
 	wrapping, ok := factory.(device.WrappingFactory)
 	if !ok {
-		return factory
+		return nil, fmt.Errorf("%w: %T", ErrNotWrappable, factory)
 	}
 	return wrapping.WithDriverWrap(func(d driver.Driver) driver.Driver {
-		return NewObservingDriver(d, nil)
-	})
+		return NewObservingDriver(d, hub)
+	}), nil
 }
 
 // Open takes ownership of the device named by req.
@@ -112,6 +118,12 @@ func observingFactory(factory device.Factory) device.Factory {
 func Open(ctx context.Context, deps Deps, req Request) (*Session, error) {
 	deps = deps.withDefaults()
 	desc := req.Descriptor
+
+	hub := NewHub()
+	factory, err := observingFactory(deps.Factory, hub)
+	if err != nil {
+		return nil, err
+	}
 
 	identity, err := deps.ResolveIdentity(ctx, desc)
 	if err != nil {
@@ -135,7 +147,7 @@ func Open(ctx context.Context, deps Deps, req Request) (*Session, error) {
 	}
 
 	ctx = logging.WithDevice(ctx, logging.DeviceTag{DeviceID: desc.ID, HardwareID: identity.HardwareID})
-	built, err := observingFactory(deps.Factory).Build(ctx, desc)
+	built, err := factory.Build(ctx, desc)
 	if err != nil {
 		if held != nil {
 			_ = held.Release()
@@ -152,7 +164,7 @@ func Open(ctx context.Context, deps Deps, req Request) (*Session, error) {
 			}
 		}
 	}
-	s := newSession(ctx, deps, desc, identity, held, built)
+	s := newSession(ctx, deps, desc, identity, held, built, hub)
 	s.relaunched = relaunched
 	return s, nil
 }

@@ -11,6 +11,7 @@ import (
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/session"
+	"dev.atomyx/internal/session/sessiontest"
 )
 
 const disconnectDeadline = time.Millisecond
@@ -28,6 +29,10 @@ func (r onePhoneIdentity) Resolve(_ context.Context, d device.Descriptor) (devic
 type failNextBuildFactory struct {
 	inner    device.Factory
 	failNext atomic.Bool
+}
+
+func (f *failNextBuildFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
 }
 
 func (f *failNextBuildFactory) Build(ctx context.Context, desc device.Descriptor) (device.Built, error) {

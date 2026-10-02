@@ -10,6 +10,7 @@ import (
 	"dev.atomyx/internal/device"
 	mockdriver "dev.atomyx/internal/driver/mock"
 	"dev.atomyx/internal/session"
+	"dev.atomyx/internal/session/sessiontest"
 	"dev.atomyx/internal/storage"
 )
 
@@ -110,6 +111,10 @@ type slowAcquireFactory struct {
 	// waitForCancel makes Build return when its context ends, the way a
 	// real launch honors cancellation.
 	waitForCancel bool
+}
+
+func (f slowAcquireFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
 }
 
 func (f slowAcquireFactory) Build(ctx context.Context, d device.Descriptor) (device.Built, error) {

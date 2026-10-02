@@ -407,6 +407,12 @@ func patternPtr(s string) *orchestra.Pattern {
 
 func stagedMock() *mockdriver.Driver {
 	d := mockdriver.New()
+	stageRun(d)
+	return d
+}
+
+// stageRun stages the hierarchies orchestraRun consumes.
+func stageRun(d *mockdriver.Driver) {
 	for range 8 {
 		d.StageHierarchy(wire.TreeNodeWire{
 			Attributes: map[string]string{"id": "root"},
@@ -415,7 +421,6 @@ func stagedMock() *mockdriver.Driver {
 			}},
 		})
 	}
-	return d
 }
 
 func callMethods(d *mockdriver.Driver) []string {

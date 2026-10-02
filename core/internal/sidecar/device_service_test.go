@@ -11,6 +11,7 @@ import (
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/driver/mock"
 	"dev.atomyx/internal/orchestra"
+	"dev.atomyx/internal/session/sessiontest"
 )
 
 // orderRecordingFactory wraps a fresh mock.Driver per Build call in an
@@ -29,6 +30,10 @@ func newOrderRecordingFactory(log *[]string) *orderRecordingFactory {
 }
 
 var _ device.Factory = (*orderRecordingFactory)(nil)
+
+func (f *orderRecordingFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
+}
 
 func (f *orderRecordingFactory) Build(ctx context.Context, _ device.Descriptor) (device.Built, error) {
 	f.mu.Lock()
@@ -113,6 +118,10 @@ func newBlockingFactory() *blockingFactory {
 }
 
 var _ device.Factory = (*blockingFactory)(nil)
+
+func (f *blockingFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
+}
 
 func (f *blockingFactory) Build(ctx context.Context, _ device.Descriptor) (device.Built, error) {
 	atomic.AddInt32(&f.buildCount, 1)

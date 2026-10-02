@@ -334,8 +334,10 @@ for a host that does not need to split them.
    open.
 4. Builds the driver through `device.Factory`, with the device tagged on
    the context through `logging.WithDevice` so every log line from the
-   driver carries `deviceId` and `hardwareId`. A factory that implements
-   `device.WrappingFactory` builds the driver inside an observing
+   driver carries `deviceId` and `hardwareId`. The factory must implement
+   `device.WrappingFactory`, and `Open` fails with `session.ErrNotWrappable`
+   before it takes the lease when it does not, so no session runs without
+   its viewers' hub. The factory builds the driver inside an observing
    decorator, `session.NewObservingDriver`, before it builds the
    Orchestra. Built.Driver, the Orchestra, the runner, the MCP tool
    handlers and failure capture all therefore act through it. The
@@ -343,8 +345,8 @@ for a host that does not need to split them.
    every mutating call (gestures, taps, swipes, streaming touch phases,
    text and key input, and app launch, stop, kill, install, uninstall
    and data clear), and reports each successful tree, screenshot and
-   screen size to a `session.Observer` together with the epoch active
-   when the capture began. It forwards `driver.StreamingTouchCapable`
+   screen size to the session's `session.Hub` together with the epoch
+   active when the capture began. It forwards `driver.StreamingTouchCapable`
    and the launched-app accessors exactly when the wrapped driver has
    them, and exposes `Unwrap()`. A caller that asserts an optional
    interface uses `driver.As`, which looks through decorators.
@@ -367,6 +369,42 @@ and the MCP server's device selection and re-acquire go through
 `session.Prepare` and `session.Open`. A nil `Deps.Leases` disables
 exclusion for a single-process host such as a test, and every production
 composition root sets it.
+
+A session is observable through the `session.Viewer` port, which
+`*Session` implements:
+
+- `Info()` reports the device, the lease holder, the role and the state.
+  The state is `idle` or `running` from the lease metadata, then `lost`
+  or `closed`.
+- `Latest()` returns a `session.Snapshot` with the newest tree, the
+  newest screenshot, the format of the screenshot, the epoch of each,
+  the scale, `Paired` and `Highlightable`. Fields are added to the
+  struct over time, so callers read them by name.
+- `Subscribe(ctx)` returns a channel of `session.Observation` values,
+  each naming the kind and epoch of a new capture. A notification
+  carries no payload, and the subscriber reads `Latest()`.
+
+The `Hub` behind it keeps only the newest tree, screenshot and screen
+size with their epochs, and never calls the device. A viewer therefore
+sees only what the runner, a tool call or failure capture already
+fetched, and any number of viewers cost the driver nothing. Each
+subscriber has a buffer of 16 notifications. A subscriber that leaves
+the buffer full is dropped, its channel is closed, and the publisher
+never waits. A dropped subscriber re-subscribes and reads `Latest()`.
+
+The tree `Latest()` returns has every secret masked by
+`orchestra.MaskSecure`. The masked copy is made on the first read after
+a tree is stored and shared by every later read of that tree, so
+polling never copies the tree again. The Orchestra keeps resolving
+selectors against the real tree.
+
+`Scale` is the screenshot pixel width divided by the width of the newest
+`ScreenSize` the driver reported, for every platform. The width comes
+from the image header, which is read without decoding the pixels, and the
+format (`png` or `jpeg`) is read from the bytes. `Paired` is true when the
+tree and the screenshot were fetched in the same action epoch.
+`Highlightable` is true when they are paired and a scale is known.
+Without a paired capture a viewer shows the tree alone.
 
 `session` may depend on `device`, `lease`, `diag`, `orchestra`, `driver`,
 `shutdown` and the common leaves. It never imports `mcp`, `cli` or

@@ -11,6 +11,7 @@ import (
 	"dev.atomyx/internal/driver/mock"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/runfolder"
+	"dev.atomyx/internal/session/sessiontest"
 	"dev.atomyx/internal/wire"
 )
 
@@ -29,6 +30,10 @@ func (d *lossOnScreenshotDriver) Screenshot(ctx context.Context) ([]byte, error)
 }
 
 type lossFactory struct{}
+
+func (f lossFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
+}
 
 func (lossFactory) Build(ctx context.Context, _ device.Descriptor) (device.Built, error) {
 	lost := make(chan error, 1)
@@ -97,6 +102,10 @@ func TestRunScriptWhoseStepFailureClassifiesAsDeviceLostEndsAsDeviceLost(t *test
 }
 
 type unreachableAgentFactory struct{}
+
+func (f unreachableAgentFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
+}
 
 func (unreachableAgentFactory) Build(ctx context.Context, _ device.Descriptor) (device.Built, error) {
 	drv := mock.New()

@@ -250,6 +250,22 @@ corresponding area. For the high-level map see
   `core/internal/session/sessiontest`, which
   `core/scripts/check-sessiontest-imports.sh` enforces, so `mcp` keeps no
   direct edge to `lease` in production.
+- **Never fetch from the device for a viewer.** A viewer reads
+  `Session.Latest()` and `Session.Subscribe`, which return what the
+  runner, a tool call or failure capture already fetched. A fetch on
+  behalf of a viewer while a run executes interleaves with the run's own
+  device calls and slows it.
+- **Masking lives in the viewer path, so read trees for display only
+  through `Latest()`.** The hub stores the real tree for the Orchestra's
+  sake and masks it on read. Code that reads the stored tree some other
+  way would show secrets. Treat every slice and map in a `Snapshot` as
+  read-only, because the masked tree shares its unmasked attribute maps
+  with the stored one.
+- **A session factory must implement `device.WrappingFactory`.** A test
+  factory gets it from `sessiontest.Wrapping`. That helper wraps
+  `Built.Driver` only, so a test that needs the Orchestra's captures to
+  reach the hub builds its Orchestra over the wrapped driver, as the mock
+  factory in `core/internal/device` does.
 - **Drive timers from the injected timer clock.** The acquisition budget,
   the tool call budget, and the idle timers use `ServerDeps.TimerClock`,
   not the orchestra clock. A test clock whose sleeps return at once would

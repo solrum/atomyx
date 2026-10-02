@@ -8,6 +8,7 @@ import (
 
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/diag"
+	"dev.atomyx/internal/session/sessiontest"
 	"dev.atomyx/internal/storage"
 )
 
@@ -16,6 +17,10 @@ import (
 // real device or transport.
 type erroringDeviceFactory struct {
 	err error
+}
+
+func (f erroringDeviceFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
 }
 
 func (f erroringDeviceFactory) Build(ctx context.Context, _ device.Descriptor) (device.Built, error) {

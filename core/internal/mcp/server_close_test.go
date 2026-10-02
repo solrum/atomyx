@@ -8,6 +8,7 @@ import (
 
 	"dev.atomyx/internal/device"
 	mockdriver "dev.atomyx/internal/driver/mock"
+	"dev.atomyx/internal/session/sessiontest"
 	"dev.atomyx/internal/storage"
 )
 
@@ -50,6 +51,10 @@ type gatedFactory struct {
 	driver  *mockdriver.Driver
 	started chan struct{}
 	release chan struct{}
+}
+
+func (f gatedFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
 }
 
 func (f gatedFactory) Build(ctx context.Context, desc device.Descriptor) (device.Built, error) {

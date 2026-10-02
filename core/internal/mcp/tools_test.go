@@ -14,6 +14,7 @@ import (
 	"dev.atomyx/internal/driver"
 	mockdriver "dev.atomyx/internal/driver/mock"
 	"dev.atomyx/internal/orchestra"
+	"dev.atomyx/internal/session/sessiontest"
 	"dev.atomyx/internal/storage"
 	"dev.atomyx/internal/wire"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -24,6 +25,10 @@ import (
 // Hierarchy returns before select_device wires it into the session.
 type singleMockDriverFactory struct {
 	driver *mockdriver.Driver
+}
+
+func (f singleMockDriverFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
 }
 
 func (f singleMockDriverFactory) Build(ctx context.Context, _ device.Descriptor) (device.Built, error) {
@@ -210,6 +215,10 @@ type kindStubFactory struct {
 	kind  driver.DeviceKind
 	err   error
 	built *[]device.Descriptor
+}
+
+func (f kindStubFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
 }
 
 func (f kindStubFactory) Build(ctx context.Context, desc device.Descriptor) (device.Built, error) {

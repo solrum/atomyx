@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"dev.atomyx/internal/device"
+	"dev.atomyx/internal/driver"
 	mockdriver "dev.atomyx/internal/driver/mock"
+	"dev.atomyx/internal/session/sessiontest"
 )
 
 const selectTestTimeout = 5 * time.Second
@@ -21,6 +23,10 @@ type sequencedFactory struct {
 	calls   atomic.Int32
 	started chan struct{}
 	release chan struct{}
+}
+
+func (f *sequencedFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
 }
 
 func (f *sequencedFactory) Build(ctx context.Context, desc device.Descriptor) (device.Built, error) {
@@ -71,7 +77,11 @@ func TestConcurrentSelectsRunOneAfterAnotherAndTheLaterOneWins(t *testing.T) {
 	if !second.IsConnected() {
 		t.Fatal("the current driver was disconnected")
 	}
-	if current := session.Current(); current == nil || current.Driver != second {
+	current := session.Current()
+	if current == nil {
+		t.Fatal("no current device, want the second driver")
+	}
+	if got, _ := driver.As[*mockdriver.Driver](current.Driver); got != second {
 		t.Fatalf("current device = %+v, want the second driver", current)
 	}
 }
