@@ -20,13 +20,16 @@ type listeningBackground struct {
 }
 
 func (b listeningBackground) Start(ctx context.Context, _ string, args ...string) (process.BackgroundProcess, error) {
+	return b.startWith(ctx, process.NewFakeBackgroundProcess(), args)
+}
+
+func (b listeningBackground) startWith(ctx context.Context, proc *process.FakeBackgroundProcess, args []string) (process.BackgroundProcess, error) {
 	hostPort, _, _ := strings.Cut(args[0], ":")
 	listener, err := new(net.ListenConfig).Listen(ctx, "tcp", "127.0.0.1:"+hostPort)
 	if err != nil {
 		return nil, err
 	}
 	b.t.Cleanup(func() { _ = listener.Close() })
-	proc := process.NewFakeBackgroundProcess()
 	proc.SetPid(tunnelTestPid)
 	return proc, nil
 }

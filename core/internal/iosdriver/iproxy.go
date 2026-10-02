@@ -58,6 +58,9 @@ const (
 	// IproxyErrSpawnExit means the iproxy process exited, for any
 	// reason other than a missing binary, before the tunnel came up.
 	IproxyErrSpawnExit IproxyErrorCode = "spawn-exit"
+	// IproxyErrTunnelExit means the iproxy process exited on its own after
+	// the tunnel had come up, so the device link was lost mid-session.
+	IproxyErrTunnelExit IproxyErrorCode = "tunnel-exit"
 )
 
 // IproxyError is a named, actionable failure from launching or
@@ -155,7 +158,11 @@ func StartTunnel(ctx context.Context, bg process.BackgroundRunner, clk clock.Clo
 	if startErr != nil {
 		return nil, 0, classifyIproxyExit(startErr)
 	}
+	var tunnelReady atomic.Bool
 	exited, stopProc := superviseBackground(proc, func(_ process.BackgroundResult, err error) error {
+		if tunnelReady.Load() {
+			return classifyIproxyTunnelExit(err)
+		}
 		return classifyIproxyExit(err)
 	})
 
@@ -168,6 +175,7 @@ func StartTunnel(ctx context.Context, bg process.BackgroundRunner, clk clock.Clo
 	)
 	switch outcome {
 	case process.ReadinessReady:
+		tunnelReady.Store(true)
 		var stopping atomic.Bool
 		notifyOnExit(exited, &stopping, cfg.OnExit)
 		return func() {
@@ -225,6 +233,16 @@ func classifyIproxyExit(err error) *IproxyError {
 		Code:    IproxyErrSpawnExit,
 		Message: fmt.Sprintf("iproxy exited before the tunnel became reachable: %v", err),
 	}
+}
+
+// classifyIproxyTunnelExit names the exit of an iproxy process that had
+// already made the tunnel reachable.
+func classifyIproxyTunnelExit(err error) *IproxyError {
+	message := "iproxy exited after the tunnel was reachable"
+	if err != nil {
+		message = fmt.Sprintf("%s: %v", message, err)
+	}
+	return &IproxyError{Code: IproxyErrTunnelExit, Message: message}
 }
 
 // canConnectTCP reports whether 127.0.0.1:port currently accepts a
