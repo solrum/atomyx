@@ -117,7 +117,7 @@ func NewServer(info Info, deps ServerDeps) (*Server, error) {
 	// bookkeeping apply uniformly to all registered tools without each
 	// tool's handler knowing about any of them. Registered before any AddTool call so it is in place for
 	// every tool the loop below adds.
-	server.AddReceivingMiddleware(newToolCallMiddleware(logger, timers, devices, traits))
+	server.AddReceivingMiddleware(newToolCallMiddleware(logger, timers, devices, devices, traits))
 
 	// Registration order matches DEFAULT_TOOLS in
 	// packages/mcp/src/tools/index.ts: device + app lifecycle first,

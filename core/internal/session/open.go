@@ -71,6 +71,11 @@ type Request struct {
 	// device. It applies only when the rebuilt driver proves it reached
 	// the same runner instance.
 	Restore *LaunchState
+	// Gate is the activity gate the session's FreshTree takes. A host
+	// that outlives its sessions passes one gate to every Open, so a
+	// tool call in flight keeps excluding fresh captures across a
+	// re-acquire. Nil gives the session its own gate.
+	Gate *ActivityGate
 }
 
 // LaunchState is the launched-app state of an iOS driver, carried
@@ -164,7 +169,11 @@ func Open(ctx context.Context, deps Deps, req Request) (*Session, error) {
 			}
 		}
 	}
-	s := newSession(ctx, deps, desc, identity, held, built, hub)
+	gate := req.Gate
+	if gate == nil {
+		gate = NewActivityGate()
+	}
+	s := newSession(ctx, deps, desc, identity, held, built, hub, gate)
 	s.relaunched = relaunched
 	return s, nil
 }

@@ -36,6 +36,7 @@ type Session struct {
 	lease    *lease.Lease
 	built    device.Built
 	hub      *Hub
+	gate     *ActivityGate
 
 	watchCancel context.CancelFunc
 	watchers    sync.WaitGroup
@@ -53,9 +54,9 @@ type Session struct {
 	closed    chan struct{}
 }
 
-func newSession(ctx context.Context, deps Deps, desc device.Descriptor, identity device.Identity, held *lease.Lease, built device.Built, hub *Hub) *Session {
+func newSession(ctx context.Context, deps Deps, desc device.Descriptor, identity device.Identity, held *lease.Lease, built device.Built, hub *Hub, gate *ActivityGate) *Session {
 	s := &Session{
-		deps: deps, desc: desc, identity: identity, lease: held, built: built, hub: hub,
+		deps: deps, desc: desc, identity: identity, lease: held, built: built, hub: hub, gate: gate,
 		lost:   make(chan struct{}),
 		closed: make(chan struct{}),
 	}

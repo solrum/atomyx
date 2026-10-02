@@ -123,6 +123,14 @@ func (h *Hub) Latest() Snapshot {
 	return snap
 }
 
+// sizeCurrent reports whether the screen size was read in the epoch of
+// the newest tree.
+func (h *Hub) sizeCurrent() bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.hasSize && h.hasTree && h.sizeEpoch == h.treeEpoch
+}
+
 // Subscribe reports every capture until ctx ends, the hub closes, or
 // the subscriber leaves subscriberBuffer notifications unread. The hub
 // then closes the channel, and the subscriber re-reads Latest.

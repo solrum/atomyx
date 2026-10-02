@@ -406,6 +406,22 @@ tree and the screenshot were fetched in the same action epoch.
 `Highlightable` is true when they are paired and a scale is known.
 Without a paired capture a viewer shows the tree alone.
 
+`*Session` also implements `session.Controller`, which adds
+`FreshTree(ctx)`. It captures a tree and a screenshot back to back
+through the Orchestra, so the decorator publishes both under one epoch,
+and reads the screen size when none was read in that epoch. The result is
+what `Latest()` then returns, so it is paired and highlightable. Only the
+process that holds the lease has a `Controller`, and a consumer such as
+the inspector takes the interface, never `*Session`.
+
+`FreshTree` takes the session's `session.ActivityGate` alone, and the MCP
+tool-call middleware enters the same gate around every tool that is not
+observe-only. Calls share the gate with each other. A fresh capture waits
+for the calls inside to end and holds back later calls while it waits.
+Both waits honor their context. A host that outlives its sessions, such
+as `DeviceSession`, passes one gate in `session.Request.Gate` to every
+`Open`, so the exclusion holds across a re-acquire.
+
 `session` may depend on `device`, `lease`, `diag`, `orchestra`, `driver`,
 `shutdown` and the common leaves. It never imports `mcp`, `cli` or
 `inspector`.

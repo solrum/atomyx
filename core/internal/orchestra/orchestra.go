@@ -754,6 +754,12 @@ func (o *Orchestra) IsAppInstalled(ctx context.Context, appID string) (bool, err
 	return o.driver.IsAppInstalled(ctx, appID)
 }
 
+// ScreenSize reports the size of the device screen in the units the
+// driver's coordinates use.
+func (o *Orchestra) ScreenSize(ctx context.Context) (wire.Size, error) {
+	return o.driver.ScreenSize(ctx)
+}
+
 // DeviceInfo reports static information about the device.
 func (o *Orchestra) DeviceInfo(ctx context.Context) (driver.DeviceInfo, error) {
 	return o.driver.DeviceInfo(ctx)

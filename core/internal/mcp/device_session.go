@@ -200,6 +200,9 @@ type DeviceSession struct {
 	deps       session.Deps
 	timeouts   session.Timeouts
 	runs       *runSession
+	// gate keeps a fresh capture of any session this host holds from
+	// interleaving with a tool call. It outlives each held session.
+	gate *session.ActivityGate
 }
 
 // errSessionClosed is returned by Select once the session has been
@@ -256,6 +259,7 @@ func NewDeviceSession(deps DeviceSessionDeps) *DeviceSession {
 		life: life, cancelLife: cancelLife,
 		state: holderUnselected, probe: deps.Probe, runners: deps.Runners, clock: nowClock, timers: timers, timerBase: context.Background(), logger: logger,
 		deps: sessionDeps, timeouts: deps.Timeouts.WithDefaults(), runs: deps.Runs,
+		gate: session.NewActivityGate(),
 	}
 }
 
@@ -458,6 +462,7 @@ func (s *DeviceSession) prepare(ctx context.Context, desc device.Descriptor) err
 // are reported to the calling client, except the connected phase, which
 // install reports once the session is installed. The caller holds acquireMu.
 func (s *DeviceSession) open(ctx context.Context, req session.Request) (*session.Session, error) {
+	req.Gate = s.gate
 	sess, err := session.OpenWithinBudget(ctx, s.deps, req, session.Acquisition{
 		BudgetMs: s.timeouts.DeviceAcquireMs,
 		Clock:    s.timers,
@@ -563,6 +568,15 @@ func (s *DeviceSession) releasePrevious(previous *session.Session) {
 	s.logger.Info("session.previous_disconnected", logging.LogContext{
 		"id": desc.ID, "platform": string(desc.Platform),
 	})
+}
+
+// EnterCall admits a tool call that drives the device through the
+// activity gate, so a fresh capture of the held session never runs
+// between two of the call's device operations. The returned function
+// ends the admission and must run when the call ends. It fails with the
+// context error when ctx ends while a fresh capture holds the gate.
+func (s *DeviceSession) EnterCall(ctx context.Context) (func(), error) {
+	return s.gate.Enter(ctx)
 }
 
 // BeginCall records that a tool call starts. It stops the idle timers,

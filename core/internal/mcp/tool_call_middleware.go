@@ -144,8 +144,15 @@ func resolveToolTimeoutBudget(rawArgs json.RawMessage) (budgetMs float64, declar
 	return budget, declared
 }
 
+// callGate admits the tool calls that drive the device. Entering it
+// waits for a fresh capture of the held session to finish, and while a
+// call is inside, no fresh capture starts.
+type callGate interface {
+	EnterCall(ctx context.Context) (release func(), err error)
+}
+
 // newToolCallMiddleware builds the single choke point every tools/call
-// request passes through, applying four behaviors uniformly to every
+// request passes through, applying five behaviors uniformly to every
 // registered tool without touching each tool's own handler:
 //
 //  1. Value-constraint validation the published (deliberately loose)
@@ -165,7 +172,9 @@ func resolveToolTimeoutBudget(rawArgs json.RawMessage) (budgetMs float64, declar
 //     because it is not session activity.
 //  4. The notices raised while the call ran, such as an app relaunch on
 //     a re-acquire, are appended to its result.
-func newToolCallMiddleware(logger logging.Logger, clk clock.Clock, sess *DeviceSession, traits *toolTraits) mcp.Middleware {
+//  5. A tool that is not observe-only enters gate for the whole call,
+//     so a fresh capture of the held session never interleaves with it.
+func newToolCallMiddleware(logger logging.Logger, clk clock.Clock, sess *DeviceSession, gate callGate, traits *toolTraits) mcp.Middleware {
 	return func(next mcp.MethodHandler) mcp.MethodHandler {
 		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
 			if method != toolCallMethod {
@@ -181,6 +190,11 @@ func newToolCallMiddleware(logger logging.Logger, clk clock.Clock, sess *DeviceS
 			}
 
 			if !traits.isObserveOnly(params.Name) {
+				release, err := gate.EnterCall(ctx)
+				if err != nil {
+					return errorResult(err), nil
+				}
+				defer release()
 				if err := sess.BeginCall(params.Name); err != nil {
 					return errorResult(err), nil
 				}

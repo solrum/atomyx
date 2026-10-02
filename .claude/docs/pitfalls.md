@@ -255,6 +255,12 @@ corresponding area. For the high-level map see
   runner, a tool call or failure capture already fetched. A fetch on
   behalf of a viewer while a run executes interleaves with the run's own
   device calls and slows it.
+- **Take the activity gate around every call that drives the device.** A
+  fresh capture runs only while no tool call is inside the gate. A host
+  that drives the device without entering it lets a capture interleave
+  with the call and pair a tree with a screenshot from different screens.
+  The MCP middleware enters it, so a handler never does, and a new tool
+  is covered by registering it as it is.
 - **Masking lives in the viewer path, so read trees for display only
   through `Latest()`.** The hub stores the real tree for the Orchestra's
   sake and masks it on read. Code that reads the stored tree some other

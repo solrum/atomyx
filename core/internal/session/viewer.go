@@ -88,3 +88,16 @@ type Viewer interface {
 	// subscriber falls behind, and then closes the channel.
 	Subscribe(ctx context.Context) (<-chan Observation, error)
 }
+
+// Controller is a Viewer that can also ask the device for a matched
+// pair of captures. Only the process that holds the device lease has
+// one.
+type Controller interface {
+	Viewer
+	// FreshTree captures a tree and a screenshot back to back, with no
+	// tool call between them, and returns what a viewer would now read
+	// from Latest. The pair is paired and highlightable when the
+	// device reports its screen size. It waits for tool calls inside the
+	// activity gate to end and honors ctx while it waits.
+	FreshTree(ctx context.Context) (Snapshot, error)
+}

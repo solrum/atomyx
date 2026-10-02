@@ -183,6 +183,12 @@ above). Registration is never auto-discovered, so adding a file under
   `list_devices` and `disconnect_device` register this way, and so does
   `select_device`, which settles the holder state itself when it
   installs the new session.
+  A call that is not observe-only also enters the activity gate
+  through `DeviceSession.EnterCall` for its whole length. Several calls
+  may be inside at once, and a fresh capture of the held session
+  (`session.Controller.FreshTree`) waits for them to end, so it never
+  runs between two device operations of one call. The wait honors the
+  call's context.
   The middleware also appends the notices raised during a call
   (`core/internal/mcp/call_notices.go`) as extra text content blocks
   after the tool's own content. `DeviceSession.Ensure` raises one when a
