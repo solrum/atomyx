@@ -28,27 +28,6 @@ type Options struct {
 	HidDispatchTimeout time.Duration
 }
 
-// StreamingTouchCapable is the capability interface for drivers that
-// accept streaming touch phase events (down, move, up) independent of
-// gesture classification. A caller checks for this interface before
-// routing streaming input through the HID path instead of
-// DispatchGesture.
-//
-// Only IosSimDriver implements it in this package.
-type StreamingTouchCapable interface {
-	StreamingTouchDown(ctx context.Context, point wire.Point, id int) error
-	StreamingTouchMove(ctx context.Context, point wire.Point, id int) error
-	StreamingTouchUp(ctx context.Context, point wire.Point, id int) error
-}
-
-// AsStreamingTouchCapable reports whether d also implements
-// StreamingTouchCapable, letting a caller route streaming mirror
-// input through the HID path when it does.
-func AsStreamingTouchCapable(d driver.Driver) (StreamingTouchCapable, bool) {
-	s, ok := d.(StreamingTouchCapable)
-	return s, ok
-}
-
 // IosSimDriver routes touch gestures (Tap, LongPress, Swipe, and the
 // StreamingTouchCapable phases) through the atomyx-sim-hid helper's
 // HID connection, while every other Driver method delegates to an
@@ -111,7 +90,7 @@ func New(conn iosdriver.Conn, proc process.Runner, dialer Dialer, opts Options) 
 }
 
 var _ driver.Driver = (*IosSimDriver)(nil)
-var _ StreamingTouchCapable = (*IosSimDriver)(nil)
+var _ driver.StreamingTouchCapable = (*IosSimDriver)(nil)
 
 func (d *IosSimDriver) Platform() string { return d.delegate.Platform() }
 

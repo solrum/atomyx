@@ -112,8 +112,9 @@ Dev tooling `make -C core check` runs (see
 `core/scripts/check-comments.sh` (the comment-style gate),
 `core/scripts/check-no-raw-syscall-open.sh` (rejects a bare
 `syscall.Open(` or `unix.Open(` outside `core/internal/lease`),
-`core/scripts/check-sessiontest-imports.sh` (rejects a non-test file
-that imports `core/internal/session/sessiontest`),
+`core/scripts/check-test-support-imports.sh` (rejects a non-test file
+that imports `core/internal/session/sessiontest` or
+`core/internal/driver/drivertest`),
 `core/scripts/check-runfolder-layout/` (a Go program that rejects a
 run folder layout name spelled as a string literal outside
 `core/internal/runfolder`), and `core/scripts/check-schema-fresh.sh` (the schema-freshness gate), plus

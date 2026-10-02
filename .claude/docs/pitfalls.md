@@ -248,7 +248,7 @@ corresponding area. For the high-level map see
 - **Give a test lease helper to `session/sessiontest`, never to a
   production package.** Only `_test.go` files import
   `core/internal/session/sessiontest`, which
-  `core/scripts/check-sessiontest-imports.sh` enforces, so `mcp` keeps no
+  `core/scripts/check-test-support-imports.sh` enforces, so `mcp` keeps no
   direct edge to `lease` in production.
 - **Never fetch from the device for a viewer.** A viewer reads
   `Session.Latest()` and `Session.Subscribe`, which return what the

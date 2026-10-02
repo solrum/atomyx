@@ -304,8 +304,11 @@ the key down.
 interface, which `*lease.Manager` satisfies, so `mcp` does not import
 `lease`. A host test passes a `sessiontest.Leases` from
 `core/internal/session/sessiontest` instead of a manager. Only test
-files import that package, and `core/scripts/check-sessiontest-imports.sh`
-fails the build when a production file does.
+files import that package and `core/internal/driver/drivertest`, and
+`core/scripts/check-test-support-imports.sh` fails the build when a
+production file imports either. The layer rules cannot enforce this,
+because they treat a test file like any other file of its package, so
+the components that import these packages in tests keep the edge.
 
 ## Session ownership
 
@@ -353,6 +356,10 @@ for a host that does not need to split them.
    and the launched-app accessors exactly when the wrapped driver has
    them, and exposes `Unwrap()`. A caller that asserts an optional
    interface uses `driver.As`, which looks through decorators.
+   The `drivertest` contract suite runs over the decorator for each
+   combination of those optional interfaces, using mock-backed test
+   doubles, because the protocol fakes of the real adapters are private
+   to their packages and `session` may not depend on a concrete driver.
 5. Offers the previous driver's launched-app state to the new driver.
    The iOS drivers apply it only when the runner they reached reports the
    same launch id as the one that launched the app. When the new driver

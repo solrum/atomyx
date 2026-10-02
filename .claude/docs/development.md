@@ -54,7 +54,7 @@ the repo-wide lints alongside it, runs these steps in order:
 | Lint gate | `golangci-lint run ./...` (install `v2.13.2`, the version `.golangci.yml` is authored and verified against) |
 | Comment gate | `bash scripts/check-comments.sh` |
 | Raw syscall.Open gate | `bash scripts/check-no-raw-syscall-open.sh` |
-| Session test-helper import gate | `bash scripts/check-sessiontest-imports.sh` |
+| Test-support import gate | `bash scripts/check-test-support-imports.sh` |
 | Run folder layout gate | `go run ./scripts/check-runfolder-layout .` |
 | Schema freshness gate | `bash scripts/check-schema-fresh.sh` |
 | Test | `go test -race ./...` |

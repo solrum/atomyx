@@ -1,6 +1,6 @@
 // Package sessiontest holds helpers that only tests use to exercise a
 // session host. Production code never imports it, which
-// scripts/check-sessiontest-imports.sh enforces.
+// scripts/check-test-support-imports.sh enforces.
 package sessiontest
 
 import (

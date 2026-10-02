@@ -104,8 +104,8 @@ check:
 	bash scripts/check-comments.sh
 	@echo "Raw syscall.Open gate ..."
 	bash scripts/check-no-raw-syscall-open.sh
-	@echo "Session test-helper import gate ..."
-	bash scripts/check-sessiontest-imports.sh
+	@echo "Test-support import gate ..."
+	bash scripts/check-test-support-imports.sh
 	@echo "Run folder layout gate ..."
 	go run ./scripts/check-runfolder-layout .
 	@echo "Schema freshness gate ..."

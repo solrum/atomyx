@@ -516,7 +516,7 @@ func TestIosSimDriver_StreamingTouch_RoutesThroughHid(t *testing.T) {
 		t.Fatalf("Connect() error = %v", err)
 	}
 
-	streaming, ok := iossimdriver.AsStreamingTouchCapable(d)
+	streaming, ok := driver.AsStreamingTouchCapable(d)
 	if !ok {
 		t.Fatal("AsStreamingTouchCapable() = false, want IosSimDriver to satisfy StreamingTouchCapable")
 	}
