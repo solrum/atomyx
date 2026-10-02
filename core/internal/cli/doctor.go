@@ -23,7 +23,14 @@ import (
 // is reachable and healthy or held by another process, 1 when the connection could not be
 // established or the device is reachable but unhealthy, 2 when the
 // command itself was misused (an unknown --platform value).
+//
+// With --migrate-runs, Doctor instead rewrites the flat run records
+// under the run root as run folders and never touches a device. Its
+// exit codes are documented on migrateRuns.
 func Doctor(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
+	if flagBool(flags, migrateRunsFlag) {
+		return migrateRuns(ctx, deps, flags)
+	}
 	stdout := deps.stdout()
 	stderr := deps.stderr()
 

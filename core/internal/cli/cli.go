@@ -89,6 +89,7 @@ DRIVER COMMANDS
   atomyx driver suite [<name>] [--tag <name>] [--glob <pattern>]
   atomyx driver list-devices [--json]
   atomyx driver doctor [--platform <ios|android>] [--device <id>]
+  atomyx driver doctor --migrate-runs [--report-dir <path>] [--json]
 
 MCP SERVER
   The MCP server ships as a separate binary, atomyx-mcp. It speaks

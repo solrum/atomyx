@@ -235,6 +235,7 @@ deps:
       - lease
       - shutdown
       - storageroot
+      - storage
   skills:
     anyVendorDeps: true
   storage:

@@ -132,17 +132,28 @@ FLAGS
                            atomyx driver list-devices.
   --json                   Output the health report as JSON instead
                            of text.
+  --migrate-runs           Instead of a health check, rewrite the flat run
+                           records under the run root as run folders.
+                           Needs no device, is safe to repeat, and exits
+                           1 when a record is damaged or conflicts with
+                           an existing folder. Cannot be combined with
+                           --platform or --device.
+  --report-dir <path>      Run root for --migrate-runs. Defaults to
+                           ATOMYX_STORAGE_DIR, then ~/.atomyx.
   --help, -h               Show this message.
 
 EXAMPLES
   atomyx driver doctor
   atomyx driver doctor --platform ios --device <UDID>
   atomyx driver doctor --json
+  atomyx driver doctor --migrate-runs
+  atomyx driver doctor --migrate-runs --json --report-dir <path>
 
 EXIT CODES
   0    the device is reachable and healthy, or held by another process
   1    the connection could not be established, or the device is
-       reachable but unhealthy
+       reachable but unhealthy, or with
+       --migrate-runs a record is damaged or in conflict
   2    the command was misused
 `)
 	case CommandVersion:
