@@ -38,7 +38,9 @@ var mcpConformanceEpoch = time.Date(2026, time.September, 15, 12, 0, 0, 0, time.
 func newGoMcpClientSession(t *testing.T, ctx context.Context, program *McpDriverProgram) (*mcp.ClientSession, func()) {
 	t.Helper()
 	server := atomcp.NewServer(atomcp.Info{Name: "atomyx-conformance", Version: "0.0.0-test"}, atomcp.ServerDeps{
-		Probe:   device.NewStaticProbe(),
+		Probe: device.NewStaticProbe([]device.Descriptor{
+			{ID: "mock-device-2", Platform: device.PlatformIOS, Kind: device.KindSimulator},
+		}),
 		Factory: &mcpScriptedMockFactory{program: program},
 		Storage: storage.NewInMemoryStorage(),
 		Clock:   orchestra.NewFakeClock(mcpConformanceEpoch.UnixMilli()),
