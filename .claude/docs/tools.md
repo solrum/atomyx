@@ -186,9 +186,12 @@ above). Registration is never auto-discovered, so adding a file under
   A call that is not observe-only also enters the activity gate
   through `DeviceSession.EnterCall` for its whole length. Several calls
   may be inside at once, and a fresh capture of the held session
-  (`session.Controller.FreshTree`) waits for them to end, so it never
-  runs between two device operations of one call. The wait honors the
-  call's context.
+  (`session.Controller.FreshTree`) is refused with `HOLDER_BUSY` while
+  any call is inside, so it never runs between two device operations of
+  one call. A call that arrives during a capture waits for it inside its
+  own tool budget. When the budget elapses first the call fails with
+  `TOOL_TIMEOUT`, and when the caller cancels first it fails with
+  `HOLDER_BUSY`, never with a bare context error.
   The middleware also appends the notices raised during a call
   (`core/internal/mcp/call_notices.go`) as extra text content blocks
   after the tool's own content. `DeviceSession.Ensure` raises one when a

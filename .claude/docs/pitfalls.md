@@ -256,7 +256,9 @@ corresponding area. For the high-level map see
   behalf of a viewer while a run executes interleaves with the run's own
   device calls and slows it.
 - **Take the activity gate around every call that drives the device.** A
-  fresh capture runs only while no tool call is inside the gate. A host
+  fresh capture runs only while no tool call is inside the gate, and
+  `FreshTree` returns `HOLDER_BUSY` instead of waiting when one is. A
+  caller of `FreshTree` retries later and never loops on it. A host
   that drives the device without entering it lets a capture interleave
   with the call and pair a tree with a screenshot from different screens.
   The MCP middleware enters it, so a handler never does, and a new tool

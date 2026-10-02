@@ -131,7 +131,9 @@ type Controller interface {
 	// FreshTree captures a tree and a screenshot back to back, with no
 	// tool call between them, and returns what a viewer would now read
 	// from Latest. The pair is paired and highlightable when the
-	// device reports its screen size. It waits for tool calls inside the
-	// activity gate to end and honors ctx while it waits.
+	// device reports its screen size. It never waits: while any tool
+	// call is inside the activity gate, or another fresh capture holds
+	// it, it returns a diag.CodeHolderBusy error at once, because a
+	// capture taken beside a running call would interleave with it.
 	FreshTree(ctx context.Context) (Snapshot, error)
 }

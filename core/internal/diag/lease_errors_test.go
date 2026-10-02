@@ -17,6 +17,7 @@ func TestLeaseErrors_CodesAndRemedies(t *testing.T) {
 	}{
 		{"held", diag.NewDeviceHeld("pid 7 (atomyx run), running"), diag.CodeDeviceHeld, "pid 7", "Stop that process"},
 		{"released held", diag.NewDeviceReleasedHeld("atomyx run, running"), diag.CodeDeviceReleasedHeld, "atomyx run", "Retry the call shortly"},
+		{"holder busy", diag.NewHolderBusy("a tool call is running"), diag.CodeHolderBusy, "a tool call is running", "ask again"},
 		{"run expired", diag.NewRunExpired("r-1"), diag.CodeRunExpired, "r-1", "Start a new run"},
 	}
 	for _, tt := range tests {

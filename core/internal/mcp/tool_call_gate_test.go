@@ -2,12 +2,14 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"runtime"
 	"testing"
 
 	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/device"
+	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/logging"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -83,7 +85,7 @@ func TestToolCallMiddleware_ACallThatCannotEnterTheGateIsRefusedWithoutRunning(t
 	}
 }
 
-func TestDeviceSession_AFreshCaptureWaitsForAToolCallInFlight(t *testing.T) {
+func TestDeviceSession_AFreshCaptureIsRefusedWhileAToolCallIsInFlight(t *testing.T) {
 	sess := newGateTestSession()
 	t.Cleanup(sess.Close)
 	inCall := make(chan struct{})
@@ -101,26 +103,104 @@ func TestDeviceSession_AFreshCaptureWaitsForAToolCallInFlight(t *testing.T) {
 	}()
 	<-inCall
 
-	captured := make(chan struct{})
-	go func() {
-		release, err := sess.gate.Exclusive(context.Background())
-		if err == nil {
-			release()
-		}
-		close(captured)
-	}()
-	for sess.gate.Waiting() < 1 {
-		runtime.Gosched()
-	}
-	select {
-	case <-captured:
-		t.Fatal("a fresh capture ran while a tool call was in flight")
-	default:
+	if release, ok := sess.gate.TryExclusive(); ok {
+		release()
+		t.Fatal("a fresh capture was admitted while a tool call was in flight")
 	}
 
 	close(finish)
 	<-callDone
-	<-captured
+	release, ok := sess.gate.TryExclusive()
+	if !ok {
+		t.Fatal("a fresh capture was refused after the tool call ended")
+	}
+	release()
+}
+
+func errorResultCode(t *testing.T, result mcp.Result) string {
+	t.Helper()
+	toolResult, ok := result.(*mcp.CallToolResult)
+	if !ok || !toolResult.IsError || len(toolResult.Content) != 1 {
+		t.Fatalf("result = %+v, want one error content block", result)
+	}
+	var payload struct {
+		Code string `json:"code"`
+	}
+	text := toolResult.Content[0].(*mcp.TextContent).Text
+	if err := json.Unmarshal([]byte(text), &payload); err != nil {
+		t.Fatalf("result text %q is not a coded payload: %v", text, err)
+	}
+	return payload.Code
+}
+
+func TestToolCallMiddleware_TheWaitForTheGateCountsAgainstTheCallBudget(t *testing.T) {
+	sess := newGateTestSession()
+	t.Cleanup(sess.Close)
+	capture, ok := sess.gate.TryExclusive()
+	if !ok {
+		t.Fatal("TryExclusive refused on a free gate")
+	}
+	defer capture()
+	clk := clock.NewManualClock(0)
+	ran := false
+	next := func(context.Context, string, mcp.Request) (mcp.Result, error) {
+		ran = true
+		return &mcp.CallToolResult{}, nil
+	}
+	handler := newToolCallMiddleware(logging.NoopLogger{}, clk, sess, sess, newToolTraits())(next)
+
+	type outcome struct {
+		result mcp.Result
+		err    error
+	}
+	done := make(chan outcome, 1)
+	go func() {
+		result, err := handler(context.Background(), toolCallMethod, toolCallRequest("tap"))
+		done <- outcome{result, err}
+	}()
+	for sess.gate.Waiting() < 1 {
+		runtime.Gosched()
+	}
+	clk.AwaitSleepers(1)
+	clk.Advance(int64(defaultToolTimeoutMs))
+
+	got := <-done
+	if got.err != nil {
+		t.Fatal(got.err)
+	}
+	if code := errorResultCode(t, got.result); code != diag.CodeToolTimeout {
+		t.Fatalf("code = %q, want %q for a wait that outlasted the budget", code, diag.CodeToolTimeout)
+	}
+	if ran {
+		t.Fatal("the tool ran although it never entered the gate")
+	}
+}
+
+func TestToolCallMiddleware_ACallCanceledWhileItWaitsForTheGateReportsACodedError(t *testing.T) {
+	sess := newGateTestSession()
+	t.Cleanup(sess.Close)
+	capture, _ := sess.gate.TryExclusive()
+	defer capture()
+	next := func(context.Context, string, mcp.Request) (mcp.Result, error) {
+		t.Fatal("the tool ran although it never entered the gate")
+		return nil, nil
+	}
+	handler := newToolCallMiddleware(logging.NoopLogger{}, clock.NewManualClock(0), sess, sess, newToolTraits())(next)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan mcp.Result, 1)
+	go func() {
+		result, _ := handler(ctx, toolCallMethod, toolCallRequest("tap"))
+		done <- result
+	}()
+	for sess.gate.Waiting() < 1 {
+		runtime.Gosched()
+	}
+	cancel()
+
+	if code := errorResultCode(t, <-done); code != diag.CodeHolderBusy {
+		t.Fatalf("code = %q, want %q, never UNKNOWN from a bare context error", code, diag.CodeHolderBusy)
+	}
 }
 
 func equalStrings(a, b []string) bool {

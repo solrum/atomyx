@@ -112,6 +112,11 @@ const (
 	// still holding open. The condition is temporary, so the same call
 	// succeeds once the run finishes.
 	CodeRunBusy = "RUN_BUSY"
+	// CodeHolderBusy means a request needed the process that holds the
+	// device to be free of other work, and it was running a tool call or
+	// a capture. The condition is temporary, so the same request
+	// succeeds once that work ends.
+	CodeHolderBusy = "HOLDER_BUSY"
 )
 
 // Coded is implemented by an error that carries a stable code and an

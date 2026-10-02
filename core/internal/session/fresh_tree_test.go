@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"dev.atomyx/internal/device"
+	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/driver"
 	mockdriver "dev.atomyx/internal/driver/mock"
 	"dev.atomyx/internal/orchestra"
@@ -144,7 +145,7 @@ func openWithGate(t *testing.T) (*session.Session, *session.ActivityGate) {
 	return s, gate
 }
 
-func TestFreshTree_WaitsWhileAToolCallHoldsTheGate(t *testing.T) {
+func TestFreshTree_RefusesAtOnceWhileAToolCallHoldsTheGate(t *testing.T) {
 	s, gate := openWithGate(t)
 	events, err := s.Subscribe(context.Background())
 	if err != nil {
@@ -155,18 +156,19 @@ func TestFreshTree_WaitsWhileAToolCallHoldsTheGate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	done := make(chan error, 1)
-	go func() {
-		_, err := s.FreshTree(context.Background())
-		done <- err
-	}()
-	awaitWaiting(gate, 1)
+	_, err = s.FreshTree(context.Background())
+	if code, _, remedy := diag.Describe(err); code != diag.CodeHolderBusy || remedy == "" {
+		t.Fatalf("FreshTree error = %v, want a HOLDER_BUSY error with a remedy", err)
+	}
+	if gate.Waiting() != 0 {
+		t.Fatal("FreshTree waited at the gate instead of refusing")
+	}
 	if got := collectKinds(t, events); len(got) != 0 {
 		t.Fatalf("FreshTree captured %v while a tool call held the gate", got)
 	}
 
 	endCall()
-	if err := <-done; err != nil {
+	if _, err := s.FreshTree(context.Background()); err != nil {
 		t.Fatalf("FreshTree after the call ended: %v", err)
 	}
 	if got := collectKinds(t, events); len(got) == 0 {
@@ -174,31 +176,26 @@ func TestFreshTree_WaitsWhileAToolCallHoldsTheGate(t *testing.T) {
 	}
 }
 
-func TestFreshTree_HonorsContextCancellationWhileWaiting(t *testing.T) {
+func TestFreshTree_RefusesWhileAnotherFreshCaptureHoldsTheGate(t *testing.T) {
 	s, gate := openWithGate(t)
-	events, err := s.Subscribe(context.Background())
-	if err != nil {
-		t.Fatal(err)
+	release, ok := gate.TryExclusive()
+	if !ok {
+		t.Fatal("TryExclusive refused on a free gate")
 	}
-	endCall, err := gate.Enter(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer endCall()
+	defer release()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan error, 1)
-	go func() {
-		_, err := s.FreshTree(ctx)
-		done <- err
-	}()
-	awaitWaiting(gate, 1)
-	cancel()
-	if err := <-done; !errors.Is(err, context.Canceled) {
-		t.Fatalf("FreshTree error = %v, want context.Canceled", err)
+	_, err := s.FreshTree(context.Background())
+	if code, _, _ := diag.Describe(err); code != diag.CodeHolderBusy {
+		t.Fatalf("FreshTree error = %v, want HOLDER_BUSY", err)
 	}
-	if got := collectKinds(t, events); len(got) != 0 {
-		t.Fatalf("a canceled FreshTree captured %v", got)
+}
+
+func TestFreshTree_ReturnsTheContextErrorOfAnEndedContext(t *testing.T) {
+	s, _ := openWithGate(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := s.FreshTree(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("FreshTree error = %v, want context.Canceled", err)
 	}
 }
 

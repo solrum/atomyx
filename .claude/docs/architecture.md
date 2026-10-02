@@ -434,11 +434,15 @@ the inspector takes the interface, never `*Session`.
 
 `FreshTree` takes the session's `session.ActivityGate` alone, and the MCP
 tool-call middleware enters the same gate around every tool that is not
-observe-only. Calls share the gate with each other. A fresh capture waits
-for the calls inside to end and holds back later calls while it waits.
-Both waits honor their context. A host that outlives its sessions, such
-as `DeviceSession`, passes one gate in `session.Request.Gate` to every
-`Open`, so the exclusion holds across a re-acquire.
+observe-only. Calls share the gate with each other. A fresh capture never
+waits: while any call is inside the gate, or another fresh capture holds
+it, `FreshTree` returns a `HOLDER_BUSY` error at once, because the holder
+is working and a capture beside a running call would interleave with it.
+A call that arrives while a capture holds the gate waits for that one
+capture, and the wait counts against the call's tool budget. A host that
+outlives its sessions, such as `DeviceSession`, passes one gate in
+`session.Request.Gate` to every `Open`, so the exclusion holds across a
+re-acquire.
 
 `session` may depend on `device`, `lease`, `diag`, `orchestra`, `driver`,
 `shutdown` and the common leaves. It never imports `mcp`, `cli` or

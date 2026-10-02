@@ -174,6 +174,7 @@ type callGate interface {
 //     a re-acquire, are appended to its result.
 //  5. A tool that is not observe-only enters gate for the whole call,
 //     so a fresh capture of the held session never interleaves with it.
+//     The wait to enter counts against the call's budget.
 func newToolCallMiddleware(logger logging.Logger, clk clock.Clock, sess *DeviceSession, gate callGate, traits *toolTraits) mcp.Middleware {
 	return func(next mcp.MethodHandler) mcp.MethodHandler {
 		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
@@ -189,10 +190,17 @@ func newToolCallMiddleware(logger logging.Logger, clk clock.Clock, sess *DeviceS
 				return invalidArgumentsResult(params.Name, verr), nil
 			}
 
+			budgetMs, declaredBudgetMs := resolveToolTimeoutBudget(params.Arguments)
+			callCtx, stop := newBudgetContext(ctx, clk, int64(budgetMs))
+			defer stop()
+			startedAt := clk.NowMs()
+
 			if !traits.isObserveOnly(params.Name) {
-				release, err := gate.EnterCall(ctx)
+				release, err := gate.EnterCall(callCtx)
 				if err != nil {
-					return errorResult(err), nil
+					return gateWaitResult(callCtx, err, func() *mcp.CallToolResult {
+						return timeoutResult(logger, clk, params.Name, startedAt, budgetMs, declaredBudgetMs)
+					}), nil
 				}
 				defer release()
 				if err := sess.BeginCall(params.Name); err != nil {
@@ -201,11 +209,6 @@ func newToolCallMiddleware(logger logging.Logger, clk clock.Clock, sess *DeviceS
 				defer sess.EndCall() //nolint:contextcheck // idle timers outlive any call, so they take no call context
 			}
 
-			budgetMs, declaredBudgetMs := resolveToolTimeoutBudget(params.Arguments)
-			callCtx, stop := newBudgetContext(ctx, clk, int64(budgetMs))
-			defer stop()
-
-			startedAt := clk.NowMs()
 			noticeCtx, notices := withCallNotices(withProgress(callCtx, req, params))
 			result, err := next(noticeCtx, method, req)
 			if !errors.Is(callCtx.Err(), context.DeadlineExceeded) {
@@ -216,27 +219,50 @@ func newToolCallMiddleware(logger logging.Logger, clk clock.Clock, sess *DeviceS
 				return result, err
 			}
 
-			elapsedMs := clk.NowMs() - startedAt
-			var declaredOut *int64
-			if declaredBudgetMs != nil {
-				d := int64(*declaredBudgetMs)
-				declaredOut = &d
-			}
-			if logger != nil {
-				logger.Warn("tool.timeout", logging.LogContext{
-					"tool":       params.Name,
-					"durationMs": elapsedMs,
-					"budgetMs":   int64(budgetMs),
-				})
-			}
-			return toolTimeoutResult(toolTimeoutPayload{
-				Code:             diag.CodeToolTimeout,
-				Tool:             params.Name,
-				ElapsedMs:        elapsedMs,
-				BudgetMs:         int64(budgetMs),
-				DeclaredBudgetMs: declaredOut,
-				Hint:             toolTimeoutHint,
-			}), nil
+			return timeoutResult(logger, clk, params.Name, startedAt, budgetMs, declaredBudgetMs), nil
 		}
+	}
+}
+
+// timeoutResult logs and builds the TOOL_TIMEOUT result of a call whose
+// budget elapsed.
+func timeoutResult(logger logging.Logger, clk clock.Clock, tool string, startedAt int64, budgetMs float64, declaredBudgetMs *float64) *mcp.CallToolResult {
+	elapsedMs := clk.NowMs() - startedAt
+	var declaredOut *int64
+	if declaredBudgetMs != nil {
+		d := int64(*declaredBudgetMs)
+		declaredOut = &d
+	}
+	if logger != nil {
+		logger.Warn("tool.timeout", logging.LogContext{
+			"tool":       tool,
+			"durationMs": elapsedMs,
+			"budgetMs":   int64(budgetMs),
+		})
+	}
+	return toolTimeoutResult(toolTimeoutPayload{
+		Code:             diag.CodeToolTimeout,
+		Tool:             tool,
+		ElapsedMs:        elapsedMs,
+		BudgetMs:         int64(budgetMs),
+		DeclaredBudgetMs: declaredOut,
+		Hint:             toolTimeoutHint,
+	})
+}
+
+// gateWaitResult maps the failure of a wait at the activity gate to a
+// coded result. The wait counts against the call's budget, so an
+// elapsed budget reports TOOL_TIMEOUT like any other call that ran out
+// of time, and a call canceled while it waited reports HOLDER_BUSY,
+// because the only thing it waited for was a fresh capture of the
+// device. Neither leaks a bare context error.
+func gateWaitResult(callCtx context.Context, err error, timedOut func() *mcp.CallToolResult) *mcp.CallToolResult {
+	switch {
+	case errors.Is(callCtx.Err(), context.DeadlineExceeded):
+		return timedOut()
+	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+		return errorResult(diag.NewHolderBusy("a fresh capture held the device while this call waited, and the call was canceled"))
+	default:
+		return errorResult(err)
 	}
 }

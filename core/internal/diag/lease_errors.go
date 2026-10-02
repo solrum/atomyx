@@ -30,6 +30,18 @@ func NewDeviceReleasedHeld(holder string) error {
 	)
 }
 
+// NewHolderBusy builds the CodeHolderBusy error for a request that finds
+// the device holder in the middle of other work. work names that work,
+// for example "a tool call is running".
+func NewHolderBusy(work string) error {
+	return New(
+		CodeHolderBusy,
+		fmt.Sprintf("the device holder is busy: %s", work),
+		"Wait for that work to finish, then ask again.",
+		nil,
+	)
+}
+
 // NewRunExpired builds the CodeRunExpired error for a tool call on a
 // run that the open-run idle timeout already closed.
 func NewRunExpired(runID string) error {

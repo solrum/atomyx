@@ -28,81 +28,82 @@ func TestActivityGate_ToolCallsShareTheGate(t *testing.T) {
 	first()
 	second()
 	second()
-	exclusive, err := g.Exclusive(context.Background())
-	if err != nil {
-		t.Fatalf("Exclusive after every call left and a repeated release: %v", err)
+	exclusive, ok := g.TryExclusive()
+	if !ok {
+		t.Fatal("TryExclusive refused after every call left and a repeated release")
 	}
 	exclusive()
 }
 
-func TestActivityGate_ExclusiveWaitsForCallsInsideAndHoldsBackLaterCalls(t *testing.T) {
+func TestActivityGate_TryExclusiveRefusesAtOnceWhileACallIsInsideOrACaptureHoldsTheGate(t *testing.T) {
 	g := session.NewActivityGate()
 	inside, err := g.Enter(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, ok := g.TryExclusive(); ok {
+		t.Fatal("TryExclusive was admitted while a call was inside")
+	}
+	if g.Waiting() != 0 {
+		t.Fatalf("Waiting() = %d, want a refused TryExclusive not to wait", g.Waiting())
+	}
+	inside()
 
-	exclusiveReady := make(chan func(), 1)
+	release, ok := g.TryExclusive()
+	if !ok {
+		t.Fatal("TryExclusive refused on a free gate")
+	}
+	if _, ok := g.TryExclusive(); ok {
+		t.Fatal("a second TryExclusive was admitted while one held the gate")
+	}
+	release()
+	release()
+	if again, ok := g.TryExclusive(); !ok {
+		t.Fatal("TryExclusive refused after the capture released")
+	} else {
+		again()
+	}
+}
+
+func TestActivityGate_ACallWaitsForACaptureToEnd(t *testing.T) {
+	g := session.NewActivityGate()
+	capture, ok := g.TryExclusive()
+	if !ok {
+		t.Fatal("TryExclusive refused on a free gate")
+	}
+
+	entered := make(chan func(), 1)
 	go func() {
-		release, _ := g.Exclusive(context.Background())
-		exclusiveReady <- release
+		release, _ := g.Enter(context.Background())
+		entered <- release
 	}()
 	awaitWaiting(g, 1)
 	select {
-	case <-exclusiveReady:
-		t.Fatal("Exclusive was admitted while a call was inside")
+	case <-entered:
+		t.Fatal("a call entered while a capture held the gate")
 	default:
 	}
 
-	lateReady := make(chan func(), 1)
-	go func() {
-		release, _ := g.Enter(context.Background())
-		lateReady <- release
-	}()
-	awaitWaiting(g, 2)
-	select {
-	case <-lateReady:
-		t.Fatal("a call entered ahead of a waiting Exclusive")
-	default:
-	}
-
-	inside()
-	releaseExclusive := <-exclusiveReady
-	select {
-	case <-lateReady:
-		t.Fatal("a call entered while Exclusive held the gate")
-	default:
-	}
-	releaseExclusive()
-	(<-lateReady)()
+	capture()
+	(<-entered)()
 }
 
-func TestActivityGate_WaitersHonorTheirContext(t *testing.T) {
+func TestActivityGate_AWaitingCallHonorsItsContext(t *testing.T) {
 	g := session.NewActivityGate()
-	inside, err := g.Enter(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
+	capture, _ := g.TryExclusive()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() {
-		_, err := g.Exclusive(ctx)
+		_, err := g.Enter(ctx)
 		done <- err
 	}()
 	awaitWaiting(g, 1)
 	cancel()
 	if err := <-done; !errors.Is(err, context.Canceled) {
-		t.Fatalf("Exclusive error = %v, want context.Canceled", err)
+		t.Fatalf("Enter error = %v, want context.Canceled", err)
 	}
-
-	// The canceled waiter no longer holds back later calls.
-	another, err := g.Enter(context.Background())
-	if err != nil {
-		t.Fatalf("Enter after the waiter gave up: %v", err)
-	}
-	another()
-	inside()
+	capture()
 	if g.Waiting() != 0 {
 		t.Fatalf("Waiting() = %d, want none", g.Waiting())
 	}
@@ -114,8 +115,5 @@ func TestActivityGate_AnEndedContextNeverEntersAFreeGate(t *testing.T) {
 	cancel()
 	if _, err := g.Enter(ctx); !errors.Is(err, context.Canceled) {
 		t.Fatalf("Enter error = %v, want context.Canceled", err)
-	}
-	if _, err := g.Exclusive(ctx); !errors.Is(err, context.Canceled) {
-		t.Fatalf("Exclusive error = %v, want context.Canceled", err)
 	}
 }

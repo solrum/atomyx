@@ -7,16 +7,17 @@ import (
 
 // ActivityGate keeps a fresh capture from interleaving with a tool call.
 // Any number of tool calls may be inside the gate at once, because a
-// host may run several, but a fresh capture holds it alone: it waits
-// for the calls inside to end, and calls that arrive meanwhile wait for
-// it. Waiting honors the caller's context.
+// host may run several. A fresh capture holds the gate alone, and it
+// never waits for it: TryExclusive refuses while any call is inside or
+// another capture holds the gate. A call that arrives while a capture
+// holds the gate waits for the capture to end, which is bounded by one
+// capture, and honors the caller's context while it waits.
 type ActivityGate struct {
-	mu           sync.Mutex
-	inside       int
-	exclusive    bool
-	waiting      int
-	waitingAlone int
-	changed      chan struct{}
+	mu        sync.Mutex
+	inside    int
+	exclusive bool
+	waiting   int
+	changed   chan struct{}
 }
 
 // NewActivityGate returns an open gate.
@@ -28,14 +29,34 @@ func NewActivityGate() *ActivityGate {
 // returns the context error without admitting the call when ctx ends
 // first, and a ctx that already ended never enters a free gate.
 func (g *ActivityGate) Enter(ctx context.Context) (release func(), err error) {
-	return g.acquire(ctx, false)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	g.mu.Lock()
+	if g.exclusive {
+		if err := g.waitLocked(ctx); err != nil {
+			g.mu.Unlock()
+			return nil, err
+		}
+	}
+	g.inside++
+	g.mu.Unlock()
+	var once sync.Once
+	return func() { once.Do(g.leave) }, nil
 }
 
-// Exclusive admits the caller alone and returns the function that ends
-// it. It waits for every call inside to end, and holds back later calls
-// while it waits, so a steady stream of calls cannot starve it.
-func (g *ActivityGate) Exclusive(ctx context.Context) (release func(), err error) {
-	return g.acquire(ctx, true)
+// TryExclusive admits the caller alone when no tool call is inside and
+// no other caller holds the gate, and reports false at once otherwise.
+// The returned function ends the admission.
+func (g *ActivityGate) TryExclusive() (release func(), ok bool) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.exclusive || g.inside > 0 {
+		return nil, false
+	}
+	g.exclusive = true
+	var once sync.Once
+	return func() { once.Do(g.leaveExclusive) }, true
 }
 
 // Waiting reports how many callers are blocked at the gate.
@@ -45,41 +66,12 @@ func (g *ActivityGate) Waiting() int {
 	return g.waiting
 }
 
-func (g *ActivityGate) acquire(ctx context.Context, alone bool) (func(), error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	g.mu.Lock()
-	if !g.admitsLocked(alone) {
-		if err := g.waitLocked(ctx, alone); err != nil {
-			g.mu.Unlock()
-			return nil, err
-		}
-	}
-	if alone {
-		g.exclusive = true
-	} else {
-		g.inside++
-	}
-	g.mu.Unlock()
-	var once sync.Once
-	return func() { once.Do(func() { g.leave(alone) }) }, nil
-}
-
-// waitLocked blocks until the caller is admitted or ctx ends. It is
+// waitLocked blocks until no capture holds the gate or ctx ends. It is
 // called and returns with g.mu held.
-func (g *ActivityGate) waitLocked(ctx context.Context, alone bool) error {
+func (g *ActivityGate) waitLocked(ctx context.Context) error {
 	g.waiting++
-	if alone {
-		g.waitingAlone++
-	}
-	defer func() {
-		g.waiting--
-		if alone {
-			g.waitingAlone--
-		}
-	}()
-	for !g.admitsLocked(alone) {
+	defer func() { g.waiting-- }()
+	for g.exclusive {
 		changed := g.changed
 		g.mu.Unlock()
 		select {
@@ -87,38 +79,22 @@ func (g *ActivityGate) waitLocked(ctx context.Context, alone bool) error {
 			g.mu.Lock()
 		case <-ctx.Done():
 			g.mu.Lock()
-			g.broadcastLocked()
 			return ctx.Err()
 		}
 	}
 	return nil
 }
 
-// admitsLocked reports whether a caller may enter now. A shared caller
-// yields to a waiting exclusive one.
-func (g *ActivityGate) admitsLocked(alone bool) bool {
-	switch {
-	case g.exclusive:
-		return false
-	case alone:
-		return g.inside == 0
-	default:
-		return g.waitingAlone == 0
-	}
-}
-
-func (g *ActivityGate) leave(alone bool) {
+func (g *ActivityGate) leave() {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	if alone {
-		g.exclusive = false
-	} else {
-		g.inside--
-	}
-	g.broadcastLocked()
+	g.inside--
 }
 
-func (g *ActivityGate) broadcastLocked() {
+func (g *ActivityGate) leaveExclusive() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.exclusive = false
 	close(g.changed)
 	g.changed = make(chan struct{})
 }

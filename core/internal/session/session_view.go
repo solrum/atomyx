@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/lease"
 )
 
@@ -45,9 +46,12 @@ func (s *Session) Gate() *ActivityGate { return s.gate }
 
 // FreshTree implements Controller.
 func (s *Session) FreshTree(ctx context.Context) (Snapshot, error) {
-	release, err := s.gate.Exclusive(ctx)
-	if err != nil {
+	if err := ctx.Err(); err != nil {
 		return Snapshot{}, err
+	}
+	release, ok := s.gate.TryExclusive()
+	if !ok {
+		return Snapshot{}, diag.NewHolderBusy("a tool call or another fresh capture is running")
 	}
 	defer release()
 	select {
