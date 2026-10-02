@@ -23,6 +23,9 @@
 //   - Readers accept any schemaVersion up to SchemaVersion and ignore
 //     unknown fields. Writers never reshape a field within a major
 //     version.
+//   - Run migration and every edit of a run record serialize on the
+//     migrate lock under the runs directory. A migration takes it
+//     exclusively and an editor takes it shared without waiting.
 //   - The run id carries no format constraint, because a run migrated
 //     from a flat record keeps its original id.
 //   - A Writer holds an exclusive lock on run.lock while its run is

@@ -72,3 +72,26 @@ func TestSameFile_DetectsReplacement(t *testing.T) {
 		t.Fatal("replaced path reported same")
 	}
 }
+
+func TestTryShared_SharesWithSharedAndExcludesExclusive(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "x.lock")
+	a, b, c := openLockFile(t, path), openLockFile(t, path), openLockFile(t, path)
+
+	if err := TryShared(a); err != nil {
+		t.Fatalf("first shared: %v", err)
+	}
+	if err := TryShared(b); err != nil {
+		t.Fatalf("second shared: %v", err)
+	}
+	if err := TryExclusive(c); !IsContended(err) {
+		t.Fatalf("exclusive against shared = %v, want contended", err)
+	}
+	_ = Unlock(a)
+	_ = Unlock(b)
+	if err := Exclusive(c); err != nil {
+		t.Fatalf("blocking exclusive on a free file: %v", err)
+	}
+	if err := TryShared(a); !IsContended(err) {
+		t.Fatalf("shared against exclusive = %v, want contended", err)
+	}
+}

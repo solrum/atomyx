@@ -17,6 +17,15 @@ const (
 	ConsoleFileName       = "console.log"
 	InterventionsFileName = "interventions.jsonl"
 
+	// MigrateLockFileName is the file under the runs directory that
+	// serializes run migration against edits of run records.
+	MigrateLockFileName = ".migrate.lock"
+
+	// importTempPrefix names the scratch folders an import builds a run
+	// in before renaming it into place. Listings never treat one as a
+	// run.
+	importTempPrefix = ".import-"
+
 	// LockFileName is the file a live writer holds an exclusive lock on
 	// for the whole life of its run.
 	LockFileName = "run.lock"
@@ -65,4 +74,10 @@ func LooseScreenshotsDir(root string) string {
 // LockPath returns the lock file of a run folder.
 func LockPath(runDir string) string {
 	return filepath.Join(runDir, LockFileName)
+}
+
+// MigrateLockPath returns the lock file that serializes run migration
+// against edits of run records under root.
+func MigrateLockPath(root string) string {
+	return filepath.Join(RunsDir(root), MigrateLockFileName)
 }
