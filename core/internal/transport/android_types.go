@@ -87,6 +87,7 @@ type AndroidTreeNode struct {
 	Checkable   *bool             `json:"checkable,omitempty"`
 	Checked     *bool             `json:"checked,omitempty"`
 	Visible     *bool             `json:"visible,omitempty"`
+	IsPassword  bool              `json:"isPassword,omitempty"`
 	IsIme       bool              `json:"isIme"`
 	Children    []AndroidTreeNode `json:"children"`
 }

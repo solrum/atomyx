@@ -258,6 +258,9 @@ class UiTreeService(
         // (e.g. "Email", "Search products"). Cross-platform selector
         // key: `hint`.
         val hint = node.hintText?.toString()
+        // Platform signal that the node holds a secret such as a password
+        // input. Serialized only when true so ordinary nodes are unchanged.
+        val password = passwordMarker(node.isPassword)
 
         // Walk children first so we can decide whether to retain non-interesting parents
         val children = mutableListOf<RawElementDto>()
@@ -325,6 +328,7 @@ class UiTreeService(
             checkable = checkable,
             checked = checked,
             visible = visible,
+            isPassword = password,
             children = children,
         )
     }
@@ -379,6 +383,10 @@ data class RawElementDto(
     val checkable: Boolean = false,
     val checked: Boolean = false,
     val visible: Boolean = true,
+    // True when the node holds a secret such as a password input. Null
+    // (omitted from the serialized tree) otherwise, so the host decoder
+    // reads an absent field as false.
+    val isPassword: Boolean? = null,
     // Set on the TOP-LEVEL DTO of an IME window subtree by dumpTree().
     // Lets host-side `findKeyboardNode(tree)` locate the keyboard
     // without a separate RPC. Descendants of the IME root inherit
@@ -386,6 +394,9 @@ data class RawElementDto(
     var isIme: Boolean = false,
     val children: MutableList<RawElementDto> = mutableListOf(),
 )
+
+/** Maps the platform password flag to the serialized marker: true, or null so the field is omitted. */
+internal fun passwordMarker(isPassword: Boolean): Boolean? = if (isPassword) true else null
 
 data class BoundsDto(val left: Int, val top: Int, val right: Int, val bottom: Int)
 

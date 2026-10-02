@@ -370,8 +370,8 @@ type WaitForInputCommittedOptions struct {
 // AnchorBounds accepted Expected, picking a role-appropriate
 // postcondition:
 //
-//   - A secure text field renders masked characters, never the
-//     original text, so it is verified by character count: typing N
+//   - A secure node (see IsSecure) renders masked characters, never
+//     the original text, so it is verified by character count: typing N
 //     characters must render N masked characters.
 //   - Every other input role is verified by exact string match.
 //
@@ -452,9 +452,8 @@ func areaOf(c *TreeCursor) float64 {
 func matchesInputExpectation(cursor *TreeCursor, expected string, expectedLength int) bool {
 	actual := cursor.Node.Attributes[AttrText]
 	label := cursor.Node.Attributes[AttrLabel]
-	role := cursor.Node.Attributes[AttrRole]
 
-	if role == RoleSecureTextField {
+	if IsSecure(cursor.Node) {
 		if utf8.RuneCountInString(actual) == expectedLength {
 			return true
 		}

@@ -123,6 +123,9 @@ func NormalizeAndroidTree(raw transport.AndroidTreeNode) wire.TreeNodeWire {
 	if raw.IsIme {
 		attributes["ext:isIme"] = "true"
 	}
+	if raw.IsPassword {
+		attributes[wire.AttrSecure] = wire.AttrSecureTrue
+	}
 
 	children := make([]wire.TreeNodeWire, 0, len(raw.Children))
 	for _, c := range raw.Children {

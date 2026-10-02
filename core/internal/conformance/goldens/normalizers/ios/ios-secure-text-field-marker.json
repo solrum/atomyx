@@ -1,0 +1,34 @@
+{
+  "attributes": {
+    "class": "other",
+    "role": "other"
+  },
+  "children": [
+    {
+      "attributes": {
+        "class": "secureTextField",
+        "id": "password",
+        "label": "Password",
+        "role": "secure-text-field",
+        "secure": "true",
+        "text": "•••••",
+        "value": "•••••"
+      },
+      "children": [],
+      "clickable": true
+    },
+    {
+      "attributes": {
+        "class": "textField",
+        "id": "email",
+        "label": "Email",
+        "role": "text-field",
+        "text": "a@b.co",
+        "value": "a@b.co"
+      },
+      "children": [],
+      "clickable": true
+    }
+  ],
+  "clickable": false
+}

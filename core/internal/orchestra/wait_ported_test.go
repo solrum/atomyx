@@ -81,23 +81,29 @@ func TestMatchesInputExpectation(t *testing.T) {
 		name           string
 		actual, label  string
 		role           string
+		secure         bool
 		expected       string
 		expectedLength int
 		want           bool
 	}{
-		{"exact-match-text-field", "hello", "", RoleTextField, "hello", 5, true},
-		{"typed-change-fallback-text-field", "h", "Placeholder", RoleTextField, "hello", 5, true},
-		{"no-change-text-field", "Placeholder", "Placeholder", RoleTextField, "hello", 5, false},
-		{"secure-field-exact-mask-count", "•••••", "", RoleSecureTextField, "hello", 5, true},
-		{"secure-field-weak-typed-change", "••", "Password", RoleSecureTextField, "hello", 5, true},
-		{"secure-field-no-change", "Password", "Password", RoleSecureTextField, "hello", 5, false},
-		{"secure-field-empty", "", "Password", RoleSecureTextField, "hello", 5, false},
+		{"exact-match-text-field", "hello", "", RoleTextField, false, "hello", 5, true},
+		{"typed-change-fallback-text-field", "h", "Placeholder", RoleTextField, false, "hello", 5, true},
+		{"no-change-text-field", "Placeholder", "Placeholder", RoleTextField, false, "hello", 5, false},
+		{"android-password-exact-mask-count", "•••••", "", RoleTextField, true, "hello", 5, true},
+		{"android-password-weak-typed-change", "••", "Password", RoleTextField, true, "hello", 5, true},
+		{"android-password-no-change", "Password", "Password", RoleTextField, true, "hello", 5, false},
+		{"android-password-empty", "", "Password", RoleTextField, true, "hello", 5, false},
+		{"ios-secure-exact-mask-count", "•••••", "", RoleSecureTextField, true, "hello", 5, true},
+		{"ios-secure-no-change", "Password", "Password", RoleSecureTextField, true, "hello", 5, false},
+		{"role-without-attribute-uses-exact-match", "•••••", "", RoleSecureTextField, false, "hello", 5, true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			cursor := &TreeCursor{Node: wire.TreeNodeWire{Attributes: map[string]string{
-				AttrText: tc.actual, AttrLabel: tc.label, AttrRole: tc.role,
-			}}}
+			attrs := map[string]string{AttrText: tc.actual, AttrLabel: tc.label, AttrRole: tc.role}
+			if tc.secure {
+				attrs[AttrSecure] = wire.AttrSecureTrue
+			}
+			cursor := &TreeCursor{Node: wire.TreeNodeWire{Attributes: attrs}}
 			if got := matchesInputExpectation(cursor, tc.expected, tc.expectedLength); got != tc.want {
 				t.Fatalf("matchesInputExpectation() = %v, want %v", got, tc.want)
 			}
@@ -287,16 +293,22 @@ func TestWaitForInputCommitted_ExactMatchOnTextField(t *testing.T) {
 }
 
 func TestWaitForInputCommitted_SecureFieldVerifiesByMaskedCount(t *testing.T) {
-	d := mock.New()
-	d.StageHierarchy(node("root", "", "0,0,430,932", nodeWithRole("field", "•••••", RoleSecureTextField, "10,10,110,50")))
-	clock := NewFakeClock(0)
+	for _, role := range []string{RoleSecureTextField, RoleTextField} {
+		t.Run(role, func(t *testing.T) {
+			d := mock.New()
+			field := nodeWithRole("field", "•••••", role, "10,10,110,50")
+			field.Attributes[AttrSecure] = wire.AttrSecureTrue
+			d.StageHierarchy(node("root", "", "0,0,430,932", field))
+			clock := NewFakeClock(0)
 
-	_, err := WaitForInputCommitted(context.Background(), WaitForInputCommittedOptions{
-		Driver: d, AnchorBounds: wire.Bounds{Left: 10, Top: 10, Right: 110, Bottom: 50}, Expected: "hello",
-		Clock: clock, TimeoutMs: 500, IntervalMs: 50,
-	})
-	if err != nil {
-		t.Fatalf("WaitForInputCommitted returned error: %v", err)
+			_, err := WaitForInputCommitted(context.Background(), WaitForInputCommittedOptions{
+				Driver: d, AnchorBounds: wire.Bounds{Left: 10, Top: 10, Right: 110, Bottom: 50}, Expected: "hello",
+				Clock: clock, TimeoutMs: 500, IntervalMs: 50,
+			})
+			if err != nil {
+				t.Fatalf("WaitForInputCommitted returned error: %v", err)
+			}
+		})
 	}
 }
 

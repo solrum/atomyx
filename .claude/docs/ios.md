@@ -396,6 +396,12 @@ data path, `RUN_DERIVED`, which defaults to `build/run-<udid>`.
 
 ## Platform-specific quirks
 
+**A secure text field carries the `secure` attribute and keeps the
+role `secure-text-field`.** The runner reports the element type
+`secureTextField`, and the normalizer sets `attributes["secure"] =
+"true"` for it, so `iossimdriver` inherits it through `iosdriver`.
+`orchestra.IsSecure` is the only reader of the attribute.
+
 **A runner that exits on its own moves the session to lost.** The
 provisioner supervises the `xcodebuild` process that hosts the runner
 and, for a physical iPhone, the `iproxy` tunnel. When either exits

@@ -190,6 +190,13 @@ has no per-touch pressure API at any current Android level.
 permanently `false`. `/ping` reports it, and the driver rejects
 pressure waypoints before dispatch.
 
+**A password input carries the `secure` attribute, not a distinct
+role.** The agent reports `AccessibilityNodeInfo.isPassword` as
+`isPassword` on a tree node, and only when it is true. The driver
+normalizer turns it into `attributes["secure"] = "true"` and keeps the
+role `text-field`. `orchestra.IsSecure` is the only reader of the
+attribute.
+
 **Multi-pointer gestures dispatch one time segment per
 `GestureDescription`, one continued stroke per pointer.**
 `GestureRunner.dispatchMultiPointer` chains a sequence of

@@ -283,6 +283,7 @@ func formatBounds(b iosBounds) string {
 //   - (derived from elementType, traits, and the merged-leaf
 //     heuristic)                      -> attributes.role
 //   - bounds                          -> attributes.bounds
+//   - elementType secureTextField     -> attributes.secure ("true")
 //
 // Role is decided in priority order: the keyboard elementType always
 // wins, because Orchestra's keyboard-dismiss gate hard-codes role ==
@@ -343,6 +344,9 @@ func NormalizeIosTree(raw IosRawElement) wire.TreeNodeWire {
 	}
 	if raw.Bounds != nil {
 		attributes["bounds"] = formatBounds(*raw.Bounds)
+	}
+	if elementType == "secureTextField" {
+		attributes[wire.AttrSecure] = wire.AttrSecureTrue
 	}
 	if raw.Title != "" {
 		attributes["ext:ios-title"] = raw.Title

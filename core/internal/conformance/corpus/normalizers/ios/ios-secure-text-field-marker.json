@@ -1,0 +1,23 @@
+{
+  "name": "ios-secure-text-field-marker",
+  "description": "elementType secureTextField sets the canonical secure attribute and keeps the secure-text-field role, a plain textField sets nothing",
+  "rawTree": {
+    "elementType": "other",
+    "children": [
+      {
+        "elementType": "secureTextField",
+        "identifier": "password",
+        "label": "Password",
+        "value": "•••••",
+        "children": []
+      },
+      {
+        "elementType": "textField",
+        "identifier": "email",
+        "label": "Email",
+        "value": "a@b.co",
+        "children": []
+      }
+    ]
+  }
+}

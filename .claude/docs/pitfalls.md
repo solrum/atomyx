@@ -374,6 +374,14 @@ corresponding area. For the high-level map see
   `WaitForInputCommitted` take a `Clock` for deterministic tests. Add
   a new wait here, following the same signature pattern, rather than
   inline inside an Orchestra method.
+- **Secret-holding inputs are detected through `orchestra.IsSecure`,
+  never through the role.** Every driver sets `attributes["secure"] =
+  "true"` on a node that holds a secret, so an Android password field
+  (role `text-field`) and an iOS secure text field take the same
+  masked-count verification in `WaitForInputCommitted`. A new wait or
+  action that treats secrets differently must call `IsSecure`, because
+  a role check misses the platform whose role vocabulary has no secure
+  role.
 - **The script `handle` command polls, so do not add a `sleep` before
   it.** `HandleCommand`
   (`core/internal/runner/handle_command.go`) polls the current screen

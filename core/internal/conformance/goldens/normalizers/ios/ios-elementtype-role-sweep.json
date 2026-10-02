@@ -46,7 +46,8 @@
       "attributes": {
         "class": "secureTextField",
         "id": "t-secureTextField",
-        "role": "secure-text-field"
+        "role": "secure-text-field",
+        "secure": "true"
       },
       "children": [],
       "clickable": true
