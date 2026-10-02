@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"testing"
 
+	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/runfolder"
@@ -239,5 +240,68 @@ func TestRunSuiteWritesSuiteKindRunFolder(t *testing.T) {
 	}
 	if html := string(findReportHTML(t, root)); !strings.Contains(html, `src="../artifacts/`+shots[0].Name()+`"`) {
 		t.Errorf("suite report does not link ../artifacts/%s", shots[0].Name())
+	}
+}
+
+// stopWhenSleeping delivers sig through the same stop path the binary
+// uses once a step is blocked on the clock, and returns the command's
+// exit code. The watchdog clock never advances, so the forced exit
+// never fires.
+func stopWhenSleeping(t *testing.T, args []string, sig syscall.Signal, deps Deps, stepClock *clock.ManualClock) int {
+	t.Helper()
+	ctx, cancel := context.WithCancelCause(context.Background())
+	defer cancel(nil)
+	deps.Clock = stepClock
+
+	codes := make(chan int, 1)
+	go func() { codes <- RunContext(ctx, args, deps) }()
+
+	stepClock.AwaitSleepers(1)
+	disarm := shutdown.HandleStop(clock.NewManualClock(0), sig, shutdown.StopHooks{
+		Cancel: func() { cancel(shutdown.InterruptCause(sig)) },
+		Exit:   func(int) { t.Error("forced exit fired") },
+	})
+	defer disarm()
+	return <-codes
+}
+
+func TestStopSignalDuringBlockedStepFinalizesRunFolderAsCancelled(t *testing.T) {
+	signals := []struct {
+		name     string
+		sig      syscall.Signal
+		wantCode int
+	}{
+		{"interrupt", syscall.SIGINT, shutdown.ExitCodeSigint},
+		{"terminate", syscall.SIGTERM, shutdown.ExitCodeSigterm},
+	}
+	commands := []struct {
+		name string
+		args func(root, script string) []string
+	}{
+		{"run", func(root, script string) []string {
+			return []string{"run", "--file", script, "--report-dir", root}
+		}},
+		{"suite", func(root, script string) []string {
+			return []string{"suite", "--glob", filepath.Base(script), "--report-dir", root}
+		}},
+	}
+	for _, command := range commands {
+		for _, tc := range signals {
+			t.Run(command.name+"/"+tc.name, func(t *testing.T) {
+				root := t.TempDir()
+				scriptPath := writeScript(t, "flow.yml", "- sleep: 60000\n")
+				t.Chdir(filepath.Dir(scriptPath))
+				var stdout, stderr bytes.Buffer
+
+				code := stopWhenSleeping(t, command.args(root, scriptPath), tc.sig, mockDeps(&stdout, &stderr), clock.NewManualClock(0))
+				if code != tc.wantCode {
+					t.Fatalf("exit code %d, want %d; stderr: %s", code, tc.wantCode, stderr.String())
+				}
+				meta := readMeta(t, singleRunDir(t, root))
+				if meta.Result != runfolder.ResultCancelled || meta.Outcome != runfolder.OutcomeCancelled {
+					t.Errorf("meta = result %q outcome %q, want cancelled cancelled", meta.Result, meta.Outcome)
+				}
+			})
+		}
 	}
 }

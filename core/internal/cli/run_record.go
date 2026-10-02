@@ -98,12 +98,13 @@ func outcomeForResult(ok bool) runfolder.Outcome {
 }
 
 // end finalizes the run folder and announces its path on stderr. A
-// stop signal that canceled ctx turns an unrecorded outcome into
-// cancelled. When the meta cannot be written, the lock is still
-// released and the failure is reported without changing the command's
-// exit code.
+// stop signal that canceled ctx turns every outcome except passed into
+// cancelled, because the runner reports a step interrupted by the
+// signal as a failure the operator did not cause. When the meta cannot
+// be written, the lock is still released and the failure is reported
+// without changing the command's exit code.
 func (r *runRecord) end(ctx context.Context, stderr io.Writer) {
-	if _, interrupted := shutdown.InterruptExitCode(ctx); interrupted && r.outcome == runfolder.OutcomeError {
+	if _, interrupted := shutdown.InterruptExitCode(ctx); interrupted && r.outcome != runfolder.OutcomePassed {
 		r.outcome = runfolder.OutcomeCancelled
 	}
 	if err := r.writer.Finalize(r.outcome, r.mutate); err != nil {
