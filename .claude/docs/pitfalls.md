@@ -246,6 +246,17 @@ corresponding area. For the high-level map see
   renaming or retyping one is not. Treat that as a breaking change
   that needs an ADR. Studio keeps its own run root and does not read
   this folder.
+- **Hold `run.lock` for the whole life of a run.** The lock marks the
+  run live to every process, so close it only through `Finalize` or
+  `Close`, and never unlink it. A probe through `LockLiveness` takes
+  and drops the real lock but never creates the file. A run with no
+  `completedAt` and no lock reads as interrupted, so a writer that
+  skips `Finalize` is reported as interrupted even on a clean exit.
+- **Finalize once, and only through `Finalize`.** `meta.json` is
+  replaced through a temporary file and a rename, so never write it in
+  place. `Finalize` fixes the verdict from the outcome, and a second
+  call returns an error. Call it after the last `AppendLog`, because
+  it closes the log.
 
 ## Tool layer (cross-platform)
 

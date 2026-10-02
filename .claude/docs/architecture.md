@@ -380,6 +380,7 @@ ask it for paths and types and never spell the layout themselves.
   artifacts/
   report/
   interventions.jsonl
+  run.lock
 ```
 
 Contract:
@@ -405,7 +406,28 @@ Contract:
   failed step, matching `ScriptResult.FailedAtStep` in the runner.
   Display code adds one.
 - **Run id.** The schema puts no pattern on it, because a migrated run
-  keeps its legacy id.
+  keeps its legacy id. A run written by `runfolder.Starter` gets
+  `<yyyymmdd-hhmmss>-<label>-<4 hex>`. The time is UTC. The label is
+  lowercased, every character outside a to z and 0 to 9 becomes a
+  dash, repeated dashes collapse, edge dashes are dropped, and the
+  result is cut to 24 characters, with `mcp` when nothing is left. The
+  folder is made with an exclusive mkdir, and on a collision the four
+  hex characters are drawn again up to 8 times before `Start` fails.
+- **Write lifecycle.** `Start` writes `meta.json` with no
+  `completedAt`, `result`, or `outcome`. `Finalize` takes the outcome,
+  derives `result` from it, and replaces `meta.json` through a
+  temporary file and rename. A second `Finalize` returns an error and
+  changes nothing. `Close` without `Finalize` leaves the run to read
+  as interrupted.
+- **Live lock.** A live `Writer` holds an exclusive lock on `run.lock`
+  inside the run folder, released by `Finalize` or `Close` and by the
+  kernel when the process dies. `LockLiveness` reports a run as live
+  when that lock is held, from any process, and `AnyLive` combines it
+  with other liveness signals.
+- **Log bound.** `log.jsonl` grows to at most 8 MiB of lines. The
+  first line past the bound is dropped and one marker line
+  `{"truncated":true,"limitBytes":N}` ends the file, after which
+  further lines are dropped silently.
 - **Evidence.** One `artifacts/` directory holds every screenshot and
   piece of failure evidence. The report lives in the sibling
   `report/` directory and links files as `../artifacts/<file>`.

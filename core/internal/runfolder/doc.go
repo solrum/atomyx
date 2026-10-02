@@ -12,6 +12,7 @@
 //	  artifacts/
 //	  report/
 //	  interventions.jsonl
+//	  run.lock
 //
 // Invariants callers rely on:
 //
@@ -24,6 +25,12 @@
 //     version.
 //   - The run id carries no format constraint, because a run migrated
 //     from a flat record keeps its original id.
+//   - A Writer holds an exclusive lock on run.lock while its run is
+//     live. The kernel drops the lock when the process exits, so a run
+//     with no completedAt and no lock was interrupted.
+//   - meta.json is only ever replaced through a temporary file in the
+//     same directory and a rename, so a reader never sees a partial
+//     file.
 //
 // The package depends only on the standard library and the flock leaf
 // package, so it can sit below every consumer of a run folder.

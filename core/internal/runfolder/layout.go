@@ -16,6 +16,10 @@ const (
 	LogFileName           = "log.jsonl"
 	ConsoleFileName       = "console.log"
 	InterventionsFileName = "interventions.jsonl"
+
+	// LockFileName is the file a live writer holds an exclusive lock on
+	// for the whole life of its run.
+	LockFileName = "run.lock"
 )
 
 // RunsDir returns the directory under root that holds every run, both
@@ -52,4 +56,9 @@ func ReportDir(runDir string) string {
 // screenshot taken while no run is open.
 func LooseScreenshotsDir(root string) string {
 	return filepath.Join(root, screenshotsDirName)
+}
+
+// LockPath returns the lock file of a run folder.
+func LockPath(runDir string) string {
+	return filepath.Join(runDir, LockFileName)
 }

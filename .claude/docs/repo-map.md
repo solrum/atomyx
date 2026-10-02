@@ -89,7 +89,7 @@ atomyx/
 | `orchestra` | Composes Driver calls into selector resolution, priority broadening, scroll-into-view, obscurement, and retry. |
 | `process` | Abstracts external command execution (adb, xcrun, and similar) behind Runner and BackgroundRunner interfaces, carries extra child environment on the context, and reads process and host start times. |
 | `report` | Renders a run's result into a persisted report bundle: HTML, versioned JSON, and referenced screenshots. |
-| `runfolder` | Defines the run folder contract: the layout names, the `meta.json` record with its result and outcome enums, the legacy status mapping, and the generated JSON Schema. Depends on the standard library and `flock`. |
+| `runfolder` | Defines the run folder contract: the layout names, the `meta.json` record with its result and outcome enums, the legacy status mapping, and the generated JSON Schema. It also writes run folders with an exclusive create and a live lock. Depends on the standard library and `flock`. |
 | `runner` | Defines the command execution contract and the ScriptRunner that dispatches a parsed script's steps. |
 | `scenario` | Runs ordered groups of scripts and ordered sets of scripts or scenarios against a shared Orchestra. |
 | `script` | Owns the test-script schema, parser, and expression engine. |
