@@ -75,6 +75,9 @@ func TestServerCloseDuringSelectReleasesTheLateDriver(t *testing.T) {
 		server.Close()
 		close(closed)
 	}()
+	// Close runs on its own goroutine, so releasing the build before the
+	// session is closed would let Select finish and install normally.
+	<-server.session.life.Done()
 	close(factory.release)
 
 	select {
