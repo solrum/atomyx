@@ -71,6 +71,16 @@ components:
     in: internal/config
   report:
     in: internal/report
+  lease:
+    in: internal/lease
+  attach:
+    in: internal/attach
+  runfolder:
+    in: internal/runfolder
+  session:
+    in: internal/session
+  inspector:
+    in: internal/inspector
   cmd:
     in: cmd/**
 
@@ -211,10 +221,16 @@ deps:
       - suite
       - skills
       - diag
+      - session
+      - runfolder
+      - inspector
+      - lease
   skills:
     anyVendorDeps: true
   storage:
     anyVendorDeps: true
+    mayDependOn:
+      - runfolder
   mcp:
     mayDependOn:
       - wire
@@ -228,6 +244,8 @@ deps:
       - storage
       - diag
       - netcapture
+      - session
+      - runfolder
   config:
     anyVendorDeps: true
   report:
@@ -235,5 +253,37 @@ deps:
       - runner
       - scenario
       - config
+  lease:
+    mayDependOn:
+      - diag
+  attach:
+    mayDependOn:
+      - wire
+      - diag
+  runfolder:
+    mayDependOn:
+      - wire
+      - diag
+  session:
+    mayDependOn:
+      - wire
+      - diag
+      - driver
+      - orchestra
+      - script
+      - expression
+      - runner
+      - device
+      - lease
+      - attach
+      - runfolder
+  inspector:
+    mayDependOn:
+      - wire
+      - diag
+      - orchestra
+      - script
+      - runner
+      - session
   cmd:
     anyProjectDeps: true
