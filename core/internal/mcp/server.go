@@ -3,9 +3,11 @@ package mcp
 import (
 	"context"
 
+	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
+	"dev.atomyx/internal/session"
 	"dev.atomyx/internal/storage"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -22,13 +24,24 @@ type Info struct {
 // default to a file-backed store rooted per storage.NewFileStorage's
 // own precedence, a fresh in-memory RunStore, the system clock, and a
 // no-op logger when left zero-valued.
+//
+// Session carries the identity resolver, lease manager and orphan reaper
+// device selection goes through, and a composition root sets all three.
+// Left zero, selection takes no lease. Timeouts left at zero take the
+// session package defaults.
 type ServerDeps struct {
 	Probe    device.Probe
 	Factory  device.Factory
 	Storage  storage.Storage
 	RunStore *storage.RunStore
 	Clock    orchestra.Clock
-	Logger   logging.Logger
+	// TimerClock drives tool call budgets, the device acquisition
+	// budget and the idle timers. It defaults to the system clock, and
+	// only a test that controls time injects another.
+	TimerClock clock.Clock
+	Logger     logging.Logger
+	Session    session.Deps
+	Timeouts   session.Timeouts
 }
 
 // NewServer constructs the Atomyx MCP server and registers its tool
@@ -40,9 +53,13 @@ func NewServer(info Info, deps ServerDeps) *Server {
 		Version: info.Version,
 	}, nil)
 
-	clock := deps.Clock
-	if clock == nil {
-		clock = orchestra.SystemClock{}
+	clk := deps.Clock
+	if clk == nil {
+		clk = orchestra.SystemClock{}
+	}
+	timers := deps.TimerClock
+	if timers == nil {
+		timers = clock.SystemClock{}
 	}
 	logger := deps.Logger
 	if logger == nil {
@@ -53,21 +70,25 @@ func NewServer(info Info, deps ServerDeps) *Server {
 		runStore = storage.NewRunStore()
 	}
 
-	session := NewDeviceSession(DeviceSessionDeps{Factory: deps.Factory, Probe: deps.Probe, Clock: clock, Logger: logger})
+	tracker := &runTracker{runs: runStore, storage: deps.Storage, clock: clk, logger: logger}
+	devices := NewDeviceSession(DeviceSessionDeps{
+		Factory: deps.Factory, Probe: deps.Probe, Clock: clk, TimerClock: timers, Logger: logger,
+		Session: deps.Session, Timeouts: deps.Timeouts, Runs: tracker,
+	})
 	tc := &ToolContext{
-		Session:  session,
+		Session:  devices,
 		Logger:   logger,
 		Storage:  deps.Storage,
 		RunStore: runStore,
-		Clock:    clock,
+		Clock:    clk,
 	}
 
 	// Single choke point for every tools/call request: value-constraint
-	// validation plus the per-call timeout wrapper apply uniformly to
-	// all registered tools without each tool's handler knowing about
-	// either. Registered before any AddTool call so it is in place for
+	// validation, the per-call timeout wrapper and the session's idle
+	// bookkeeping apply uniformly to all registered tools without each
+	// tool's handler knowing about any of them. Registered before any AddTool call so it is in place for
 	// every tool the loop below adds.
-	server.AddReceivingMiddleware(newToolCallMiddleware(logger))
+	server.AddReceivingMiddleware(newToolCallMiddleware(logger, timers, devices))
 
 	// Registration order matches DEFAULT_TOOLS in
 	// packages/mcp/src/tools/index.ts: device + app lifecycle first,
@@ -113,7 +134,7 @@ func NewServer(info Info, deps ServerDeps) *Server {
 
 	registerRunScriptTool(server, tc)
 
-	return &Server{Server: server, session: session}
+	return &Server{Server: server, session: devices}
 }
 
 // Server is the Atomyx MCP server together with the device session its

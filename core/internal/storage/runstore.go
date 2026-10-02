@@ -21,6 +21,10 @@ const (
 	RunStatusPassed  RunStatus = "passed"
 	RunStatusFailed  RunStatus = "failed"
 	RunStatusError   RunStatus = "error"
+	// RunStatusCancelled marks a run the server closed because its
+	// session sat idle past the open-run idle timeout, or lost its
+	// device. A caller never submits it as a finish_run verdict.
+	RunStatusCancelled RunStatus = "cancelled"
 )
 
 // RunBugReport is one bug finding recorded against a run.

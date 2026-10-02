@@ -38,7 +38,7 @@ func registerLaunchAppTool(server *mcp.Server, tc *ToolContext) {
 			return invalidArgumentsResult("launch_app", err), nil
 		}
 
-		orch, err := orchestraOrFail(tc)
+		orch, err := orchestraOrFail(ctx, tc)
 		if err != nil {
 			return errorResult(err), nil
 		}

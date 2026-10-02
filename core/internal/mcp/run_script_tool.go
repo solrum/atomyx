@@ -139,7 +139,7 @@ func registerRunScriptTool(server *mcp.Server, tc *ToolContext) {
 			return invalidArgumentsResult("run_script", err), nil
 		}
 
-		orch, err := orchestraOrFail(tc)
+		orch, err := orchestraOrFail(ctx, tc)
 		if err != nil {
 			return errorResult(err), nil
 		}

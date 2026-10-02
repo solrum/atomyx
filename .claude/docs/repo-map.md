@@ -62,6 +62,7 @@ atomyx/
 | `core/cmd/gen-config-schema` | `gen-config-schema` | Regenerates the checked-in JSON Schema for the project config type from `core/internal/config`'s Go types. |
 | `core/cmd/gen-script-schema` | `gen-script-schema` | Regenerates the checked-in JSON Schema for the script definition type from `core/internal/script`'s Go types. |
 | `core/cmd/internal/runnerprovision` | none | Builds the iOS runner provisioner that `atomyx` and `atomyx-mcp` wire into their driver factory, including where runner records live. |
+| `core/cmd/internal/sessionwire` | none | Builds the lease manager, identity resolver, orphaned runner reaper and session timeouts that `atomyx` and `atomyx-mcp` hand to `session.Open`, so both arbitrate devices the same way. |
 
 ## `core/internal/`: one package per concern
 
@@ -70,7 +71,7 @@ atomyx/
 | `androiddriver` | Implements the Driver port over the Android agent's HTTP control server. |
 | `cli` | Implements the `atomyx` command-line binary: argument parsing, command routing, driver and skills commands. |
 | `clock` | Time-source abstraction every polling loop, timeout, and retry uses instead of calling the standard library directly. |
-| `config` | Owns the project config schema, its file-discovery and YAML loader, schema validation, and environment reference resolution. |
+| `config` | Owns the project config schema, including the `session` timeouts block, its file-discovery and YAML loader, schema validation, and environment reference resolution. |
 | `conformance` | Drives the Go runtime's implementation of an operation and asserts its output against a frozen golden fixture. |
 | `device` | Discovers reachable Android and iOS devices and builds a live Driver plus Orchestra pair for whichever one a caller selects. For an iOS target it launches the runner through a provisioner and ties the runner's lifetime to the driver, and it ends a runner a crashed process left behind. |
 | `diag` | Defines the stable error-code taxonomy every user-facing surface reports a failure through. |
@@ -81,7 +82,7 @@ atomyx/
 | `iossimdriver` | Implements the Driver port over the iOS Simulator's direct-HID input path. |
 | `lease` | Gives each physical device at most one driving process through a per-device flock, and probes it without writing. |
 | `logging` | The structured logging port every layer writes through, so the host chooses the destination. |
-| `mcp` | Builds the Atomyx MCP server: server construction, tool registration, and the tool handlers themselves. |
+| `mcp` | Builds the Atomyx MCP server: server construction, tool registration, the tool handlers themselves, and the `DeviceSession` holder state machine with its idle timers and clock-driven tool budget. |
 | `netcapture` | The concrete network-capture adapters a script run observes HTTP traffic through. |
 | `orchestra` | Composes Driver calls into selector resolution, priority broadening, scroll-into-view, obscurement, and retry. |
 | `process` | Abstracts external command execution (adb, xcrun, and similar) behind Runner and BackgroundRunner interfaces, carries extra child environment on the context, and reads process and host start times. |

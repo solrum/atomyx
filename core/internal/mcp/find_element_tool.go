@@ -69,7 +69,7 @@ func registerFindElementTool(server *mcp.Server, tc *ToolContext) {
 			return invalidArgumentsResult("find_element", err), nil
 		}
 
-		orch, err := orchestraOrFail(tc)
+		orch, err := orchestraOrFail(ctx, tc)
 		if err != nil {
 			return errorResult(err), nil
 		}

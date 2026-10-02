@@ -1,6 +1,8 @@
 package mcp
 
 import (
+	"context"
+
 	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
@@ -13,9 +15,10 @@ import (
 // logic needs.
 type ToolContext struct {
 	// Session is the server's single device-selection container.
-	// Handlers that drive the device call Session.Current() on every
+	// Handlers that drive the device call Session.Ensure() on every
 	// invocation rather than caching an Orchestra reference, so a
-	// mid-session select_device call is observed immediately.
+	// mid-session select_device call is observed immediately and a
+	// device the session released is taken again.
 	Session *DeviceSession
 	// Logger is the structured logging sink every handler and the
 	// run_script command registry write through.
@@ -41,16 +44,18 @@ var errNoActiveDevice = diag.New(
 	nil,
 )
 
-// orchestraOrFail resolves the active device's Orchestra or reports
-// errNoActiveDevice. Callers that need a device for the tool to mean
-// anything at all use this and turn a non-nil error into an
-// isError:true result; tools where "no device yet" is itself an
-// agent-actionable outcome (report_bug, disconnect_device) read
-// ctx.Session.Current() directly instead.
-func orchestraOrFail(ctx *ToolContext) (*orchestra.Orchestra, error) {
-	active := ctx.Session.Current()
-	if active == nil {
-		return nil, errNoActiveDevice
+// orchestraOrFail resolves the active device's Orchestra, taking a
+// device the session released or lost again first, or reports
+// errNoActiveDevice when none was ever selected. A re-acquire that finds
+// the device held by another process reports DEVICE_RELEASED_HELD.
+// Callers that need a device for the tool to mean anything at all use
+// this and turn a non-nil error into an isError:true result; tools where
+// "no device yet" is itself an agent-actionable outcome (report_bug,
+// disconnect_device) read ctx.Session.Current() directly instead.
+func orchestraOrFail(ctx context.Context, tc *ToolContext) (*orchestra.Orchestra, error) {
+	active, err := tc.Session.Ensure(ctx)
+	if err != nil {
+		return nil, err
 	}
 	return active.Orchestra, nil
 }

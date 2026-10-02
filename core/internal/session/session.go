@@ -38,12 +38,14 @@ type Session struct {
 
 	closeOnce sync.Once
 	closeErr  error
+	closed    chan struct{}
 }
 
 func newSession(ctx context.Context, deps Deps, desc device.Descriptor, identity device.Identity, held *lease.Lease, built device.Built) *Session {
 	s := &Session{
 		deps: deps, desc: desc, identity: identity, lease: held, built: built,
 		lost:      make(chan struct{}),
+		closed:    make(chan struct{}),
 		watchDone: make(chan struct{}),
 	}
 	// The watcher outlives the Open call that started it, so it keeps
@@ -78,6 +80,10 @@ func (s *Session) Orchestra() *orchestra.Orchestra { return s.built.Orchestra }
 // owner decides what to do, normally by ending the run in flight and
 // closing the session.
 func (s *Session) Lost() <-chan struct{} { return s.lost }
+
+// Closed is closed once Close has finished, so a goroutine that waits on
+// Lost can also end when the owner closes the session itself.
+func (s *Session) Closed() <-chan struct{} { return s.closed }
 
 // LostErr reports why the session was lost, or nil while it is held.
 func (s *Session) LostErr() error {
@@ -175,6 +181,7 @@ func (s *Session) Close() error {
 			releaseErr = s.lease.Release()
 		}
 		s.closeErr = errors.Join(disconnectErr, releaseErr)
+		close(s.closed)
 	})
 	return s.closeErr
 }

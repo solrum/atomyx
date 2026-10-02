@@ -83,6 +83,9 @@
         "report": {
           "$ref": "#/definitions/Report"
         },
+        "session": {
+          "$ref": "#/definitions/Session"
+        },
         "suites": {
           "additionalProperties": {
             "$ref": "#/definitions/SuiteEntry"
@@ -182,6 +185,28 @@
         "formats",
         "outDir"
       ],
+      "type": "object"
+    },
+    "Session": {
+      "additionalProperties": false,
+      "description": "Device session timeouts.",
+      "properties": {
+        "deviceAcquireTimeoutMs": {
+          "description": "Milliseconds a device acquisition may take, excluding the runner build.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "mcpIdleTimeoutMs": {
+          "description": "Milliseconds an MCP session with no tool call keeps its device before releasing it.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "openRunIdleTimeoutMs": {
+          "description": "Milliseconds a session with an open run and no tool call keeps its device before closing the run and releasing it.",
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
       "type": "object"
     },
     "SuiteEntry": {

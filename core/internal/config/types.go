@@ -55,6 +55,15 @@ type Report struct {
 	OutDir  string   `json:"outDir"`
 }
 
+// Session tunes the device session timeouts shared by the CLI and the
+// MCP server. Every field is optional, and an absent field keeps its
+// default. Values are positive millisecond counts.
+type Session struct {
+	McpIdleTimeoutMs       *int64 `json:"mcpIdleTimeoutMs,omitempty"`
+	OpenRunIdleTimeoutMs   *int64 `json:"openRunIdleTimeoutMs,omitempty"`
+	DeviceAcquireTimeoutMs *int64 `json:"deviceAcquireTimeoutMs,omitempty"`
+}
+
 // SuiteEntry is one named test selector, matching SuiteEntrySchema.
 //
 // Tags and Globs are pointers for the same reason as
@@ -82,6 +91,7 @@ type AtomyxConfig struct {
 	Launch           *LaunchPolicy               `json:"launch,omitempty"`
 	Preconditions    *string                     `json:"preconditions,omitempty"`
 	Report           *Report                     `json:"report,omitempty"`
+	Session          *Session                    `json:"session,omitempty"`
 	Suites           *map[string]SuiteEntry      `json:"suites,omitempty"`
 	TestRoots        *[]string                   `json:"testRoots,omitempty"`
 	DataRoots        *[]string                   `json:"dataRoots,omitempty"`

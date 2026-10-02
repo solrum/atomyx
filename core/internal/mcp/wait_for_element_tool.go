@@ -55,7 +55,7 @@ func registerWaitForElementTool(server *mcp.Server, tc *ToolContext) {
 			pollIntervalMs = *args.PollIntervalMs
 		}
 
-		orch, err := orchestraOrFail(tc)
+		orch, err := orchestraOrFail(ctx, tc)
 		if err != nil {
 			return errorResult(err), nil
 		}

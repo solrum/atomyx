@@ -81,9 +81,10 @@ above). Registration is never auto-discovered, so adding a file under
   handler reads only the fields its own logic needs. There is no
   `Driver` field, so a handler cannot bypass `Orchestra`.
 - **`orchestraOrFail`** (`core/internal/mcp/tool_context.go`):
-  resolves the currently selected device's `Orchestra` or returns an
-  actionable "no active device" error naming `select_device` as the
-  fix. Tools where "no device yet" is itself a meaningful outcome
+  resolves the currently selected device's `Orchestra` through
+  `DeviceSession.Ensure`, which takes a device the session released
+  back again, or returns an actionable "no active device" error naming
+  `select_device` as the fix. Tools where "no device yet" is itself a meaningful outcome
   (`report_bug`, `disconnect_device`) read
   `tc.Session.Current()` directly instead.
 - **Input schema helpers** (`core/internal/mcp/schema_helpers.go`):
@@ -105,6 +106,20 @@ above). Registration is never auto-discovered, so adding a file under
   `timeoutMs`/`maxTimeoutMs` plus a fixed buffer, or a built-in
   default) uniformly to every registered tool, so no handler
   implements its own top-level timeout.
+  It also reports every call start and end to the `DeviceSession`,
+  which drives the idle timers and refuses a call on an expired run
+  with `RUN_EXPIRED`.
+- **Tool budget** (`core/internal/mcp/tool_budget.go`): the context a
+  call runs under. It is clock-driven and can be paused.
+  `pauseToolBudget(ctx)` stops the budget for the rest of a device
+  acquisition and restarts it in full afterwards. Never count device
+  acquisition against a tool budget: `DeviceSession.Select` and
+  `DeviceSession.Ensure` pause it and run `session.Open` within the
+  acquisition timeout instead (`session.deviceAcquireTimeoutMs`,
+  120 seconds by default, runner build excluded).
+- **Run tracker** (`core/internal/mcp/run_tracker.go`): lets the
+  `DeviceSession` see the open run and close it when the open-run
+  idle timeout or a lost lease ends the session's ownership.
 
 ## Composition inside the MCP server
 
@@ -115,6 +130,27 @@ middleware, then calls every `register*Tool` function in the fixed
 order shown in the table above. `Serve` (same file) runs the
 constructed server over stdio until the context is done or the
 client disconnects.
+
+`DeviceSession` is a holder state machine over `session.Open`. The
+states are unselected, idle, running, released and lost.
+
+| From | Event | To |
+|---|---|---|
+| unselected, released, lost | `select_device` succeeds | running, then idle at the end of the call |
+| idle | a tool call starts | running |
+| running | the last in-flight call ends with no run open | idle, MCP idle timer starts |
+| running | the last in-flight call ends with a run open | running, open-run idle timer starts |
+| idle | MCP idle timeout (10 minutes by default) | released |
+| running with a run open | open-run idle timeout (10 minutes by default) | released, the run is closed as cancelled |
+| idle, running | the lease watcher reports the lease lost | lost, an open run is closed with status error |
+| released, lost | a tool that needs a device runs | running again, or the call fails with `DEVICE_RELEASED_HELD` when another process holds the device |
+| any | `disconnect_device` | unselected, the remembered device is forgotten |
+
+Timers and the acquisition budget run on the injectable timer clock of
+`ServerDeps`, so tests drive them with `clock.ManualClock`. After the
+open-run idle timeout closes a run, `finish_run` and `report_bug` fail
+with `RUN_EXPIRED` until `start_run` runs, and the first tool that
+needs a device fails once with `RUN_EXPIRED`.
 
 Contract guarantees this composition holds:
 

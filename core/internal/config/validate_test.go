@@ -252,3 +252,35 @@ func TestParseAndValidate_KeepsPresentEmptySuiteContainerFields(t *testing.T) {
 		t.Errorf("Tags = %v, want a present, empty slice", smoke.Tags)
 	}
 }
+
+func TestParseAndValidate_ReadsTheSessionTimeouts(t *testing.T) {
+	cfg := mustValidate(t, baseConfig+`
+session:
+  mcpIdleTimeoutMs: 20000
+  openRunIdleTimeoutMs: 30000
+  deviceAcquireTimeoutMs: 90000
+`)
+	s := cfg.Session
+	if s == nil || *s.McpIdleTimeoutMs != 20000 || *s.OpenRunIdleTimeoutMs != 30000 || *s.DeviceAcquireTimeoutMs != 90000 {
+		t.Fatalf("Session = %+v, want all three timeouts read", s)
+	}
+}
+
+func TestParseAndValidate_AConfigWithoutASessionBlockHasNoSession(t *testing.T) {
+	if cfg := mustValidate(t, baseConfig); cfg.Session != nil {
+		t.Fatalf("Session = %+v, want nil", cfg.Session)
+	}
+}
+
+func TestParseAndValidate_RejectsInvalidSessionTimeouts(t *testing.T) {
+	cases := map[string]string{
+		"zero":     "session:\n  mcpIdleTimeoutMs: 0\n",
+		"negative": "session:\n  openRunIdleTimeoutMs: -1\n",
+		"fraction": "session:\n  deviceAcquireTimeoutMs: 1.5\n",
+		"string":   "session:\n  mcpIdleTimeoutMs: soon\n",
+		"unknown":  "session:\n  idleMs: 5\n",
+	}
+	for name, block := range cases {
+		t.Run(name, func(t *testing.T) { mustReject(t, baseConfig+block) })
+	}
+}

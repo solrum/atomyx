@@ -111,7 +111,7 @@ func registerDisconnectDeviceTool(server *mcp.Server, tc *ToolContext) {
 			return invalidArgumentsResult("disconnect_device", err), nil
 		}
 		wasActive := tc.Session.Current()
-		tc.Session.Disconnect()
+		tc.Session.Disconnect() //nolint:contextcheck // teardown is bounded by its own grace timer, not by a call context
 		var wasActiveOut *wasActiveWire
 		if wasActive != nil {
 			wasActiveOut = &wasActiveWire{Platform: wasActive.Platform, ID: wasActive.ID}

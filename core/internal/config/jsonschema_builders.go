@@ -33,6 +33,10 @@ func booleanSchema(description string) map[string]any {
 	return withDescription(map[string]any{"type": "boolean"}, description)
 }
 
+func integerMin(minimum int, description string) map[string]any {
+	return withDescription(map[string]any{"type": "integer", "minimum": minimum}, description)
+}
+
 func arraySchema(items any, minItems int, description string) map[string]any {
 	m := withDescription(map[string]any{"type": "array", "items": items}, description)
 	if minItems > 0 {

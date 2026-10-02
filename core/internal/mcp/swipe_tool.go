@@ -48,7 +48,7 @@ func registerSwipeTool(server *mcp.Server, tc *ToolContext) {
 			return errResult, nil
 		}
 
-		orch, err := orchestraOrFail(tc)
+		orch, err := orchestraOrFail(ctx, tc)
 		if err != nil {
 			return errorResult(err), nil
 		}

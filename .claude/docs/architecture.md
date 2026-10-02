@@ -331,6 +331,18 @@ composition root sets it.
 `shutdown` and the common leaves. It never imports `mcp`, `cli` or
 `inspector`.
 
+The two hosts own a session differently. A CLI command holds it for the
+length of the command and cancels its run when `Session.Lost()` closes.
+The MCP server holds it through `DeviceSession`, which releases the
+device after an idle timeout, takes it again on the next call that needs
+it, and runs acquisition outside the tool call budget. The idle timeouts
+and the acquisition budget come from the `session` block of the project
+config (`mcpIdleTimeoutMs`, `openRunIdleTimeoutMs`,
+`deviceAcquireTimeoutMs`), with `ATOMYX_MCP_IDLE_TIMEOUT_MS` and
+`ATOMYX_DEVICE_ACQUIRE_TIMEOUT_MS` overriding the first and last.
+`cmd/internal/sessionwire` resolves them. The holder state machine is
+documented in [`tools.md`](./tools.md).
+
 ## Dependency direction and its enforcement
 
 Dependency direction across every package under `core/internal/` is

@@ -38,7 +38,7 @@ func registerPressKeyTool(server *mcp.Server, tc *ToolContext) {
 			return invalidArgumentsResult("press_key", err), nil
 		}
 
-		orch, err := orchestraOrFail(tc)
+		orch, err := orchestraOrFail(ctx, tc)
 		if err != nil {
 			return errorResult(err), nil
 		}

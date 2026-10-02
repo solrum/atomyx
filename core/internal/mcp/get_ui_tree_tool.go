@@ -118,7 +118,7 @@ func registerGetUiTreeTool(server *mcp.Server, tc *ToolContext) {
 			return invalidArgumentsResult("get_ui_tree", err), nil
 		}
 
-		orch, err := orchestraOrFail(tc)
+		orch, err := orchestraOrFail(ctx, tc)
 		if err != nil {
 			return errorResult(err), nil
 		}

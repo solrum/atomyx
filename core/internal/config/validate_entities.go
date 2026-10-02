@@ -214,6 +214,27 @@ func validateReportFormats(obj map[string]any, path []any, c *issueCollector) []
 	return formats
 }
 
+var sessionKeys = map[string]bool{
+	"mcpIdleTimeoutMs": true, "openRunIdleTimeoutMs": true, "deviceAcquireTimeoutMs": true,
+}
+
+func validateSession(root map[string]any, path []any, c *issueCollector) *Session {
+	raw, present := root["session"]
+	if !present || raw == nil {
+		return nil
+	}
+	fieldPath := withSegment(path, "session")
+	obj, ok := asObject(raw, fieldPath, c)
+	if !ok {
+		return nil
+	}
+	checkUnknownKeys(obj, sessionKeys, fieldPath, c)
+	mcpIdle, _ := optionalPositiveInt(obj, "mcpIdleTimeoutMs", fieldPath, c)
+	openRun, _ := optionalPositiveInt(obj, "openRunIdleTimeoutMs", fieldPath, c)
+	acquire, _ := optionalPositiveInt(obj, "deviceAcquireTimeoutMs", fieldPath, c)
+	return &Session{McpIdleTimeoutMs: mcpIdle, OpenRunIdleTimeoutMs: openRun, DeviceAcquireTimeoutMs: acquire}
+}
+
 func validateSuites(root map[string]any, path []any, c *issueCollector) *map[string]SuiteEntry {
 	raw, present := root["suites"]
 	if !present || raw == nil {

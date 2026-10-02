@@ -2,6 +2,7 @@ package clock
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 )
@@ -41,6 +42,22 @@ func TestManualClockSleepReturnsWhenContextIsCanceled(t *testing.T) {
 	cancel()
 	if err := <-woke; err == nil {
 		t.Fatal("Sleep returned nil after its context was canceled")
+	}
+	c.AwaitIdle()
+}
+
+func TestManualClock_ACanceledSleeperIsNotCountedAndIsNotWoken(t *testing.T) {
+	c := NewManualClock(0)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- c.Sleep(ctx, 100) }()
+	c.AwaitSleepers(1)
+
+	cancel()
+	c.Advance(100)
+
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatalf("Sleep() = %v, want the cancellation, not a normal wake", err)
 	}
 	c.AwaitIdle()
 }

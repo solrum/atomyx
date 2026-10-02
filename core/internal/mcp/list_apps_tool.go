@@ -31,7 +31,7 @@ func registerListAppsTool(server *mcp.Server, tc *ToolContext) {
 			return invalidArgumentsResult("list_apps", err), nil
 		}
 
-		orch, err := orchestraOrFail(tc)
+		orch, err := orchestraOrFail(ctx, tc)
 		if err != nil {
 			return errorResult(err), nil
 		}

@@ -36,6 +36,7 @@ func jsonSchemaDefinitions() map[string]any {
 		"EnvironmentEntry": environmentEntrySchema(),
 		"LaunchPolicy":     launchPolicySchema(),
 		"Report":           reportSchema(),
+		"Session":          sessionSchema(),
 		"SuiteEntry":       suiteEntrySchema(),
 		"AtomyxConfig":     atomyxConfigSchema(),
 	}
@@ -95,6 +96,18 @@ func reportSchema() map[string]any {
 	)
 }
 
+func sessionSchema() map[string]any {
+	return objectSchema(
+		map[string]any{
+			"mcpIdleTimeoutMs":       integerMin(1, "Milliseconds an MCP session with no tool call keeps its device before releasing it."),
+			"openRunIdleTimeoutMs":   integerMin(1, "Milliseconds a session with an open run and no tool call keeps its device before closing the run and releasing it."),
+			"deviceAcquireTimeoutMs": integerMin(1, "Milliseconds a device acquisition may take, excluding the runner build."),
+		},
+		nil,
+		"Device session timeouts.",
+	)
+}
+
 func suiteEntrySchema() map[string]any {
 	return objectSchema(
 		map[string]any{
@@ -115,6 +128,7 @@ func atomyxConfigSchema() map[string]any {
 			"launch":        ref("LaunchPolicy"),
 			"preconditions": stringEnum([]string{PreconditionsSkip, PreconditionsForce}, "Project-wide precondition override."),
 			"report":        ref("Report"),
+			"session":       ref("Session"),
 			"suites":        recordSchema(ref("SuiteEntry"), "Named test selectors, keyed by suite name."),
 			"testRoots":     arraySchema(stringMinLen(1, ""), 0, "Directories the CLI searches for test scripts."),
 			"dataRoots":     arraySchema(stringMinLen(1, ""), 0, "Directories the CLI searches for data-driven fixtures."),

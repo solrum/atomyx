@@ -179,6 +179,16 @@ corresponding area. For the high-level map see
 - **Run the provisioner's `kill` once.** It stops the runner and releases
   the reserved port. A second call must not release a port a later
   launch has since reserved.
+- **Never count device acquisition against an MCP tool budget.** A first
+  iOS launch compiles the runner and a re-acquire waits for a lease, so
+  both can run far longer than the 30 second tool call budget.
+  `DeviceSession.Select` and `DeviceSession.Ensure` pause the call's
+  budget with `pauseToolBudget` and bound the acquisition by
+  `session.deviceAcquireTimeoutMs` instead.
+- **Drive timers from the injected timer clock.** The acquisition budget,
+  the tool call budget, and the idle timers use `ServerDeps.TimerClock`,
+  not the orchestra clock. A test clock whose sleeps return at once would
+  otherwise expire every timer immediately.
 
 ## Tool layer (cross-platform)
 

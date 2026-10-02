@@ -183,7 +183,9 @@ Bind the session to one device so every other device-driving tool operates on it
 - The device kind is resolved from the id, the same way the command line resolves it. On iOS the id must name a simulator or physical device that list_devices currently reports, and the match is case-insensitive. An iOS id that is not listed fails with code DEVICE_NOT_FOUND before any connection is attempted. On Android the id is used as given.
 - The returned kind reports the kind of the device actually bound, taken from the driver, not an echo of the kind argument the caller passed. It is always present in the response, even when the caller omitted kind. On Android it is "emulator" when the device id starts with "emulator-" and "device" otherwise. On iOS it is "simulator" or "device". The value "emulator" can appear in the response even though the kind argument only accepts "simulator" or "device" as input.
 - connectedAt is a timestamp in milliseconds, recorded at the moment the new connection was established.
-- Connecting to a device, especially a physical one, can take longer than a quick call. This tool call is bounded by the same overall time budget as any other tool call (30 seconds by default), so a slow physical-device connection can time out. See Errors and recovery.
+- Binding takes exclusive ownership of the device. Only one Atomyx process, whether the CLI or another MCP server, can drive a device at a time, and a second one fails with DEVICE_HELD.
+- Acquiring the device does not count against the 30 second tool call budget. Acquisition has its own budget of 120 seconds by default, which excludes the one-time build of the iOS runner. When it is exhausted the call fails with code TOOL_TIMEOUT. Configure it with `session.deviceAcquireTimeoutMs` in the project config or the `ATOMYX_DEVICE_ACQUIRE_TIMEOUT_MS` environment variable. The environment variable wins.
+- A bound device is released automatically when the session sits idle. See Device ownership and idle release.
 
 **Returns**
 - On a successful bind: ok true, and active with platform, id, kind (see Behavior), and connectedAt.
@@ -192,12 +194,25 @@ Bind the session to one device so every other device-driving tool operates on it
 **Errors and recovery**
 - Missing platform or id, an id that is empty, a non-positive port, or a platform, kind, or id outside the accepted values all fail argument validation before a connection is attempted. Correct the arguments and retry.
 - ok false with code DEVICE_NOT_FOUND means an iOS id is not among the reachable devices. Other reasons typically mean the id does not currently match a reachable device, or the device toolchain rejected the connection. Call list_devices again to confirm the id is still valid and the device is online, then retry.
-- If the call itself times out (for example, a slow physical-device connection), the result reports a timeout with the elapsed time and the budget. Retry, or pass a larger timeoutMs argument alongside the call to raise the budget.
+- ok false with code DEVICE_HELD means another Atomyx process is driving the device. The reason names that process and its state. Wait for it to finish or ask the operator to stop it, then call select_device again.
+- ok false with code TOOL_TIMEOUT means the device did not become ready within the acquisition budget. Check that the device is connected, unlocked and trusted, then retry.
 
 **Example**
 ```json
 { "platform": "ios", "id": "00008030-001A2D3E1401002E", "kind": "device" }
 ```
+
+### Device ownership and idle release
+
+A session owns its device for as long as it is selected and active, and gives it up in these cases.
+
+- With no tool call in flight and no run open, the device is released after the MCP idle timeout, 10 minutes by default. Configure it with `session.mcpIdleTimeoutMs` or the `ATOMYX_MCP_IDLE_TIMEOUT_MS` environment variable.
+- With a run open and no tool call in flight, the device is released after the open-run idle timeout, 10 minutes by default and configured with `session.openRunIdleTimeoutMs`. The open run is closed with status cancelled.
+- A released device is remembered. The next tool call that needs a device takes it again without a new select_device call, and the call runs outside its tool budget like select_device does.
+- If another process took the device in the meantime, the call fails with DEVICE_RELEASED_HELD. Retry shortly, and ask the operator to release the device if it keeps failing.
+- After the open-run idle timeout closed a run, finish_run and report_bug fail with RUN_EXPIRED until start_run is called. The first tool that needs a device after the expiry also fails once with RUN_EXPIRED so the agent learns the run is gone. Start a new run and repeat the lost work.
+- disconnect_device releases the device and forgets it, so nothing is taken again until select_device is called.
+- If the device lease is lost while the session holds it, the session behaves as released, and the open run is closed with status error.
 
 ### disconnect_device
 Release the currently-bound device and leave the session idle.
@@ -234,6 +249,7 @@ None
 
 **Behavior**
 - Never runs a flow, never touches app state, and never changes what device is bound.
+- A device released by an idle timeout is taken again for the check. If another process holds it meanwhile, the report is selected true, healthy false, with code DEVICE_RELEASED_HELD.
 - The liveness probe is bounded by a fixed five-second timeout, separate from and shorter than the overall per-call time budget.
 - An unresponsive device is a normal, successful check outcome, not a tool failure. This tool only reports isError:true when the check itself could not be attempted at all.
 

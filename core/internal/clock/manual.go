@@ -19,6 +19,7 @@ type ManualClock struct {
 type manualSleeper struct {
 	deadline int64
 	wake     chan struct{}
+	ctx      context.Context
 }
 
 // NewManualClock constructs a ManualClock starting at startMs.
@@ -42,7 +43,7 @@ func (c *ManualClock) Sleep(ctx context.Context, ms int64) error {
 		return ctx.Err()
 	}
 	c.mu.Lock()
-	sleeper := &manualSleeper{deadline: c.current + ms, wake: make(chan struct{})}
+	sleeper := &manualSleeper{deadline: c.current + ms, wake: make(chan struct{}), ctx: ctx}
 	c.sleepers = append(c.sleepers, sleeper)
 	c.cond.Broadcast()
 	c.mu.Unlock()
@@ -68,15 +69,27 @@ func (c *ManualClock) remove(target *manualSleeper) {
 	}
 }
 
-// AwaitSleepers blocks until at least n goroutines are inside Sleep,
-// so a test can advance time only after the code under test has
-// registered its timer.
+// AwaitSleepers blocks until at least n goroutines are inside Sleep
+// with a context that is still live, so a test can advance time only
+// after the code under test has registered its timer. A sleeper whose
+// context was already canceled is on its way out and does not count,
+// because it can no longer be woken by Advance.
 func (c *ManualClock) AwaitSleepers(n int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	for len(c.sleepers) < n {
+	for c.liveSleepersLocked() < n {
 		c.cond.Wait()
 	}
+}
+
+func (c *ManualClock) liveSleepersLocked() int {
+	live := 0
+	for _, s := range c.sleepers {
+		if s.ctx.Err() == nil {
+			live++
+		}
+	}
+	return live
 }
 
 // AwaitIdle blocks until no goroutine is inside Sleep, so a test can
@@ -97,7 +110,7 @@ func (c *ManualClock) Advance(ms int64) {
 	c.current += ms
 	remaining := c.sleepers[:0]
 	for _, s := range c.sleepers {
-		if s.deadline <= c.current {
+		if s.deadline <= c.current && s.ctx.Err() == nil {
 			close(s.wake)
 			continue
 		}

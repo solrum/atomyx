@@ -3,11 +3,12 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
-	"time"
 
+	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/logging"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -144,18 +145,24 @@ func resolveToolTimeoutBudget(rawArgs json.RawMessage) (budgetMs float64, declar
 }
 
 // newToolCallMiddleware builds the single choke point every tools/call
-// request passes through, applying two behaviors uniformly to every
+// request passes through, applying three behaviors uniformly to every
 // registered tool without touching each tool's own handler:
 //
 //  1. Value-constraint validation the published (deliberately loose)
 //     input schemas don't enforce. See value_constraint_schemas.go.
-//  2. A hard per-call timeout, enforced via context deadline. The
-//     deadline only aborts a call whose downstream code observes
+//  2. A hard per-call timeout, enforced through the call's context. The
+//     timeout only aborts a call whose downstream code observes
 //     ctx.Done() (as the Driver port's calls do); a tool that ignores
-//     the deadline blocks the wrapper right along with it, because the
-//     wrapper's timeout depends entirely on the underlying call
-//     observing the deadline in order to actually stop.
-func newToolCallMiddleware(logger logging.Logger) mcp.Middleware {
+//     it blocks the wrapper right along with it, because the wrapper's
+//     timeout depends entirely on the underlying call observing it in
+//     order to actually stop. Acquiring a device is exempt: the code
+//     that acquires one pauses the budget, which starts over in full
+//     once the device is ready.
+//  3. The session bookkeeping that bounds how long a device stays held:
+//     the call is reported to sess when it starts and when it ends, and
+//     a call on a run the open-run idle timeout closed is refused with
+//     RUN_EXPIRED.
+func newToolCallMiddleware(logger logging.Logger, clk clock.Clock, sess *DeviceSession) mcp.Middleware {
 	return func(next mcp.MethodHandler) mcp.MethodHandler {
 		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
 			if method != toolCallMethod {
@@ -170,17 +177,22 @@ func newToolCallMiddleware(logger logging.Logger) mcp.Middleware {
 				return invalidArgumentsResult(params.Name, verr), nil
 			}
 
-			budgetMs, declaredBudgetMs := resolveToolTimeoutBudget(params.Arguments)
-			callCtx, cancel := context.WithTimeout(ctx, time.Duration(budgetMs)*time.Millisecond)
-			defer cancel()
+			if err := sess.BeginCall(params.Name); err != nil {
+				return errorResult(err), nil
+			}
+			defer sess.EndCall() //nolint:contextcheck // idle timers outlive any call, so they take no call context
 
-			startedAt := time.Now()
+			budgetMs, declaredBudgetMs := resolveToolTimeoutBudget(params.Arguments)
+			callCtx, stop := newBudgetContext(ctx, clk, int64(budgetMs))
+			defer stop()
+
+			startedAt := clk.NowMs()
 			result, err := next(callCtx, method, req)
-			if callCtx.Err() != context.DeadlineExceeded {
+			if !errors.Is(callCtx.Err(), context.DeadlineExceeded) {
 				return result, err
 			}
 
-			elapsedMs := time.Since(startedAt).Milliseconds()
+			elapsedMs := clk.NowMs() - startedAt
 			var declaredOut *int64
 			if declaredBudgetMs != nil {
 				d := int64(*declaredBudgetMs)
