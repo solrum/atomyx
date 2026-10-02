@@ -356,6 +356,7 @@ Captures the current UI hierarchy as a flat, depth-annotated list of elements.
 - Each element reports role, id, text, label, hint, value, bounds, and boolean interactive state (enabled, clickable, focused, selected, checked, visible) only for the fields the underlying platform actually supplied. Fields the platform does not report are omitted rather than sent as empty or false.
 - Bounds are reported as a raw rectangle string in the form "left,top,right,bottom", in device pixels. This tool does not compute a center point for you. Use find_element or wait_for_element when you need a ready-to-tap center coordinate for a specific element.
 - Platform- or framework-specific extension attributes, when present, are grouped under an `ext` map on the element rather than mixed into the common fields.
+- An element that holds a secret, such as a password input, reports `secure: true`. Its `text` and `value` are replaced by the fixed mask `********`, whatever the field holds, so the secret never reaches the agent. Its `label`, `hint`, `id` and `role` stay readable, so the field is still identifiable. An empty secure field keeps its empty `text` and `value`. Selectors still match the real content of the field, but an agent cannot read it back.
 
 **Returns**
 - `total`: number of elements after overlay filtering, before any limit is applied.
@@ -404,7 +405,7 @@ Finds a single element matching a selector and returns enough detail to act on i
 
 **Returns**
 - `found`: true when a match was located, false otherwise.
-- On a match: `id`, `text`, `label`, `value`, `role`, `enabled`, `clickable` for the fields the platform reported, plus `bounds` (parsed rectangle) and `center` (the computed tap point), both null when the element has no parseable bounds.
+- On a match: `id`, `text`, `label`, `value`, `role`, `enabled`, `clickable` for the fields the platform reported, plus `secure: true` for a field that holds a secret (its `text` and `value` are then the mask `********`, as in get_ui_tree), plus `bounds` (parsed rectangle) and `center` (the computed tap point), both null when the element has no parseable bounds.
 - On no match: only `found: false` is returned.
 
 **Errors and recovery**
@@ -538,6 +539,7 @@ instead when no screen transition is expected.
   obscurement check, keyboard-dismiss retry). If the tap itself is
   rejected, the call returns immediately with `classification:
   "tap_failed"` and never starts waiting.
+- An appeared element that holds a secret reports the mask `********` in place of its text, in the `selector` of the `appeared` entry.
 - After a successful tap, polls the hierarchy until waitForAbsent no
   longer matches and waitForAppear matches, whichever of the two was
   supplied.
@@ -781,7 +783,7 @@ failure should also be classified.
 **Returns**
 - On match: the same shape as find_element (`found: true`, plus
   whichever of `id`, `text`, `label`, `value`, `role`, `bounds`,
-  `center`, `enabled`, and `clickable` the element carries).
+  `center`, `enabled`, and `clickable` the element carries, including `secure` and the masked `text` and `value` of a secret field).
 - On timeout: `{ found: false, reason, elapsedMs, polls }`, where
   `elapsedMs` is time spent waiting and `polls` is the number of
   hierarchy reads performed.
@@ -833,6 +835,7 @@ Execute a YAML test script against the currently bound device, one step at a tim
   - command: string, the step's command name, or the literal unrecognized command text when the command name is not known.
   - ok: boolean, whether this step passed.
   - detail: string, present when the command reports additional detail. More often present on a failure, describing why.
+    A `type` step reports only the number of characters it entered, for example `Typed 12 characters`, never the text.
   - durationMs: integer, how long this step took to run.
   - deviceLost: boolean, true only on the step the run aborted on when that abort happened because the device or agent went unreachable. Absent on every other step, including an ordinary failed step.
 - totalSteps: integer, the number of steps declared in the script's own step list. This stays the full declared count even when the run stopped early, for example on a failed precondition.

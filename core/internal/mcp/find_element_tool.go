@@ -24,6 +24,7 @@ type elementDetails struct {
 	Center    *wire.Point  `json:"center"`
 	Enabled   *bool        `json:"enabled,omitempty"`
 	Clickable *bool        `json:"clickable,omitempty"`
+	Secure    *bool        `json:"secure,omitempty"`
 }
 
 // resolveElementDetails builds the find_element / wait_for_element
@@ -39,6 +40,7 @@ func resolveElementDetails(cursor *orchestra.TreeCursor) elementDetails {
 		Role:      attrPtr(attrs, orchestra.AttrRole),
 		Enabled:   cursor.Node.Enabled,
 		Clickable: cursor.Node.Clickable,
+		Secure:    secureFlag(cursor.Node),
 	}
 	if bounds, ok := orchestra.ParseBounds(attrs[orchestra.AttrBounds]); ok {
 		details.Bounds = &bounds

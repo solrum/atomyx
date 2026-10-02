@@ -32,7 +32,8 @@ type CompactElement struct {
 // TreeNodeToCompactElements flattens root into a CompactElement list
 // in pre-order (matching Walk's traversal, since both implement the
 // same parent-before-children, earlier-sibling-before-later-sibling
-// stack walk). Nodes with no parseable bounds attribute are dropped:
+// stack walk). A secure node's text is masked, because the list is
+// built for output. Nodes with no parseable bounds attribute are dropped:
 // they have no geometry for the diagnostic functions to reason about
 // and typically represent invisible semantic grouping nodes.
 func TreeNodeToCompactElements(root wire.TreeNodeWire) []CompactElement {
@@ -40,14 +41,15 @@ func TreeNodeToCompactElements(root wire.TreeNodeWire) []CompactElement {
 	out := make([]CompactElement, 0, len(cursors))
 	counter := 0
 	for _, c := range cursors {
-		bounds, ok := ParseBounds(c.Node.Attributes[AttrBounds])
+		attrs := MaskSecureAttributes(c.Node.Attributes)
+		bounds, ok := ParseBounds(attrs[AttrBounds])
 		if !ok {
 			continue
 		}
-		resourceID := c.Node.Attributes[AttrID]
-		label := c.Node.Attributes[AttrLabel]
-		text := c.Node.Attributes[AttrText]
-		role := c.Node.Attributes[AttrRole]
+		resourceID := attrs[AttrID]
+		label := attrs[AttrLabel]
+		text := attrs[AttrText]
+		role := attrs[AttrRole]
 
 		var selector map[string]string
 		if resourceID != "" || label != "" || text != "" {

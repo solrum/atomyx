@@ -263,7 +263,7 @@
     }
   },
   "get_ui_tree": {
-    "description": "Capture the current UI hierarchy as a flat depth-annotated list of elements. Each entry includes role, id, text, label, bounds, and interactive state. THIS IS YOUR PRIMARY OBSERVATION TOOL, so call it FIRST after launch_app, after every navigation action (tap, back, swipe), and whenever you need to understand the current screen. Prefer this over screenshot because it is faster, cheaper, and gives you actionable selectors for tap/input_text directly.",
+    "description": "Capture the current UI hierarchy as a flat depth-annotated list of elements. Each entry includes role, id, text, label, bounds, and interactive state. A password field reports secure:true and a masked text and value. THIS IS YOUR PRIMARY OBSERVATION TOOL, so call it FIRST after launch_app, after every navigation action (tap, back, swipe), and whenever you need to understand the current screen. Prefer this over screenshot because it is faster, cheaper, and gives you actionable selectors for tap/input_text directly.",
     "inputSchema": {
       "properties": {
         "includeSystemOverlays": {

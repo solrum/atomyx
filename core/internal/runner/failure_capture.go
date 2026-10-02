@@ -143,7 +143,7 @@ func (b *FailureBundle) CaptureFailure(ctx context.Context, failure StepFailure)
 			treeCh <- captured{err: err}
 			return
 		}
-		data, err := json.Marshal(tree)
+		data, err := json.Marshal(orchestra.MaskSecure(tree))
 		treeCh <- captured{data: data, err: err}
 	}()
 

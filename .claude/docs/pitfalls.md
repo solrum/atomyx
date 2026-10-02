@@ -337,6 +337,16 @@ corresponding area. For the high-level map see
   tool handler, not pasted into the handler itself. Selector
   compilation lives in `core/internal/orchestra/priority_broadening.go`
   and the raw filter primitives in `core/internal/orchestra/filter.go`.
+- **Never emit a tree or an element without the masking pass.** A
+  node that holds a secret has `secure` set (`orchestra.IsSecure`), and
+  its `text` and `value` must reach no output as the real string. A
+  tool result gets this from the tool-call middleware, which masks every
+  element object that reports `secure: true`, so a new result shape for
+  tree or element data must carry the `secure` member
+  (`core/internal/mcp/secure_result.go`). Any other output, such as an
+  evidence file, must call `orchestra.MaskSecure` or
+  `orchestra.MaskSecureAttributes` first. Selector resolution keeps the
+  real tree, so never mask before resolving.
 - **Never log or return typed text.** A `type` step may enter a
   secret, so its result detail states a character count only
   (`core/internal/runner/type_command.go`). Any new step result, log

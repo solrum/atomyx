@@ -196,6 +196,7 @@ func newToolCallMiddleware(logger logging.Logger, clk clock.Clock, sess *DeviceS
 			result, err := next(noticeCtx, method, req)
 			if !errors.Is(callCtx.Err(), context.DeadlineExceeded) {
 				if toolResult, ok := result.(*mcp.CallToolResult); ok {
+					maskSecureResult(toolResult)
 					notices.attachTo(toolResult)
 				}
 				return result, err

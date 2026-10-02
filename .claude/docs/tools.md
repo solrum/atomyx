@@ -310,6 +310,19 @@ applies.
   the `Orchestra` pipeline (scroll, obscurement, priority
   broadening). The type system blocks it: `ToolContext` has no
   `Driver` field.
+- **Every tool result passes through one masking pass.** The
+  tool-call middleware (`core/internal/mcp/tool_call_middleware.go`)
+  runs `maskSecureResult` (`core/internal/mcp/secure_result.go`) on
+  each result. An element object that reports `secure: true` has its
+  `text` and `value` replaced by `orchestra.SecureMask`, and its label,
+  hint, id and role stay. A tool that returns element or tree data
+  therefore sets `secure` through `secureFlag`, and never masks in its
+  own handler. `TestEverySecureElementIsMaskedInEveryToolResult` calls
+  every registered tool against a secure fixture, so a new tool must be
+  added to its table. Projections built inside `orchestra` for output,
+  such as `TreeNodeToCompactElements`, mask through
+  `orchestra.MaskSecureAttributes`, and selector resolution always
+  reads the real tree.
 - **A tool's `execute` closure is pure orchestration.** Logic beyond
   argument decoding and result shaping belongs on `Orchestra`, a
   `runner` command, or a new helper in the layer beneath `mcp`, not

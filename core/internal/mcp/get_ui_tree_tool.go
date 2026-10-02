@@ -36,6 +36,7 @@ type flatNode struct {
 	Selected  *bool             `json:"selected,omitempty"`
 	Checked   *bool             `json:"checked,omitempty"`
 	Visible   *bool             `json:"visible,omitempty"`
+	Secure    *bool             `json:"secure,omitempty"`
 	Ext       map[string]string `json:"ext,omitempty"`
 	Depth     int               `json:"depth"`
 }
@@ -80,6 +81,7 @@ func flattenTree(node wire.TreeNodeWire, depth int) []flatNode {
 		Selected:  node.Selected,
 		Checked:   node.Checked,
 		Visible:   node.Visible,
+		Secure:    secureFlag(node),
 		Ext:       ext,
 		Depth:     depth,
 	})
@@ -103,7 +105,8 @@ func registerGetUiTreeTool(server *mcp.Server, tc *ToolContext) {
 		Name: "get_ui_tree",
 		Description: "Capture the current UI hierarchy as a flat depth-annotated list of " +
 			"elements. Each entry includes role, id, text, label, bounds, and " +
-			"interactive state. THIS IS YOUR PRIMARY OBSERVATION TOOL, so call it " +
+			"interactive state. A password field reports secure:true and a masked " +
+			"text and value. THIS IS YOUR PRIMARY OBSERVATION TOOL, so call it " +
 			"FIRST after launch_app, after every navigation action (tap, back, " +
 			"swipe), and whenever you need to understand the current screen. " +
 			"Prefer this over screenshot because it is faster, cheaper, and gives you " +

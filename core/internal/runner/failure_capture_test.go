@@ -210,3 +210,29 @@ func TestScriptRunner_PanickingFailureCaptureDoesNotChangeTheResult(t *testing.T
 		t.Fatalf("outcome changed: Ok=%t FailedAtStep=%v Abort=%v", result.Ok, result.FailedAtStep, result.Abort)
 	}
 }
+
+func TestFailureBundle_TreeFileMasksSecureNodeValues(t *testing.T) {
+	const secret = "hunter2-sentinel"
+	rig := newMockCaptureRig()
+	rig.driver.StageHierarchy(wire.TreeNodeWire{
+		Attributes: map[string]string{"id": "root"},
+		Children: []wire.TreeNodeWire{{Attributes: map[string]string{
+			"id": "pw", "label": "Password", "text": secret, "value": secret, "secure": "true",
+		}}},
+	})
+
+	rig.run(t, "appId: com.test\n---\n- assertVisible: \"Does not exist\"\n")
+
+	data := rig.evidence.file("step-001-tree.json")
+	if strings.Contains(string(data), secret) {
+		t.Fatalf("tree file carries the secret: %s", data)
+	}
+	var tree wire.TreeNodeWire
+	if err := json.Unmarshal(data, &tree); err != nil {
+		t.Fatalf("tree file: %v", err)
+	}
+	pw := tree.Children[0].Attributes
+	if pw["text"] != orchestra.SecureMask || pw["value"] != orchestra.SecureMask || pw["label"] != "Password" {
+		t.Fatalf("secure node attributes = %v, want masked text and value with the label kept", pw)
+	}
+}
