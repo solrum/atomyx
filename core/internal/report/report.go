@@ -29,8 +29,7 @@ const (
 // individual script result: identity, timing, and the environment
 // the run targeted. Every report format renders the same metadata.
 type ReportMetadata struct {
-	// RunID uniquely identifies this run. It is also the report
-	// bundle's directory name.
+	// RunID uniquely identifies this run.
 	RunID      string        `json:"runId"`
 	Label      string        `json:"label"`
 	StartedAt  string        `json:"startedAt"`
@@ -122,11 +121,19 @@ func (i SuiteReportInput) ReportKind() ReportKind                { return Report
 func (i SuiteReportInput) ReportMetadata() ReportMetadata        { return i.Metadata }
 func (i SuiteReportInput) ReportScreenshots() []ReportScreenshot { return i.Screenshots }
 
-// ReportOptions selects which formats a Reporter writes and where.
-// It is the same shape a project config's report block declares, so
-// it is an alias of config.Report rather than a duplicate of the
-// same two fields.
-type ReportOptions = config.Report
+// ReportOptions selects which formats a Reporter writes and the
+// directories it writes into. The caller decides both directories, so
+// the report package holds no knowledge of where a run lives on disk.
+//
+// Screenshots always go into ArtifactsDir. ReportDir is created only
+// when Formats is not empty. Image links in the HTML report are
+// computed from ReportDir to ArtifactsDir, so the two directories may
+// sit anywhere relative to each other.
+type ReportOptions struct {
+	Formats      []string
+	ReportDir    string
+	ArtifactsDir string
+}
 
 // FormatHTML and FormatJSON are the two values a ReportOptions.Formats
 // entry accepts, re-exported from config so callers that only import
@@ -136,9 +143,9 @@ const (
 	FormatJSON = config.ReportFormatJSON
 )
 
-// ReportBundle is where a generated report bundle landed, and every
-// file written into it.
+// ReportBundle is where a generated report landed, and every file the
+// Reporter wrote, screenshots included.
 type ReportBundle struct {
-	BundleDir string
+	BundleDir string // the report directory, as given in ReportOptions
 	Files     []string
 }

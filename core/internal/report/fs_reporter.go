@@ -2,6 +2,7 @@ package report
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,27 +10,31 @@ import (
 )
 
 // Reporter turns a run's in-memory result into a persisted report
-// bundle. Implementations decide the storage backend; callers only
-// see the bundle directory and the files it contains.
+// report. Implementations decide the storage backend; callers only
+// see the report directory and the files written.
 type Reporter interface {
 	Generate(input ReportInput, options ReportOptions) (ReportBundle, error)
 }
 
 type fsReporter struct{}
 
-// NewFsReporter returns a Reporter that writes a report bundle under
-// <outDir>/<runId>/: report.html and report.json per the requested
-// formats, and every screenshot under a screenshots/ subdirectory,
-// named to match the relative paths the HTML and JSON renderers
-// reference.
+// NewFsReporter returns a Reporter that writes every screenshot into
+// options.ArtifactsDir, named to match the relative paths the JSON
+// renderer references, and writes report.html and report.json into
+// options.ReportDir per the requested formats. HTML image links lead
+// from ReportDir to ArtifactsDir. A Reporter given no formats writes the
+// screenshots only and never creates ReportDir.
 func NewFsReporter() Reporter {
 	return fsReporter{}
 }
 
 func (fsReporter) Generate(input ReportInput, options ReportOptions) (ReportBundle, error) {
-	bundleDir := filepath.Join(options.OutDir, input.ReportMetadata().RunID)
-	if err := os.MkdirAll(bundleDir, 0o755); err != nil {
-		return ReportBundle{}, fmt.Errorf("report: creating bundle directory: %w", err)
+	if options.ArtifactsDir == "" {
+		return ReportBundle{}, errors.New("report: ReportOptions.ArtifactsDir is required")
+	}
+	wantsReport := len(options.Formats) > 0
+	if wantsReport && options.ReportDir == "" {
+		return ReportBundle{}, errors.New("report: ReportOptions.ReportDir is required when a format is requested")
 	}
 
 	var files []string
@@ -37,12 +42,11 @@ func (fsReporter) Generate(input ReportInput, options ReportOptions) (ReportBund
 	screenshots := input.ReportScreenshots()
 	index := BuildScreenshotIndex(screenshots)
 	if len(index.Refs) > 0 {
-		screenshotsDir := filepath.Join(bundleDir, "screenshots")
-		if err := os.MkdirAll(screenshotsDir, 0o755); err != nil {
-			return ReportBundle{}, fmt.Errorf("report: creating screenshots directory: %w", err)
+		if err := os.MkdirAll(options.ArtifactsDir, 0o755); err != nil {
+			return ReportBundle{}, fmt.Errorf("report: creating artifacts directory: %w", err)
 		}
 		for i, screenshot := range screenshots {
-			filePath := filepath.Join(screenshotsDir, index.Refs[i].File)
+			filePath := filepath.Join(options.ArtifactsDir, index.Refs[i].File)
 			if err := os.WriteFile(filePath, screenshot.Data, 0o644); err != nil {
 				return ReportBundle{}, fmt.Errorf("report: writing screenshot %q: %w", index.Refs[i].File, err)
 			}
@@ -50,12 +54,22 @@ func (fsReporter) Generate(input ReportInput, options ReportOptions) (ReportBund
 		}
 	}
 
+	if wantsReport {
+		if err := os.MkdirAll(options.ReportDir, 0o755); err != nil {
+			return ReportBundle{}, fmt.Errorf("report: creating report directory: %w", err)
+		}
+	}
+
 	if slices.Contains(options.Formats, FormatHTML) {
-		html, err := RenderHTML(input, index.ByScope)
+		imageBase, err := ArtifactsLink(options.ReportDir, options.ArtifactsDir)
 		if err != nil {
 			return ReportBundle{}, err
 		}
-		htmlPath := filepath.Join(bundleDir, "report.html")
+		html, err := RenderHTML(input, index.ByScope, imageBase)
+		if err != nil {
+			return ReportBundle{}, err
+		}
+		htmlPath := filepath.Join(options.ReportDir, "report.html")
 		if err := os.WriteFile(htmlPath, []byte(html), 0o644); err != nil {
 			return ReportBundle{}, fmt.Errorf("report: writing report.html: %w", err)
 		}
@@ -71,12 +85,12 @@ func (fsReporter) Generate(input ReportInput, options ReportOptions) (ReportBund
 		if err != nil {
 			return ReportBundle{}, fmt.Errorf("report: encoding report.json: %w", err)
 		}
-		jsonPath := filepath.Join(bundleDir, "report.json")
+		jsonPath := filepath.Join(options.ReportDir, "report.json")
 		if err := os.WriteFile(jsonPath, append(encoded, '\n'), 0o644); err != nil {
 			return ReportBundle{}, fmt.Errorf("report: writing report.json: %w", err)
 		}
 		files = append(files, jsonPath)
 	}
 
-	return ReportBundle{BundleDir: bundleDir, Files: files}, nil
+	return ReportBundle{BundleDir: options.ReportDir, Files: files}, nil
 }

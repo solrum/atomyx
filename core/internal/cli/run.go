@@ -9,9 +9,10 @@ import (
 	"runtime/debug"
 	"time"
 
+	"dev.atomyx/internal/config"
 	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/netcapture"
-	"dev.atomyx/internal/report"
+	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/runner"
 	"dev.atomyx/internal/scenario"
 	"dev.atomyx/internal/script"
@@ -55,11 +56,11 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	}
 	fromConfigPreconditions := configPreconditionsOverride(loaded)
 
-	var configReport *report.ReportOptions
+	var configReport *config.Report
 	if loaded != nil {
 		configReport = loaded.Config.Report
 	}
-	reportOptions, err := resolveReportOptions(flags, configReport)
+	output, err := resolveReportOptions(flags, configReport)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "error: %s\n", err)
 		return 2
@@ -122,17 +123,25 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 
 	runStartedAt := time.Now()
 
-	// runID is generated once, before the script or scenario runs, so
-	// the same value both correlates this run's live step trace and
-	// names its report bundle directory, letting an operator go from
-	// a logged line straight to the matching report.
-	runID := generateRunID(runStartedAt)
-
 	if script.IsScenarioYaml(string(content)) {
 		scenarioDef, err := script.ParseScenario(string(content))
 		if err != nil {
 			return reportUncaught(ctx, stderr, deps.Debug, err)
 		}
+
+		// The run folder is created after the file parses and before
+		// the scenario runs. Its id correlates this run's live step
+		// trace and names the folder holding its report.
+		record, err := startRunRecord(output, runIdentity{
+			Kind:       runfolder.KindSuite,
+			Label:      runLabel(scenarioDef.Name, absPath),
+			ScriptPath: absPath,
+			Device:     desc,
+		})
+		if err != nil {
+			return reportUncaught(ctx, stderr, deps.Debug, err)
+		}
+		defer record.end(ctx, stderr)
 
 		fromScenarioPreconditions := runner.PreconditionsNoOverride
 		if scenarioDef.Preconditions != nil {
@@ -144,7 +153,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 			Orchestra:             built.Orchestra,
 			Clock:                 deps.clock(),
 			Logger:                deps.logger(),
-			RunID:                 runID,
+			RunID:                 record.ID(),
 			NetworkCapture:        networkCapture,
 			Commands:              runner.DefaultCommands(),
 			LoadScript:            fsScenarioScriptLoader(filepath.Dir(absPath)),
@@ -154,27 +163,30 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		result, err := scenarioRunner.Run(runCtx, scenarioDef)
 		finishedAt := time.Now()
 		if opened.reportLost(stderr) {
+			record.setOutcome(runfolder.OutcomeDeviceLost, nil)
 			return 1
 		}
 		if err != nil {
 			return reportUncaught(ctx, stderr, deps.Debug, err)
 		}
+		record.setOutcome(outcomeForResult(result.Ok), nil)
 
 		if jsonOutput {
-			if err := encodeJSON(stdout, toJSONScenarioResult(result)); err != nil {
+			payload := toJSONScenarioResult(result)
+			payload.RunFolder = record.Dir()
+			if err := encodeJSON(stdout, payload); err != nil {
 				return reportUncaught(ctx, stderr, deps.Debug, err)
 			}
+			record.reportedInJSON = true
 		} else {
 			printScenarioResult(stdout, result)
 		}
 
-		if reportOptions != nil {
-			bundle, genErr := writeScenarioReport(runID, result, runStartedAt, finishedAt, platform, deviceID, envName, *reportOptions)
-			if genErr != nil {
-				return reportUncaught(ctx, stderr, deps.Debug, genErr)
-			}
-			_, _ = fmt.Fprintf(stderr, "Report: %s\n", bundle.BundleDir)
+		bundle, genErr := writeScenarioReport(record.ID(), result, runStartedAt, finishedAt, platform, deviceID, envName, record.reportOptions())
+		if genErr != nil {
+			return reportUncaught(ctx, stderr, deps.Debug, genErr)
 		}
+		printReportLocation(stderr, record, bundle)
 
 		if result.Ok {
 			return 0
@@ -188,11 +200,22 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	}
 	preconditionsOverride := resolvePreconditionsOverride(cliPreconditionsFlag, runner.PreconditionsNoOverride, fromConfigPreconditions)
 
+	record, err := startRunRecord(output, runIdentity{
+		Kind:       runfolder.KindScript,
+		Label:      runLabel(def.Name, absPath),
+		ScriptPath: absPath,
+		Device:     desc,
+	})
+	if err != nil {
+		return reportUncaught(ctx, stderr, deps.Debug, err)
+	}
+	defer record.end(ctx, stderr)
+
 	scriptRunner := runner.NewScriptRunner(runner.ScriptRunnerDeps{
 		Orchestra:             built.Orchestra,
 		Clock:                 deps.clock(),
 		Logger:                deps.logger(),
-		RunID:                 runID,
+		RunID:                 record.ID(),
 		Commands:              runner.DefaultCommands(),
 		FlowLoader:            fsFlowLoader{},
 		PreconditionsOverride: preconditionsOverride,
@@ -201,27 +224,30 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	result, err := scriptRunner.Run(runCtx, def)
 	finishedAt := time.Now()
 	if opened.reportLost(stderr) {
+		record.setOutcome(runfolder.OutcomeDeviceLost, nil)
 		return 1
 	}
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
+	record.setOutcome(outcomeForResult(result.Ok), scriptMeta(result.TotalSteps, result.FailedAtStep))
 
 	if jsonOutput {
-		if err := encodeJSON(stdout, toJSONScriptResult(result)); err != nil {
+		payload := toJSONScriptResult(result)
+		payload.RunFolder = record.Dir()
+		if err := encodeJSON(stdout, payload); err != nil {
 			return reportUncaught(ctx, stderr, deps.Debug, err)
 		}
+		record.reportedInJSON = true
 	} else {
 		printTextResult(stdout, result)
 	}
 
-	if reportOptions != nil {
-		bundle, genErr := writeReport(runID, result, runStartedAt, finishedAt, platform, deviceID, envName, *reportOptions)
-		if genErr != nil {
-			return reportUncaught(ctx, stderr, deps.Debug, genErr)
-		}
-		_, _ = fmt.Fprintf(stderr, "Report: %s\n", bundle.BundleDir)
+	bundle, genErr := writeReport(record.ID(), result, runStartedAt, finishedAt, platform, deviceID, envName, record.reportOptions())
+	if genErr != nil {
+		return reportUncaught(ctx, stderr, deps.Debug, genErr)
 	}
+	printReportLocation(stderr, record, bundle)
 
 	if result.Ok {
 		return 0

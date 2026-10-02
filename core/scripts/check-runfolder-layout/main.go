@@ -51,10 +51,6 @@ const (
 // Each entry states what the file spells and why it is tolerated.
 // Never add an entry for new code.
 var allowlist = map[string]bool{
-	// Links screenshots as screenshots/<file> in the rendered HTML.
-	"internal/report/render_html.go": true,
-	// Writes screenshots into a directory named screenshots.
-	"internal/report/fs_reporter.go": true,
 	// Names its own screenshots directory.
 	"internal/mcp/screenshot_tool.go": true,
 	// Prefixes the flat legacy run record key with runs.

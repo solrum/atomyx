@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"crypto/rand"
 	"fmt"
 	"io"
 	"strings"
@@ -53,6 +52,10 @@ type jsonScriptResult struct {
 	// requirement this host cannot meet), consistent with how
 	// runner.ScriptResult.Abort reports the same outcome.
 	Abort *jsonAbort `json:"abort,omitempty"`
+	// RunFolder is the directory of the run folder this run wrote. It is
+	// set only on the top-level result of a run, never on a scenario's
+	// child results.
+	RunFolder string `json:"runFolder,omitempty"`
 }
 
 // jsonAbort is the --json run output's shape for runner.RunAbort.
@@ -123,6 +126,7 @@ type jsonScenarioResult struct {
 	TotalScripts  int                        `json:"totalScripts"`
 	PassedScripts int                        `json:"passedScripts"`
 	DurationMs    int64                      `json:"durationMs"`
+	RunFolder     string                     `json:"runFolder,omitempty"`
 }
 
 func toJSONScenarioResult(result scenario.ScenarioResult) jsonScenarioResult {
@@ -290,10 +294,9 @@ func writeReport(
 }
 
 // writeScenarioReport builds this run's report.ScenarioReportInput
-// and writes the bundle through a report.NewFsReporter for a "run"
-// command scenario result. runID is the caller's already-generated
-// run identifier, so the report bundle's directory name matches the
-// id this run's live log trace carried.
+// and writes its screenshots and requested report formats through a
+// report.NewFsReporter for a "run" command scenario result. runID is
+// the run folder's id, which this run's live log trace carried.
 func writeScenarioReport(
 	runID string,
 	result scenario.ScenarioResult,
@@ -317,44 +320,6 @@ func writeScenarioReport(
 // parse report metadata can rely on it byte-for-byte.
 func formatReportTimestamp(t time.Time) string {
 	return t.UTC().Format("2006-01-02T15:04:05.000Z")
-}
-
-// runIDSuffixAlphabet and runIDSuffixLength describe the random
-// suffix generateRunID appends: 6 characters drawn from base36
-// (0-9, a-z). The suffix's own value is never meaningful on its own,
-// only its shape: consumers that parse a run id only need to know it
-// ends in a fixed-length base36 suffix, not what value it holds.
-const runIDSuffixAlphabet = "0123456789abcdefghijklmnopqrstuvwxyz"
-const runIDSuffixLength = 6
-
-// generateRunID builds a run's report id from startedAt: a UTC,
-// millisecond-precision timestamp with ":" and "." replaced by "-"
-// and lowercased, then a random base36 suffix, e.g.
-// "2026-09-14t03-59-31-064z-a1b2c3". This exact format is part of the
-// report bundle's on-disk contract, so tooling that locates or sorts
-// run directories can rely on it byte-for-byte.
-func generateRunID(startedAt time.Time) string {
-	stamp := strings.ToLower(formatReportTimestamp(startedAt))
-	stamp = strings.NewReplacer(":", "-", ".", "-").Replace(stamp)
-	return stamp + "-" + randomRunIDSuffix()
-}
-
-// randomRunIDSuffix draws runIDSuffixLength characters from
-// runIDSuffixAlphabet using a cryptographic random source. The
-// resulting distribution has a slight bias toward the alphabet's
-// first 28 characters (256 is not an exact multiple of 36), which is
-// immaterial here: the suffix only needs to disambiguate two runs
-// that start within the same millisecond, not to be uniform.
-func randomRunIDSuffix() string {
-	raw := make([]byte, runIDSuffixLength)
-	if _, err := rand.Read(raw); err != nil {
-		panic(err)
-	}
-	suffix := make([]byte, runIDSuffixLength)
-	for i, v := range raw {
-		suffix[i] = runIDSuffixAlphabet[int(v)%len(runIDSuffixAlphabet)]
-	}
-	return string(suffix)
 }
 
 // toReportScreenshots converts a script run's flat screenshot list

@@ -13,6 +13,7 @@ import (
 	"dev.atomyx/internal/config"
 	"dev.atomyx/internal/netcapture"
 	"dev.atomyx/internal/report"
+	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/runner"
 	"dev.atomyx/internal/scenario"
 	"dev.atomyx/internal/suite"
@@ -53,11 +54,11 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 		return 2
 	}
 
-	var configReport *report.ReportOptions
+	var configReport *config.Report
 	if loaded != nil {
 		configReport = loaded.Config.Report
 	}
-	reportOptions, err := resolveReportOptions(flags, configReport)
+	output, err := resolveReportOptions(flags, configReport)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "error: %s\n", err)
 		return 2
@@ -135,17 +136,28 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 	}
 
 	runStartedAt := time.Now()
-	// runID is generated once, before the suite runs, so the same
-	// value both correlates every entry's live step trace and names
-	// the suite's report bundle directory, letting an operator go
-	// from a logged line straight to the matching report.
-	runID := generateRunID(runStartedAt)
+	suiteLabel := "suite"
+	if positional != nil {
+		suiteLabel = *positional
+	}
+	// The run folder is created before the suite runs. Its id
+	// correlates every entry's live step trace and names the folder
+	// holding the suite's report.
+	record, err := startRunRecord(output, runIdentity{
+		Kind:   runfolder.KindSuite,
+		Label:  suiteLabel,
+		Device: desc,
+	})
+	if err != nil {
+		return reportUncaught(ctx, stderr, deps.Debug, err)
+	}
+	defer record.end(ctx, stderr)
 
 	suiteRunner := scenario.NewSuiteRunner(scenario.SuiteRunnerDeps{
 		Orchestra:        built.Orchestra,
 		Clock:            deps.clock(),
 		Logger:           deps.logger(),
-		RunID:            runID,
+		RunID:            record.ID(),
 		NetworkCapture:   networkCapture,
 		Commands:         runner.DefaultCommands(),
 		CreateLoadScript: fsScenarioScriptLoader,
@@ -158,32 +170,28 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 	})
 	finishedAt := time.Now()
 	if opened.reportLost(stderr) {
+		record.setOutcome(runfolder.OutcomeDeviceLost, nil)
 		return 1
 	}
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
+	record.setOutcome(outcomeForResult(result.Ok), nil)
 
 	printSuiteResult(stdout, result)
 
-	if reportOptions != nil {
-		label := "suite"
-		if result.SuiteName != nil {
-			label = *result.SuiteName
-		}
-		metadata := buildReportMetadata(runID, label, runStartedAt, finishedAt, result.DurationMs, platform, deviceID, envName, nil)
-		metadata.Command = report.ReportCommandSuite
-		input := report.SuiteReportInput{
-			Metadata:    metadata,
-			Result:      result,
-			Screenshots: suiteReportScreenshots(result),
-		}
-		bundle, genErr := report.NewFsReporter().Generate(input, *reportOptions)
-		if genErr != nil {
-			return reportUncaught(ctx, stderr, deps.Debug, genErr)
-		}
-		_, _ = fmt.Fprintf(stderr, "Report: %s\n", bundle.BundleDir)
+	metadata := buildReportMetadata(record.ID(), suiteLabel, runStartedAt, finishedAt, result.DurationMs, platform, deviceID, envName, nil)
+	metadata.Command = report.ReportCommandSuite
+	input := report.SuiteReportInput{
+		Metadata:    metadata,
+		Result:      result,
+		Screenshots: suiteReportScreenshots(result),
 	}
+	bundle, genErr := report.NewFsReporter().Generate(input, record.reportOptions())
+	if genErr != nil {
+		return reportUncaught(ctx, stderr, deps.Debug, genErr)
+	}
+	printReportLocation(stderr, record, bundle)
 
 	if result.Ok {
 		return 0

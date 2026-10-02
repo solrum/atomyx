@@ -15,6 +15,7 @@ import (
 	"dev.atomyx/internal/netcapture"
 	"dev.atomyx/internal/report"
 	"dev.atomyx/internal/runner"
+	"dev.atomyx/internal/storageroot"
 )
 
 // Flag, project config, and precedence resolution: turning the run
@@ -241,49 +242,51 @@ func readVarFile(path string) (map[string]string, error) {
 	return out, nil
 }
 
-// resolveReportOptions combines the --report and --report-dir flags
-// with an optional project-config report block into a
-// report.ReportOptions. Reporting is opt-in: nil when neither the CLI
-// flags nor configReport request it, and an error when reporting is
-// requested but no output directory is given. The CLI flags win over
-// configReport field by field, so --report-dir alone can redirect a
-// config-declared report without also having to repeat --report.
-func resolveReportOptions(flags map[string]FlagValue, configReport *report.ReportOptions) (*report.ReportOptions, error) {
-	rawFormats, hasFormats := flags["--report"]
-	rawOutDir, hasOutDir := flags["--report-dir"]
-	cliRequestsReport := hasFormats || hasOutDir
+// runOutput is where a run writes its run folder and which report
+// formats it renders into it. Formats is empty when no report was
+// requested, and the run folder is still written.
+type runOutput struct {
+	Formats []string
+	Root    string
+}
 
-	if !cliRequestsReport && configReport == nil {
-		return nil, nil
-	}
+// resolveReportOptions combines the --report and --report-dir flags
+// with an optional project-config report block into a runOutput. The
+// root is --report-dir, then the config block's outDir, then the
+// shared storage root. A report is requested by --report, by
+// --report-dir, or by a config block, and --report-dir alone implies
+// HTML. The CLI flags win over configReport field by field, so
+// --report-dir alone can redirect a config-declared report without
+// also having to repeat --report.
+func resolveReportOptions(flags map[string]FlagValue, configReport *config.Report) (runOutput, error) {
+	rawFormats, hasFormats := flags["--report"]
+	rawRoot, hasRoot := flags["--report-dir"]
 
 	var formats []string
 	switch {
 	case hasFormats:
 		parsed, err := parseReportFormats(rawFormats)
 		if err != nil {
-			return nil, err
+			return runOutput{}, err
 		}
 		formats = parsed
 	case configReport != nil:
 		formats = configReport.Formats
-	default:
+	case hasRoot:
 		formats = []string{report.FormatHTML}
 	}
 
-	var outDir string
-	if hasOutDir {
-		outDir, _ = rawOutDir.(string)
+	var explicitRoot string
+	if hasRoot {
+		explicitRoot, _ = rawRoot.(string)
 	} else if configReport != nil {
-		outDir = configReport.OutDir
+		explicitRoot = configReport.OutDir
 	}
-	if outDir == "" {
-		return nil, fmt.Errorf(
-			"reporting is enabled, but no output directory is set. Pass --report-dir <path>, or set report.outDir in the project config",
-		)
+	root, err := storageroot.Resolve(explicitRoot)
+	if err != nil {
+		return runOutput{}, err
 	}
-
-	return &report.ReportOptions{Formats: formats, OutDir: outDir}, nil
+	return runOutput{Formats: formats, Root: root}, nil
 }
 
 // parseReportFormats parses the raw --report flag value (e.g.

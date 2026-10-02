@@ -11,7 +11,7 @@ const reportVersion = 1
 
 // ReportJsonScreenshotRef is one screenshot reference inside a
 // rendered ReportJson: its label and the file it was written under,
-// relative to the report bundle's screenshots directory.
+// relative to the run's artifacts directory.
 type ReportJsonScreenshotRef struct {
 	Label string `json:"label"`
 	File  string `json:"file"`
@@ -98,7 +98,7 @@ type ReportJson struct {
 
 // RenderJSON renders a ReportJson for input: the full result plus
 // the run's metadata, with every screenshot replaced by a reference
-// to its file under the report bundle's own screenshots directory.
+// to its file under the run's artifacts directory.
 //
 // byScope is the run's screenshot index grouped by owning scope (see
 // BuildScreenshotIndex). Compute it once per run and pass the same

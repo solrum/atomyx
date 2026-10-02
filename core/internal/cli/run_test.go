@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -18,8 +17,10 @@ import (
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/report"
+	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/runner"
 	"dev.atomyx/internal/script"
+	"dev.atomyx/internal/storageroot"
 	"dev.atomyx/internal/wire"
 )
 
@@ -405,39 +406,6 @@ func TestRunScriptSmokeJSON(t *testing.T) {
 	}
 }
 
-var runIDStampPattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}t\d{2}-\d{2}-\d{2}-\d{3}z$`)
-var runIDSuffixPattern = regexp.MustCompile(`^[0-9a-z]{6}$`)
-
-func TestGenerateRunIDStampAndSuffixShape(t *testing.T) {
-	at := time.Date(2026, 9, 14, 3, 59, 31, 64_000_000, time.UTC)
-	id := generateRunID(at)
-
-	stamp, suffix, ok := strings.Cut(id, "z-")
-	if !ok {
-		t.Fatalf("generateRunID(%v) = %q, want a stamp and suffix joined by \"z-\"", at, id)
-	}
-	stamp += "z"
-	if stamp != "2026-09-14t03-59-31-064z" {
-		t.Errorf("stamp: got %q, want %q", stamp, "2026-09-14t03-59-31-064z")
-	}
-	if !runIDStampPattern.MatchString(stamp) {
-		t.Errorf("stamp %q does not match %s", stamp, runIDStampPattern)
-	}
-	if !runIDSuffixPattern.MatchString(suffix) {
-		t.Errorf("suffix %q does not match %s", suffix, runIDSuffixPattern)
-	}
-}
-
-func TestGenerateRunIDUsesRunStartTime(t *testing.T) {
-	startedAt := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
-	finishedAt := startedAt.Add(time.Hour)
-
-	id := generateRunID(startedAt)
-	if !strings.HasPrefix(id, "2026-01-02t03-04-05-000z-") {
-		t.Errorf("generateRunID(startedAt) = %q, want it derived from the start time, not %v", id, finishedAt)
-	}
-}
-
 func TestParseReportFormatsDedupesPreservingFirstSeenOrder(t *testing.T) {
 	got, err := parseReportFormats("json, html,json , html")
 	if err != nil {
@@ -469,13 +437,19 @@ func TestParseReportFormatsErrors(t *testing.T) {
 	}
 }
 
-func TestResolveReportOptionsNoFlagsNoConfigIsNil(t *testing.T) {
+func TestResolveReportOptionsNoFlagsNoConfigWritesFolderWithoutReport(t *testing.T) {
+	storageRoot := t.TempDir()
+	t.Setenv(storageroot.EnvVar, storageRoot)
+
 	got, err := resolveReportOptions(map[string]FlagValue{}, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got != nil {
-		t.Errorf("got %#v, want nil", got)
+	if len(got.Formats) != 0 {
+		t.Errorf("Formats = %v, want none", got.Formats)
+	}
+	if got.Root != storageRoot {
+		t.Errorf("Root = %q, want the shared storage root %q", got.Root, storageRoot)
 	}
 }
 
@@ -484,39 +458,43 @@ func TestResolveReportOptionsReportDirOnlyDefaultsToHTML(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	want := &report.ReportOptions{Formats: []string{"html"}, OutDir: "out"}
-	if got == nil || len(got.Formats) != 1 || got.Formats[0] != want.Formats[0] || got.OutDir != want.OutDir {
-		t.Errorf("got %#v, want %#v", got, want)
+	if len(got.Formats) != 1 || got.Formats[0] != report.FormatHTML || got.Root != "out" {
+		t.Errorf("got %#v, want HTML formats and root out", got)
 	}
 }
 
-func TestResolveReportOptionsMissingOutDirErrors(t *testing.T) {
-	_, err := resolveReportOptions(map[string]FlagValue{"--report": "html"}, nil)
-	wantErr := "reporting is enabled, but no output directory is set. Pass --report-dir <path>, or set report.outDir in the project config"
-	if err == nil || err.Error() != wantErr {
-		t.Errorf("got %v, want error %q", err, wantErr)
+func TestResolveReportOptionsReportFlagWithoutDirUsesStorageRoot(t *testing.T) {
+	storageRoot := t.TempDir()
+	t.Setenv(storageroot.EnvVar, storageRoot)
+
+	got, err := resolveReportOptions(map[string]FlagValue{"--report": "json"}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got.Formats) != 1 || got.Formats[0] != report.FormatJSON || got.Root != storageRoot {
+		t.Errorf("got %#v, want json formats and root %q", got, storageRoot)
 	}
 }
 
 func TestResolveReportOptionsUsesConfigReportBlockWhenCliOmitsFlags(t *testing.T) {
-	configReport := &report.ReportOptions{Formats: []string{"json"}, OutDir: "from-config"}
+	configReport := &config.Report{Formats: []string{"json"}, OutDir: "from-config"}
 	got, err := resolveReportOptions(map[string]FlagValue{}, configReport)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil || len(got.Formats) != 1 || got.Formats[0] != "json" || got.OutDir != "from-config" {
+	if len(got.Formats) != 1 || got.Formats[0] != "json" || got.Root != "from-config" {
 		t.Errorf("got %#v, want a report built from configReport", got)
 	}
 }
 
 func TestResolveReportOptionsReportDirFlagOverridesConfigOutDir(t *testing.T) {
-	configReport := &report.ReportOptions{Formats: []string{"json"}, OutDir: "from-config"}
+	configReport := &config.Report{Formats: []string{"json"}, OutDir: "from-config"}
 	got, err := resolveReportOptions(map[string]FlagValue{"--report-dir": "from-cli"}, configReport)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil || got.OutDir != "from-cli" {
-		t.Errorf("got %#v, want OutDir overridden to \"from-cli\"", got)
+	if got.Root != "from-cli" {
+		t.Errorf("got %#v, want Root overridden to \"from-cli\"", got)
 	}
 	if len(got.Formats) != 1 || got.Formats[0] != "json" {
 		t.Errorf("got %#v, want Formats kept from configReport since --report was not given", got)
@@ -893,15 +871,19 @@ func TestWriteReport_DeviceLostAbort_CarriedIntoReportMetadata(t *testing.T) {
 		t.Fatal("result.Abort is nil, want a device-lost abort to assert against")
 	}
 
-	dir := t.TempDir()
+	runDir := t.TempDir()
 	if _, err := writeReport("run-abort-1", result, time.Now(), time.Now(), "android", "mock-1", nil, report.ReportOptions{
-		OutDir:  dir,
-		Formats: []string{report.FormatJSON},
+		Formats:      []string{report.FormatJSON},
+		ReportDir:    runfolder.ReportDir(runDir),
+		ArtifactsDir: runfolder.ArtifactsDir(runDir),
 	}); err != nil {
 		t.Fatalf("writeReport: %v", err)
 	}
 
-	bundleJSON := findReportJSON(t, dir)
+	bundleJSON, err := os.ReadFile(filepath.Join(runfolder.ReportDir(runDir), "report.json"))
+	if err != nil {
+		t.Fatalf("reading report.json: %v", err)
+	}
 	var decoded map[string]any
 	if err := json.Unmarshal(bundleJSON, &decoded); err != nil {
 		t.Fatalf("invalid report.json: %v", err)
@@ -1046,38 +1028,35 @@ func TestRunScriptScenarioReportProducesScenarioKindBundle(t *testing.T) {
 	}
 }
 
-// findReportJSON locates the single report.json a test run wrote
-// under reportDir (one run, one runId subdirectory) and returns its
-// raw bytes.
-func findReportJSON(t *testing.T, reportDir string) []byte {
+// singleRunDir returns the run folder the one run under root wrote.
+func singleRunDir(t *testing.T, root string) string {
 	t.Helper()
-	entries, err := os.ReadDir(reportDir)
+	entries, err := os.ReadDir(runfolder.VersionedRunsDir(root))
 	if err != nil {
-		t.Fatalf("reading report dir: %v", err)
+		t.Fatalf("reading the versioned runs directory: %v", err)
 	}
 	if len(entries) != 1 {
-		t.Fatalf("report dir has %d entries, want exactly 1 run bundle: %v", len(entries), entries)
+		t.Fatalf("root has %d run folders, want exactly 1: %v", len(entries), entries)
 	}
-	data, err := os.ReadFile(filepath.Join(reportDir, entries[0].Name(), "report.json"))
+	return runfolder.RunDir(root, entries[0].Name())
+}
+
+// findReportJSON returns the raw bytes of the report.json the single
+// run under root wrote.
+func findReportJSON(t *testing.T, root string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(runfolder.ReportDir(singleRunDir(t, root)), "report.json"))
 	if err != nil {
 		t.Fatalf("reading report.json: %v", err)
 	}
 	return data
 }
 
-// findReportHTML locates the single report.html a test run wrote
-// under reportDir (one run, one runId subdirectory) and returns its
-// raw bytes.
-func findReportHTML(t *testing.T, reportDir string) []byte {
+// findReportHTML returns the raw bytes of the report.html the single
+// run under root wrote.
+func findReportHTML(t *testing.T, root string) []byte {
 	t.Helper()
-	entries, err := os.ReadDir(reportDir)
-	if err != nil {
-		t.Fatalf("reading report dir: %v", err)
-	}
-	if len(entries) != 1 {
-		t.Fatalf("report dir has %d entries, want exactly 1 run bundle: %v", len(entries), entries)
-	}
-	data, err := os.ReadFile(filepath.Join(reportDir, entries[0].Name(), "report.html"))
+	data, err := os.ReadFile(filepath.Join(runfolder.ReportDir(singleRunDir(t, root)), "report.html"))
 	if err != nil {
 		t.Fatalf("reading report.html: %v", err)
 	}

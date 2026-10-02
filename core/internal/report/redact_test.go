@@ -84,7 +84,7 @@ func TestRenderHTML_RedactsSuccessfulTypeStepDetail(t *testing.T) {
 	detail := "Typed \"" + secret + "\""
 	input := scriptInputWithTypeStep(&detail, true)
 
-	html, err := RenderHTML(input, ScreenshotsByScope{})
+	html, err := RenderHTML(input, ScreenshotsByScope{}, "")
 	if err != nil {
 		t.Fatalf("RenderHTML: %v", err)
 	}

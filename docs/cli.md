@@ -92,7 +92,7 @@ Flags:
 | `--preconditions <skip\|force>` | Overrides every precondition's own policy for this run. `skip` does nothing for every precondition. `force` runs every precondition's setup unconditionally. Takes precedence over the scenario's and the project config's `preconditions` field. | the precondition's own policy | no |
 | `--skip-preconditions` | Shorthand for `--preconditions skip`. | off | no |
 | `--report <formats>` | Enables report generation and selects its output formats: `html`, `json`, or both, separated by a comma. Overrides the project config's `report` block. | the project config's `report.formats`, or `html` when reporting is enabled by `--report-dir` alone | no |
-| `--report-dir <path>` | Directory to write the report bundle into. Required when reporting is enabled and the config sets no `report.outDir`. | the project config's `report.outDir` | no |
+| `--report-dir <path>` | Root directory the run folder is written under. See "Run folder" below. | the project config's `report.outDir`, or the storage root | no |
 | `--json` | Outputs the result as JSON instead of text. | off | no |
 | `--help`, `-h` | Prints this command's usage and exits. | off | no |
 
@@ -108,13 +108,9 @@ and the Proxy Setup section in
 [`yml-script-reference.md`](./yml-script-reference.md) for how to
 configure capture per platform.
 
-Reporting is opt-in: it runs only when the project config declares a
-`report` block, or when `--report` or `--report-dir` is given. When
-reporting runs, the CLI writes a report bundle under
-`<outDir>/<runId>/` and prints the bundle's directory. The CLI flags
-take precedence over the config's `report` block field by field, so
-`--report-dir` alone can redirect a config-declared report without
-repeating `--report`.
+Every run writes a run folder under a storage root, with or without
+`--report`. See "Run folder" below for the layout and the root
+resolution.
 
 Example:
 
@@ -126,8 +122,46 @@ atomyx driver run --file test.yml --report html,json --report-dir ./reports
 Exit codes: `0` when the script passed, `1` when the script ran and
 failed, `2` when the command was misused or a usage or config error
 occurred, `130` when SIGINT interrupted the run, and `143` when SIGTERM
-did. An interrupted run prints `interrupted` and still writes the
-partial report.
+did. An interrupted run prints `interrupted` and finalizes its run folder as
+cancelled before it exits.
+
+### Run folder
+
+Every `run` and `suite` command writes a run folder, with or without
+`--report`. The folder holds the run's `meta.json`, its screenshots in
+`artifacts/`, and, when a report is requested, the rendered report in
+`report/`. The CLI prints `Run folder: <path>` on stderr when the
+command ends. With `--json`, the printed result carries the same path
+in a top level `runFolder` field and the line is not printed.
+
+The run folder is `<root>/runs/v1/<id>/`, and the root is the first of
+these that is set:
+
+1. `--report-dir <path>`.
+2. The project config's `report.outDir`.
+3. The `ATOMYX_STORAGE_DIR` environment variable.
+4. `~/.atomyx`, the same default root the MCP server uses.
+
+The id has the form `<yyyymmdd-hhmmss>-<label>-<4 hex>`, where the
+label comes from the script name for `run` and the suite name for
+`suite`. The report is at `<root>/runs/v1/<id>/report/report.html`, and
+its images link to `../artifacts/<file>`. A report is rendered only
+when the project config declares a `report` block or when `--report`
+or `--report-dir` is given, and `--report-dir` alone implies `html`.
+The CLI flags take precedence over the config's `report` block field
+by field, so `--report-dir` alone can redirect a config-declared
+report without repeating `--report`.
+
+Tooling that reads a report uses the `report.html` and `report.json`
+files in the run folder's `report` directory. The flat
+`<outDir>/<runId>/report.html` location is not written.
+
+`meta.json` ends with a result and an outcome. A passing run is
+`passed`, a run that ran and failed is `failed`, a run that ended in an
+error before it produced a result is `failed` with outcome `error`, a
+run that lost its device is `cancelled` with outcome `deviceLost`, and
+a run stopped by SIGINT or SIGTERM is `cancelled`. The meta is
+finalized before the process exits.
 
 ## driver suite
 
@@ -154,7 +188,7 @@ Flags:
 | `--preconditions <skip\|force>` | Overrides every precondition's own policy for every flow in the suite. | the precondition's own policy | no |
 | `--skip-preconditions` | Shorthand for `--preconditions skip`. | off | no |
 | `--report <formats>` | Enables report generation and selects its output formats: `html`, `json`, or both, separated by a comma. Same precedence rule as `atomyx driver run`. | the project config's `report.formats`, or `html` when reporting is enabled by `--report-dir` alone | no |
-| `--report-dir <path>` | Directory to write the report bundle into. Same rule as `atomyx driver run`. | the project config's `report.outDir` | no |
+| `--report-dir <path>` | Root directory the run folder is written under. Same rule as `atomyx driver run`. | the project config's `report.outDir`, or the storage root | no |
 | `--help`, `-h` | Prints this command's usage and exits. | off | no |
 
 Selecting by tag alone requires `testRoots` in the project config, or
@@ -172,8 +206,8 @@ atomyx driver suite --tag smoke --tag regression
 Exit codes: `0` when every flow passed, `1` when the suite ran and at
 least one flow failed, `2` when the selector matched no flows or the
 command was misused, `130` when SIGINT interrupted the suite, and `143`
-when SIGTERM did. An interrupted suite prints `interrupted` and still
-writes the partial report.
+when SIGTERM did. An interrupted suite prints `interrupted` and finalizes its run
+folder as cancelled before it exits.
 
 ## driver doctor
 

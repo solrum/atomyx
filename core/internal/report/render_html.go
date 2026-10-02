@@ -11,26 +11,28 @@ import (
 // RenderHTML renders one self-contained HTML report document for
 // input: a summary header, then a section per step, listing every
 // step's outcome. The document inlines its own styling and
-// references screenshot files through a relative "screenshots/"
-// path, so it opens correctly as a plain file with no network access
-// and no script framework.
+// references screenshot files through relative links, so it opens
+// correctly as a plain file with no network access and no script
+// framework.
 //
 // byScope is the run's screenshot index grouped by owning scope, as
-// documented on RenderJSON.
-func RenderHTML(input ReportInput, byScope ScreenshotsByScope) (string, error) {
+// documented on RenderJSON. imageBase is the link prefix, ending in a
+// slash, that leads from the report file to the directory holding the
+// screenshots. ArtifactsLink computes it.
+func RenderHTML(input ReportInput, byScope ScreenshotsByScope, imageBase string) (string, error) {
 	var summary htmlSummary
 	var body string
 
 	switch v := input.(type) {
 	case ScriptReportInput:
 		summary = summarizeScript(v.Result)
-		body = renderScriptSection(v.Result, RootScriptScope, byScope)
+		body = renderScriptSection(v.Result, RootScriptScope, byScope, imageBase)
 	case ScenarioReportInput:
 		summary = summarizeScenario(v.Result)
-		body = renderScenarioSection(v.Result, byScope)
+		body = renderScenarioSection(v.Result, byScope, imageBase)
 	case SuiteReportInput:
 		summary = summarizeSuite(v.Result)
-		body = renderSuiteSection(v.Result, byScope)
+		body = renderSuiteSection(v.Result, byScope, imageBase)
 	default:
 		return "", fmt.Errorf("report: renderHtml does not support report kind %q yet", input.ReportKind())
 	}
@@ -109,7 +111,7 @@ func metaRow(term, value string) string {
 	return fmt.Sprintf("<div><dt>%s</dt><dd>%s</dd></div>", escapeHTML(term), escapeHTML(value))
 }
 
-func renderScriptSection(result runner.ScriptResult, scope string, byScope ScreenshotsByScope) string {
+func renderScriptSection(result runner.ScriptResult, scope string, byScope ScreenshotsByScope, imageBase string) string {
 	status, statusClass := "FAIL", "status-fail"
 	if result.Ok {
 		status, statusClass = "PASS", "status-pass"
@@ -118,7 +120,7 @@ func renderScriptSection(result runner.ScriptResult, scope string, byScope Scree
 		"<section class=\"script-result\">\n  <h2><span class=\"%s\">%s</span> %s</h2>\n  <p>%d of %d steps passed, %d ms</p>\n  %s\n  %s\n</section>",
 		statusClass, status, escapeHTML(result.ScriptName),
 		result.PassedSteps, result.TotalSteps, result.DurationMs,
-		renderStepsTable(result.Steps), renderInlineScreenshots(byScope[scope]),
+		renderStepsTable(result.Steps), renderInlineScreenshots(byScope[scope], imageBase),
 	)
 }
 
@@ -147,14 +149,14 @@ func renderStepsTable(steps []runner.StepResult) string {
 	)
 }
 
-func renderScenarioSection(result scenario.ScenarioResult, byScope ScreenshotsByScope) string {
+func renderScenarioSection(result scenario.ScenarioResult, byScope ScreenshotsByScope, imageBase string) string {
 	status, statusClass := "FAIL", "status-fail"
 	if result.Ok {
 		status, statusClass = "PASS", "status-pass"
 	}
 	children := make([]string, len(result.Scripts))
 	for i, child := range result.Scripts {
-		children[i] = renderScenarioChild(child, byScope, ScenarioChildScope(RootScriptScope, child.ScriptIndex, child.ScriptPath))
+		children[i] = renderScenarioChild(child, byScope, ScenarioChildScope(RootScriptScope, child.ScriptIndex, child.ScriptPath), imageBase)
 	}
 	return fmt.Sprintf(
 		"<section class=\"scenario-result\">\n  <h2><span class=\"%s\">%s</span> %s</h2>\n  <p>%d of %d scripts passed, %d ms</p>\n  %s\n</section>",
@@ -164,7 +166,7 @@ func renderScenarioSection(result scenario.ScenarioResult, byScope ScreenshotsBy
 	)
 }
 
-func renderScenarioChild(child scenario.ScenarioScriptResult, byScope ScreenshotsByScope, scope string) string {
+func renderScenarioChild(child scenario.ScenarioScriptResult, byScope ScreenshotsByScope, scope string, imageBase string) string {
 	statusClass := scenarioChildStatusClass(child.Status)
 	header := fmt.Sprintf(
 		"<h3><span class=\"%s\">%s</span> [%d] %s</h3>",
@@ -181,7 +183,7 @@ func renderScenarioChild(child scenario.ScenarioScriptResult, byScope Screenshot
 	}
 	return fmt.Sprintf(
 		"<article class=\"scenario-child\">\n  %s\n  %s\n  %s\n</article>",
-		header, renderStepsTable(child.Result.Steps), renderInlineScreenshots(byScope[scope]),
+		header, renderStepsTable(child.Result.Steps), renderInlineScreenshots(byScope[scope], imageBase),
 	)
 }
 
@@ -203,14 +205,14 @@ func scenarioChildStatusClass(status scenario.ScriptRunStatus) string {
 	}
 }
 
-func renderSuiteSection(result scenario.SuiteResult, byScope ScreenshotsByScope) string {
+func renderSuiteSection(result scenario.SuiteResult, byScope ScreenshotsByScope, imageBase string) string {
 	status, statusClass := "FAIL", "status-fail"
 	if result.Ok {
 		status, statusClass = "PASS", "status-pass"
 	}
 	entries := make([]string, len(result.Entries))
 	for i, entry := range result.Entries {
-		entries[i] = renderSuiteEntry(entry, i, byScope)
+		entries[i] = renderSuiteEntry(entry, i, byScope, imageBase)
 	}
 	suiteName := "suite"
 	if result.SuiteName != nil {
@@ -224,7 +226,7 @@ func renderSuiteSection(result scenario.SuiteResult, byScope ScreenshotsByScope)
 	)
 }
 
-func renderSuiteEntry(entry scenario.SuiteEntryResult, entryIndex int, byScope ScreenshotsByScope) string {
+func renderSuiteEntry(entry scenario.SuiteEntryResult, entryIndex int, byScope ScreenshotsByScope, imageBase string) string {
 	scope := SuiteEntryScope(entryIndex, entry.Path)
 	statusClass := "status-fail"
 	if entry.Status == scenario.EntryPassed {
@@ -247,7 +249,7 @@ func renderSuiteEntry(entry scenario.SuiteEntryResult, entryIndex int, byScope S
 		s := entry.Result.Scenario
 		children := make([]string, len(s.Scripts))
 		for i, child := range s.Scripts {
-			children[i] = renderScenarioChild(child, byScope, ScenarioChildScope(scope, child.ScriptIndex, child.ScriptPath))
+			children[i] = renderScenarioChild(child, byScope, ScenarioChildScope(scope, child.ScriptIndex, child.ScriptPath), imageBase)
 		}
 		return fmt.Sprintf(
 			"<article class=\"suite-entry\">\n  %s\n  <p>%d of %d scripts passed, %d ms</p>\n  %s\n</article>",
@@ -260,19 +262,19 @@ func renderSuiteEntry(entry scenario.SuiteEntryResult, entryIndex int, byScope S
 	script := entry.Result.Script
 	return fmt.Sprintf(
 		"<article class=\"suite-entry\">\n  %s\n  %s\n  %s\n</article>",
-		header, renderStepsTable(script.Steps), renderInlineScreenshots(byScope[scope]),
+		header, renderStepsTable(script.Steps), renderInlineScreenshots(byScope[scope], imageBase),
 	)
 }
 
-func renderInlineScreenshots(refs []ScreenshotRef) string {
+func renderInlineScreenshots(refs []ScreenshotRef, imageBase string) string {
 	if len(refs) == 0 {
 		return ""
 	}
 	figures := make([]string, len(refs))
 	for i, ref := range refs {
 		figures[i] = fmt.Sprintf(
-			"<figure>\n      <img src=\"screenshots/%s\" alt=\"%s\">\n      <figcaption>%s</figcaption>\n    </figure>",
-			encodeURIComponent(ref.File), escapeHTML(ref.Label), escapeHTML(ref.Label),
+			"<figure>\n      <img src=\"%s%s\" alt=\"%s\">\n      <figcaption>%s</figcaption>\n    </figure>",
+			imageBase, encodeURIComponent(ref.File), escapeHTML(ref.Label), escapeHTML(ref.Label),
 		)
 	}
 	return fmt.Sprintf("<div class=\"screenshots\">\n%s\n  </div>", strings.Join(figures, "\n"))

@@ -30,7 +30,7 @@ func TestReportRenderHTML_Script(t *testing.T) {
 	}
 
 	index := BuildScreenshotIndex(input.Screenshots)
-	html, err := RenderHTML(input, index.ByScope)
+	html, err := RenderHTML(input, index.ByScope, "screenshots/")
 	if err != nil {
 		t.Fatalf("RenderHTML: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestReportRenderHTML_Scenario(t *testing.T) {
 	}
 
 	index := BuildScreenshotIndex(input.Screenshots)
-	html, err := RenderHTML(input, index.ByScope)
+	html, err := RenderHTML(input, index.ByScope, "screenshots/")
 	if err != nil {
 		t.Fatalf("RenderHTML: %v", err)
 	}
@@ -190,7 +190,7 @@ func TestReportRenderHTML_Suite(t *testing.T) {
 	}
 
 	index := BuildScreenshotIndex(input.Screenshots)
-	html, err := RenderHTML(input, index.ByScope)
+	html, err := RenderHTML(input, index.ByScope, "screenshots/")
 	if err != nil {
 		t.Fatalf("RenderHTML: %v", err)
 	}
@@ -213,7 +213,7 @@ func TestReportRenderHTML_Suite(t *testing.T) {
 }
 
 func TestReportRenderHTML_UnsupportedKind(t *testing.T) {
-	if _, err := RenderHTML(fakeReportInput{}, ScreenshotsByScope{}); err == nil {
+	if _, err := RenderHTML(fakeReportInput{}, ScreenshotsByScope{}, ""); err == nil {
 		t.Fatal("expected RenderHTML to error on an unsupported report kind")
 	}
 }
