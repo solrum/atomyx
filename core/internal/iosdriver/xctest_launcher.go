@@ -868,10 +868,21 @@ func (l *XctestLauncher) runnerEnv(runnerPort int) []string {
 // elapses on the injected Clock. A runner that answers but is not the
 // expected one ends the wait with XctestErrRunnerMismatch, because
 // that runner holds the port and the launched process never will.
+//
+// The exception is a physical device launched with an allocated host
+// port: every host port maps onto the same device-side port, so an
+// earlier runner of the same device that is still winding down answers
+// first. That answer means the new runner is not ready yet, so the wait
+// continues, and a timeout then names the earlier runner as the cause.
 func (l *XctestLauncher) waitForReadyOrExit(ctx context.Context, port int, exited <-chan error) error {
+	previousRunnerSeen := false
 	probe := func() (bool, error) {
 		found, _, idErr := CheckRunnerIdentity(ctx, port, iproxyPingProbeTimeout, l.expected())
 		if idErr != nil {
+			if l.waitsForPreviousRunner() && l.expected().IsPreviousDeviceRunner(idErr.Got) {
+				previousRunnerSeen = true
+				return false, nil
+			}
 			return false, runnerMismatchError(idErr)
 		}
 		return found, nil
@@ -881,6 +892,16 @@ func (l *XctestLauncher) waitForReadyOrExit(ctx context.Context, port int, exite
 	case process.ReadinessReady, process.ReadinessExited:
 		return err
 	case process.ReadinessTimeout:
+		if previousRunnerSeen {
+			return &XctestLauncherError{
+				Code: XctestErrLaunchTimeout,
+				Message: fmt.Sprintf(
+					"A previous runner of device %s still holds the device runner port, so the new runner did not become reachable within %ds. "+
+						"Stop the earlier atomyx session or wait for it to exit, then try again.",
+					l.cfg.UDID, l.cfg.LaunchTimeoutMs/1000,
+				),
+			}
+		}
 		return &XctestLauncherError{
 			Code: XctestErrLaunchTimeout,
 			Message: fmt.Sprintf(
@@ -891,6 +912,14 @@ func (l *XctestLauncher) waitForReadyOrExit(ctx context.Context, port int, exite
 	default: // process.ReadinessCtxDone
 		return err
 	}
+}
+
+// waitsForPreviousRunner reports whether a runner of the same device
+// with another launch id is treated as a predecessor to wait out. It
+// holds only for a physical device with an allocated host port, because
+// only there does every launch reach the one device-side runner port.
+func (l *XctestLauncher) waitsForPreviousRunner() bool {
+	return l.cfg.Kind == KindDevice && l.cfg.AllocatePort != nil
 }
 
 // classifySpawnExit turns a spawned "xcodebuild test-without-building"

@@ -76,6 +76,19 @@ func (e ExpectedRunner) Verify(got RunnerIdentity) (IdentityVerdict, string) {
 	return e.verifySimulator(got)
 }
 
+// IsPreviousDeviceRunner reports whether got is an earlier runner of the
+// expected physical device: it targets the same device but reports a
+// different launch id than the one this launch assigned. A device
+// exposes one fixed runner port, so such a runner is the predecessor
+// still occupying that port, not a runner of another target.
+func (e ExpectedRunner) IsPreviousDeviceRunner(got RunnerIdentity) bool {
+	return e.Kind == KindDevice &&
+		e.RunnerID != "" &&
+		got.TargetUDID != "" &&
+		strings.EqualFold(got.TargetUDID, e.UDID) &&
+		got.RunnerID != e.RunnerID
+}
+
 func (e ExpectedRunner) verifySimulator(got RunnerIdentity) (IdentityVerdict, string) {
 	if got.SimulatorUDID != "" && !strings.EqualFold(got.SimulatorUDID, e.UDID) {
 		return IdentityMismatch, fmt.Sprintf("the runner belongs to simulator %s, not %s", got.SimulatorUDID, e.UDID)
@@ -158,6 +171,8 @@ func ProbeRunnerIdentity(ctx context.Context, port int, timeout time.Duration) (
 type RunnerIdentityError struct {
 	Port   int
 	Expect ExpectedRunner
+	// Got is the identity the answering runner reported.
+	Got    RunnerIdentity
 	Reason string
 	// Legacy is true when the runner reports no identity at all, so the
 	// fix is to rebuild it instead of choosing another port.
@@ -189,7 +204,7 @@ func CheckRunnerIdentity(ctx context.Context, port int, timeout time.Duration, w
 	}
 	verdict, reason := want.Verify(got)
 	if verdict == IdentityMismatch || verdict == IdentityLegacy {
-		return true, false, &RunnerIdentityError{Port: port, Expect: want, Reason: reason, Legacy: verdict == IdentityLegacy}
+		return true, false, &RunnerIdentityError{Port: port, Expect: want, Got: got, Reason: reason, Legacy: verdict == IdentityLegacy}
 	}
 	return true, verdict == IdentityUnmanaged, nil
 }
