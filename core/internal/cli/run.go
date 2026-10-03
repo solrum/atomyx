@@ -100,7 +100,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
-	opened, err := openDevice(ctx, deps, "atomyx run", desc)
+	opened, err := borrowDevice(ctx, deps, "atomyx run", "atomyx run "+filepath.Base(absPath), desc)
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}

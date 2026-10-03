@@ -59,6 +59,19 @@ func openDevice(ctx context.Context, deps Deps, command string, desc device.Desc
 	return &deviceSession{Session: opened}, nil
 }
 
+// borrowDevice is openDevice for a command that may take a device from an
+// idle holder able to yield it. borrower is the command string the holder
+// shows to its own user, for example "atomyx run login.yml".
+func borrowDevice(ctx context.Context, deps Deps, command, borrower string, desc device.Descriptor) (*deviceSession, error) {
+	opened, err := acquireWith(ctx, deps, command, session.Request{Descriptor: desc}, func(sessionDeps session.Deps, req session.Request, acq session.Acquisition) (*session.Session, error) {
+		return session.Borrow(ctx, sessionDeps, req, acq, borrower)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &deviceSession{Session: opened}, nil
+}
+
 // acquireSession is the acquisition openDevice performs, returning the
 // bare session for a command that manages its release itself.
 // socketRefresher, when set, answers a viewer's fresh capture request on the
@@ -66,6 +79,14 @@ func openDevice(ctx context.Context, deps Deps, command string, desc device.Desc
 // yielder, when set, lets another process ask this command to give the device
 // up, and makes the session advertise that it can.
 func acquireSession(ctx context.Context, deps Deps, command string, desc device.Descriptor, socketRefresher session.Refresher, yielder session.Yielder) (*session.Session, error) {
+	return acquireWith(ctx, deps, command, session.Request{Descriptor: desc, SocketRefresher: socketRefresher, Yielder: yielder}, func(d session.Deps, req session.Request, acq session.Acquisition) (*session.Session, error) {
+		return session.Acquire(ctx, d, req, acq)
+	})
+}
+
+// acquireWith builds the session dependencies and acquisition budgets for
+// command and hands them to acquire.
+func acquireWith(ctx context.Context, deps Deps, command string, req session.Request, acquire func(session.Deps, session.Request, session.Acquisition) (*session.Session, error)) (*session.Session, error) {
 	sessionDeps := deps.Session
 	sessionDeps.Factory = deps.Factory
 	if sessionDeps.Command == "" {
@@ -77,8 +98,7 @@ func acquireSession(ctx context.Context, deps Deps, command string, desc device.
 	if sessionDeps.Logger == nil {
 		sessionDeps.Logger = deps.logger()
 	}
-	opened, err := session.Acquire(ctx, sessionDeps, session.Request{Descriptor: desc, SocketRefresher: socketRefresher, Yielder: yielder}, session.Acquisition{BudgetMs: deps.Timeouts.DeviceAcquireMs, BuildBudgetMs: deps.Timeouts.RunnerBuildMs})
-	return opened, err
+	return acquire(sessionDeps, req, session.Acquisition{BudgetMs: deps.Timeouts.DeviceAcquireMs, BuildBudgetMs: deps.Timeouts.RunnerBuildMs})
 }
 
 // reportLost tells the operator that a run stopped because the device

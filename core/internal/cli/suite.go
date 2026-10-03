@@ -106,7 +106,7 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
-	opened, err := openDevice(ctx, deps, "atomyx suite", desc)
+	opened, err := borrowDevice(ctx, deps, "atomyx suite", "atomyx suite", desc)
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
