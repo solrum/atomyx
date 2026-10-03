@@ -15,6 +15,9 @@ export class ApiError extends Error {
     super(info.message || `request failed with status ${status}`);
     this.status = status;
     this.code = info.code || 'UNKNOWN';
+    // True when the body carried a code, so the server itself answered
+    // and the failure is not a proxy page or a broken connection.
+    this.coded = Boolean(info.code);
     this.remedy = info.remedy || '';
   }
 }
