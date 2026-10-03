@@ -22,17 +22,25 @@ function lineClass(step) {
 
 // Lists the step lines of the run the holder drives, newest last. The
 // completed line of a step updates the row its started line made. Lines
-// of a new run replace the list, and a gap notice says lines were lost.
+// of a new run replace the list, a gap notice says lines were lost, and
+// reset empties the list when the device or its holder changes.
 // Every value is written with textContent, never as markup.
 export function createStepsPanel(host) {
   const body = addPanel(host, 'Steps');
-  const list = el('ol', 'steps');
+  const list = el('ul', 'steps');
   const empty = el('p', 'muted', 'No run is in progress.');
   const heading = el('p', 'note', '');
   heading.hidden = true;
   body.append(empty, heading, list);
   let runId = null;
   let rows = new Map();
+
+  function clear() {
+    runId = null;
+    rows = new Map();
+    list.replaceChildren();
+    show('');
+  }
 
   function show(text) {
     heading.textContent = text;
@@ -42,15 +50,14 @@ export function createStepsPanel(host) {
   return {
     add(step) {
       if (step.runId !== runId) {
+        clear();
         runId = step.runId;
-        list.replaceChildren();
-        rows = new Map();
-        show('');
       }
       empty.hidden = true;
       let item = rows.get(step.stepIndex);
       if (!item) {
         item = el('li', 'step', '');
+        item.dataset.stepIndex = String(step.stepIndex);
         rows.set(step.stepIndex, item);
         list.append(item);
       }
@@ -58,8 +65,13 @@ export function createStepsPanel(host) {
       item.textContent = lineText(step);
       item.title = step.detail || '';
       while (list.children.length > MAX_STEPS) {
+        rows.delete(Number(list.firstChild.dataset.stepIndex));
         list.firstChild.remove();
       }
+    },
+    reset() {
+      clear();
+      empty.hidden = false;
     },
     gap() {
       empty.hidden = true;

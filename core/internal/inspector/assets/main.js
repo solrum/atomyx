@@ -32,11 +32,21 @@ const view = createTreeView({
 });
 
 let events = null;
+let steps = null;
+let generation = null;
+
+// Shows the released banner, and forgets the step lines of the device
+// the page no longer has.
+function released(text) {
+  steps?.reset();
+  events?.resetSteps();
+  showReleased(text);
+}
 
 function handleFailure(err) {
   if (err instanceof ApiError && DEVICE_UNAVAILABLE_CODES.has(err.code)) {
     events?.stop();
-    showReleased(unavailableText(err.code));
+    released(unavailableText(err.code));
   } else if (err instanceof ApiError && EMPTY_CODES.has(err.code)) {
     return;
   } else if (err instanceof ApiError && err.status === 401) {
@@ -59,9 +69,14 @@ function guarded(task) {
 
 const loadSession = guarded(async () => {
   const info = await refreshSession();
+  if (generation !== null && info.generation !== generation) {
+    steps?.reset();
+    events?.resetSteps();
+  }
+  generation = info.generation;
   if (info.state === 'lost') {
     events?.stop();
-    showReleased(unavailableText('DEVICE_LOST'));
+    released(unavailableText('DEVICE_LOST'));
   }
 });
 const loadScreenshot = guarded(refreshScreenshot);
@@ -100,7 +115,7 @@ async function reconnect() {
     loadScreenshot();
   } catch (err) {
     if (err instanceof ApiError) {
-      showReleased(`${err.message} ${err.remedy}`.trim());
+      released(`${err.message} ${err.remedy}`.trim());
     } else {
       showNotice(err.message);
     }
@@ -139,7 +154,7 @@ async function start() {
   createSuggestionsPanel(panels, { operate, notify: showNotice, reloadTree: loadTree, onUse: (selector) => tester.setSelector(selector) });
   const tester = createTesterPanel(panels, { operate, notify: showNotice, selectPath: (path) => view.selectPath(path) });
   createYamlPanel(panels, { operate, notify: showNotice, readSelector: tester.readSelector });
-  const steps = createStepsPanel(panels);
+  steps = createStepsPanel(panels);
   createHighlight({
     img: byId('screenshot'),
     overlay: byId('highlight'),
@@ -158,7 +173,7 @@ async function start() {
     onStep: steps.add,
     onStepGap: steps.gap,
     onReleased: (code) => {
-      showReleased(unavailableText(code));
+      released(unavailableText(code));
       loadSession();
     },
     onFatal: showFatal,

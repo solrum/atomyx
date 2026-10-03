@@ -73,6 +73,27 @@ function verdict(err) {
 // attempt that opens the feed starts the count over.
 export function createEventStream({ onTree, onScreenshot, onStep, onStepGap, onReleased, onFatal }) {
   let abort = null;
+  let lastRunId = '';
+  let lastSeq = 0;
+
+  // Step lines are delivered once, in order. A reopened feed replays the
+  // lines the page already has unless the server resumed after them, so
+  // a line at or before the last one of the same run is dropped here.
+  function deliverStep(event) {
+    if (event.runId === lastRunId && event.seq <= lastSeq) {
+      return;
+    }
+    lastRunId = event.runId;
+    lastSeq = event.seq;
+    onStep(event);
+  }
+
+  function eventsPath() {
+    if (lastRunId === '') {
+      return '/api/v1/events';
+    }
+    return `/api/v1/events?runId=${encodeURIComponent(lastRunId)}&seq=${lastSeq}`;
+  }
 
   async function run(signal) {
     let backoff = BACKOFF_START_MS;
@@ -80,7 +101,7 @@ export function createEventStream({ onTree, onScreenshot, onStep, onStepGap, onR
     let lastError = null;
     while (!signal.aborted) {
       try {
-        const res = await request('/api/v1/events', { signal });
+        const res = await request(eventsPath(), { signal });
         backoff = BACKOFF_START_MS;
         failures = 0;
         onTree();
@@ -91,7 +112,7 @@ export function createEventStream({ onTree, onScreenshot, onStep, onStepGap, onR
           } else if (event.kind === 'screenshot') {
             onScreenshot();
           } else if (event.kind === 'step') {
-            onStep(event);
+            deliverStep(event);
           } else if (event.kind === 'step_gap') {
             onStepGap();
           }
@@ -126,6 +147,12 @@ export function createEventStream({ onTree, onScreenshot, onStep, onStepGap, onR
       this.stop();
       abort = new AbortController();
       run(abort.signal);
+    },
+    // Forgets the last step line read, so the next feed starts from the
+    // first line the holder still has. Called when the device changes.
+    resetSteps() {
+      lastRunId = '';
+      lastSeq = 0;
     },
     stop() {
       if (abort) {
