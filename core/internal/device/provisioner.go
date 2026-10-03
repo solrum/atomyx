@@ -161,8 +161,11 @@ type DriverProvisioner struct {
 	// now reports the current time for the runner record.
 	now func() time.Time
 	// ownPid reports the pid recorded as the owner of every runner this
-	// provisioner launches.
+	// provisioner launches or adopts.
 	ownPid func() int
+	// awaitWatchTick blocks until the next check of an adopted runner's
+	// process is due, and fails once ctx ends.
+	awaitWatchTick func(ctx context.Context) error
 
 	mu       sync.Mutex
 	reserved map[int]struct{}
@@ -186,11 +189,13 @@ func NewDriverProvisioner(deps DriverProvisionerDeps) *DriverProvisioner {
 	if inspector == nil {
 		inspector = process.SystemInspector{}
 	}
-	return &DriverProvisioner{
+	p := &DriverProvisioner{
 		runner: deps.Runner, background: background, clock: clock, logger: logger, inspector: inspector, deps: deps,
 		freePort: operatingSystemFreePort, newRunnerID: randomRunnerID, now: time.Now, ownPid: os.Getpid,
 		reserved: make(map[int]struct{}),
 	}
+	p.awaitWatchTick = p.defaultWatchTick
+	return p
 }
 
 var _ AgentProvisioner = (*DriverProvisioner)(nil)
@@ -325,6 +330,16 @@ func (p *DriverProvisioner) EnsureIOSAgent(ctx context.Context, udid string, kin
 
 // EnsureIOSAgentWatched implements AgentProvisioner.
 func (p *DriverProvisioner) EnsureIOSAgentWatched(ctx context.Context, udid string, kind IosAgentKind, onLost func(error)) (int, func() error, error) {
+	agent, err := p.ProvisionIOSAgent(ctx, udid, kind, onLost, ProvisionOptions{})
+	return agent.Port, agent.Kill, err
+}
+
+// ProvisionIOSAgent implements AdoptingProvisioner. Unless the
+// provisioner was built with FixedIosPort or opts.Fresh is set, it first
+// adopts the simulator runner an earlier holder left running when every
+// condition of adopt holds. Otherwise it ends the recorded runner and
+// launches a new one.
+func (p *DriverProvisioner) ProvisionIOSAgent(ctx context.Context, udid string, kind IosAgentKind, onLost func(error), opts ProvisionOptions) (IOSAgent, error) {
 	// A process can exit right after the launch settles, before this call
 	// has built its kill function, so a loss waits on settled for it. A
 	// launch that failed leaves ended nil, and its caller already has
@@ -354,6 +369,12 @@ func (p *DriverProvisioner) EnsureIOSAgentWatched(ctx context.Context, udid stri
 	cfg := p.iosLaunchConfig(udid, kind)
 	cfg.OnRunnerExit = lostHook(LostRunner)
 	if !p.deps.FixedIosPort {
+		if !opts.Fresh {
+			if state, ok := p.adopt(ctx, udid, cfg); ok {
+				held = launchRecord{path: p.statePath(udid), runnerID: state.RunnerID, owner: RunnerOwner{Pid: state.OwnerPid, StartTime: state.OwnerStartTime}}
+				return p.adoptedAgent(ctx, state, held, udid, lostHook(LostRunner), func(stop func() error) { ended = stop }), nil
+			}
+		}
 		p.reapOrphan(ctx, udid)
 		cfg.RunnerID = p.newRunnerID()
 		cfg.AllocatePort = p.reservePort
@@ -364,11 +385,11 @@ func (p *DriverProvisioner) EnsureIOSAgentWatched(ctx context.Context, udid stri
 	launcher := iosdriver.NewXctestLauncher(p.runner, p.background, p.clock, cfg)
 	kill, err := launcher.EnsureRunning(ctx)
 	if err != nil {
-		return 0, kill, err
+		return IOSAgent{Kill: kill}, err
 	}
 	if p.deps.FixedIosPort {
 		ended = kill
-		return launcher.Port(), kill, nil
+		return IOSAgent{Port: launcher.Port(), Kill: kill}, nil
 	}
 	port := launcher.Port()
 	stop := sync.OnceValue(func() error {
@@ -383,7 +404,7 @@ func (p *DriverProvisioner) EnsureIOSAgentWatched(ctx context.Context, udid stri
 	if p.deps.Keeper != nil {
 		p.deps.Keeper.keep(held, stop)
 	}
-	return port, stop, nil
+	return IOSAgent{Port: port, RunnerID: cfg.RunnerID, Kill: stop}, nil
 }
 
 // statePath returns the runner record path for udid, or an empty string

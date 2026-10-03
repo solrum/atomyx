@@ -218,6 +218,33 @@ func (r *RunnerReaper) Reap(ctx context.Context, statePath, udid string) (ReapOu
 	return outcome, nil
 }
 
+// AdoptionBlocker reports why the runner a record names cannot be adopted
+// by a new holder of udid, or an empty string when it can. It applies the
+// checks Reap applies before it signals anything: the record names this
+// device, the host has not rebooted since it was written, and the
+// recorded pid is a live process that is still the recorded xcodebuild
+// runner. It adds that the runner is a simulator runner with a launch id,
+// because only that runner can be proven the same one later.
+func (r *RunnerReaper) AdoptionBlocker(state RunnerState, udid string) string {
+	if reason := r.unusableRecord(state, udid); reason != "" {
+		return reason
+	}
+	if state.Kind != string(IosAgentKindSimulator) {
+		return "the recorded runner is not a simulator runner"
+	}
+	if state.RunnerID == "" || state.HostPort <= 0 {
+		return "the runner record carries no launch id or port"
+	}
+	alive, reason := r.isRecordedRunner(state)
+	if reason != "" {
+		return reason
+	}
+	if !alive {
+		return "the recorded runner process has gone"
+	}
+	return ""
+}
+
 func (r *RunnerReaper) discard(statePath, reason string) ReapOutcome {
 	_ = os.Remove(statePath)
 	r.deps.Logger.Warn("discarded a runner record without signaling", logging.LogContext{"reason": reason})

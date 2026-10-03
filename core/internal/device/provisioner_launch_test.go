@@ -22,6 +22,7 @@ const (
 	testRunnerPidBase = 9100
 	testBootSeconds   = 1759372800
 	testOwnerPid      = 4242
+	testRunnerUID     = 501
 )
 
 // testProcessStart is the start time the fixture's inspector reports for
@@ -86,7 +87,7 @@ func (f *runnerFarm) Start(ctx context.Context, name string, args ...string) (pr
 	proc := &farmProcess{FakeBackgroundProcess: process.NewFakeBackgroundProcess(), name: name}
 	proc.SetPid(pid)
 	if f.inspector != nil {
-		f.inspector.Set(process.ProcessInfo{PID: pid, PGID: pid, Command: name, StartTime: testProcessStart})
+		f.inspector.Set(process.ProcessInfo{PID: pid, PGID: pid, UID: testRunnerUID, Command: name, StartTime: testProcessStart})
 	}
 	switch name {
 	case "iproxy":
