@@ -8,6 +8,7 @@ import { refreshScreenshot } from './screenshot.js';
 import { refreshSession } from './session-header.js';
 import { createSuggestionsPanel } from './suggestions-panel.js';
 import { createTesterPanel } from './tester-panel.js';
+import { createYamlPanel } from './yaml-panel.js';
 import { bindSearch } from './tree-search.js';
 import { createTreeView } from './tree-view.js';
 
@@ -60,11 +61,41 @@ const loadTree = guarded(async () => {
 
 // Every operator action ends with a session refetch, because the holder
 // state changes while the action runs and no capture event follows it.
+// An action refused because the device was released shows the released
+// banner, whichever panel took it.
 async function operate(path, body) {
   try {
     return await postJson(path, body);
+  } catch (err) {
+    if (err instanceof ApiError && err.code === RELEASED_CODE) {
+      handleFailure(err);
+    }
+    throw err;
   } finally {
     loadSession();
+  }
+}
+
+// Takes the device again on the operator's request, then resumes the
+// capture feed and refetches everything the page shows. A refusal, such
+// as DEVICE_HELD, keeps the banner up with the server's remedy.
+async function reconnect() {
+  const button = byId('reconnect');
+  button.disabled = true;
+  try {
+    await operate('/api/v1/reconnect');
+    hideReleased();
+    events.start();
+    loadTree();
+    loadScreenshot();
+  } catch (err) {
+    if (err instanceof ApiError) {
+      showReleased(`${err.message} ${err.remedy}`.trim());
+    } else {
+      showNotice(err.message);
+    }
+  } finally {
+    button.disabled = false;
   }
 }
 
@@ -97,6 +128,7 @@ async function start() {
   createPropertiesPanel(panels);
   createSuggestionsPanel(panels, { operate, notify: showNotice, reloadTree: loadTree, onUse: (selector) => tester.setSelector(selector) });
   const tester = createTesterPanel(panels, { operate, notify: showNotice, selectPath: (path) => view.selectPath(path) });
+  createYamlPanel(panels, { operate, notify: showNotice, readSelector: tester.readSelector });
   createHighlight({
     img: byId('screenshot'),
     overlay: byId('highlight'),
@@ -105,6 +137,7 @@ async function start() {
   });
   bindSearch(byId('search'), view);
   byId('refresh').addEventListener('click', refreshCapture);
+  byId('reconnect').addEventListener('click', reconnect);
   events = createEventStream({
     onTree: () => {
       loadTree();

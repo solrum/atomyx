@@ -525,6 +525,15 @@ build on the `.Built(` and `.Orchestra(` accessors, on
   they answer while the device is released. The page renders what the
   server decides and holds no logic of its own, so the JavaScript has
   no unit tests.
+- **Page contract with the server.** The page never decides whether a
+  tree and a screenshot belong together. It draws a highlight only when
+  the screenshot headers `X-Atomyx-Paired` and `X-Atomyx-Highlightable`
+  are both `true` and the selected node comes from the current tree
+  revision, and it multiplies bounds by `X-Atomyx-Scale`. Every request
+  that names a node sends the tree revision and the child index path, and
+  a `TREE_STALE` answer means the page must refetch the tree. Page text
+  is built with `textContent` and element children only, and a Go test
+  fails when a script parses text as markup or code.
 - **Idle release and reconnect.** `Host` owns the device lifecycle and
   is itself the `session.Controller` the server and every route group
   receive, so a route never captures a controller that a release or a

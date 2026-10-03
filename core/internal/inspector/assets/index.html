@@ -19,7 +19,10 @@
     <button type="button" id="refresh">Refresh</button>
   </header>
   <div id="fatal" class="banner banner-error" role="alert" hidden></div>
-  <div id="released" class="banner banner-warn" role="status" hidden></div>
+  <div id="released" class="banner banner-warn banner-action" role="status" hidden>
+    <span id="released-text"></span>
+    <button type="button" id="reconnect">Reconnect</button>
+  </div>
   <div id="notice" class="banner banner-info" role="status" hidden></div>
   <main class="layout" id="layout" hidden>
     <section class="pane pane-shot" aria-label="Screenshot">

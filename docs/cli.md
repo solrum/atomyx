@@ -398,13 +398,19 @@ one, is logged as refused.
   device by then, reconnect fails with `DEVICE_HELD` and the device
   stays released. The server and the token keep working across a
   release and a reconnect.
+  The page shows the released banner with a Reconnect button when the
+  feed or any action answers `410` with `DEVICE_RELEASED`. Pressing it
+  posts to `/api/v1/reconnect`, and on success the page resumes the
+  capture feed and refetches the session, the tree and the screenshot.
+  When the device is held elsewhere, the banner shows the refusal and
+  its remedy and the button stays available.
 - **The page.** The header names the device, its platform and kind,
   and the holder state. The page reads the code from the URL fragment,
   removes it from the address bar, and trades it for a token that it
   keeps in memory only. A page opened without a code, or with a code
   that was already used, says so and tells you to press Enter in the
   terminal for a fresh URL.
-- **The tree.** The right pane shows the tree as an outline. Each row
+- **The tree.** The middle pane shows the tree as an outline. Each row
   shows the role and the most useful of the id, label and text, with
   secret values already masked by the server. Only the first three levels
   show at first, and a twisty, a click or the arrow keys open and
@@ -415,6 +421,37 @@ one, is logged as refused.
   the matching text, and Enter steps to the next match while Shift
   and Enter steps back. Selecting a row, by click, arrow key or match
   step, selects its node for the detail panels.
+- **The panels.** The right pane holds four panels, from top to bottom.
+  - Properties lists every attribute of the selected node as the tree
+    response returns it, with the node's path, its bounds and its state
+    flags. A secure node shows its masked values here, and its tree row
+    is labelled by its hint or label.
+  - Selector suggestions asks the server for candidate selectors for
+    the selected node. Each candidate shows `unique` or `ambiguous`, how
+    many nodes it matches, and `obscured` when another node covers the
+    target. A candidate button copies its selector into the tester. A
+    selection from an earlier capture is not sent, and a `TREE_STALE`
+    answer shows a notice and reloads the tree.
+  - Selector tester takes the selector as one JSON object, the same
+    shape a script step uses: `id`, `label`, `text`, `hint`, `value`,
+    `role`, `enabled`, `clickable`, `focused` and `nth`, where a text
+    field may also be `{"regex": "..."}`. Test selector lists the
+    matches in resolution order with their paths and bounds, and a match
+    button selects that node in the tree.
+  - Copy as YAML renders one step for the tester's selector. The action
+    is `tap`, `type`, `waitFor`, `assertVisible`, `assertNotVisible` or
+    `assertExists`, and `type` also takes the text. The server renders
+    the YAML, and for a secure target it writes a placeholder such as
+    `${password}` instead of the text, which the panel explains. Copy
+    puts the step on the clipboard through the browser, which may refuse
+    it, in which case the step stays selectable.
+- **The highlight.** The selected node's bounds are drawn over the
+  screenshot only when the server reports that the tree and the
+  screenshot were captured together and can be matched, and the
+  selection belongs to the tree currently shown. Otherwise no box is
+  drawn and a note under the screenshot says why. While the screenshot
+  is highlightable, a click on it selects the deepest node whose bounds
+  contain the clicked point, and the tree opens the path to that node.
 - **Live updates.** The page follows the capture feed, so the
   screenshot and the header change as the holder captures. A feed that
   drops or ends is reopened after a growing pause. When the device has

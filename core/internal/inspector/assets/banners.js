@@ -22,7 +22,8 @@ export function showNotice(text) {
 }
 
 export function showReleased(text) {
-  show('released', text);
+  document.getElementById('released-text').textContent = text;
+  document.getElementById('released').hidden = false;
 }
 
 export function hideReleased() {
