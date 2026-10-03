@@ -42,6 +42,8 @@ func (e *DeviceNotFoundError) Error() string {
 //     serial is an emulator and any other is a physical device. The
 //     id is never rejected, because the Android driver only needs a
 //     serial adb accepts.
+//     Only the probes that can report Android are scanned, so a
+//     composite probe does not run its iOS tooling for an Android id.
 //   - iOS with an id: probe is scanned for a reachable iOS device
 //     whose id matches, ignoring case, and the match's Kind
 //     (simulator or physical device) is returned. An id no scan finds
@@ -80,7 +82,7 @@ func ResolveDescriptor(ctx context.Context, probe Probe, runners RunnerIdentifie
 // otherwise.
 func resolveAndroidKind(ctx context.Context, probe Probe, id string) Kind {
 	if probe != nil {
-		for _, d := range probe.Scan(ctx) {
+		for _, d := range scanPlatform(ctx, probe, PlatformAndroid) {
 			if d.Platform == PlatformAndroid && d.ID == id {
 				return d.Kind
 			}

@@ -42,9 +42,52 @@ var _ Probe = (*CompositeProbe)(nil)
 // concurrently and concatenating their results. Result order across
 // probes is not guaranteed.
 func (c *CompositeProbe) Scan(ctx context.Context) []Descriptor {
-	results := make([][]Descriptor, len(c.probes))
+	return c.scan(ctx, c.probes)
+}
+
+// PlatformScoped is implemented by a probe that only ever reports
+// devices of one platform, so a caller that needs one platform can skip
+// the probes of the others.
+type PlatformScoped interface {
+	// ProbePlatform names the only platform the probe reports.
+	ProbePlatform() Platform
+}
+
+// platformScanner scans only the probes that can report one platform.
+type platformScanner interface {
+	ScanPlatform(ctx context.Context, platform Platform) []Descriptor
+}
+
+// ScanPlatform scans the constituent probes that can report platform:
+// every probe that is not PlatformScoped, and each PlatformScoped probe
+// whose platform matches. A probe of another platform is never called,
+// so resolving an Android device does not spend an iOS tooling scan.
+func (c *CompositeProbe) ScanPlatform(ctx context.Context, platform Platform) []Descriptor {
+	selected := make([]Probe, 0, len(c.probes))
+	for _, p := range c.probes {
+		if scoped, ok := p.(PlatformScoped); ok && scoped.ProbePlatform() != platform {
+			continue
+		}
+		selected = append(selected, p)
+	}
+	return c.scan(ctx, selected)
+}
+
+var _ platformScanner = (*CompositeProbe)(nil)
+
+// scanPlatform scans probe for platform, narrowing a probe that can
+// scope its scan.
+func scanPlatform(ctx context.Context, probe Probe, platform Platform) []Descriptor {
+	if s, ok := probe.(platformScanner); ok {
+		return s.ScanPlatform(ctx, platform)
+	}
+	return probe.Scan(ctx)
+}
+
+func (c *CompositeProbe) scan(ctx context.Context, probes []Probe) []Descriptor {
+	results := make([][]Descriptor, len(probes))
 	var wg sync.WaitGroup
-	for i, p := range c.probes {
+	for i, p := range probes {
 		wg.Add(1)
 		go func(i int, p Probe) {
 			defer wg.Done()

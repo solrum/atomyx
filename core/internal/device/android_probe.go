@@ -21,7 +21,13 @@ func NewAndroidAdbProbe(runner process.Runner) *AndroidAdbProbe {
 	return &AndroidAdbProbe{runner: runner}
 }
 
-var _ Probe = (*AndroidAdbProbe)(nil)
+var (
+	_ Probe          = (*AndroidAdbProbe)(nil)
+	_ PlatformScoped = (*AndroidAdbProbe)(nil)
+)
+
+// ProbePlatform implements PlatformScoped.
+func (*AndroidAdbProbe) ProbePlatform() Platform { return PlatformAndroid }
 
 // Scan implements Probe.
 func (p *AndroidAdbProbe) Scan(ctx context.Context) []Descriptor {

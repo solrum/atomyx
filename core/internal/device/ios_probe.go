@@ -35,7 +35,13 @@ func NewIosProbe(runner process.Runner) *IosProbe {
 	return &IosProbe{runner: runner}
 }
 
-var _ Probe = (*IosProbe)(nil)
+var (
+	_ Probe          = (*IosProbe)(nil)
+	_ PlatformScoped = (*IosProbe)(nil)
+)
+
+// ProbePlatform implements PlatformScoped.
+func (*IosProbe) ProbePlatform() Platform { return PlatformIOS }
 
 // Scan implements Probe.
 func (p *IosProbe) Scan(ctx context.Context) []Descriptor {
@@ -198,7 +204,13 @@ func NewIosBootedSimulatorProbe(runner process.Runner) *IosBootedSimulatorProbe 
 	return &IosBootedSimulatorProbe{runner: runner}
 }
 
-var _ Probe = (*IosBootedSimulatorProbe)(nil)
+var (
+	_ Probe          = (*IosBootedSimulatorProbe)(nil)
+	_ PlatformScoped = (*IosBootedSimulatorProbe)(nil)
+)
+
+// ProbePlatform implements PlatformScoped.
+func (*IosBootedSimulatorProbe) ProbePlatform() Platform { return PlatformIOS }
 
 // Scan implements Probe.
 func (p *IosBootedSimulatorProbe) Scan(ctx context.Context) []Descriptor {
