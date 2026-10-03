@@ -211,8 +211,12 @@ func (h *RemoteHandle) FreshTree(ctx context.Context) (Snapshot, error) {
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.store.storeTree(result.Tree)
-	h.store.storeScreenshot(result.Screenshot)
+	if h.store.storeTree(result.Tree) {
+		h.fanout.notifyLocked(Observation{Kind: ObservedTree, Epoch: result.Tree.Epoch, Revision: result.Tree.Revision, Stable: result.Tree.Stable})
+	}
+	if h.store.storeScreenshot(result.Screenshot) {
+		h.fanout.notifyLocked(Observation{Kind: ObservedScreenshot, Epoch: result.Screenshot.Epoch, Revision: result.Screenshot.Revision, Stable: result.Screenshot.Stable})
+	}
 	h.store.snap.Paired, h.store.snap.Highlightable, h.store.snap.Scale = result.Paired, result.Highlightable, result.Scale
 	return h.store.snap, nil
 }
