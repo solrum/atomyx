@@ -28,6 +28,17 @@
         <p id="screenshot-empty" class="muted">No screenshot yet.</p>
       </div>
     </section>
+    <section class="pane pane-tree" aria-label="UI tree">
+      <div class="tree-tools">
+        <input type="search" id="search" placeholder="Search id, label, text, hint, role" autocomplete="off" spellcheck="false">
+        <span id="search-count" class="muted" aria-live="polite"></span>
+      </div>
+      <div id="tree-viewport" class="tree-viewport" tabindex="0" role="tree">
+        <div id="tree-spacer" class="tree-spacer"></div>
+        <div id="tree-rows" class="tree-rows"></div>
+      </div>
+      <p id="tree-empty" class="muted">No tree yet. Press Refresh.</p>
+    </section>
     <section class="pane pane-panels" id="panels" aria-label="Details"></section>
   </main>
 </body>

@@ -7,9 +7,12 @@
   --border: #d5d9e0;
   --accent: #2f6fed;
   --accent-text: #ffffff;
+  --select: #dbe6fd;
+  --match: #ffe08a;
   --error-bg: #fde8e8;
   --warn-bg: #fff4d6;
   --info-bg: #e6f0ff;
+  --row-height: 22px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -21,6 +24,8 @@
     --border: #343b46;
     --accent: #6b97f5;
     --accent-text: #0d1117;
+    --select: #29395c;
+    --match: #6a5400;
     --error-bg: #4a2222;
     --warn-bg: #4a3b12;
     --info-bg: #1f3358;
@@ -99,3 +104,34 @@ button:disabled { cursor: default; opacity: 0.6; }
 .shot-frame img { display: block; max-width: 100%; max-height: 100%; }
 
 .muted { color: var(--muted); }
+
+.tree-tools { display: flex; align-items: center; gap: 8px; padding: 8px; border-bottom: 1px solid var(--border); }
+.tree-tools input { flex: 1; }
+
+.tree-viewport { position: relative; flex: 1; overflow: auto; outline: none; }
+.tree-spacer { width: 1px; }
+.tree-rows { position: absolute; top: 0; left: 0; right: 0; }
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  height: var(--row-height);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tree-row:hover { background: var(--bg); }
+.tree-row.selected { background: var(--select); }
+.tree-row.current-match { outline: 1px solid var(--accent); outline-offset: -1px; }
+
+.tree-twisty {
+  flex: none;
+  width: 18px;
+  text-align: center;
+  color: var(--muted);
+  user-select: none;
+}
+.tree-role { flex: none; margin-right: 6px; font-weight: 600; }
+.tree-name { overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+.tree-row mark { background: var(--match); color: inherit; }
+
+#tree-empty { padding: 12px; margin: 0; }

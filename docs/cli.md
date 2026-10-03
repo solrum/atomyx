@@ -404,6 +404,17 @@ one, is logged as refused.
   keeps in memory only. A page opened without a code, or with a code
   that was already used, says so and tells you to press Enter in the
   terminal for a fresh URL.
+- **The tree.** The right pane shows the tree as an outline. Each row
+  shows the role and the most useful of the id, label and text, with
+  secret values already masked by the server. Only the first three levels
+  show at first, and a twisty, a click or the arrow keys open and
+  close nodes. Only the rows near the viewport are drawn, so a tree
+  of tens of thousands of nodes stays responsive.
+- **Search.** The search box matches the id, label, text, hint and
+  role of every node. It opens only the paths to the matches, marks
+  the matching text, and Enter steps to the next match while Shift
+  and Enter steps back. Selecting a row, by click, arrow key or match
+  step, selects its node for the detail panels.
 - **Live updates.** The page follows the capture feed, so the
   screenshot and the header change as the holder captures. A feed that
   drops or ends is reopened after a growing pause. When the device has
