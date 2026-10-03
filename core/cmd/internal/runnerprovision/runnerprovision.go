@@ -14,11 +14,15 @@ import (
 
 // New returns a DriverProvisioner that launches a runner per iOS target
 // on its own port and records each launched runner next to the device
-// lease files. When the runtime directory cannot be resolved, the
+// lease files. It also returns the RunnerKeeper that holds every runner
+// the provisioner launches, which the caller stops through Cleanup when
+// its process exits. When the runtime directory cannot be resolved, the
 // provisioner still launches runners but writes no record, and a warning
 // says so.
-func New(runner process.Runner, background process.BackgroundRunner, clock orchestra.Clock, logger logging.Logger) *device.DriverProvisioner {
+func New(runner process.Runner, background process.BackgroundRunner, clock orchestra.Clock, logger logging.Logger) (*device.DriverProvisioner, *device.RunnerKeeper) {
+	keeper := device.NewRunnerKeeper()
 	deps := device.DriverProvisionerDeps{
+		Keeper:     keeper,
 		Runner:     runner,
 		Background: background,
 		Clock:      clock,
@@ -33,5 +37,18 @@ func New(runner process.Runner, background process.BackgroundRunner, clock orche
 			return string(lease.KeyFor(string(device.PlatformIOS), udid))
 		}
 	}
-	return device.NewDriverProvisioner(deps)
+	return device.NewDriverProvisioner(deps), keeper
+}
+
+// Cleanup returns the exit cleanup of a process: it stops every runner
+// the keeper holds, then runs base when it is non-nil. The runners stop
+// first so a base that hangs cannot keep them alive. It is safe to call
+// more than once.
+func Cleanup(keeper *device.RunnerKeeper, base func()) func() {
+	return func() {
+		keeper.StopAll()
+		if base != nil {
+			base()
+		}
+	}
 }

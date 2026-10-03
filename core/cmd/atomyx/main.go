@@ -39,7 +39,7 @@ func main() {
 		device.NewAndroidAdbProbe(procRunner),
 		device.NewIosBootedSimulatorProbe(procRunner),
 	)
-	provisioner := runnerprovision.New(procRunner, background, clock, logger)
+	provisioner, keeper := runnerprovision.New(procRunner, background, clock, logger)
 	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Background: background, Clock: clock, Logger: logger, Provisioner: provisioner})
 
 	sessionDeps, err := sessionwire.Deps(procRunner, clock, logger, "", "cli")
@@ -79,15 +79,22 @@ func main() {
 	// a flush that finishes in time is never cut short.
 	ctx, cancel := context.WithCancelCause(context.Background())
 	sigCh := make(chan os.Signal, 1)
+	cleanup := runnerprovision.Cleanup(keeper, nil)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		sig := <-sigCh
-		shutdown.HandleStop(clock, sig, shutdown.StopHooks{Cancel: func() { cancel(shutdown.InterruptCause(sig)) }, Exit: os.Exit})
+		shutdown.HandleStop(clock, sig, shutdown.StopHooks{Cancel: func() { cancel(shutdown.InterruptCause(sig)) }, Cleanup: cleanup, Exit: os.Exit})
 	}()
 
 	// cancel deliberately does not run before this os.Exit: the process
 	// is terminating either way, and cancel only releases in-process
 	// context bookkeeping the OS reclaims regardless.
+	code := cli.RunContext(ctx, os.Args[1:], deps)
+	// Closing a session leaves its runner running, so the process stops
+	// the runners it owns itself before it exits.
+	if !shutdown.Bounded(clock, shutdown.GracePeriod, cleanup) {
+		fmt.Fprintln(os.Stderr, "atomyx: runner cleanup did not finish in time")
+	}
 	//nolint:gocritic // see the comment above
-	os.Exit(cli.RunContext(ctx, os.Args[1:], deps))
+	os.Exit(code)
 }

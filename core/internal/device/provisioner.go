@@ -129,6 +129,9 @@ type DriverProvisionerDeps struct {
 	// started, because the driver that dials the runner starts its own.
 	// A host that exposes a single fixed port to its own clients sets it.
 	FixedIosPort bool
+	// Keeper, when set, receives every runner this provisioner launches
+	// so the process that owns the keeper can stop them when it exits.
+	Keeper *RunnerKeeper
 }
 
 // DriverProvisioner is the production AgentProvisioner: each call
@@ -364,9 +367,15 @@ func (p *DriverProvisioner) EnsureIOSAgentWatched(ctx context.Context, udid stri
 	stop := sync.OnceValue(func() error {
 		err := kill()
 		p.releasePorts(port)
+		if p.deps.Keeper != nil {
+			p.deps.Keeper.forget(cfg.RunnerID)
+		}
 		return err
 	})
 	ended = stop
+	if p.deps.Keeper != nil {
+		p.deps.Keeper.keep(held, stop)
+	}
 	return port, stop, nil
 }
 
@@ -584,6 +593,7 @@ type FakeProvisioner struct {
 	iosLost         map[string]func(error)
 	iosKills        map[string]func() error
 	iosPorts        map[string]int
+	keeper          *RunnerKeeper
 
 	// gate, when non-nil, is waited on before every call returns. A
 	// test sets it to hold a call open through the "building" or
@@ -608,6 +618,14 @@ func NewFakeProvisioner() *FakeProvisioner {
 }
 
 var _ AgentProvisioner = (*FakeProvisioner)(nil)
+
+// KeepWith hands the runner of every later EnsureIOSAgent call to keeper,
+// the way the real provisioner does, so a test sees the keeper stop it.
+func (f *FakeProvisioner) KeepWith(keeper *RunnerKeeper) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.keeper = keeper
+}
 
 // SetIOSResult makes the next EnsureIOSAgent calls for udid return
 // err (nil for success).
@@ -715,7 +733,11 @@ func (f *FakeProvisioner) EnsureIOSAgentWatched(ctx context.Context, udid string
 	}
 	f.mu.Lock()
 	f.iosKills[udid] = kill
+	keeper := f.keeper
 	f.mu.Unlock()
+	if keeper != nil && err == nil {
+		keeper.keep(launchRecord{runnerID: udid}, kill)
+	}
 	return port, kill, err
 }
 

@@ -130,7 +130,7 @@ func run(opts options) int {
 		device.NewAndroidAdbProbe(procRunner),
 		device.NewIosProbe(procRunner),
 	)
-	provisioner := runnerprovision.New(procRunner, background, clock, logger)
+	provisioner, keeper := runnerprovision.New(procRunner, background, clock, logger)
 	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Background: background, Clock: clock, Logger: logger, Provisioner: provisioner})
 
 	// storage.NewFileStorage resolves its root as opts.Root, then the
@@ -171,6 +171,7 @@ func run(opts options) int {
 		return 1
 	}
 
+	cleanup := runnerprovision.Cleanup(keeper, server.Close)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	sigCh := make(chan os.Signal, 1)
@@ -185,7 +186,7 @@ func run(opts options) int {
 		shutdown.HandleStop(clock, sig, shutdown.StopHooks{
 			Cancel:     cancel,
 			CloseInput: os.Stdin.Close,
-			Cleanup:    server.Close,
+			Cleanup:    cleanup,
 			Exit:       os.Exit,
 		})
 	}()
@@ -196,7 +197,7 @@ func run(opts options) int {
 	// alike. Either way the active device must be released here, because
 	// its helper processes run in their own process group and a terminal
 	// Ctrl-C does not reach them.
-	if !shutdown.Bounded(clock, shutdown.GracePeriod, server.Close) {
+	if !shutdown.Bounded(clock, shutdown.GracePeriod, cleanup) {
 		fmt.Fprintln(os.Stderr, "atomyx-mcp: device cleanup did not finish in time")
 	}
 	if serveErr != nil {

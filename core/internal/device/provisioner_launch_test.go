@@ -201,6 +201,7 @@ type launchFixture struct {
 	runner     *process.Fake
 	farm       *runnerFarm
 	inspector  *process.FakeInspector
+	keeper     *RunnerKeeper
 }
 
 func newLaunchFixture(t *testing.T) *launchFixture {
@@ -228,7 +229,7 @@ func newLaunchFixture(t *testing.T) *launchFixture {
 	farm := newRunnerFarm(t)
 	farm.inspector = inspector
 	inspector.Set(process.ProcessInfo{PID: testOwnerPid, PGID: testOwnerPid, Command: "atomyx", StartTime: testOwnerStart})
-	return &launchFixture{projectDir: projectDir, stateDir: t.TempDir(), runner: runner, farm: farm, inspector: inspector}
+	return &launchFixture{projectDir: projectDir, stateDir: t.TempDir(), runner: runner, farm: farm, inspector: inspector, keeper: NewRunnerKeeper()}
 }
 
 func (f *launchFixture) provisioner(logger logging.Logger) *DriverProvisioner {
@@ -237,6 +238,7 @@ func (f *launchFixture) provisioner(logger logging.Logger) *DriverProvisioner {
 		IosProjectDir: f.projectDir, IosDevTeam: "TEAM123", Logger: logger,
 		RunnerStateDir: f.stateDir,
 		RunnerStateKey: func(udid string) string { return "key-" + udid },
+		Keeper:         f.keeper,
 	})
 	p.ownPid = func() int { return testOwnerPid }
 	return p
