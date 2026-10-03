@@ -36,6 +36,7 @@ func Deps(runner process.Runner, clk clock.Clock, logger logging.Logger, command
 	}
 	return session.Deps{
 		Identity: device.NewIdentityResolver(runner),
+		Owners:   device.NewOwnerResolver(process.SystemInspector{}),
 		Leases:   leases,
 		Sockets:  leases,
 		Clock:    clk,

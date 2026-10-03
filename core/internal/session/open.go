@@ -57,6 +57,14 @@ type Deps struct {
 	Role    string
 	// PID defaults to the running process.
 	PID int
+	// Owners identifies the process that holds a device Borrow asks to
+	// yield, so the runner it leaves behind is handed back to it. Nil
+	// borrows without naming a lender, and the runner is then stopped when
+	// the borrower exits.
+	Owners OwnerResolver
+	// RequestYield asks a holder to give up its device. Nil selects
+	// attach.RequestYield.
+	RequestYield YieldRequester
 }
 
 // Request names the device to open and how.
@@ -88,6 +96,11 @@ type Request struct {
 	// socket. Nil means the session cannot yield, so its hello omits the
 	// control feature.
 	Yielder Yielder
+	// Lender names the process that lent the device to this open. A runner
+	// the driver factory adopts records it, and the opener's exit hands the
+	// runner back to it while it lives. The zero value means nobody lent
+	// the device.
+	Lender device.RunnerOwner
 }
 
 // LaunchState is the launched-app state of an iOS driver, carried
@@ -163,7 +176,7 @@ func Open(ctx context.Context, deps Deps, req Request) (*Session, error) {
 	}
 
 	ctx = logging.WithDevice(ctx, logging.DeviceTag{DeviceID: desc.ID, HardwareID: identity.HardwareID})
-	built, err := factory.Build(ctx, desc)
+	built, err := factory.Build(device.WithLender(ctx, req.Lender), desc)
 	if err != nil {
 		if held != nil {
 			_ = held.Release()
