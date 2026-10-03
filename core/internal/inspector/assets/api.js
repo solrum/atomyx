@@ -47,6 +47,10 @@ export async function getJson(path) {
   return (await request(path)).json();
 }
 
+export async function postJson(path, body = {}) {
+  return (await request(path, { method: 'POST', body })).json();
+}
+
 export async function exchangeCode(code) {
   const res = await fetch('/api/v1/auth', {
     method: 'POST',
@@ -57,4 +61,24 @@ export async function exchangeCode(code) {
     throw await failure(res);
   }
   setToken((await res.json()).token);
+}
+
+export function coalesced(task) {
+  let running = false;
+  let again = false;
+  return async () => {
+    if (running) {
+      again = true;
+      return;
+    }
+    running = true;
+    try {
+      do {
+        again = false;
+        await task();
+      } while (again);
+    } finally {
+      running = false;
+    }
+  };
 }

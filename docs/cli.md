@@ -404,6 +404,13 @@ one, is logged as refused.
   keeps in memory only. A page opened without a code, or with a code
   that was already used, says so and tells you to press Enter in the
   terminal for a fresh URL.
+- **Live updates.** The page follows the capture feed, so the
+  screenshot and the header change as the holder captures. A feed that
+  drops or ends is reopened after a growing pause. When the device has
+  been released, the page shows a banner and stops reading until the
+  device is taken again. The Refresh button asks for a fresh capture,
+  and a tool call or another capture in progress shows as a notice
+  that does not block the page.
 - **Stopping.** Ctrl-C and SIGTERM stop the server and release the
   device.
 

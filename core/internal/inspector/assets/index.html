@@ -16,7 +16,19 @@
       <div><dt>Kind</dt><dd id="session-kind">-</dd></div>
       <div><dt>Holder</dt><dd id="session-holder">-</dd></div>
     </dl>
+    <button type="button" id="refresh">Refresh</button>
   </header>
   <div id="fatal" class="banner banner-error" role="alert" hidden></div>
+  <div id="released" class="banner banner-warn" role="status" hidden></div>
+  <div id="notice" class="banner banner-info" role="status" hidden></div>
+  <main class="layout" id="layout" hidden>
+    <section class="pane pane-shot" aria-label="Screenshot">
+      <div class="shot-frame">
+        <img id="screenshot" alt="Latest device screenshot" hidden>
+        <p id="screenshot-empty" class="muted">No screenshot yet.</p>
+      </div>
+    </section>
+    <section class="pane pane-panels" id="panels" aria-label="Details"></section>
+  </main>
 </body>
 </html>
