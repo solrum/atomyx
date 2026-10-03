@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"slices"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -211,12 +212,38 @@ func TestConsumerThatCallsFromItsNoticeLoopNeverHangs(t *testing.T) {
 	}
 	sub := h.nextSubscription(t)
 
-	const burst = 200
+	// The server closes a connection whose queue overflows, so the burst is
+	// bounded to a window the consumer has not yet acknowledged. The window
+	// stays well below DefaultQueueSize, so a slow writer under load never
+	// looks like a viewer that stopped reading.
+	const (
+		burst  = 200
+		window = 16
+	)
+	var seen atomic.Int64
+	seen.Store(-1)
+	progress := make(chan struct{}, 1)
+	stop := make(chan struct{})
+	defer close(stop)
 	go func() {
 		for i := range burst {
-			sub.notices <- Notice{Type: NoticeTree, Data: TreeNotice{Revision: uint64(i)}}
+			for int64(i)-seen.Load() > window {
+				select {
+				case <-progress:
+				case <-stop:
+					return
+				}
+			}
+			select {
+			case sub.notices <- Notice{Type: NoticeTree, Data: TreeNotice{Revision: uint64(i)}}:
+			case <-stop:
+				return
+			}
 		}
-		sub.notices <- Notice{Type: NoticeStep, Data: StepNotice{}}
+		select {
+		case sub.notices <- Notice{Type: NoticeStep, Data: StepNotice{}}:
+		case <-stop:
+		}
 	}()
 
 	failed := make(chan error, 1)
@@ -226,8 +253,18 @@ func TestConsumerThatCallsFromItsNoticeLoopNeverHangs(t *testing.T) {
 				failed <- nil
 				return
 			}
-			var tree TreeResult
-			if err := c.Call(context.Background(), TypeTreeLatest, nil, &tree); err != nil {
+			var tree TreeNotice
+			if err := n.Decode(&tree); err != nil {
+				failed <- err
+				return
+			}
+			seen.Store(int64(tree.Revision))
+			select {
+			case progress <- struct{}{}:
+			default:
+			}
+			var latest TreeResult
+			if err := c.Call(context.Background(), TypeTreeLatest, nil, &latest); err != nil {
 				failed <- err
 				return
 			}
