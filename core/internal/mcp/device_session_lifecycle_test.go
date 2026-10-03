@@ -601,3 +601,19 @@ func TestDeviceSession_CloseFinalizesTheOpenRunAsCancelled(t *testing.T) {
 		t.Fatal("the closed run still holds its lock")
 	}
 }
+
+func TestDeviceSession_CheckHealthReportsBorrowedWithoutProbing(t *testing.T) {
+	f := newLifecycleFixture(t)
+	if err := f.selectDevice(f.devices); err != nil {
+		t.Fatal(err)
+	}
+	f.devices.mu.Lock()
+	f.devices.sess, f.devices.active, f.devices.state = nil, nil, holderBorrowed
+	f.devices.mu.Unlock()
+
+	report := f.devices.CheckHealth(context.Background())
+
+	if !report.Selected || report.Healthy || report.State != "borrowed" || report.Remedy == "" {
+		t.Fatalf("CheckHealth() = %+v, want a selected, unprobed, borrowed report with a remedy", report)
+	}
+}

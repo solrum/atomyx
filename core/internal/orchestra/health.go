@@ -25,8 +25,8 @@ const HealthCheckTimeoutMs = 5000
 // this surface does.
 //
 // State names where the session stands: unselected, idle, running,
-// released or lost. A session in the released or lost state is not
-// probed, so Healthy is false there without meaning the device
+// released, borrowed or lost. A session in the released, borrowed or
+// lost state is not probed, so Healthy is false there without meaning the device
 // failed. The orchestra itself leaves State empty because it does not
 // know the holder state.
 type HealthReport struct {

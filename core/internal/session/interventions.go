@@ -10,6 +10,9 @@ import (
 const (
 	InterventionViewerAttached = "viewerAttached"
 	InterventionViewerDetached = "viewerDetached"
+	// InterventionControlBorrowed marks the holder giving the device to
+	// another process that asked for it. Client is that process's command.
+	InterventionControlBorrowed = "controlBorrowed"
 )
 
 // maxPendingInterventions bounds the entries a session keeps for its
@@ -81,6 +84,13 @@ func (s *Session) SetInterventionRecorder(recorder InterventionRecorder) {
 	for _, entry := range early {
 		s.appendIntervention(entry)
 	}
+}
+
+// RecordIntervention adds an intervention the host decided on itself, such
+// as handing the device to another process, so it reaches the host's
+// drainer and the open run like an entry the session recorded.
+func (s *Session) RecordIntervention(kind, client string) {
+	s.recordIntervention(kind, client)
 }
 
 func (s *Session) recordIntervention(kind, client string) {

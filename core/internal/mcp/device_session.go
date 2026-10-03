@@ -129,6 +129,10 @@ const (
 	// holderReleased: the idle timer gave the device up. The descriptor
 	// is remembered, so the next device-needing call re-acquires it.
 	holderReleased holderState = "released"
+	// holderBorrowed: the session handed its device to another process
+	// that asked for it, and watches that process until it ends. The
+	// descriptor is remembered like in holderReleased.
+	holderBorrowed holderState = "borrowed"
 	// holderLost: the session had the device and lost it without
 	// choosing to. The descriptor is remembered like in holderReleased.
 	holderLost holderState = "lost"
@@ -864,6 +868,13 @@ func (s *DeviceSession) CheckHealth(ctx context.Context) orchestra.HealthReport 
 			Selected: true, State: string(state),
 			Message: "the session lost its device and has not probed it",
 			Remedy:  "Call a device tool to take the device again, or select_device to pick another one.",
+		}
+	}
+	if state == holderBorrowed {
+		return orchestra.HealthReport{
+			Selected: true, State: string(state),
+			Message: "the session handed its device to another process and has not probed it",
+			Remedy:  "Wait for that process to finish, then call a device tool to take the device again.",
 		}
 	}
 	return orchestra.HealthReport{

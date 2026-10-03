@@ -498,7 +498,9 @@ reaches the driver:
 
 Each viewer that attaches or detaches becomes a `session.Intervention`
 with the kind `viewerAttached` or `viewerDetached`, the time in epoch
-milliseconds and the viewer's client name. `session.InterventionSource`
+milliseconds and the viewer's client name. A holder that gives the device
+to another process records `controlBorrowed` through
+`Session.RecordIntervention`, with the borrower's command as the client. `session.InterventionSource`
 drains the pending entries, and a session that nobody drains keeps only
 the newest 256. While a run is open, the host sets a
 `session.InterventionRecorder` with `Session.SetInterventionRecorder`

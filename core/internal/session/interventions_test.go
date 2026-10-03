@@ -115,3 +115,14 @@ func TestInterventions_AViewerAttachingBeforeTheHostSetsTheRecorderIsStillWritte
 		t.Fatalf("recorded %+v, want the viewerAttached entry of the early viewer", lines)
 	}
 }
+
+func TestInterventions_ARecordedHostInterventionIsDrainedWithItsClient(t *testing.T) {
+	s, _, _ := socketHolder(t)
+
+	s.RecordIntervention(session.InterventionControlBorrowed, "atomyx run login.yml")
+
+	got := s.Interventions()
+	if len(got) != 1 || got[0].Kind != session.InterventionControlBorrowed || got[0].Client != "atomyx run login.yml" || got[0].AtMs <= 0 {
+		t.Fatalf("Interventions() = %+v, want one controlBorrowed entry for the borrower's command", got)
+	}
+}
