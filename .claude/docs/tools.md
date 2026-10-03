@@ -196,6 +196,17 @@ above). Registration is never auto-discovered, so adding a file under
   (`core/internal/mcp/call_notices.go`) as extra text content blocks
   after the tool's own content. `DeviceSession.Ensure` raises one when a
   re-acquire relaunched the app, so no handler formats it.
+  The same middleware drains `DeviceSession.Interventions` after every
+  call, observe-only tools included, and appends the entries as one
+  extra text block of the JSON shape
+  `{"interventions":[{"kind","atMs","client"}]}`
+  (`core/internal/mcp/call_interventions.go`), only when new entries
+  exist. Observe-only tools carry them because draining takes no device
+  and is not session activity, and the agent should learn about a viewer
+  at its next call of any kind. A call that timed out leaves the entries
+  pending. `DeviceSession` keeps the entries of a session it gives up
+  (idle release, lost lease, select of another device, disconnect) until
+  the next drain, so a re-acquire loses none.
 - **Tool budget** (`core/internal/mcp/tool_budget.go`): the context a
   call runs under. It is clock-driven and can be paused.
   `pauseToolBudget(ctx)` stops the budget for the rest of a device

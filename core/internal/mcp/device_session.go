@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 
@@ -220,7 +221,17 @@ type DeviceSession struct {
 	recorder session.InterventionRecorder
 	// recSess is the newest installed session, which receives recorder.
 	recSess *session.Session
+
+	// pendMu guards carried. It is a leaf lock.
+	pendMu sync.Mutex
+	// carried holds the entries of sessions this host no longer holds,
+	// kept until the next result drains them.
+	carried []session.Intervention
 }
+
+// maxCarriedInterventions bounds the entries kept for sessions this host
+// gave up, so a host whose agent never calls keeps only the newest.
+const maxCarriedInterventions = 256
 
 // errSessionClosed is returned by Select once the session has been
 // closed.
@@ -625,7 +636,9 @@ func (s *DeviceSession) releasePrevious(previous *session.Session) {
 		return
 	}
 	desc := previous.Descriptor()
-	if err := previous.Close(); err != nil {
+	err := previous.Close()
+	s.carryInterventions(previous)
+	if err != nil {
 		s.logger.Warn("session.previous_disconnect_failed", logging.LogContext{
 			"id": desc.ID, "platform": string(desc.Platform), "error": err.Error(),
 		})
@@ -785,7 +798,9 @@ func (s *DeviceSession) onTimer(gen uint64, kind timerKind) {
 // carried, so a re-acquire can offer it to the next driver.
 func (s *DeviceSession) closeAndRemember(sess *session.Session, remembered *rememberedDevice, event string) {
 	desc := sess.Descriptor()
-	if err := sess.Close(); err != nil {
+	err := sess.Close()
+	s.carryInterventions(sess)
+	if err != nil {
 		s.logger.Warn("session.release_failed", logging.LogContext{"id": desc.ID, "error": err.Error()})
 	}
 	if remembered != nil {
@@ -894,7 +909,9 @@ func (s *DeviceSession) Disconnect(ctx context.Context) error {
 		return nil
 	}
 	desc := previous.Descriptor()
-	if err := previous.Close(); err != nil { //nolint:contextcheck // teardown is bounded by its own grace timer, not by a call context
+	err := previous.Close() //nolint:contextcheck // teardown is bounded by its own grace timer, not by a call context
+	s.carryInterventions(previous)
+	if err != nil {
 		s.logger.Warn("session.disconnect_failed", logging.LogContext{
 			"id": desc.ID, "platform": string(desc.Platform), "error": err.Error(),
 		})
@@ -961,3 +978,41 @@ func (s *DeviceSession) bindRecorder(sess *session.Session) {
 	s.recSess = sess
 	sess.SetInterventionRecorder(s.recorder)
 }
+
+// Interventions implements session.InterventionSource. It returns what
+// happened to the held session and to the sessions given up before it,
+// oldest first, and clears both. It never takes a device, so a call that
+// is not session activity may drain it.
+func (s *DeviceSession) Interventions() []session.Intervention {
+	s.pendMu.Lock()
+	drained := s.carried
+	s.carried = nil
+	s.pendMu.Unlock()
+
+	s.mu.Lock()
+	held := s.sess
+	s.mu.Unlock()
+	if held != nil {
+		drained = append(drained, held.Interventions()...)
+	}
+	sort.SliceStable(drained, func(i, j int) bool { return drained[i].AtMs < drained[j].AtMs })
+	return drained
+}
+
+// carryInterventions moves the pending entries of a session this host is
+// giving up into carried. It runs after the session closed, so entries
+// the close itself recorded are kept too.
+func (s *DeviceSession) carryInterventions(gone *session.Session) {
+	entries := gone.Interventions()
+	if len(entries) == 0 {
+		return
+	}
+	s.pendMu.Lock()
+	defer s.pendMu.Unlock()
+	s.carried = append(s.carried, entries...)
+	if over := len(s.carried) - maxCarriedInterventions; over > 0 {
+		s.carried = s.carried[over:]
+	}
+}
+
+var _ session.InterventionSource = (*DeviceSession)(nil)

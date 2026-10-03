@@ -96,6 +96,13 @@ directory and a timestamp). Every other field, including
 `add_case_study`'s `case-studies/YYYY-MM/<slug>` key, is compared
 exactly, so a real slug or shape regression still surfaces.
 
+## Interventions
+
+The harness attaches no viewer to the server it replays against, so no
+case result carries an `interventions` block and every golden is
+unchanged. The block's shape and carry-over are covered by tests in
+`core/internal/mcp/tool_call_middleware_test.go`.
+
 ## Out of scope
 
 - `list_devices` is not covered by a tool-CALL case (though it is

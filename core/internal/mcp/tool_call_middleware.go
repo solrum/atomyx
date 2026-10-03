@@ -152,7 +152,7 @@ type callGate interface {
 }
 
 // newToolCallMiddleware builds the single choke point every tools/call
-// request passes through, applying five behaviors uniformly to every
+// request passes through, applying six behaviors uniformly to every
 // registered tool without touching each tool's own handler:
 //
 //  1. Value-constraint validation the published (deliberately loose)
@@ -175,6 +175,12 @@ type callGate interface {
 //  5. A tool that is not observe-only enters gate for the whole call,
 //     so a fresh capture of the held session never interleaves with it.
 //     The wait to enter counts against the call's budget.
+//  6. The interventions that happened since the previous call, such as a
+//     viewer attaching, are appended to the result as one extra text
+//     block. Observe-only tools carry them too: draining takes no device
+//     and is not session activity, and the agent should learn about a
+//     viewer at its next call of any kind. A call that timed out leaves
+//     them pending for the next result.
 func newToolCallMiddleware(logger logging.Logger, clk clock.Clock, sess *DeviceSession, gate callGate, traits *toolTraits) mcp.Middleware {
 	return func(next mcp.MethodHandler) mcp.MethodHandler {
 		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
@@ -215,6 +221,7 @@ func newToolCallMiddleware(logger logging.Logger, clk clock.Clock, sess *DeviceS
 				if toolResult, ok := result.(*mcp.CallToolResult); ok {
 					maskSecureResult(toolResult)
 					notices.attachTo(toolResult)
+					attachInterventions(toolResult, sess.Interventions())
 				}
 				return result, err
 			}
