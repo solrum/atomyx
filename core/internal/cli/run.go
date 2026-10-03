@@ -143,7 +143,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 			return reportUncaught(ctx, stderr, deps.Debug, err)
 		}
 		defer record.end(ctx, stderr)
-		opened.recordRun(record.ID())
+		opened.recordRun(record)
 
 		fromScenarioPreconditions := runner.PreconditionsNoOverride
 		if scenarioDef.Preconditions != nil {
@@ -214,7 +214,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
 	defer record.end(ctx, stderr)
-	opened.recordRun(record.ID())
+	opened.recordRun(record)
 
 	artifacts := newLiveArtifacts(runfolder.ArtifactsDir(record.Dir()))
 	scriptRunner := runner.NewScriptRunner(runner.ScriptRunnerDeps{

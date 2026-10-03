@@ -33,6 +33,9 @@ type runRecord struct {
 	// into the command's JSON output, which makes the plain path line
 	// redundant.
 	reportedInJSON bool
+	// onEnd, when set, runs before the run folder is finalized, so a host
+	// stops writing into it first.
+	onEnd func()
 }
 
 // runIdentity describes what a run drives, for the meta of its run
@@ -115,6 +118,9 @@ func outcomeForScript(result runner.ScriptResult) runfolder.Outcome {
 // be written, the lock is still released and the failure is reported
 // without changing the command's exit code.
 func (r *runRecord) end(ctx context.Context, stderr io.Writer) {
+	if r.onEnd != nil {
+		r.onEnd()
+	}
 	if _, interrupted := shutdown.InterruptExitCode(ctx); interrupted && r.outcome != runfolder.OutcomePassed {
 		r.outcome = runfolder.OutcomeCancelled
 	}

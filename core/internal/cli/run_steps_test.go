@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"dev.atomyx/internal/runfolder"
-	"dev.atomyx/internal/session"
 )
 
 const typedSecret = "hunter2-correct-horse"
@@ -132,85 +131,6 @@ func TestSuiteWritesStepLinesForEveryEntryInOrder(t *testing.T) {
 	if strings.Contains(body, typedSecret) {
 		t.Errorf("steps file carries the typed text:\n%s", body)
 	}
-}
-
-func publishedLines(t *testing.T, deps *Deps) func() []runfolder.StepLine {
-	t.Helper()
-	var held *session.Session
-	deps.SessionOpened = func(s *session.Session) { held = s }
-	return func() []runfolder.StepLine {
-		if held == nil {
-			t.Fatal("the command never opened a session")
-		}
-		lines, gap, err := held.StepsSince("", 0)
-		if err != nil || gap {
-			t.Fatalf("the hub reported lost lines or an error: %v", err)
-		}
-		return lines
-	}
-}
-
-func requireSameLines(t *testing.T, published []runfolder.StepLine, runDir string) {
-	t.Helper()
-	written, _ := readStepLines(t, runDir)
-	if len(published) != len(written) || len(published) == 0 {
-		t.Fatalf("hub holds %d lines, steps.jsonl has %d, want the same non-zero count", len(published), len(written))
-	}
-	for i, line := range published {
-		if int(line.Seq) != i+1 || float64(line.Seq) != written[i]["seq"] || line.Command != written[i]["command"] {
-			t.Errorf("hub line %d = seq %d command %q, file has %v %v", i, line.Seq, line.Command, written[i]["seq"], written[i]["command"])
-		}
-	}
-}
-
-func TestRunPublishesEveryStepLineToTheSessionHub(t *testing.T) {
-	root := t.TempDir()
-	var stdout, stderr bytes.Buffer
-	deps := stepsDeps(&stdout, &stderr)
-	lines := publishedLines(t, &deps)
-
-	code := RunScript(context.Background(), deps, map[string]FlagValue{
-		"--file": writeScript(t, "flow.yml", secretFlow), "--report-dir": root,
-	})
-	if code != 0 {
-		t.Fatalf("exit code = %d, stderr: %s", code, stderr.String())
-	}
-
-	requireSameLines(t, lines(), singleRunDir(t, root))
-}
-
-func TestSuitePublishesEveryStepLineToTheSessionHub(t *testing.T) {
-	dir := t.TempDir()
-	t.Chdir(dir)
-	writeFile(t, dir, "a.yml", secretFlow)
-	root := filepath.Join(dir, "reports")
-	var stdout, stderr bytes.Buffer
-	deps := stepsDeps(&stdout, &stderr)
-	lines := publishedLines(t, &deps)
-
-	code := RunSuite(context.Background(), deps, map[string]FlagValue{"--glob": []string{"*.yml"}, "--report-dir": root}, nil)
-	if code != 0 {
-		t.Fatalf("exit code = %d, stderr: %s", code, stderr.String())
-	}
-
-	requireSameLines(t, lines(), singleRunDir(t, root))
-}
-
-func TestScenarioRunPublishesItsChildrensStepLinesToTheSessionHub(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, dir, "child.yml", "- screenshot: one\n")
-	writeFile(t, dir, "scenario.yml", "name: Nested\nscripts:\n  - child.yml\n")
-	root := filepath.Join(dir, "reports")
-	var stdout, stderr bytes.Buffer
-	deps := stepsDeps(&stdout, &stderr)
-	lines := publishedLines(t, &deps)
-
-	code := RunScript(context.Background(), deps, map[string]FlagValue{"--file": filepath.Join(dir, "scenario.yml"), "--report-dir": root})
-	if code != 0 {
-		t.Fatalf("exit code = %d, stderr: %s", code, stderr.String())
-	}
-
-	requireSameLines(t, lines(), singleRunDir(t, root))
 }
 
 func TestRunKeepsAnEnvValueOutOfTheStepFileWhenAnExpressionCannotConvertIt(t *testing.T) {

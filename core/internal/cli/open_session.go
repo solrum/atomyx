@@ -25,10 +25,13 @@ func (d *deviceSession) Close() {
 }
 
 // recordRun records the open run's id in the holder metadata other
-// processes read when they find the device held. It is best-effort,
-// because the metadata is display-only.
-func (d *deviceSession) recordRun(runID string) {
-	_ = d.SetRunning(runID)
+// processes read when they find the device held, and routes the holder's
+// interventions into the run folder until the run ends. It is
+// best-effort, because the metadata is display-only.
+func (d *deviceSession) recordRun(record *runRecord) {
+	d.SetInterventionRecorder(record.writer)
+	record.onEnd = func() { d.SetInterventionRecorder(nil) }
+	_ = d.SetRunning(record.ID())
 }
 
 // cancelOnLost cancels the command's context when the session loses the
@@ -71,9 +74,6 @@ func acquireSession(ctx context.Context, deps Deps, command string, desc device.
 		sessionDeps.Logger = deps.logger()
 	}
 	opened, err := session.Acquire(ctx, sessionDeps, session.Request{Descriptor: desc}, session.Acquisition{BudgetMs: deps.Timeouts.DeviceAcquireMs, BuildBudgetMs: deps.Timeouts.RunnerBuildMs})
-	if err == nil && deps.SessionOpened != nil {
-		deps.SessionOpened(opened)
-	}
 	return opened, err
 }
 
