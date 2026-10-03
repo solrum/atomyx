@@ -6,6 +6,8 @@ import { createHighlight } from './highlight.js';
 import { createPropertiesPanel } from './properties-panel.js';
 import { refreshScreenshot } from './screenshot.js';
 import { refreshSession } from './session-header.js';
+import { createSuggestionsPanel } from './suggestions-panel.js';
+import { createTesterPanel } from './tester-panel.js';
 import { bindSearch } from './tree-search.js';
 import { createTreeView } from './tree-view.js';
 
@@ -91,7 +93,10 @@ async function start() {
     return;
   }
   byId('layout').hidden = false;
-  createPropertiesPanel(byId('panels'));
+  const panels = byId('panels');
+  createPropertiesPanel(panels);
+  createSuggestionsPanel(panels, { operate, notify: showNotice, reloadTree: loadTree, onUse: (selector) => tester.setSelector(selector) });
+  const tester = createTesterPanel(panels, { operate, notify: showNotice, selectPath: (path) => view.selectPath(path) });
   createHighlight({
     img: byId('screenshot'),
     overlay: byId('highlight'),

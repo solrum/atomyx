@@ -24,3 +24,12 @@ export function addPanel(host, title) {
 export function describeError(err) {
   return err.remedy ? `${err.message} ${err.remedy}` : err.message;
 }
+
+// A one line summary of a selector for a list, for example
+// `id: login, role: button`. A regular expression pattern shows as its
+// JSON form.
+export function summarizeSelector(selector) {
+  return Object.entries(selector)
+    .map(([key, value]) => `${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`)
+    .join(', ');
+}

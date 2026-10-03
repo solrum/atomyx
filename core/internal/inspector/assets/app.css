@@ -156,3 +156,14 @@ button:disabled { cursor: default; opacity: 0.6; }
   background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 .pane-shot .note { align-self: stretch; margin: 8px 0 0; }
+
+.candidates { margin: 4px 0; padding: 0; list-style: none; }
+.candidate-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0; }
+.candidate { max-width: 100%; padding: 2px 8px; font-family: ui-monospace, monospace; font-size: 12px; text-align: left; overflow-wrap: anywhere; }
+.badges { display: flex; gap: 4px; }
+.badge { padding: 0 6px; border: 1px solid var(--border); border-radius: 10px; font-size: 12px; }
+.badge-ok { background: var(--select); }
+.badge-warn { background: var(--warn-bg); }
+
+.selector-input { display: block; width: 100%; margin-bottom: 6px; padding: 6px; font: 12px/1.4 ui-monospace, monospace; color: inherit; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; resize: vertical; }
+.tester-result { margin-top: 6px; }
