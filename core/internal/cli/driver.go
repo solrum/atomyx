@@ -35,7 +35,7 @@ func ExecuteDriver(ctx context.Context, deps Deps, args []string) int {
 			PrintCommandHelp(CommandListDevices, deps.stdout())
 			return 0
 		}
-		return ListDevices(ctx, deps.Probe, flagBool(argv.Flags, "--json"), deps.stdout())
+		return ListDevices(ctx, deps, flagBool(argv.Flags, "--json"), deps.stdout())
 	case CommandRun:
 		if argv.Help {
 			PrintCommandHelp(CommandRun, deps.stdout())

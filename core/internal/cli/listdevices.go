@@ -18,6 +18,10 @@ type deviceEntry struct {
 	Name     string `json:"name"`
 	State    string `json:"state"`
 	Kind     string `json:"kind"`
+	// Lease is the device's lease as a read-only probe sees it: free,
+	// held with the holder's command and state, or unknown when the
+	// probe failed.
+	Lease bundleLeaseJSON `json:"lease"`
 }
 
 // devicesEnvelope is the JSON shape list-devices --json writes.
@@ -30,14 +34,20 @@ type devicesEnvelope struct {
 	Warnings []string      `json:"warnings"`
 }
 
-// ListDevices scans for connected devices via probe and renders them
-// to w, as JSON when jsonOutput is set or as the grouped text listing
-// otherwise. A scan tool that could not run is reflected as fewer
-// devices found, never a command failure, so the only way this
-// returns a non-zero exit code is a write failure while encoding the
-// JSON envelope to w.
-func ListDevices(ctx context.Context, probe device.Probe, jsonOutput bool, w io.Writer) int {
-	descriptors := probe.Scan(ctx)
+// ListDevices scans for connected devices through deps.Probe and
+// renders them to w, as JSON when jsonOutput is set or as the grouped
+// text listing otherwise. Each device carries its lease, probed
+// read-only, so a device another Atomyx process drives shows that
+// holder and a failed probe shows as unknown. A scan tool that could
+// not run is reflected as fewer devices found, never a command
+// failure, so the only way this returns a non-zero exit code is a
+// write failure while encoding the JSON envelope to w.
+func ListDevices(ctx context.Context, deps Deps, jsonOutput bool, w io.Writer) int {
+	descriptors := deps.Probe.Scan(ctx)
+	leases := make(map[string]bundleLeaseJSON, len(descriptors))
+	for _, d := range descriptors {
+		leases[deviceKey(d)] = probeLease(ctx, deps, d)
+	}
 
 	if jsonOutput {
 		entries := make([]deviceEntry, len(descriptors))
@@ -48,6 +58,7 @@ func ListDevices(ctx context.Context, probe device.Probe, jsonOutput bool, w io.
 				Name:     d.Name,
 				State:    displayState(d),
 				Kind:     string(d.Kind),
+				Lease:    leases[deviceKey(d)],
 			}
 		}
 		envelope := devicesEnvelope{Devices: entries, Warnings: []string{}}
@@ -57,18 +68,22 @@ func ListDevices(ctx context.Context, probe device.Probe, jsonOutput bool, w io.
 		return 0
 	}
 
-	renderDevicesText(w, descriptors)
+	renderDevicesText(w, descriptors, leases)
 	return 0
 }
 
-func renderDevicesText(w io.Writer, descriptors []device.Descriptor) {
+func deviceKey(d device.Descriptor) string {
+	return string(d.Platform) + "/" + d.ID
+}
+
+func renderDevicesText(w io.Writer, descriptors []device.Descriptor, leases map[string]bundleLeaseJSON) {
 	_, _ = io.WriteString(w, "Atomyx: connected devices\n\n")
 
 	android := filterDescriptors(descriptors, func(d device.Descriptor) bool {
 		return d.Platform == device.PlatformAndroid
 	})
 	_, _ = io.WriteString(w, "Android (via adb):\n")
-	writeDeviceGroup(w, android, true)
+	writeDeviceGroup(w, android, true, leases)
 
 	_, _ = io.WriteString(w, "\n")
 
@@ -76,7 +91,7 @@ func renderDevicesText(w io.Writer, descriptors []device.Descriptor) {
 		return d.Platform == device.PlatformIOS && d.Kind == device.KindSimulator
 	})
 	_, _ = io.WriteString(w, "iOS Simulators (booted):\n")
-	writeDeviceGroup(w, iosSims, false)
+	writeDeviceGroup(w, iosSims, false, leases)
 
 	_, _ = io.WriteString(w, "\n")
 
@@ -84,7 +99,7 @@ func renderDevicesText(w io.Writer, descriptors []device.Descriptor) {
 		return d.Platform == device.PlatformIOS && d.Kind == device.KindDevice
 	})
 	_, _ = io.WriteString(w, "iOS Devices (USB):\n")
-	writeDeviceGroup(w, iosDevices, false)
+	writeDeviceGroup(w, iosDevices, false, leases)
 }
 
 // writeDeviceGroup writes one device-list group's lines. When
@@ -92,18 +107,36 @@ func renderDevicesText(w io.Writer, descriptors []device.Descriptor) {
 // equals its id omits the trailing name, because adb reports no
 // separate model for some devices and simply repeats the serial as
 // the name: printing it twice would be redundant.
-func writeDeviceGroup(w io.Writer, descriptors []device.Descriptor, nameOptional bool) {
+func writeDeviceGroup(w io.Writer, descriptors []device.Descriptor, nameOptional bool, leases map[string]bundleLeaseJSON) {
 	if len(descriptors) == 0 {
 		_, _ = io.WriteString(w, "  (none)\n")
 		return
 	}
 	for _, d := range descriptors {
 		state := displayState(d)
+		note := leaseNote(leases[deviceKey(d)])
 		if nameOptional && d.Name == d.ID {
-			_, _ = fmt.Fprintf(w, "  %s  [%s]\n", d.ID, state)
+			_, _ = fmt.Fprintf(w, "  %s  [%s]%s\n", d.ID, state, note)
 			continue
 		}
-		_, _ = fmt.Fprintf(w, "  %s  [%s] %s\n", d.ID, state, d.Name)
+		_, _ = fmt.Fprintf(w, "  %s  [%s] %s%s\n", d.ID, state, d.Name, note)
+	}
+}
+
+// leaseNote is the text a device line ends with for its lease: nothing
+// for a free device, the holder's command and state for a held one, and
+// a plain statement when the probe failed.
+func leaseNote(l bundleLeaseJSON) string {
+	switch l.State {
+	case "held":
+		if l.Holder == nil {
+			return "  held by an unknown process"
+		}
+		return fmt.Sprintf("  held by %s, %s", l.Holder.Command, l.Holder.State)
+	case "unknown":
+		return "  lease unknown"
+	default:
+		return ""
 	}
 }
 

@@ -645,6 +645,22 @@ Enumerates devices Atomyx can currently see: Android devices and
 emulators through `adb`, booted iOS simulators, and iOS physical
 devices connected over USB.
 
+Each device also reports its lease, read from the lease file without
+creating or changing it, so the listing shows which devices another
+Atomyx process drives.
+
+- A free device shows nothing extra in the text listing.
+- A held device ends its line with the holder's command and state, for
+  example `  emulator-5554  [ready]  held by atomyx run, running`. When
+  the holder's details cannot be read, the line ends with `held by an
+  unknown process`.
+- A device whose lease could not be probed ends its line with
+  `lease unknown`.
+- With `--json`, every device carries a `lease` object. Its `state` is
+  `free`, `held` or `unknown`. A held lease adds a `holder` object with
+  `pid`, `command`, `role`, `state` and, while a run is open, `runId`. An
+  unknown lease adds an `error` message.
+
 Usage:
 
 ```
