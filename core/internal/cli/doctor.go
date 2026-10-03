@@ -24,20 +24,26 @@ import (
 // established or the device is reachable but unhealthy, 2 when the
 // command itself was misused (an unknown --platform value).
 //
-// --report-dir is accepted only with --migrate-runs and is refused with
-// exit 2 otherwise.
+// --report-dir is accepted only with --migrate-runs or --bundle and is
+// refused with exit 2 otherwise.
 //
 // With --migrate-runs, Doctor instead rewrites the flat run records
 // under the run root as run folders and never touches a device. Its
 // exit codes are documented on migrateRuns.
+//
+// With --bundle, Doctor instead writes a diagnostic zip and acquires no
+// device. Its exit codes are documented on doctorBundle.
 func Doctor(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
+	if _, set := flags[bundleFlag]; set {
+		return doctorBundle(ctx, deps, flags)
+	}
 	if flagBool(flags, migrateRunsFlag) {
 		return migrateRuns(ctx, deps, flags)
 	}
 	stdout := deps.stdout()
 	stderr := deps.stderr()
 	if _, set := flags["--report-dir"]; set {
-		_, _ = fmt.Fprintf(stderr, "error: --report-dir only applies with %s, because a device health check writes no report.\n", migrateRunsFlag)
+		_, _ = fmt.Fprintf(stderr, "error: --report-dir only applies with %s or %s, because a device health check writes no report.\n", migrateRunsFlag, bundleFlag)
 		return 2
 	}
 

@@ -262,7 +262,8 @@ Flags:
 | `--device <id>` | Device identifier, as reported by `atomyx driver list-devices`. | none | no |
 | `--json` | Outputs the report as JSON instead of text. | off | no |
 | `--migrate-runs` | Rewrites flat run records as run folders instead of checking a device. See below. | off | no |
-| `--report-dir <path>` | Run root for `--migrate-runs`. Defaults to `ATOMYX_STORAGE_DIR`, then `~/.atomyx`. | none | no |
+| `--bundle <path.zip>` | Writes a diagnostic zip instead of checking a device. See below. | none | no |
+| `--report-dir <path>` | Run root for `--migrate-runs` and `--bundle`. Defaults to `ATOMYX_STORAGE_DIR`, then `~/.atomyx`. | none | no |
 | `--help`, `-h` | Prints this command's usage and exits. | off | no |
 
 When another Atomyx process holds the device, doctor does not probe it.
@@ -276,6 +277,51 @@ when known. For a free device, `--json` carries `held: false` and
 Exit codes: `0` when the device is healthy or held by another process,
 `1` when it could not be reached or is unhealthy, `2` when the command
 was misused.
+
+### Diagnostic bundle
+
+`atomyx doctor --bundle <path.zip>` writes one zip a contributor can
+attach to a bug report, and prints the path of the zip on success.
+
+```
+atomyx doctor --bundle atomyx-diagnostics.zip
+atomyx doctor --bundle atomyx-diagnostics.zip --report-dir <path>
+```
+
+The zip holds:
+
+- `environment.json`: the atomyx version, the host operating system and
+  architecture, and the version output of `adb`, `xcodebuild`, `iproxy`,
+  and `go`. Each query is bounded to five seconds, and a tool that is
+  absent or fails is recorded with its error and never fails the bundle.
+- `devices.json`: every connected device with its reachability state and
+  its lease state, which is `free`, `held` with the holder's `pid`,
+  `command`, `role`, `state`, and `runId` when known, or `unknown` with
+  the reason. Each entry carries `healthChecked: false`, because a health
+  check needs the device lease and a bundle never takes one.
+- `runs/<id>/meta.json`, `runs/<id>/log.jsonl`, and every
+  `step-NNN-log.jsonl` log file of the five newest runs under the run
+  root. No screenshot, accessibility tree, or other artifact is included.
+
+Every file is scrubbed before it is written. The scrubber masks the
+value of each environment variable and each value in a `device.env` file
+with `[REDACTED]`, longest value first. It finds `device.env` files in
+the iOS agent folder of the checkout containing the working directory
+or any parent, and directly in the working directory or any parent.
+Values shorter than six characters, the words `true` and `false`,
+plain numbers, absolute paths, and host-description variables such as
+`USER` and `HOME` are not masked, so the bundle stays readable. It also
+masks `Bearer` tokens, the value of an `X-Atomyx-Token` header, hex
+strings of 32 characters or more, and base64url strings of 32 or more
+characters that mix letters and digits. A UUID is kept.
+
+The zip is written to a temporary file next to the target and renamed
+into place, so a failed write never leaves a partial zip. `--bundle`
+covers every device, so it cannot be combined with `--platform`,
+`--device`, `--json`, or `--migrate-runs`.
+
+Exit codes: `0` when the zip is written, `1` when it could not be
+written, `2` when the command was misused.
 
 ### Migrating run records
 

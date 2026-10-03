@@ -61,7 +61,11 @@ func main() {
 		Stdin:    os.Stdin,
 		Session:  sessionDeps,
 		Timeouts: sessionwire.ResolveTimeouts(sessionwire.LoadConfigBestEffort(logger), os.Getenv, logger),
-		Debug:    os.Getenv("ATOMYX_DEBUG") == "1",
+		HostCommand: func(ctx context.Context, name string, args ...string) (string, error) {
+			res, err := procRunner.Run(ctx, name, args...)
+			return res.Stdout + res.Stderr, err
+		},
+		Debug: os.Getenv("ATOMYX_DEBUG") == "1",
 	}
 
 	// A plain cli.Run would leave Ctrl-C during a run or suite command

@@ -115,6 +115,7 @@ var commandFlags = map[Command][]flagDef{
 		{"--device", flagValue},
 		{"--json", flagBoolean},
 		{"--migrate-runs", flagBoolean},
+		{"--bundle", flagValue},
 		{"--report-dir", flagValue},
 		{"--help", flagBoolean},
 		{"-h", flagBoolean},

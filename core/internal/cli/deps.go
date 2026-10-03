@@ -50,6 +50,9 @@ type Deps struct {
 	// Stdin is read by the inspect command for the Enter key that asks
 	// for a fresh URL. Nil means no key is read.
 	Stdin io.Reader
+	// HostCommand runs a host tool for the doctor bundle's version
+	// queries. Nil records every tool as unavailable.
+	HostCommand HostCommand
 	// Debug, when true, appends a stack trace to an unhandled error
 	// reported on Stderr, matching ATOMYX_DEBUG=1.
 	Debug bool

@@ -175,8 +175,19 @@ FLAGS
                            1 when a record is damaged or conflicts with
                            an existing folder. Cannot be combined with
                            --platform or --device.
-  --report-dir <path>      Run root for --migrate-runs. Defaults to
-                           ATOMYX_STORAGE_DIR, then ~/.atomyx.
+  --bundle <path.zip>      Instead of a health check, write a diagnostic
+                           zip: versions of atomyx and the host tools,
+                           the connected devices with their lease state,
+                           and the meta and log files of the five newest
+                           runs. Every file is scrubbed of environment
+                           and device.env values and of token-shaped
+                           strings. No screenshot is included, no device
+                           lease is taken, and device health is not
+                           checked. Prints the path on success. Cannot be
+                           combined with --migrate-runs, --platform,
+                           --device, or --json.
+  --report-dir <path>      Run root for --migrate-runs and --bundle.
+                           Defaults to ATOMYX_STORAGE_DIR, then ~/.atomyx.
   --help, -h               Show this message.
 
 EXAMPLES
@@ -185,12 +196,14 @@ EXAMPLES
   atomyx driver doctor --json
   atomyx driver doctor --migrate-runs
   atomyx driver doctor --migrate-runs --json --report-dir <path>
+  atomyx driver doctor --bundle atomyx-diagnostics.zip
 
 EXIT CODES
   0    the device is reachable and healthy, or held by another process
   1    the connection could not be established, or the device is
        reachable but unhealthy, or with
-       --migrate-runs a record is damaged or in conflict
+       --migrate-runs a record is damaged or in conflict, or with
+       --bundle the zip could not be written
   2    the command was misused
 `)
 	case CommandVersion:
