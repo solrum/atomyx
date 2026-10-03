@@ -195,3 +195,24 @@ func TestEveryModuleImportIsEmbedded(t *testing.T) {
 		}
 	}
 }
+
+// Device text reaches the page in tree attributes, so a module that
+// parsed it as markup or code would let a screen name run script in the
+// inspector origin. Modules build their output with textContent and
+// element children only.
+func TestEmbeddedScriptsNeverParseDeviceTextAsMarkupOrCode(t *testing.T) {
+	assets := mustSub(embeddedAssets, "assets")
+	banned := regexp.MustCompile(`\.innerHTML\b|\.outerHTML\b|insertAdjacentHTML|document\.write|\beval\(|new Function\(`)
+	for _, file := range embeddedFiles(t) {
+		if path.Ext(file) != ".js" {
+			continue
+		}
+		raw, err := fs.ReadFile(assets, file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if loc := banned.FindString(string(raw)); loc != "" {
+			t.Errorf("%s uses %q, which parses text as markup or code", file, loc)
+		}
+	}
+}

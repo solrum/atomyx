@@ -84,8 +84,13 @@ export function isOpenEntry(entry, { overrides, openPaths }) {
   return openPaths ? openPaths.has(entry) : entry.depth < DEFAULT_EXPAND_DEPTH;
 }
 
+// The row label. A secure node's text and value are masks, so its row
+// names it by the hint or label that tells which field it is.
 export function displayName(node) {
   const attrs = node.attributes || {};
+  if (attrs.secure === 'true') {
+    return attrs.hint || attrs.label || attrs.id || '';
+  }
   return attrs.id || attrs.label || attrs.text || attrs.hint || '';
 }
 

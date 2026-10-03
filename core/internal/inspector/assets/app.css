@@ -135,3 +135,15 @@ button:disabled { cursor: default; opacity: 0.6; }
 .tree-row mark { background: var(--match); color: inherit; }
 
 #tree-empty { padding: 12px; margin: 0; }
+
+.pane-panels { gap: 4px; padding: 8px; }
+.panel { padding: 8px 4px; border-bottom: 1px solid var(--border); }
+.panel:last-child { border-bottom: 0; }
+.panel-title { margin: 0 0 6px; font-size: 14px; }
+.panel-subtitle { margin: 10px 0 4px; font-size: 12px; color: var(--muted); text-transform: uppercase; }
+.panel p { margin: 4px 0; }
+.note { padding: 4px 8px; background: var(--warn-bg); border-radius: 6px; }
+
+.props { width: 100%; border-collapse: collapse; }
+.props th, .props td { padding: 2px 6px 2px 0; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.props th { width: 28%; font-weight: 600; color: var(--muted); }

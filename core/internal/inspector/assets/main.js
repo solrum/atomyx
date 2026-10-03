@@ -2,6 +2,7 @@ import { ApiError, coalesced, getJson, postJson } from './api.js';
 import { bootstrap } from './bootstrap.js';
 import { hideReleased, showFatal, showNotice, showReleased } from './banners.js';
 import { createEventStream } from './events.js';
+import { createPropertiesPanel } from './properties-panel.js';
 import { refreshScreenshot } from './screenshot.js';
 import { refreshSession } from './session-header.js';
 import { bindSearch } from './tree-search.js';
@@ -54,11 +55,21 @@ const loadTree = guarded(async () => {
   view.setTree(await getJson('/api/v1/tree'));
 });
 
+// Every operator action ends with a session refetch, because the holder
+// state changes while the action runs and no capture event follows it.
+async function operate(path, body) {
+  try {
+    return await postJson(path, body);
+  } finally {
+    loadSession();
+  }
+}
+
 async function refreshCapture() {
   const button = byId('refresh');
   button.disabled = true;
   try {
-    view.setTree(await postJson('/api/v1/tree/fresh'));
+    view.setTree(await operate('/api/v1/tree/fresh'));
     await loadScreenshot();
   } catch (err) {
     if (err instanceof ApiError && err.code === HOLDER_BUSY_CODE) {
@@ -79,6 +90,7 @@ async function start() {
     return;
   }
   byId('layout').hidden = false;
+  createPropertiesPanel(byId('panels'));
   bindSearch(byId('search'), view);
   byId('refresh').addEventListener('click', refreshCapture);
   events = createEventStream({
