@@ -87,7 +87,12 @@ func (h *RemoteHandle) subscribeOn(parent context.Context, client *attach.Client
 }
 
 // redial connects again after the connection ended, subscribes on the new
-// connection and makes it the handle's connection.
+// connection and makes it the handle's connection. The socket path belongs
+// to the device, so whoever holds the device next answers on it. A new
+// connection is kept only when the process that answers is the one the
+// handle attached to, identified by its pid and start time. Any other
+// holder ends the handle, so the caller attaches to it as a new viewer
+// instead of silently following a different run.
 func (h *RemoteHandle) redial(parent context.Context) (*attach.Client, bool) {
 	ctx, cancel := context.WithTimeout(parent, remoteCallTimeout)
 	defer cancel()
@@ -95,7 +100,7 @@ func (h *RemoteHandle) redial(parent context.Context) (*attach.Client, bool) {
 	if err != nil {
 		return nil, false
 	}
-	if !h.subscribeOn(parent, client) {
+	if !h.sameHolder(ctx, client) || !h.subscribeOn(parent, client) {
 		_ = client.Close()
 		return nil, false
 	}
@@ -112,6 +117,23 @@ func (h *RemoteHandle) redial(parent context.Context) (*attach.Client, bool) {
 	h.syncTree(parent)
 	h.syncScreenshot(parent)
 	return client, true
+}
+
+// sameHolder reports whether the process behind client is the holder the
+// handle first attached to.
+func (h *RemoteHandle) sameHolder(ctx context.Context, client *attach.Client) bool {
+	var status attach.Status
+	if err := client.Call(ctx, attach.TypeStatus, nil, &status); err != nil {
+		return false
+	}
+	h.mu.Lock()
+	want := h.info.Holder
+	h.mu.Unlock()
+	var wantStarted int64
+	if !want.StartedAt.IsZero() {
+		wantStarted = want.StartedAt.UnixMilli()
+	}
+	return status.Holder.PID == want.PID && status.Holder.StartedAt == wantStarted
 }
 
 func (h *RemoteHandle) finish() {

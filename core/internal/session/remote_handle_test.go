@@ -311,6 +311,9 @@ type severableProxy struct {
 
 	mu    sync.Mutex
 	conns []net.Conn
+	// hold, when set, parks the accept loop before it forwards the next
+	// connection, until the channel closes.
+	hold chan struct{}
 }
 
 func newSeverableProxy(t *testing.T, target string) *severableProxy {
@@ -332,6 +335,12 @@ func newSeverableProxy(t *testing.T, target string) *severableProxy {
 			if err != nil {
 				return
 			}
+			p.mu.Lock()
+			hold := p.hold
+			p.mu.Unlock()
+			if hold != nil {
+				<-hold
+			}
 			back, err := (&net.Dialer{}).DialContext(context.Background(), "unix", target)
 			if err != nil {
 				_ = front.Close()
@@ -345,6 +354,16 @@ func newSeverableProxy(t *testing.T, target string) *severableProxy {
 		}
 	}()
 	return p
+}
+
+// holdNew parks every connection accepted from now on, and returns the
+// function that lets them through.
+func (p *severableProxy) holdNew() (release func()) {
+	hold := make(chan struct{})
+	p.mu.Lock()
+	p.hold = hold
+	p.mu.Unlock()
+	return func() { close(hold) }
 }
 
 func (p *severableProxy) sever() {
@@ -432,5 +451,49 @@ func TestRemoteHandle_CarriesTheHoldersStabilityAndPairing(t *testing.T) {
 	if got.Paired != want.Paired || got.Highlightable != want.Highlightable || got.Scale != want.Scale ||
 		got.TreeStable != want.TreeStable || got.ScreenshotStable != want.ScreenshotStable {
 		t.Fatalf("Latest() = %+v, want the holder's pairing %+v", got, want)
+	}
+}
+
+func TestRemoteHandle_EndsWhenADifferentHolderAnswersAfterTheRedial(t *testing.T) {
+	m := newSocketManager(t, clock.SystemClock{})
+	first, err := session.Open(context.Background(), socketDeps(t, &recordingFactory{events: &eventLog{}}, m), session.Request{Descriptor: androidDesc("A")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = first.Close() })
+	proxy := newSeverableProxy(t, socketPathFor(m))
+	h := dialRemote(t, proxy.path)
+	feed, err := h.Subscribe(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	release := proxy.holdNew()
+	if err := first.Close(); err != nil {
+		t.Fatal(err)
+	}
+	deps := socketDeps(t, &recordingFactory{events: &eventLog{}}, m)
+	deps.PID, deps.Command = os.Getpid()+1, "atomyx suite"
+	second, err := session.Open(context.Background(), deps, session.Request{Descriptor: androidDesc("A")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = second.Close() })
+	release()
+
+	select {
+	case <-h.Done():
+	case <-time.After(remoteGuard):
+		t.Fatal("the handle kept following a different holder after the redial")
+	}
+	var last session.Observation
+	for o := range feed {
+		last = o
+	}
+	if last.Kind != session.ObservedClosed {
+		t.Fatalf("last observation = %+v, want ObservedClosed", last)
+	}
+	if got := h.Info(); got.State != session.StateClosed || got.Holder.Command != "atomyx run" {
+		t.Fatalf("Info() = %+v, want the first holder's closed state", got)
 	}
 }
