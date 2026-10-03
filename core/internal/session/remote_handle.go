@@ -11,7 +11,6 @@ import (
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/lease"
 	"dev.atomyx/internal/runfolder"
-	"dev.atomyx/internal/wire"
 )
 
 const (
@@ -71,8 +70,7 @@ type RemoteHandle struct {
 	mu     sync.Mutex
 	client *attach.Client
 	info   Info
-	snap   Snapshot
-	steps  stepRing
+	store  captureStore
 	fanout fanout
 	closed bool
 }
@@ -102,7 +100,8 @@ func DialRemote(ctx context.Context, cfg RemoteConfig, desc device.Descriptor) (
 		client:     client,
 	}
 	h.fanout = newFanout(&h.mu)
-	h.snap.Generation = h.generation
+	h.store.generation = h.generation
+	h.store.snap.Generation = h.generation
 	if err := h.prime(ctx, client); err != nil {
 		cancel()
 		_ = client.Close()
@@ -176,7 +175,7 @@ func (h *RemoteHandle) Info() Info {
 func (h *RemoteHandle) Latest() Snapshot {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	return h.snap
+	return h.store.snap
 }
 
 // FreshTree asks the holder for a fresh capture. A holder that is
@@ -193,17 +192,17 @@ func (h *RemoteHandle) FreshTree(ctx context.Context) (Snapshot, error) {
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.storeTreeLocked(result.Tree)
-	h.storeScreenshotLocked(result.Screenshot)
-	h.snap.Paired, h.snap.Highlightable, h.snap.Scale = result.Paired, result.Highlightable, result.Scale
-	return h.snap, nil
+	h.store.storeTree(result.Tree)
+	h.store.storeScreenshot(result.Screenshot)
+	h.store.snap.Paired, h.store.snap.Highlightable, h.store.snap.Scale = result.Paired, result.Highlightable, result.Scale
+	return h.store.snap, nil
 }
 
 // StepsSince implements StepSource over the lines the handle received.
 func (h *RemoteHandle) StepsSince(runID string, sinceSeq int64) ([]runfolder.StepLine, bool, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	return h.steps.since(runID, sinceSeq)
+	return h.store.steps.since(runID, sinceSeq)
 }
 
 // Subscribe implements Viewer.
@@ -217,7 +216,7 @@ func (h *RemoteHandle) SubscribeSince(ctx context.Context, runID string, sinceSe
 }
 
 func (h *RemoteHandle) subscribe(ctx context.Context, resume *stepResume) (<-chan Observation, error) {
-	return h.fanout.subscribe(ctx, &h.steps, func() bool { return h.closed }, ErrRemoteClosed, resume)
+	return h.fanout.subscribe(ctx, &h.store.steps, func() bool { return h.closed }, ErrRemoteClosed, resume)
 }
 
 // Close ends the connection and every subscription, and waits for the
@@ -236,235 +235,4 @@ func (h *RemoteHandle) currentClient() *attach.Client {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return h.client
-}
-
-// pump follows the holder's notices until the holder is gone. When a
-// subscription ends while the connection lives, the pump subscribes again
-// on that connection after the last step line it stored. It dials a new
-// connection only when the connection itself is gone.
-func (h *RemoteHandle) pump(ctx context.Context) {
-	defer h.finish()
-	client := h.currentClient()
-	stale := false
-	for {
-		restart := h.consume(ctx, client, stale)
-		if ctx.Err() != nil {
-			return
-		}
-		if restart && h.resubscribe(ctx, client) {
-			stale = true
-			continue
-		}
-		next, ok := h.redial(ctx)
-		if !ok {
-			return
-		}
-		client, stale = next, true
-	}
-}
-
-// consume handles notices until the connection ends, and reports whether
-// the subscription must be started again. That is the case when the
-// client dropped step notices, and when the holder ended the subscription,
-// which it does for a viewer that fell behind as well as for a holder that
-// is closing. Starting again fails when the holder is gone. While stale is
-// set, notices of the replaced subscription are skipped up to the marker
-// that announces the new one.
-func (h *RemoteHandle) consume(ctx context.Context, client *attach.Client, stale bool) (restart bool) {
-	for f := range client.Notices() {
-		if stale {
-			stale = f.Type != attach.NoticeSubscribed
-			continue
-		}
-		switch f.Type {
-		case attach.NoticeTree:
-			h.syncTree(ctx)
-		case attach.NoticeScreenshot:
-			h.syncScreenshot(ctx)
-		case attach.NoticeStep:
-			var n attach.StepNotice
-			if f.Decode(&n) == nil {
-				h.storeStep(n)
-			}
-		case attach.NoticeStepGap:
-			var n attach.StepGapNotice
-			if f.Decode(&n) == nil {
-				h.storeGap(n)
-			}
-		case attach.NoticeStepsDropped, attach.NoticeClosed:
-			return true
-		}
-	}
-	return false
-}
-
-// resubscribe replaces the subscription on client, resuming after the
-// last step line the handle stored, and then refreshes the captures.
-func (h *RemoteHandle) resubscribe(parent context.Context, client *attach.Client) bool {
-	if !h.subscribeOn(parent, client) {
-		return false
-	}
-	h.syncTree(parent)
-	h.syncScreenshot(parent)
-	return true
-}
-
-func (h *RemoteHandle) subscribeOn(parent context.Context, client *attach.Client) bool {
-	ctx, cancel := context.WithTimeout(parent, remoteCallTimeout)
-	defer cancel()
-	h.mu.Lock()
-	runID, seq := h.steps.runID, h.steps.lastSeq
-	h.mu.Unlock()
-	return client.Call(ctx, attach.TypeSubscribe, attach.Subscribe{RunID: runID, SinceSeq: seq}, nil) == nil
-}
-
-// redial connects again after the connection ended, subscribes on the new
-// connection and makes it the handle's connection.
-func (h *RemoteHandle) redial(parent context.Context) (*attach.Client, bool) {
-	ctx, cancel := context.WithTimeout(parent, remoteCallTimeout)
-	defer cancel()
-	client, err := h.cfg.dial(ctx)
-	if err != nil {
-		return nil, false
-	}
-	if !h.subscribeOn(parent, client) {
-		_ = client.Close()
-		return nil, false
-	}
-	h.mu.Lock()
-	if h.ctx.Err() != nil {
-		h.mu.Unlock()
-		_ = client.Close()
-		return nil, false
-	}
-	old := h.client
-	h.client = client
-	h.mu.Unlock()
-	_ = old.Close()
-	h.syncTree(parent)
-	h.syncScreenshot(parent)
-	return client, true
-}
-
-func (h *RemoteHandle) finish() {
-	defer close(h.done)
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.closed = true
-	h.fanout.endAllLocked(ObservedClosed)
-}
-
-func (h *RemoteHandle) syncTree(parent context.Context) {
-	ctx, cancel := context.WithTimeout(parent, remoteCallTimeout)
-	defer cancel()
-	_ = h.pullTree(ctx)
-}
-
-func (h *RemoteHandle) syncScreenshot(parent context.Context) {
-	ctx, cancel := context.WithTimeout(parent, remoteCallTimeout)
-	defer cancel()
-	_ = h.pullScreenshot(ctx)
-}
-
-func (h *RemoteHandle) pullTree(ctx context.Context) error {
-	var r attach.TreeResult
-	if err := h.pull(ctx, attach.TypeTreeLatest, &r); err != nil {
-		return err
-	}
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if h.storeTreeLocked(r) {
-		h.fanout.notifyLocked(Observation{Kind: ObservedTree, Epoch: r.Epoch, Revision: r.Revision, Stable: r.Stable})
-	}
-	return nil
-}
-
-func (h *RemoteHandle) pullScreenshot(ctx context.Context) error {
-	var r attach.ScreenshotResult
-	if err := h.pull(ctx, attach.TypeScreenshotLatest, &r); err != nil {
-		return err
-	}
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if h.storeScreenshotLocked(r) {
-		h.fanout.notifyLocked(Observation{Kind: ObservedScreenshot, Epoch: r.Epoch, Revision: r.Revision, Stable: r.Stable})
-	}
-	return nil
-}
-
-func (h *RemoteHandle) pull(ctx context.Context, messageType string, result any) error {
-	h.pullMu.Lock()
-	defer h.pullMu.Unlock()
-	return h.currentClient().Call(ctx, messageType, nil, result)
-}
-
-// storeTreeLocked keeps r when it is newer than the held tree and reports
-// whether it did. A result of the held revision still refreshes the
-// holder's pairing, which can change with no new capture.
-func (h *RemoteHandle) storeTreeLocked(r attach.TreeResult) bool {
-	if r.Revision < h.snap.TreeRevision {
-		return false
-	}
-	h.applyStateLocked(r.CaptureState)
-	h.snap.TreeStable = r.Stable
-	if r.Revision == h.snap.TreeRevision {
-		return false
-	}
-	h.snap.HasTree = r.Tree != nil
-	h.snap.Tree = wire.TreeNodeWire{}
-	if r.Tree != nil {
-		h.snap.Tree = *r.Tree
-	}
-	h.snap.TreeEpoch, h.snap.TreeRevision = r.Epoch, r.Revision
-	h.snap.Generation = h.generation
-	return true
-}
-
-func (h *RemoteHandle) storeScreenshotLocked(r attach.ScreenshotResult) bool {
-	if r.Revision < h.snap.ScreenshotRevision {
-		return false
-	}
-	h.applyStateLocked(r.CaptureState)
-	h.snap.ScreenshotStable = r.Stable
-	if r.Revision == h.snap.ScreenshotRevision {
-		return false
-	}
-	h.snap.HasScreenshot = len(r.Image) > 0
-	h.snap.Screenshot = r.Image
-	h.snap.ScreenshotFormat = ImageFormat(r.Format)
-	h.snap.ScreenshotEpoch, h.snap.ScreenshotRevision = r.Epoch, r.Revision
-	h.snap.Generation = h.generation
-	return true
-}
-
-func (h *RemoteHandle) applyStateLocked(c attach.CaptureState) {
-	h.snap.Paired, h.snap.Highlightable, h.snap.Scale = c.Paired, c.Highlightable, c.Scale
-}
-
-func (h *RemoteHandle) storeStep(n attach.StepNotice) {
-	line := runfolder.StepLine{
-		SchemaVersion: n.Line.SchemaVersion,
-		RunID:         n.Line.RunID,
-		Seq:           n.Line.Seq,
-		StepIndex:     n.Line.StepIndex,
-		Command:       n.Line.Command,
-		Phase:         runfolder.StepPhase(n.Line.Phase),
-		Ok:            n.Line.Ok,
-		DurationMs:    n.Line.DurationMs,
-		Detail:        n.Line.Detail,
-		Artifacts:     n.Line.Artifacts,
-	}
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.steps.push(line)
-	h.fanout.notifyLocked(Observation{Kind: ObservedStep, Epoch: n.Epoch, Revision: uint64(line.Seq), Stable: true})
-}
-
-// storeGap forgets the held lines, because the lines that follow a gap
-// are not contiguous with them.
-func (h *RemoteHandle) storeGap(n attach.StepGapNotice) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.steps = stepRing{}
-	h.fanout.notifyLocked(Observation{Kind: ObservedStepGap, Revision: uint64(n.OldestSeq), Stable: true})
 }
