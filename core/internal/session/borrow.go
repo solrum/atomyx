@@ -44,8 +44,24 @@ type YieldRequester func(ctx context.Context, cfg attach.ClientConfig, command s
 // holds it, asks that holder to yield and takes the device from it.
 //
 // The device is prepared first, so no runner build happens while the
-// holder is gone. Only a plain acquisition that fails with DEVICE_HELD
-// leads to a yield. A request with Reacquire fails with
+// holder is gone. See BorrowWithinBudget for the rest of the contract.
+func Borrow(ctx context.Context, deps Deps, req Request, acq Acquisition, borrower string) (*Session, error) {
+	if acq.Progress != nil {
+		acq.Progress(PhaseBuilding)
+	}
+	if err := Prepare(ctx, deps, req.Descriptor, acq.BuildBudgetMs); err != nil {
+		return nil, err
+	}
+	return BorrowWithinBudget(ctx, deps, req, acq, borrower)
+}
+
+// BorrowWithinBudget is the open half of Borrow for a host that already
+// ran Prepare itself, so the build neither repeats nor runs under a lock
+// the open must hold. It reports PhaseLaunching once and PhaseConnected,
+// and never PhaseBuilding.
+//
+// Only a plain acquisition that fails with DEVICE_HELD leads to a
+// yield. A request with Reacquire fails with
 // DEVICE_RELEASED_HELD instead, so it never borrows.
 // borrower is the short command string the holder shows to its own user,
 // for example "atomyx run login.yml".
@@ -62,8 +78,8 @@ type YieldRequester func(ctx context.Context, cfg attach.ClientConfig, command s
 // The holder is recorded as the lender of the new session, so a runner
 // left running by the holder is handed back to it when this process
 // exits.
-func Borrow(ctx context.Context, deps Deps, req Request, acq Acquisition, borrower string) (*Session, error) {
-	opened, err := Acquire(ctx, deps, req, acq)
+func BorrowWithinBudget(ctx context.Context, deps Deps, req Request, acq Acquisition, borrower string) (*Session, error) {
+	opened, err := OpenWithinBudget(ctx, deps, req, acq)
 	if err == nil {
 		return opened, err
 	}

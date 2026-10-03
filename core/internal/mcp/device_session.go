@@ -588,15 +588,7 @@ func (s *DeviceSession) open(ctx context.Context, req session.Request, borrow bo
 	var sess *session.Session
 	var err error
 	if borrow && !req.Reacquire {
-		acq.BuildBudgetMs = s.timeouts.RunnerBuildMs
-		report := acq.Progress
-		// The caller already reported the build phase before it took acquireMu.
-		acq.Progress = func(p session.Phase) {
-			if p != session.PhaseBuilding {
-				report(p)
-			}
-		}
-		sess, err = session.Borrow(ctx, s.deps, req, acq, selectBorrower)
+		sess, err = session.BorrowWithinBudget(ctx, s.deps, req, acq, selectBorrower)
 	} else {
 		sess, err = session.OpenWithinBudget(ctx, s.deps, req, acq)
 	}

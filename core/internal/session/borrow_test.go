@@ -161,3 +161,40 @@ func TestBorrow_AConnectionThatEndsAfterTheRequestStillAcquiresWhenTheHolderRele
 		t.Fatalf("Borrow() = %v, %v, want a session after a yield that may have happened", s, err)
 	}
 }
+
+type countingPreparer struct{ calls atomic.Int32 }
+
+func (p *countingPreparer) Prepare(context.Context, device.Descriptor) error {
+	p.calls.Add(1)
+	return nil
+}
+
+func TestBorrowWithinBudget_BorrowsWithoutPreparingTheDevice(t *testing.T) {
+	f := newBorrowFixture(t, &closingYielder{})
+	preparer := &countingPreparer{}
+	f.deps.Preparer = preparer
+
+	s, err := session.BorrowWithinBudget(context.Background(), f.deps, session.Request{Descriptor: androidDesc("A")}, session.Acquisition{}, borrowCommand)
+	if err != nil || s == nil {
+		t.Fatalf("BorrowWithinBudget() = %v, %v, want the borrowed session", s, err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+
+	if got := preparer.calls.Load(); got != 0 {
+		t.Fatalf("builds = %d, want none because the caller prepared the device", got)
+	}
+}
+
+func TestBorrow_PreparesTheDeviceOnceAcrossTheYield(t *testing.T) {
+	f := newBorrowFixture(t, &closingYielder{})
+	preparer := &countingPreparer{}
+	f.deps.Preparer = preparer
+
+	if _, err := f.borrow(t); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := preparer.calls.Load(); got != 1 {
+		t.Fatalf("builds = %d, want 1", got)
+	}
+}

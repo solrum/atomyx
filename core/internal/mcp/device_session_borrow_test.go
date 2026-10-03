@@ -1,7 +1,9 @@
 package mcp
 
 import (
+	"context"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"dev.atomyx/internal/clock"
@@ -14,11 +16,23 @@ import (
 
 // newDevicesWithSeam is newDevices with the yield request routed through seam.
 func (f *lifecycleFixture) newDevicesWithSeam(command string, seam *sessiontest.YieldSeam) *DeviceSession {
+	return f.newDevicesWithSeamPreparing(command, seam, nil)
+}
+
+// countingPreparer counts the builds it is asked to run.
+type countingPreparer struct{ calls atomic.Int32 }
+
+func (p *countingPreparer) Prepare(context.Context, device.Descriptor) error {
+	p.calls.Add(1)
+	return nil
+}
+
+func (f *lifecycleFixture) newDevicesWithSeamPreparing(command string, seam *sessiontest.YieldSeam, preparer device.RunnerPreparer) *DeviceSession {
 	return NewDeviceSession(DeviceSessionDeps{
 		Factory: f.factory, Probe: device.NewStaticProbe(), Clock: f.clk, TimerClock: f.clk, Logger: logging.NoopLogger{},
 		Session: session.Deps{
 			Leases: f.leases, Sockets: f.leases, Clock: clock.SystemClock{}, Command: command,
-			RequestYield: seam.Requester(),
+			RequestYield: seam.Requester(), Preparer: preparer,
 		},
 		Timeouts: session.Timeouts{McpIdleMs: testIdleMs, OpenRunIdleMs: testOpenRunMs, DeviceAcquireMs: 120_000},
 		Runs:     f.runs,
@@ -44,6 +58,22 @@ func TestDeviceSessionBorrow_SelectTakesTheDeviceFromAnIdleSourceAndHoldsIt(t *t
 	}
 	eventually(t, "the source to report borrowed", func() bool { return f.state(f.devices) == holderBorrowed })
 	requireIntervention(t, f.devices.Interventions(), "controlBorrowed:"+selectBorrower)
+}
+
+func TestDeviceSessionBorrow_SelectPreparesTheDeviceExactlyOnce(t *testing.T) {
+	f := newLifecycleFixture(t)
+	f.selectedAndIdle()
+	preparer := &countingPreparer{}
+	borrower := f.newDevicesWithSeamPreparing("atomyx-mcp", &sessiontest.YieldSeam{}, preparer)
+	t.Cleanup(borrower.Close)
+
+	if err := f.selectDevice(borrower); err != nil {
+		t.Fatalf("select_device on a device held by an idle source: %v", err)
+	}
+
+	if got := preparer.calls.Load(); got != 1 {
+		t.Fatalf("builds for one select_device = %d, want 1", got)
+	}
 }
 
 func TestDeviceSessionBorrow_SelectOnABusySourceFailsWithDeviceHeldNamingIt(t *testing.T) {
