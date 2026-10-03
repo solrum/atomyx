@@ -2,11 +2,19 @@ package script
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 )
+
+// ignoreStepSource keeps the comparison to a step's own fields, because
+// the authored form every parsed step may carry is not part of what a
+// round trip must preserve.
+var ignoreStepSource = cmp.FilterPath(func(p cmp.Path) bool {
+	return p.Last().Type() == reflect.TypeOf(stepSource{})
+}, cmp.Ignore())
 
 func strp(s string) *string { return &s }
 func intp(n int) *int       { return &n }
@@ -31,7 +39,7 @@ func roundTrip(t *testing.T, step ScriptStep) string {
 	if len(def.Steps) != 1 {
 		t.Fatalf("rendered step parsed into %d steps:\n%s", len(def.Steps), rendered)
 	}
-	if diff := cmp.Diff(step, def.Steps[0]); diff != "" {
+	if diff := cmp.Diff(step, def.Steps[0], ignoreStepSource); diff != "" {
 		t.Fatalf("step changed through the round trip (-want +got):\n%s\nyaml:\n%s", diff, rendered)
 	}
 	return rendered

@@ -33,8 +33,11 @@ var ScriptDefaults = struct {
 // plus steps, separated by a `---` document boundary) or a flow
 // fragment (steps only, executing in a parent script's context).
 type ScriptDefinition struct {
-	Format        *string           `json:"format,omitempty"`
-	AppID         string            `json:"appId"`
+	Format *string `json:"format,omitempty"`
+	AppID  string  `json:"appId"`
+	// AppIDSource is AppID as written, before `${var}` interpolation. It
+	// is empty for a definition built without parsing a script.
+	AppIDSource   string            `json:"-"`
 	Name          string            `json:"name"`
 	Description   *string           `json:"description,omitempty"`
 	Precondition  *string           `json:"precondition,omitempty"`
@@ -46,4 +49,13 @@ type ScriptDefinition struct {
 	StepDelay     *float64          `json:"stepDelay,omitempty"`
 	Steps         []ScriptStep      `json:"steps"`
 	StepLines     []int             `json:"_stepLines,omitempty"`
+}
+
+// AuthoredAppID returns the app id as the script author wrote it, so
+// text that names the app does not carry a value a variable supplied.
+func (d *ScriptDefinition) AuthoredAppID() string {
+	if d.AppIDSource != "" {
+		return d.AppIDSource
+	}
+	return d.AppID
 }

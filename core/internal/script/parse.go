@@ -49,15 +49,17 @@ func ParseScript(yamlContent string, externalEnv map[string]string) (*ScriptDefi
 		}
 		steps = append(steps, step)
 	}
+	attachAuthoredSteps(steps, docs.rawSteps)
 
 	if len(steps) == 0 && appID == "" {
 		return nil, newParseError("Script has no steps")
 	}
 
 	def := &ScriptDefinition{
-		AppID: appID,
-		Env:   mergedEnv,
-		Steps: steps,
+		AppID:       appID,
+		AppIDSource: appIDStr,
+		Env:         mergedEnv,
+		Steps:       steps,
 	}
 
 	if err := applyConfigFields(def, docs.config); err != nil {
@@ -71,6 +73,21 @@ func ParseScript(yamlContent string, externalEnv map[string]string) (*ScriptDefi
 	}
 
 	return def, nil
+}
+
+// attachAuthoredSteps pairs each resolved step with the same step
+// normalized from the script's text before interpolation. A step whose
+// unexpanded text fails normalization, for example a placeholder where a
+// number belongs, keeps no authored form and stands for itself.
+func attachAuthoredSteps(steps []ScriptStep, rawSteps []any) {
+	for i, raw := range rawSteps {
+		if i >= len(steps) {
+			return
+		}
+		if authored, err := normalizeStep(raw, i); err == nil {
+			attachAuthored(steps[i], authored)
+		}
+	}
 }
 
 // applyConfigFields copies every remaining ScriptDefinition field
