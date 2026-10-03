@@ -17,6 +17,9 @@ const (
 	// remoteCallTimeout bounds one request a handle makes to the holder
 	// on its own, such as a status read or a capture pull.
 	remoteCallTimeout = 5 * time.Second
+	// remotePrimeTimeout bounds the first reads of a new handle: the
+	// status, the subscription and the newest tree and screenshot.
+	remotePrimeTimeout = 15 * time.Second
 )
 
 // ErrRemoteClosed reports a subscription to a handle whose connection to
@@ -39,10 +42,18 @@ type RemoteConfig struct {
 	// NoticeBuffer bounds the step notices the connection holds for the
 	// handle. Zero selects attach.DefaultNoticeBuffer.
 	NoticeBuffer int
+	// DialTimeout, HelloTimeout and PrimeTimeout bound the connect, the
+	// hello exchange and the first reads of DialRemote. Zero selects
+	// attach.DefaultDialTimeout, attach.DefaultClientHelloTimeout and
+	// remotePrimeTimeout.
+	DialTimeout  time.Duration
+	HelloTimeout time.Duration
+	PrimeTimeout time.Duration
 }
 
 func (c RemoteConfig) dial(ctx context.Context) (*attach.Client, error) {
-	return attach.Dial(ctx, attach.ClientConfig{Path: c.Path, Client: c.Client, PeerUID: c.PeerUID, NoticeBuffer: c.NoticeBuffer})
+	return attach.Dial(ctx, attach.ClientConfig{Path: c.Path, Client: c.Client, PeerUID: c.PeerUID, NoticeBuffer: c.NoticeBuffer,
+		DialTimeout: c.DialTimeout, HelloTimeout: c.HelloTimeout})
 }
 
 // RemoteHandle is a Viewer, a StepSource and a Refresher over the attach
@@ -102,9 +113,18 @@ func DialRemote(ctx context.Context, cfg RemoteConfig, desc device.Descriptor) (
 	h.fanout = newFanout(&h.mu)
 	h.store.generation = h.generation
 	h.store.snap.Generation = h.generation
-	if err := h.prime(ctx, client); err != nil {
+	primeTimeout := cfg.PrimeTimeout
+	if primeTimeout <= 0 {
+		primeTimeout = remotePrimeTimeout
+	}
+	pctx, cancelPrime := context.WithTimeout(ctx, primeTimeout)
+	defer cancelPrime()
+	if err := h.prime(pctx, client); err != nil {
 		cancel()
 		_ = client.Close()
+		if ctx.Err() == nil && pctx.Err() != nil {
+			return nil, &attach.TimeoutError{Stage: "prime", Path: cfg.Path, After: primeTimeout}
+		}
 		return nil, err
 	}
 	go h.pump(hctx)

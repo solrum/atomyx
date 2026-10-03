@@ -15,6 +15,16 @@ import (
 // consumer before it drops the newest and reports a gap.
 const DefaultNoticeBuffer = 64
 
+const (
+	// DefaultDialTimeout bounds the connect of a Dial. A holder whose
+	// accept queue is full never completes it.
+	DefaultDialTimeout = 5 * time.Second
+	// DefaultClientHelloTimeout bounds the hello exchange of a Dial. A process
+	// that accepts the connection and never answers would otherwise hold
+	// the caller forever.
+	DefaultClientHelloTimeout = 5 * time.Second
+)
+
 // NoticeStepsDropped is a notice the client itself produces, never one a
 // holder sends. It marks the place in the notice stream where step
 // notices were dropped because the consumer fell behind, so the consumer
@@ -46,6 +56,22 @@ func (e *RemoteError) Remedy() string { return e.RemedyText }
 
 var _ diag.Coded = (*RemoteError)(nil)
 
+// TimeoutError reports a Dial stage that did not finish in time. It
+// unwraps to context.DeadlineExceeded.
+type TimeoutError struct {
+	// Stage names what ran out: "dial", "hello", or "prime" when a caller
+	// above Dial reports its own stage.
+	Stage string
+	Path  string
+	After time.Duration
+}
+
+func (e *TimeoutError) Error() string {
+	return fmt.Sprintf("attach: %s of %s did not finish within %s", e.Stage, e.Path, e.After)
+}
+
+func (e *TimeoutError) Unwrap() error { return context.DeadlineExceeded }
+
 // ConnectionError reports that the connection ended. Cause is a
 // *RemoteError when the holder turned the viewer away, ErrClientClosed
 // after Close, and otherwise the read error that ended the stream, such
@@ -70,6 +96,11 @@ type ClientConfig struct {
 	// and screenshot notices never queue, because only the newest of each
 	// matters.
 	NoticeBuffer int
+	// DialTimeout bounds the connect. Zero selects DefaultDialTimeout.
+	DialTimeout time.Duration
+	// HelloTimeout bounds the hello exchange. Zero selects
+	// DefaultClientHelloTimeout.
+	HelloTimeout time.Duration
 }
 
 // Client is one attached viewer's connection to a holder. Its methods are
@@ -97,10 +128,19 @@ type Client struct {
 }
 
 // Dial connects to the holder at cfg.Path, refuses a holder that runs as
-// another user, and completes the hello exchange.
+// another user, and completes the hello exchange. The connect and the
+// hello each have their own bound, and one that runs out returns a
+// *TimeoutError, so a holder that never answers cannot hold the caller.
 func Dial(ctx context.Context, cfg ClientConfig) (*Client, error) {
-	nc, err := (&net.Dialer{}).DialContext(ctx, "unix", cfg.Path)
+	dialTimeout := orDefault(cfg.DialTimeout, DefaultDialTimeout)
+	helloTimeout := orDefault(cfg.HelloTimeout, DefaultClientHelloTimeout)
+	dctx, cancelDial := context.WithTimeout(ctx, dialTimeout)
+	defer cancelDial()
+	nc, err := (&net.Dialer{}).DialContext(dctx, "unix", cfg.Path)
 	if err != nil {
+		if ctx.Err() == nil && dctx.Err() != nil {
+			return nil, &TimeoutError{Stage: "dial", Path: cfg.Path, After: dialTimeout}
+		}
 		return nil, fmt.Errorf("attach: dialing %s: %w", cfg.Path, err)
 	}
 	uc, ok := nc.(*net.UnixConn)
@@ -118,11 +158,23 @@ func Dial(ctx context.Context, cfg ClientConfig) (*Client, error) {
 		features = []string{}
 	}
 	hello := Hello{Protocol: SupportedVersions, Client: cfg.Client, Features: features}
-	if err := c.Call(ctx, TypeHello, hello, &c.hello); err != nil {
+	hctx, cancelHello := context.WithTimeout(ctx, helloTimeout)
+	defer cancelHello()
+	if err := c.Call(hctx, TypeHello, hello, &c.hello); err != nil {
 		_ = c.Close()
+		if ctx.Err() == nil && hctx.Err() != nil {
+			return nil, &TimeoutError{Stage: "hello", Path: cfg.Path, After: helloTimeout}
+		}
 		return nil, err
 	}
 	return c, nil
+}
+
+func orDefault(d, fallback time.Duration) time.Duration {
+	if d <= 0 {
+		return fallback
+	}
+	return d
 }
 
 func newClient(nc net.Conn, noticeBuffer int) *Client {
