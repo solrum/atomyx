@@ -669,13 +669,111 @@ Connections:
   may close the whole session, because no goroutine the server waits for
   runs it. In the session package the host injects the port as
   `Request.Yielder`.
-- A host that yields refuses with `HOLDER_BUSY` unless it is idle, records
-  `controlBorrowed`, and in `afterReply` closes its session, leaving the
-  runner running. It then calls `session.Follow`, which attaches to the
-  process that takes the device, probing a free device every
-  `FollowIntervalMs` for at most `FollowBudgetMs`. The host reports
-  `released` when that process ends or none appears. The MCP
-  `DeviceSession` and the inspector `Host` both yield this way.
+The hand-over that follows an accepted yield is described under
+"Device sharing and hand-over".
+
+## Device sharing and hand-over
+
+One process drives a device at a time, and the flock behind the lease
+guarantees it. A process that needs a device another process holds
+idle takes it by cooperative release. There is no descriptor passing
+and no request to return control. This section answers: how does one
+Atomyx process take a device from another, and who owns the iOS runner
+meanwhile?
+
+Roles:
+
+- **Source.** The holder that gives the device up. An idle MCP
+  `DeviceSession` and an idle inspector `Host` are sources, because
+  each passes a `session.Yielder` in `session.Request.Yielder`. A CLI
+  `run`, `suite` or `doctor` is never a source, because it is never
+  idle.
+- **Borrower.** The process that asks. `atomyx run` and `atomyx suite`
+  borrow automatically, the MCP `select_device` borrows explicitly, and
+  the inspector's reconnect button borrows. A re-acquire after an idle
+  release and a pinned auto-select never borrow, so two idle MCP
+  sessions cannot pass a device back and forth.
+
+Yield sequence, run by `session.Borrow`:
+
+1. `session.Prepare` runs first, so no runner build happens while the
+   source has already given the device up.
+2. A plain acquisition that fails with `DEVICE_HELD` names a holder
+   with a socket. The borrower connects to it and sends
+   `control.yield` only when the hello answer lists the `control`
+   feature. The holder is recorded as the lender of the new session,
+   but only when the live process with the holder's pid started at the
+   `processStartedAt` the lease records.
+3. The source's `Yielder` refuses with `HOLDER_BUSY` unless the holder
+   is idle, with no call, capture or open run in flight. Otherwise it
+   cancels its idle timer, records `controlBorrowed`, and returns the
+   function the attach server runs after it writes the `ok` response.
+4. After the reply, on a goroutine outside the attach handler, the
+   source closes its session. The close stops the attach server,
+   disconnects the driver, leaves the runner running, and releases the
+   lease. The source state is `borrowed`.
+5. The borrower acquires through `OpenWithinBudget`, retrying every 50
+   milliseconds, within `session.YieldBudgetMs` (the shutdown grace
+   period plus 5 seconds). A request the source acknowledged counts as
+   a yield even when the wait for its close is cut short.
+6. The source calls `session.Follow`, which attaches as a viewer to the
+   process that now holds the device, probing a free device every
+   `session.FollowIntervalMs` for at most `session.FollowBudgetMs`.
+   When that process ends, or none appears, the source state is
+   `released`.
+
+The borrower returns the original `DEVICE_HELD` error, naming the
+source, when the source serves no socket, does not advertise `control`,
+refuses with `HOLDER_BUSY`, cannot be reached, or still holds the device
+when the budget ends. When a third process wins the gap between the
+source's release and the borrower's acquisition, the error names that
+process.
+
+Return of control:
+
+- The borrower's exit closes its session and frees the device. The
+  source, still a viewer, sees the end and moves to `released`.
+- An MCP session takes the device again on its next device call, or
+  fails with `DEVICE_RELEASED_HELD` naming the process that holds it.
+  The same error is the answer while the session is still `borrowed`.
+  The inspector waits for the operator's reconnect.
+
+Runner ownership follows the owning process, not the session:
+
+- Closing a session never stops the iOS runner. This covers a normal
+  close, an idle release, and a yield.
+- The runner record names its owner by pid and start time. The process
+  that launches or adopts a runner, under the lease, writes itself as
+  owner.
+- A process-level `device.RunnerKeeper`, built at each composition
+  root, stops the runners that still name its process as owner when the
+  process exits through the shutdown path. It takes the device lease
+  with one non-blocking attempt first and skips the runner when the
+  lease is held.
+- A borrower that adopts the source's runner records the source as
+  lender. At exit its keeper hands the runner back to a live lender, so
+  the source adopts its own runner when it takes the device again, and
+  stops it when the lender is gone.
+- A Connect failure stops the runner at once, and the Studio sidecar's
+  dispose stops its runner.
+
+[`ios.md`](./ios.md) holds the record fields, the adoption conditions
+and the tunnel rules. On Android, a lease-holding session takes
+ownership of an existing `adb forward` to its device's agent port only
+after the agent answers through it, and removes it on close. The Studio
+sidecar holds no lease, so it never takes ownership of a forward.
+
+Contract the hand-over keeps:
+
+- The kernel flock guarantees one holder at any time, so two processes
+  never drive the device together.
+- The gap between the source's release and the borrower's acquisition
+  is a few milliseconds, and a third acquirer may win it. The loser
+  gets an honest `DEVICE_HELD` naming the winner.
+- The source reports `borrowed` then `released` through `check_health`
+  and the inspector's state notice, and records `controlBorrowed` with
+  the borrower's command in its own interventions. The borrower records
+  nothing.
 
 ## Inspector server
 

@@ -265,6 +265,23 @@ are unselected, idle, running, released, borrowed and lost.
 | unselected, released, borrowed, lost | `select_device` names a device held by a process that is idle and can yield | running, then idle at the end of the call, after the holder yielded through `session.Borrow` with the borrower `atomyx-mcp select_device`. A busy holder keeps the device and the call fails with `DEVICE_HELD` |
 | any | `disconnect_device` | unselected, the remembered device is forgotten |
 
+Notes on the shared-device states:
+
+- `check_health` reports `borrowed` while another process holds the
+  device the session gave up, and `released` after it. The `released`
+  message names its cause, an idle timeout or a hand-over to another
+  process that no longer holds the device. Neither state is probed.
+- `DEVICE_RELEASED_HELD` names the holder, for example `atomyx run,
+  running`, and appears in two cases. A call that needs the device while
+  the state is `borrowed` fails with it without trying. A call that takes
+  a released device again fails with it when another process holds the
+  device, and that re-acquire never asks the holder to yield.
+- `select_device` is the only tool that borrows. It names the borrower
+  `atomyx-mcp select_device` to the holder.
+- A yield that the session accepts adds one `controlBorrowed` intervention,
+  with the borrower's command as the client, to the next result of any tool.
+  The borrower records nothing.
+
 Timers and the acquisition budget run on the injectable timer clock of
 `ServerDeps`, so tests drive them with `clock.ManualClock`. After the
 open-run idle timeout closes a run, `finish_run` and `report_bug` fail

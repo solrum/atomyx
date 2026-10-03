@@ -518,6 +518,12 @@ The page works only on this machine, because the command listens on
   command gives it up, the holder state reads `lost`, and the page shows
   the same banner. Unlike `run`, which stops when the device is lost,
   the inspector keeps running.
+- **Hand-over.** An idle inspector gives the device to a `run`, a
+  `suite` or an MCP `select_device` that asks for it. The page then
+  shows that process as the holder and its steps, and shows the
+  released banner when that process ends. A capture or action in
+  progress makes the inspector refuse, and the other process fails with
+  `DEVICE_HELD`.
 - **Reconnect.** The Reconnect button takes the device again, with the
   same steps as at startup, and the page resumes and reloads the tree
   and screenshot. The command never reconnects on its own, so it does
@@ -589,12 +595,24 @@ an `atomyx-mcp` server, can drive a device at a time.
   server to one device. It selects that device on the first call that
   needs one, and `select_device` naming another device fails with code
   `DEVICE_PINNED`.
-- A second `run`, `suite` or `doctor` command against a device that is
-  already owned fails with code `DEVICE_HELD`. The message names the
+- `run` and `suite` take a device from an idle holder that can give it
+  up, which is an idle `atomyx-mcp` session or an idle `atomyx inspect`.
+  The command asks the holder, the holder releases the device, and the
+  command takes it. The holder is told which command took it, and it
+  watches the command until the command ends. The device then stays
+  free until the holder's operator or agent takes it again. A holder
+  that is working, such as another `run`, or that serves no socket
+  keeps the device, and the command fails as described next.
+- A `run`, `suite` or `doctor` command against a device that a holder
+  keeps fails with code `DEVICE_HELD`. `doctor` never asks a holder to
+  give the device up. The message names the
   holder's process id, command, and state. Stop that process or wait
   for it to finish, then run the command again, or use
   `atomyx inspect` to watch it. `inspect` does not fail on a held
   device, because it watches the holder.
+- When another process takes the device in the short gap between the
+  holder's release and the command's acquisition, the command fails
+  with `DEVICE_HELD` naming that process.
 - On iOS, a runner that is missing or stale is built before ownership is
   taken, so a long build never holds the device. The command prints
   `building runner` to stderr while it builds. The build has a timeout

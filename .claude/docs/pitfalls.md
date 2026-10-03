@@ -486,6 +486,51 @@ corresponding area. For the high-level map see
   test that needs a socket places its lease root under a short directory
   such as one made by `os.MkdirTemp("", "a")`.
 
+## Device hand-over
+
+- **Never close the session inside the attach handler.** A yield
+  handler runs on the connection goroutine, and `Session.Close` stops
+  the attach server, which waits for that goroutine. A close from
+  inside the handler deadlocks. The handler returns the `afterReply`
+  function, and the attach server runs it on its own goroutine after the
+  `ok` response is written. For the same reason `Host.Yield` takes the
+  inspector's operation lock without waiting, because an idle release
+  holds that lock while it closes the session.
+- **A yield is accepted only from `idle`.** A call, a capture, an open
+  run or an operator action in flight answers `HOLDER_BUSY`. A source
+  that accepted during a call would close the session under it.
+- **A re-acquire never borrows.** `session.Request.Reacquire` fails with
+  `DEVICE_RELEASED_HELD` when the device is held, and the pinned
+  auto-select takes the same path. Letting either borrow lets two idle
+  MCP sessions pass the device back and forth for ever. Only an explicit
+  `select_device`, `atomyx run`, `atomyx suite` and the inspector's
+  reconnect button borrow.
+- **A borrowed session never takes the device back.** While the state is
+  `borrowed`, a call that needs the device fails with
+  `DEVICE_RELEASED_HELD`, because a call queued behind the yield would
+  otherwise win the device before the borrower acquires it.
+- **The hand-over has a gap.** Between the source's release and the
+  borrower's acquisition any third process can take the device. The
+  borrower must report the `DEVICE_HELD` naming the new holder and must
+  not retry for another holder. Do not close the gap with a handshake
+  that passes the lease, because the flock is the only proof of a
+  single holder.
+- **Run `Prepare` before the yield.** A runner build that starts after
+  the source released leaves the device unowned for the whole build.
+- **Never record a lender without the start time.** A lender is the
+  holder whose pid still has the `processStartedAt` the lease recorded.
+  A reused pid names an unrelated process, and handing a runner to it
+  leaks the runner.
+- **A viewer counts from its first `observe.*` request.** A borrower's
+  connection that only sends `session.hello` and `control.yield` is not
+  a viewer, so it never records `viewerAttached` in the source.
+- **An Android forward is owned only after the agent answered through
+  it.** A forward that exists but whose agent does not answer may belong
+  to another process or a dead session, and removing it on close would
+  break that one. Set `Options.OwnAnsweringForward` only for a caller
+  that holds the device lease. The Studio sidecar holds none, so it
+  never removes a forward it reused.
+
 ## Tool layer (cross-platform)
 
 - **Never branch on the session's platform inside a tool handler.**
