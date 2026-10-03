@@ -233,3 +233,44 @@ func TestRunKeepsAnEnvValueOutOfTheStepFileWhenAnExpressionCannotConvertIt(t *te
 		t.Errorf("completed detail = %q, want the conversion failure described by length", detail)
 	}
 }
+
+const envSecretValue = "cli-env-s3cr3t-5f2c"
+
+const envSecretFlow = "env:\n  SECRET: " + envSecretValue + "\n---\n" +
+	"- assertExpr: { expr: \"\\\"${SECRET}\\\" == \\\"${SECRET}\\\"\" }\n" +
+	"- tap: { text: \"${SECRET}\" }\n"
+
+func TestRunRecordsNeverCarryAnInterpolatedEnvValue(t *testing.T) {
+	root := t.TempDir()
+	var stdout, stderr bytes.Buffer
+	code := RunScript(context.Background(), stepsDeps(&stdout, &stderr), map[string]FlagValue{
+		"--file": writeScript(t, "flow.yml", envSecretFlow), "--report-dir": root,
+	})
+	if code == 0 {
+		t.Fatal("a tap on an absent element passed")
+	}
+
+	runDir := singleRunDir(t, root)
+	_, steps := readStepLines(t, runDir)
+	if strings.Contains(steps, envSecretValue) {
+		t.Errorf("steps file carries the expanded value:\n%s", steps)
+	}
+	if !strings.Contains(steps, `\"${SECRET}\" == \"${SECRET}\"`) {
+		t.Errorf("steps file does not quote the assertion as written:\n%s", steps)
+	}
+	for _, out := range []string{stdout.String(), stderr.String()} {
+		if strings.Contains(out, envSecretValue) {
+			t.Errorf("console output carries the expanded value:\n%s", out)
+		}
+	}
+	_ = filepath.WalkDir(runDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || filepath.Base(path) == runfolder.MetaFileName {
+			return nil
+		}
+		body, readErr := os.ReadFile(path)
+		if readErr == nil && strings.Contains(string(body), envSecretValue) && strings.HasSuffix(path, ".jsonl") {
+			t.Errorf("%s carries the expanded value", path)
+		}
+		return nil
+	})
+}

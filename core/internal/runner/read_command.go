@@ -23,6 +23,7 @@ func (ReadCommand) Command() string { return script.CommandRead }
 
 func (ReadCommand) Execute(step script.ScriptStep, ctx *CommandContext) CommandResult {
 	s := step.(*script.ReadStep)
+	writtenAs := authored[*script.ReadStep](step).As
 	selector := compileScriptSelector(s.Selector)
 	field := "value"
 	if s.Field != nil {
@@ -46,7 +47,7 @@ func (ReadCommand) Execute(step script.ScriptStep, ctx *CommandContext) CommandR
 			return CommandResult{Ok: false, Detail: strPtr(fmt.Sprintf("Element has no \"%s\" field", field))}
 		}
 		ctx.Variables[s.As] = expression.StringValue(value)
-		return CommandResult{Ok: true, Detail: strPtr(fmt.Sprintf("Read %s into \"%s\"", field, s.As))}
+		return CommandResult{Ok: true, Detail: strPtr(fmt.Sprintf("Read %s into \"%s\"", field, writtenAs))}
 	}
 
 	value, ok := readStateField(node, field)
@@ -54,7 +55,7 @@ func (ReadCommand) Execute(step script.ScriptStep, ctx *CommandContext) CommandR
 		return CommandResult{Ok: false, Detail: strPtr(fmt.Sprintf("Element does not report the \"%s\" field", field))}
 	}
 	ctx.Variables[s.As] = expression.BoolValue(value)
-	return CommandResult{Ok: true, Detail: strPtr(fmt.Sprintf("Read %s into \"%s\"", field, s.As))}
+	return CommandResult{Ok: true, Detail: strPtr(fmt.Sprintf("Read %s into \"%s\"", field, writtenAs))}
 }
 
 func isReadAttributeField(field string) bool {

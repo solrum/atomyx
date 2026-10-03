@@ -19,11 +19,13 @@ func (ExtractCommand) Command() string { return script.CommandExtract }
 
 func (ExtractCommand) Execute(step script.ScriptStep, ctx *CommandContext) CommandResult {
 	s := step.(*script.ExtractStep)
+	written := authored[*script.ExtractStep](step)
 	fromKey := unwrapFromKey(s.From)
+	writtenKey := unwrapFromKey(written.From)
 	captured, ok := ctx.Captures[fromKey]
 	if !ok {
 		return CommandResult{Ok: false, Detail: strPtr(fmt.Sprintf(
-			"No captured request named \"%s\". Run a \"capture\" step with \"as: %s\" first.", fromKey, fromKey))}
+			"No captured request named \"%s\". Run a \"capture\" step with \"as: %s\" first.", writtenKey, writtenKey))}
 	}
 	capturedObj := capturedRequestAsAny(captured)
 
@@ -31,10 +33,11 @@ func (ExtractCommand) Execute(step script.ScriptStep, ctx *CommandContext) Comma
 	extracted := make([]string, 0, len(names))
 	for _, name := range names {
 		path, _ := s.Values.Get(name)
+		writtenPath, _ := written.Values.Get(name)
 		value := resolveDotPath(capturedObj, path)
 		if isJSUndefined(value) {
 			return CommandResult{Ok: false, Detail: strPtr(fmt.Sprintf(
-				"Path \"%s\" resolved to undefined in captured \"%s\"", path, fromKey))}
+				"Path \"%s\" resolved to undefined in captured \"%s\"", writtenPath, writtenKey))}
 		}
 		stored := jsStringOf(value)
 		ctx.Variables[name] = expression.StringValue(stored)

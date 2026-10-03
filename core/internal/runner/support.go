@@ -4,12 +4,31 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"unicode/utf8"
 
 	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/orchestra"
+	"dev.atomyx/internal/script"
 	"dev.atomyx/internal/script/expression"
 )
+
+// authored returns step as the script author wrote it, as the same step
+// kind, so a detail can name the author's text where the executed step
+// holds the value a `${var}` placeholder expanded to.
+func authored[T script.ScriptStep](step script.ScriptStep) T {
+	return script.AuthoredOf(step).(T)
+}
+
+// restoreAuthored puts the author's text back into text that a component
+// outside the runner built from the executed value, so the value a
+// variable supplied does not reach a step detail through that component.
+func restoreAuthored(text, executed, written string) string {
+	if executed == "" || executed == written {
+		return text
+	}
+	return strings.ReplaceAll(text, executed, written)
+}
 
 // detailOrEmpty renders a CommandResult.Detail pointer as a plain
 // string, treating nil as empty. Command handlers that fold a nested

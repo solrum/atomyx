@@ -53,6 +53,7 @@ type StepSummary struct {
 // text and the token sequence are a stable rendering contract: they
 // must always agree with each other byte for byte.
 func SummarizeStep(step script.ScriptStep) StepSummary {
+	step = script.AuthoredOf(step)
 	b := &tokenBuilder{}
 	switch s := step.(type) {
 	case *script.TapStep:

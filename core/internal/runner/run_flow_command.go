@@ -18,6 +18,7 @@ func (RunFlowCommand) Command() string { return script.CommandRunFlow }
 
 func (RunFlowCommand) Execute(step script.ScriptStep, ctx *CommandContext) CommandResult {
 	s := step.(*script.RunFlowStep)
+	shownPath := absolutePath(authored[*script.RunFlowStep](step).File)
 
 	// Resolve to an absolute path before using it anywhere, so the
 	// "not found" message below always names the same path regardless
@@ -29,7 +30,7 @@ func (RunFlowCommand) Execute(step script.ScriptStep, ctx *CommandContext) Comma
 	}
 
 	if ctx.FlowLoader == nil {
-		return CommandResult{Ok: false, Detail: strPtr(fmt.Sprintf("Sub-flow file not found: %s", filePath))}
+		return CommandResult{Ok: false, Detail: strPtr(fmt.Sprintf("Sub-flow file not found: %s", shownPath))}
 	}
 
 	// Merge parent variables with the step's own env overrides. On a
@@ -53,7 +54,7 @@ func (RunFlowCommand) Execute(step script.ScriptStep, ctx *CommandContext) Comma
 		if errors.As(err, &parseErr) {
 			panic(err)
 		}
-		return CommandResult{Ok: false, Detail: strPtr(fmt.Sprintf("Sub-flow file not found: %s", filePath))}
+		return CommandResult{Ok: false, Detail: strPtr(fmt.Sprintf("Sub-flow file not found: %s", shownPath))}
 	}
 
 	preconditionResult := ctx.RunPreconditions(subDef.Preconditions)

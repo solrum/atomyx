@@ -46,7 +46,7 @@ func (LaunchAppCommand) Execute(_ script.ScriptStep, ctx *CommandContext) Comman
 		}
 		if err := ctx.Orchestra.ClearAppData(ctx.Context, appID, driver.ClearAppDataOptions{Source: source}); err != nil {
 			if result, ok := commandFailureFor(err); ok {
-				return result
+				return withAuthoredAppID(result, ctx)
 			}
 			panic(err)
 		}
@@ -58,9 +58,16 @@ func (LaunchAppCommand) Execute(_ script.ScriptStep, ctx *CommandContext) Comman
 	// like any other failing command instead of propagating as a panic.
 	if err := ctx.Orchestra.LaunchApp(ctx.Context, appID, driver.LaunchArgs{NoReset: ctx.LaunchNoReset}); err != nil {
 		if result, ok := commandFailureFor(err); ok {
-			return result
+			return withAuthoredAppID(result, ctx)
 		}
 		panic(err)
 	}
-	return CommandResult{Ok: true, Detail: strPtr(fmt.Sprintf("Launched %s", appID))}
+	return CommandResult{Ok: true, Detail: strPtr(fmt.Sprintf("Launched %s", ctx.Script.AuthoredAppID()))}
+}
+
+// withAuthoredAppID rewrites a launch failure so it names the app id as
+// the script author wrote it, not the value a variable expanded to.
+func withAuthoredAppID(result CommandResult, ctx *CommandContext) CommandResult {
+	result.Detail = strPtr(restoreAuthored(detailOrEmpty(result.Detail), ctx.Script.AppID, ctx.Script.AuthoredAppID()))
+	return result
 }

@@ -24,6 +24,7 @@ func (HandleCommand) Command() string { return script.CommandHandle }
 
 func (HandleCommand) Execute(step script.ScriptStep, ctx *CommandContext) CommandResult {
 	s := step.(*script.HandleStep)
+	written := authored[*script.HandleStep](step)
 	timeoutMs := defaultHandleTimeoutMs
 	if s.Timeout != nil {
 		timeoutMs = *s.Timeout
@@ -32,9 +33,9 @@ func (HandleCommand) Execute(step script.ScriptStep, ctx *CommandContext) Comman
 	parentEnv := environmentFromVariables(ctx.Variables)
 
 	for {
-		for _, branch := range s.Branches {
+		for i, branch := range s.Branches {
 			if handleBranchMatches(branch.When, ctx) {
-				steps, errDetail := resolveStepsOrFile(ctx.FlowLoader, branch.Do, parentEnv)
+				steps, errDetail := resolveStepsOrFile(ctx.FlowLoader, branch.Do, written.Branches[i].Do, parentEnv)
 				if errDetail != nil {
 					return CommandResult{Ok: false, Detail: errDetail}
 				}

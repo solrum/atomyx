@@ -21,7 +21,7 @@ import (
 // resolveStepsOrFile lets that failure propagate the same way. The
 // second return value stays reserved for the one failure mode that
 // is not a panic: no FlowLoader configured for this runner at all.
-func resolveStepsOrFile(loader FlowLoader, sof script.StepsOrFile, env map[string]string) ([]script.ScriptStep, *string) {
+func resolveStepsOrFile(loader FlowLoader, sof, written script.StepsOrFile, env map[string]string) ([]script.ScriptStep, *string) {
 	if sof.File == nil {
 		return sof.Steps, nil
 	}
@@ -33,9 +33,13 @@ func resolveStepsOrFile(loader FlowLoader, sof script.StepsOrFile, env map[strin
 	if abs, err := filepath.Abs(filePath); err == nil {
 		filePath = abs
 	}
+	shownPath := filePath
+	if written.File != nil {
+		shownPath = absolutePath(*written.File)
+	}
 
 	if loader == nil {
-		return nil, strPtr(fmt.Sprintf("no flow loader configured to resolve file: %s", filePath))
+		return nil, strPtr(fmt.Sprintf("no flow loader configured to resolve file: %s", shownPath))
 	}
 
 	flow, err := loader.LoadFlow(filePath, env)
@@ -44,7 +48,7 @@ func resolveStepsOrFile(loader FlowLoader, sof script.StepsOrFile, env map[strin
 		if errors.As(err, &parseErr) {
 			panic(err)
 		}
-		panic(errors.New(nodeStyleFileErrorMessage(err, filePath)))
+		panic(errors.New(restoreAuthored(nodeStyleFileErrorMessage(err, filePath), filePath, shownPath)))
 	}
 	return flow.Steps, nil
 }
@@ -68,4 +72,13 @@ func nodeStyleFileErrorMessage(err error, path string) string {
 	default:
 		return err.Error()
 	}
+}
+
+// absolutePath resolves path against the working directory, or returns it
+// unchanged when that fails.
+func absolutePath(path string) string {
+	if abs, err := filepath.Abs(path); err == nil {
+		return abs
+	}
+	return path
 }

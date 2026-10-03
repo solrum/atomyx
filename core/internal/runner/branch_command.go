@@ -15,18 +15,20 @@ func (BranchCommand) Command() string { return script.CommandBranch }
 
 func (BranchCommand) Execute(step script.ScriptStep, ctx *CommandContext) CommandResult {
 	s := step.(*script.BranchStep)
+	written := authored[*script.BranchStep](step)
 	fromKey := unwrapFromKey(s.From)
+	writtenKey := unwrapFromKey(written.From)
 	captured, ok := ctx.Captures[fromKey]
 	if !ok {
 		return CommandResult{Ok: false, Detail: strPtr(fmt.Sprintf(
-			"No captured request named \"%s\". Run a \"capture\" step first.", fromKey))}
+			"No captured request named \"%s\". Run a \"capture\" step first.", writtenKey))}
 	}
 
 	parentEnv := environmentFromVariables(ctx.Variables)
 
-	for _, c := range s.On {
+	for i, c := range s.On {
 		if branchCaseMatches(c.Match, captured) {
-			steps, errDetail := resolveStepsOrFile(ctx.FlowLoader, c.Do, parentEnv)
+			steps, errDetail := resolveStepsOrFile(ctx.FlowLoader, c.Do, written.On[i].Do, parentEnv)
 			if errDetail != nil {
 				return CommandResult{Ok: false, Detail: errDetail}
 			}
@@ -35,7 +37,7 @@ func (BranchCommand) Execute(step script.ScriptStep, ctx *CommandContext) Comman
 	}
 
 	if s.Default != nil {
-		steps, errDetail := resolveStepsOrFile(ctx.FlowLoader, *s.Default, parentEnv)
+		steps, errDetail := resolveStepsOrFile(ctx.FlowLoader, *s.Default, *written.Default, parentEnv)
 		if errDetail != nil {
 			return CommandResult{Ok: false, Detail: errDetail}
 		}
@@ -43,7 +45,7 @@ func (BranchCommand) Execute(step script.ScriptStep, ctx *CommandContext) Comman
 	}
 
 	return CommandResult{Ok: false, Detail: strPtr(fmt.Sprintf(
-		"branch: no case matched for \"%s\" (status=%d)", fromKey, captured.Status))}
+		"branch: no case matched for \"%s\" (status=%d)", writtenKey, captured.Status))}
 }
 
 // branchCaseMatches reports whether captured satisfies match: its
