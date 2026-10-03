@@ -6,9 +6,13 @@ import (
 
 	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/lease"
+	"dev.atomyx/internal/runfolder"
 )
 
-var _ Viewer = (*Session)(nil)
+var (
+	_ Viewer     = (*Session)(nil)
+	_ StepSource = (*Session)(nil)
+)
 
 // Info implements Viewer.
 func (s *Session) Info() Info {
@@ -85,4 +89,17 @@ func (s *Session) FreshTree(ctx context.Context) (Snapshot, error) {
 		}
 	}
 	return s.hub.Latest(), nil
+}
+
+// PublishStep hands a stamped step line to the session's viewers.
+func (s *Session) PublishStep(line runfolder.StepLine) { s.hub.PublishStep(line) }
+
+// StepsSince implements StepSource.
+func (s *Session) StepsSince(sinceSeq int64) ([]runfolder.StepLine, bool) {
+	return s.hub.StepsSince(sinceSeq)
+}
+
+// SubscribeSince implements StepSource.
+func (s *Session) SubscribeSince(ctx context.Context, sinceSeq int64) (<-chan Observation, error) {
+	return s.hub.SubscribeSince(ctx, sinceSeq)
 }

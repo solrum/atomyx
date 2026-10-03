@@ -60,6 +60,8 @@ type Hub struct {
 	sizeSeq    uint64
 	sizeStable bool
 	hasSize    bool
+
+	steps stepRing
 }
 
 var _ Observer = (*Hub)(nil)
@@ -67,6 +69,9 @@ var _ Observer = (*Hub)(nil)
 type subscriber struct {
 	ch   chan Observation
 	done chan struct{}
+	// steps is true for a subscriber that asked for step notices through
+	// SubscribeSince.
+	steps bool
 }
 
 // NewHub returns an empty hub.
@@ -172,14 +177,25 @@ func (h *Hub) sizeCurrent() bool {
 // can tell a closed session from falling behind, and re-reads Latest
 // only in the second case. Ending through ctx sends nothing.
 func (h *Hub) Subscribe(ctx context.Context) (<-chan Observation, error) {
+	return h.subscribe(ctx, nil)
+}
+
+// subscribe registers a subscriber. A non-nil sinceSeq makes it a step
+// subscriber, and its resume notices are queued before any live one.
+func (h *Hub) subscribe(ctx context.Context, sinceSeq *int64) (<-chan Observation, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	sub := &subscriber{ch: make(chan Observation, subscriberBuffer+1), done: make(chan struct{})}
+	sub := &subscriber{ch: make(chan Observation, subscriberBuffer+1), done: make(chan struct{}), steps: sinceSeq != nil}
 	h.mu.Lock()
 	if h.closed {
 		h.mu.Unlock()
 		return nil, ErrHubClosed
+	}
+	if sinceSeq != nil {
+		for _, o := range h.steps.resumeLocked(*sinceSeq) {
+			sub.ch <- o
+		}
 	}
 	h.subs[sub] = struct{}{}
 	h.mu.Unlock()
@@ -207,6 +223,9 @@ func (h *Hub) Close() {
 
 func (h *Hub) notifyLocked(o Observation) {
 	for sub := range h.subs {
+		if isStepNotice(o.Kind) && !sub.steps {
+			continue
+		}
 		if len(sub.ch) >= subscriberBuffer {
 			h.endLocked(sub, ObservedDropped)
 			continue

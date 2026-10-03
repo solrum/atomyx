@@ -82,7 +82,7 @@ func (s *runSession) runInOpenRun(
 		return runner.ScriptResult{}, err
 	}
 	artifacts := newScriptArtifacts(dir, counter, s.logger)
-	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: open.ID(), Artifacts: artifacts, Evidence: artifacts, OnStep: stepstream.NewSink(open, s.logger)})
+	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: open.ID(), Artifacts: artifacts, Evidence: artifacts, OnStep: stepstream.NewSink(open, s.logger, stepstream.WithPublisher(s.publishStep))})
 	if execErr == nil {
 		s.recordScriptTotals(open, result)
 	}
@@ -106,7 +106,7 @@ func (s *runSession) runAsOwnRun(
 		return runner.ScriptResult{}, err
 	}
 	artifacts := newScriptArtifacts(dir, &artifactCounter{}, s.logger)
-	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: w.ID(), Artifacts: artifacts, Evidence: artifacts, OnStep: stepstream.NewSink(w, s.logger)})
+	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: w.ID(), Artifacts: artifacts, Evidence: artifacts, OnStep: stepstream.NewSink(w, s.logger, stepstream.WithPublisher(s.publishStep))})
 	finalizeErr := w.Finalize(scriptOutcome(ctx, result, execErr), func(m *runfolder.Meta) {
 		m.TotalSteps = result.TotalSteps
 		m.FailedAtStep = result.FailedAtStep

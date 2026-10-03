@@ -165,7 +165,7 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 		CreateLoadScript: fsScenarioScriptLoader,
 		ExternalEnv:      externalEnv,
 		ChildArtifacts:   newArtifactSequence(runfolder.ArtifactsDir(record.Dir())).forTarget,
-		OnStep:           stepstream.NewSink(record.writer, deps.logger()),
+		OnStep:           stepstream.NewSink(record.writer, deps.logger(), stepstream.WithPublisher(opened.PublishStep)),
 	})
 
 	result, err := suiteRunner.Run(runCtx, entries, &scenario.SuiteRunOptions{

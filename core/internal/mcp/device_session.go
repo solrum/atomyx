@@ -863,3 +863,14 @@ func (s *DeviceSession) resolveDescriptor(ctx context.Context, input SelectDevic
 	desc.Port = input.Port
 	return desc, nil
 }
+
+// PublishStep hands a step line to the viewers of the held session. It
+// does nothing while no device is held.
+func (s *DeviceSession) PublishStep(line runfolder.StepLine) {
+	s.mu.Lock()
+	held := s.sess
+	s.mu.Unlock()
+	if held != nil {
+		held.PublishStep(line)
+	}
+}

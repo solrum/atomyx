@@ -59,3 +59,38 @@ func TestSinkLogsAFailedAppendOnceAndKeepsGoing(t *testing.T) {
 		t.Fatalf("appended %d lines and logged %d warnings, want 3 and 1", len(appender.lines), logger.warns)
 	}
 }
+
+type stampingAppender struct{ next int64 }
+
+func (a *stampingAppender) AppendStep(line runfolder.StepLine) (runfolder.StepLine, error) {
+	a.next++
+	line.Seq = a.next
+	return line, nil
+}
+
+func TestSinkPublishesEveryStampedLineInOrder(t *testing.T) {
+	var published []runfolder.StepLine
+	sink := NewSink(&stampingAppender{}, &countingLogger{}, WithPublisher(func(l runfolder.StepLine) {
+		published = append(published, l)
+	}))
+
+	sink(runner.StepEvent{Type: runner.StepStarted, Command: "tap"})
+	sink(runner.StepEvent{Type: runner.StepCompleted, Command: "tap", Ok: true})
+
+	if len(published) != 2 || published[0].Seq != 1 || published[1].Seq != 2 || published[1].Phase != runfolder.StepPhaseCompleted {
+		t.Fatalf("published = %+v, want two stamped lines in order", published)
+	}
+}
+
+func TestSinkDoesNotPublishALineThatFailedToAppend(t *testing.T) {
+	published := 0
+	sink := NewSink(&recordingAppender{err: errors.New("disk full")}, &countingLogger{}, WithPublisher(func(runfolder.StepLine) {
+		published++
+	}))
+
+	sink(runner.StepEvent{Type: runner.StepStarted, Command: "tap"})
+
+	if published != 0 {
+		t.Fatalf("published %d lines, want none for a failed append", published)
+	}
+}

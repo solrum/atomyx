@@ -5,6 +5,7 @@ import (
 
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/lease"
+	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/wire"
 )
 
@@ -34,6 +35,15 @@ const (
 	// session closed. The channel closes right after it, and
 	// subscribing again fails.
 	ObservedClosed
+	// ObservedStep announces that step lines are available up to the
+	// sequence number in Revision. Only a SubscribeSince subscriber
+	// receives it, and it reads the lines with StepsSince.
+	ObservedStep
+	// ObservedStepGap is the first notice of a SubscribeSince subscriber
+	// that needs step lines the hub no longer holds. Revision is the
+	// sequence number of the oldest line the hub still holds, and every
+	// line before it is lost to that subscriber.
+	ObservedStepGap
 )
 
 // Observation announces that a new capture is available. It carries no
@@ -160,6 +170,19 @@ type Viewer interface {
 	// ObservedClosed or ObservedDropped, then the channel closes. Ending
 	// through ctx sends no terminal value.
 	Subscribe(ctx context.Context) (<-chan Observation, error)
+}
+
+// StepSource is a Viewer that also follows the step lines of the runs the
+// session drives. A line carries text from the step stream, so it is
+// read with StepsSince and never travels inside an Observation.
+type StepSource interface {
+	Viewer
+	// StepsSince returns the held step lines with a sequence number above
+	// sinceSeq, oldest first, and reports whether lines were lost.
+	StepsSince(sinceSeq int64) ([]runfolder.StepLine, bool)
+	// SubscribeSince is Subscribe plus ObservedStep and ObservedStepGap
+	// notices, resuming after sinceSeq.
+	SubscribeSince(ctx context.Context, sinceSeq int64) (<-chan Observation, error)
 }
 
 // Controller is a Viewer that can also ask the device for a matched

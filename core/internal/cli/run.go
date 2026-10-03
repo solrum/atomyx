@@ -162,7 +162,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 			ExternalEnv:           externalEnv,
 			PreconditionsOverride: preconditionsOverride,
 			ChildArtifacts:        newArtifactSequence(runfolder.ArtifactsDir(record.Dir())).forTarget,
-			OnStep:                stepstream.NewSink(record.writer, deps.logger()),
+			OnStep:                stepstream.NewSink(record.writer, deps.logger(), stepstream.WithPublisher(opened.PublishStep)),
 		})
 		result, err := scenarioRunner.Run(runCtx, scenarioDef)
 		finishedAt := time.Now()
@@ -227,7 +227,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		PreconditionsOverride: preconditionsOverride,
 		NetworkCapture:        networkCapture,
 		Artifacts:             artifacts,
-		OnStep:                stepstream.NewSink(record.writer, deps.logger()),
+		OnStep:                stepstream.NewSink(record.writer, deps.logger(), stepstream.WithPublisher(opened.PublishStep)),
 		FailureCapture: runner.NewFailureBundle(runner.FailureBundleDeps{
 			Orchestra: built.Orchestra, Clock: deps.clock(), Logger: deps.logger(), Sink: artifacts,
 		}),

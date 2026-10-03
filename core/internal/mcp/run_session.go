@@ -79,6 +79,7 @@ type runSession struct {
 	logger       logging.Logger
 	drainTimeout time.Duration
 	bare         *scriptFlight
+	publishStep  func(runfolder.StepLine)
 
 	mu        sync.Mutex
 	writer    *runfolder.Writer
@@ -92,13 +93,16 @@ type runSessionDeps struct {
 	Starter RunStarter
 	Clock   orchestra.Clock
 	Logger  logging.Logger
+	// PublishStep receives every step line a script run appends, so the
+	// viewers of the held device follow the run. Nil publishes nothing.
+	PublishStep func(runfolder.StepLine)
 }
 
 func newRunSession(deps runSessionDeps) *runSession {
 	return &runSession{
 		store: deps.Store, catalog: deps.Catalog, starter: deps.Starter,
 		clock: deps.Clock, logger: deps.Logger, artifacts: &artifactCounter{},
-		drainTimeout: runDrainTimeout, bare: newScriptFlight(), flight: newScriptFlight(),
+		drainTimeout: runDrainTimeout, bare: newScriptFlight(), flight: newScriptFlight(), publishStep: deps.PublishStep,
 	}
 }
 
