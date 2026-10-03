@@ -634,6 +634,8 @@ type FakeProvisioner struct {
 	iosLost         map[string]func(error)
 	iosKills        map[string]func() error
 	iosPorts        map[string]int
+	iosAdopted      map[string]bool
+	iosOptions      []ProvisionOptions
 	keeper          *RunnerKeeper
 
 	// gate, when non-nil, is waited on before every call returns. A
@@ -655,10 +657,29 @@ func NewFakeProvisioner() *FakeProvisioner {
 		iosLost:         make(map[string]func(error)),
 		iosKills:        make(map[string]func() error),
 		iosPorts:        make(map[string]int),
+		iosAdopted:      make(map[string]bool),
 	}
 }
 
-var _ AgentProvisioner = (*FakeProvisioner)(nil)
+var (
+	_ AgentProvisioner    = (*FakeProvisioner)(nil)
+	_ AdoptingProvisioner = (*FakeProvisioner)(nil)
+)
+
+// SetIOSAdopted makes every later ProvisionIOSAgent call for udid report
+// an adopted runner, unless the call asks for a fresh one.
+func (f *FakeProvisioner) SetIOSAdopted(udid string, adopted bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.iosAdopted[udid] = adopted
+}
+
+// IOSOptions returns the ProvisionOptions of every call received so far.
+func (f *FakeProvisioner) IOSOptions() []ProvisionOptions {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]ProvisionOptions(nil), f.iosOptions...)
+}
 
 // KeepWith hands the runner of every later EnsureIOSAgent call to keeper,
 // the way the real provisioner does, so a test sees the keeper stop it.
@@ -743,11 +764,21 @@ func (f *FakeProvisioner) EnsureIOSAgent(ctx context.Context, udid string, kind 
 // EnsureIOSAgentWatched implements AgentProvisioner. FireLost reports a
 // loss through the onLost of the latest call for the same udid.
 func (f *FakeProvisioner) EnsureIOSAgentWatched(ctx context.Context, udid string, kind IosAgentKind, onLost func(error)) (int, func() error, error) {
+	agent, err := f.ProvisionIOSAgent(ctx, udid, kind, onLost, ProvisionOptions{})
+	return agent.Port, agent.Kill, err
+}
+
+// ProvisionIOSAgent implements AdoptingProvisioner. The runner is
+// reported adopted when SetIOSAdopted asked for it and opts.Fresh is
+// not set.
+func (f *FakeProvisioner) ProvisionIOSAgent(ctx context.Context, udid string, kind IosAgentKind, onLost func(error), opts ProvisionOptions) (IOSAgent, error) {
 	f.mu.Lock()
 	f.iosLost[udid] = onLost
 	f.mu.Unlock()
 	f.mu.Lock()
 	f.iosCalls = append(f.iosCalls, FakeIOSCall{UDID: udid, Kind: kind})
+	f.iosOptions = append(f.iosOptions, opts)
+	adopted := f.iosAdopted[udid] && !opts.Fresh
 	gate := f.gate
 	err := f.iosResult[udid]
 	port, ok := f.iosPorts[udid]
@@ -760,7 +791,7 @@ func (f *FakeProvisioner) EnsureIOSAgentWatched(ctx context.Context, udid string
 		select {
 		case <-gate:
 		case <-ctx.Done():
-			return 0, func() error { return nil }, ctx.Err()
+			return IOSAgent{Kill: func() error { return nil }}, ctx.Err()
 		}
 	}
 	var once sync.Once
@@ -779,7 +810,7 @@ func (f *FakeProvisioner) EnsureIOSAgentWatched(ctx context.Context, udid string
 	if keeper != nil && err == nil {
 		keeper.keep(launchRecord{runnerID: udid}, kill)
 	}
-	return port, kill, err
+	return IOSAgent{Port: port, RunnerID: "fake-runner-" + udid, Adopted: adopted && err == nil, Kill: kill}, err
 }
 
 // FireLost simulates the provisioned runner of udid exiting on its own.

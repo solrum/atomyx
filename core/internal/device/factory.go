@@ -3,6 +3,7 @@ package device
 import (
 	"context"
 	"os"
+	"time"
 
 	"dev.atomyx/internal/androiddriver"
 	"dev.atomyx/internal/driver"
@@ -24,6 +25,11 @@ const (
 	androidControlPort = 8765
 	iosControlPort     = 22087
 )
+
+// adoptedRunnerProbeTimeout bounds the hierarchy call that proves an
+// adopted runner still serves commands. A runner that does not answer in
+// this time is ended and a new one is launched.
+const adoptedRunnerProbeTimeout = 10 * time.Second
 
 // simHidOptInEnv gates whether an iOS simulator target takes the
 // direct-HID path at all: "1" opts in, anything else (including
@@ -138,6 +144,9 @@ type DriverFactory struct {
 
 	provisioner AgentProvisioner
 	wrap        DriverWrap
+
+	// probeAdopted proves an adopted runner serves commands.
+	probeAdopted func(ctx context.Context, d driver.Driver) error
 }
 
 // NewDriverFactory constructs a DriverFactory from deps.
@@ -157,7 +166,17 @@ func NewDriverFactory(deps DriverFactoryDeps) *DriverFactory {
 	return &DriverFactory{
 		runner: deps.Runner, background: background, clock: clock, simHid: deps.SimHid, logger: logger,
 		provisioner: deps.Provisioner, wrap: deps.WrapDriver,
+		probeAdopted: probeHierarchy,
 	}
+}
+
+// probeHierarchy proves a connected driver serves commands with one
+// hierarchy call bounded by adoptedRunnerProbeTimeout.
+func probeHierarchy(ctx context.Context, d driver.Driver) error {
+	probeCtx, cancel := context.WithTimeout(ctx, adoptedRunnerProbeTimeout)
+	defer cancel()
+	_, err := d.Hierarchy(probeCtx)
+	return err
 }
 
 var _ WrappingFactory = (*DriverFactory)(nil)
@@ -169,35 +188,51 @@ func (f *DriverFactory) WithDriverWrap(wrap DriverWrap) Factory {
 	return &wrapped
 }
 
-// Build implements Factory.
+// Build implements Factory. A runner the provisioner adopted must
+// connect and then answer one hierarchy call. When it does not, it is
+// ended and the build repeats once with a runner launched fresh.
 func (f *DriverFactory) Build(ctx context.Context, desc Descriptor) (Built, error) {
 	lost := make(chan error, 1)
-	drv, release, err := f.createDriverWatched(ctx, desc, func(cause error) {
+	onLost := func(cause error) {
 		select {
 		case lost <- cause:
 		default:
 		}
-	})
-	if err != nil {
-		return Built{}, err
 	}
-	drv = applyWrap(f.wrap, drv)
-	if err := drv.Connect(ctx); err != nil {
+	opts := ProvisionOptions{}
+	retried := false
+	for {
+		created, err := f.createDriverWatched(ctx, desc, onLost, opts)
+		if err != nil {
+			return Built{}, err
+		}
+		drv := applyWrap(f.wrap, created.driver)
+		connectErr := drv.Connect(ctx)
+		if connectErr == nil && created.adopted {
+			connectErr = f.probeAdopted(ctx, created.driver)
+		}
+		if connectErr == nil {
+			return Built{
+				Driver:    drv,
+				Orchestra: orchestra.New(orchestra.OrchestraDeps{Driver: drv, Clock: f.clock, Logger: f.logger}),
+				Lost:      lost,
+				Release:   created.release,
+			}, nil
+		}
 		// Connect can fail after it has already started a long-lived
 		// child, such as the USB tunnel, and the caller never receives
 		// the driver to disconnect. Disconnect is idempotent, so
 		// releasing here is always safe. The runner was never used, so
 		// it stops with the driver.
 		_ = drv.Disconnect()
-		release()
-		return Built{}, err
+		created.release()
+		if !created.adopted || retried || ctx.Err() != nil {
+			return Built{}, connectErr
+		}
+		f.logger.Warn("the adopted runner did not answer, launching a new one", logging.LogContext{"udid": desc.ID, "error": connectErr.Error()})
+		opts.Fresh = true
+		retried = true
 	}
-	return Built{
-		Driver:    drv,
-		Orchestra: orchestra.New(orchestra.OrchestraDeps{Driver: drv, Clock: f.clock, Logger: f.logger}),
-		Lost:      lost,
-		Release:   release,
-	}, nil
 }
 
 // createDriver picks the concrete driver for desc. An iOS simulator
@@ -214,17 +249,28 @@ func (f *DriverFactory) Build(ctx context.Context, desc Descriptor) (Built, erro
 // A device target, or a simulator target that never qualifies for the
 // direct-HID path, always gets the XCUITest path.
 func (f *DriverFactory) createDriver(ctx context.Context, desc Descriptor) (driver.Driver, error) {
-	drv, _, err := f.createDriverWatched(ctx, desc, nil)
-	return drv, err
+	created, err := f.createDriverWatched(ctx, desc, nil, ProvisionOptions{})
+	return created.driver, err
+}
+
+// createdDriver is a driver createDriverWatched built, not yet connected.
+type createdDriver struct {
+	driver driver.Driver
+	// release stops the runner the driver was provisioned with. It is
+	// never nil on success.
+	release func()
+	// adopted reports that the runner was already running and has not
+	// yet answered a command through this driver.
+	adopted bool
 }
 
 // createDriverWatched is createDriver with onLost wired to the loss
-// signal of a provisioned iOS runner. A platform without an observable
-// signal ignores it. The returned release stops the runner the driver was
-// provisioned with and is never nil.
-func (f *DriverFactory) createDriverWatched(ctx context.Context, desc Descriptor, onLost func(error)) (driver.Driver, func(), error) {
+// signal of a provisioned iOS runner, and opts passed to a provisioner
+// that can adopt a runner. A platform without an observable signal
+// ignores onLost.
+func (f *DriverFactory) createDriverWatched(ctx context.Context, desc Descriptor, onLost func(error), opts ProvisionOptions) (createdDriver, error) {
 	if desc.Platform == PlatformAndroid {
-		opts := androiddriver.Options{
+		androidOpts := androiddriver.Options{
 			Serial:           desc.ID,
 			AllocateHostPort: true,
 			DevicePort:       androidControlPort,
@@ -233,11 +279,11 @@ func (f *DriverFactory) createDriverWatched(ctx context.Context, desc Descriptor
 			},
 		}
 		if f.provisioner != nil {
-			opts.ReinstallAgent = func(ctx context.Context) error {
+			androidOpts.ReinstallAgent = func(ctx context.Context) error {
 				return f.provisioner.ReinstallAndroidAgent(ctx, desc.ID)
 			}
 		}
-		return androiddriver.New(nil, f.runner, opts), func() {}, nil
+		return createdDriver{driver: androiddriver.New(nil, f.runner, androidOpts), release: func() {}}, nil
 	}
 
 	kind := iosdriver.KindDevice
@@ -257,17 +303,20 @@ func (f *DriverFactory) createDriverWatched(ctx context.Context, desc Descriptor
 	// to launch a runner for, so only a descriptor with an id and
 	// without a port is provisioned.
 	stopRunner := func() {}
+	adopted := false
 	if f.provisioner != nil && desc.Port == 0 && desc.ID != "" {
-		provisioned, kill, err := f.provisioner.EnsureIOSAgentWatched(ctx, desc.ID, agentKind, onLost)
+		agent, err := f.provision(ctx, desc.ID, agentKind, onLost, opts)
 		if err != nil {
-			if kill != nil {
-				_ = kill()
+			if agent.Kill != nil {
+				_ = agent.Kill()
 			}
-			return nil, nil, iosdriver.ProvisionFailure(desc.ID, err)
+			return createdDriver{}, iosdriver.ProvisionFailure(desc.ID, err)
 		}
-		port = provisioned
-		stopRunner = func() { _ = kill() }
+		port = agent.Port
+		adopted = agent.Adopted
+		stopRunner = func() { _ = agent.Kill() }
 		iosOpts.Port = port
+		iosOpts.RunnerID = agent.RunnerID
 		iosOpts.ExternalTunnel = kind == iosdriver.KindDevice
 	}
 	conn := transport.NewTCPClient("127.0.0.1", port, transport.WithTCPLogger(f.logger))
@@ -283,7 +332,7 @@ func (f *DriverFactory) createDriverWatched(ctx context.Context, desc Descriptor
 	if desc.Kind == KindSimulator && hidPort != 0 {
 		if idErr := f.verifySimulatorRunner(ctx, port, desc.ID); idErr != nil {
 			stopRunner()
-			return nil, nil, idErr
+			return createdDriver{}, idErr
 		}
 		drv, err := iossimdriver.New(conn, f.runner, iossimdriver.NewDialer(), iossimdriver.Options{
 			Options: iosOpts,
@@ -291,11 +340,22 @@ func (f *DriverFactory) createDriverWatched(ctx context.Context, desc Descriptor
 		})
 		if err != nil {
 			stopRunner()
-			return nil, nil, err
+			return createdDriver{}, err
 		}
-		return drv, stopRunner, nil
+		return createdDriver{driver: drv, release: stopRunner, adopted: adopted}, nil
 	}
-	return iosdriver.New(conn, f.runner, iosOpts), stopRunner, nil
+	return createdDriver{driver: iosdriver.New(conn, f.runner, iosOpts), release: stopRunner, adopted: adopted}, nil
+}
+
+// provision brings the iOS runner up through the provisioner. A
+// provisioner that cannot adopt runners launches one, and reports its
+// launch identifier as unknown.
+func (f *DriverFactory) provision(ctx context.Context, udid string, kind IosAgentKind, onLost func(error), opts ProvisionOptions) (IOSAgent, error) {
+	if adopting, ok := f.provisioner.(AdoptingProvisioner); ok {
+		return adopting.ProvisionIOSAgent(ctx, udid, kind, onLost, opts)
+	}
+	port, kill, err := f.provisioner.EnsureIOSAgentWatched(ctx, udid, kind, onLost)
+	return IOSAgent{Port: port, Kill: kill}, err
 }
 
 // MockDriverFactory replaces DriverFactory in tests: it returns a
