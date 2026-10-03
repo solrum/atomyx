@@ -22,7 +22,11 @@ var (
 
 func (s *Session) attachHandlers() attach.Handlers {
 	h := &attachHandlers{s: s}
-	return attach.Handlers{Session: h, Observe: h, Viewers: h}
+	handlers := attach.Handlers{Session: h, Observe: h, Viewers: h}
+	if s.yielder != nil {
+		handlers.Control = s.yielder
+	}
+	return handlers
 }
 
 // Status implements attach.SessionHandler.

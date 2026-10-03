@@ -84,6 +84,10 @@ type Request struct {
 	// session's state check, and an idle release cannot close the session
 	// mid-capture.
 	SocketRefresher Refresher
+	// Yielder answers a control.yield request on the session's attach
+	// socket. Nil means the session cannot yield, so its hello omits the
+	// control feature.
+	Yielder Yielder
 }
 
 // LaunchState is the launched-app state of an iOS driver, carried
@@ -183,6 +187,7 @@ func Open(ctx context.Context, deps Deps, req Request) (*Session, error) {
 	s := newSession(ctx, deps, desc, identity, held, built, hub, gate)
 	s.relaunched = relaunched
 	s.socketRefresher = req.SocketRefresher
+	s.yielder = req.Yielder
 	if held != nil {
 		if deps.Sockets == nil {
 			s.socketError = reasonNoSocketConfigured

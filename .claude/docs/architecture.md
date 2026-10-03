@@ -616,6 +616,16 @@ Message groups:
   feature `observe.state` in its hello answer, and a viewer that does
   not know the notice ignores it.
   `observe.tree.fresh` returns a matched tree and screenshot pair.
+- `control`: `control.yield`, whose data is `{"command": "..."}`, a
+  short human readable name of the borrower such as
+  `atomyx run login.yml`. A holder lists the feature `control` in its
+  hello answer only while its host injected a yield port, so a client
+  checks the feature before it sends the request. A holder without the
+  port answers `UNSUPPORTED`. A holder that cannot give the device up
+  now answers `HOLDER_BUSY` and the connection stays usable. A holder
+  that accepts writes the `ok` response and then closes its session, so
+  the borrower reads `ok` before the connection ends and acquires the
+  device afterwards. `attach.RequestYield` is the client side.
 - There is no group that drives the device.
 
 The step line travels as `attach.StepLine`, whose JSON equals one line
@@ -640,8 +650,16 @@ Connections:
   may supply a `ViewerHandler` that is told when a viewer attaches and
   detaches. A group without a handler is answered with `UNSUPPORTED` and
   left out of the hello feature list.
-- `Server.Close` ends every connection and every goroutine, but leaves
-  the socket file for its owner to remove.
+- `Server.Close` writes the frames already queued for each connection,
+  bounded by one write timeout in total, then ends every connection and
+  every goroutine, but leaves the socket file for its owner to remove.
+- The owner may supply a `ControlHandler`. When it accepts a yield, the
+  server queues the `ok` response with the handler's `afterReply`
+  callback, and runs the callback once on its own goroutine after that
+  response is written, or when the connection ended first. The callback
+  may close the whole session, because no goroutine the server waits for
+  runs it. In the session package the host injects the port as
+  `Request.Yielder`.
 
 ## Inspector server
 

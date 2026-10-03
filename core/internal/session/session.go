@@ -69,9 +69,12 @@ type Session struct {
 	// a viewer's fresh request. It is nil by default and never changes
 	// after Open.
 	socketRefresher Refresher
-	attach          *attachListener
-	attachDone      bool
-	attachOnce      sync.Once
+	// yielder answers control.yield. Nil leaves the control feature out of
+	// the hello answer. It never changes after Open.
+	yielder    Yielder
+	attach     *attachListener
+	attachDone bool
+	attachOnce sync.Once
 
 	// interventionMu guards the pending interventions, the entries kept
 	// for a recorder not yet set, and the recorder. It is held while a
