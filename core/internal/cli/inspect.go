@@ -66,7 +66,7 @@ func Inspect(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	srv, err := inspector.New(inspector.Config{ //nolint:contextcheck // the listener is not bound to a call context
 		Controller: host,
 		Logger:     logger,
-		Groups:     []inspector.RouteGroup{host.Routes(inspector.ReadRoutes, inspector.SelectorRoutes)},
+		Groups:     []inspector.RouteGroup{inspector.PageRoutes, host.Routes(inspector.ReadRoutes, inspector.SelectorRoutes)},
 	})
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)

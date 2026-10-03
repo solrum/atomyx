@@ -398,6 +398,12 @@ one, is logged as refused.
   device by then, reconnect fails with `DEVICE_HELD` and the device
   stays released. The server and the token keep working across a
   release and a reconnect.
+- **The page.** The header names the device, its platform and kind,
+  and the holder state. The page reads the code from the URL fragment,
+  removes it from the address bar, and trades it for a token that it
+  keeps in memory only. A page opened without a code, or with a code
+  that was already used, says so and tells you to press Enter in the
+  terminal for a fresh URL.
 - **Stopping.** Ctrl-C and SIGTERM stop the server and release the
   device.
 

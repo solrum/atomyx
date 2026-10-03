@@ -35,7 +35,8 @@ const (
 )
 
 // Route is one endpoint of the inspector. Path is exactly "/" for the
-// page, or begins with /api/ for an API endpoint. The server wraps
+// page, exactly "/assets/" for the static files beneath it, or begins
+// with /api/ for an API endpoint. The server wraps
 // every route in the same Host, Origin and token checks, so a handler
 // never repeats them.
 type Route struct {
@@ -142,10 +143,12 @@ func routePattern(r Route) (string, error) {
 		return "", errors.New("inspector: a route needs a method and a handler")
 	case r.Path == pagePath:
 		return r.Method + " /{$}", nil
+	case r.Path == assetsPrefix:
+		return r.Method + " " + assetsPrefix, nil
 	case strings.HasPrefix(r.Path, apiPrefix) && !strings.ContainsAny(r.Path, "{}"):
 		return r.Method + " " + r.Path, nil
 	}
-	return "", fmt.Errorf("inspector: route path %q must be %q or begin with %q", r.Path, pagePath, apiPrefix)
+	return "", fmt.Errorf("inspector: route path %q must be %q, %q or begin with %q", r.Path, pagePath, assetsPrefix, apiPrefix)
 }
 
 // Addr is the address the server listens on, always 127.0.0.1 with the

@@ -508,11 +508,23 @@ build on the `.Built(` and `.Orchestra(` accessors, on
   issued tokens valid until the server stops.
 - **Routes.** A feature contributes a `RouteGroup`, a function from the
   controller to `[]Route`, through `Config.Groups`. The server rejects
-  a duplicate route, a path outside `/` and `/api/`, and a missing
+  a duplicate route, a path outside `/`, `/assets/` and `/api/`, and a missing
   method or handler, so adding an endpoint never edits a switch. A
   route declares `Operator`, true for an action taken on behalf of the
   person at the page. Only operator routes count as activity for the
   idle release, so polling never keeps a device held.
+- **Page.** `PageRoutes` serves the inspector page from
+  `core/internal/inspector/assets/`, embedded with `go:embed`, at
+  `GET /` and under `/assets/`. The page is plain HTML, CSS and ES
+  modules with no framework, no bundler and no npm. Only `.html`,
+  `.css` and `.js` files are served, each with an explicit content
+  type. Because the content security policy is `default-src 'self'`,
+  an embedded HTML file may hold no inline script, no style element,
+  no style attribute and no event handler attribute, and a Go test
+  fails on any of them. The page and its assets need no token, and
+  they answer while the device is released. The page renders what the
+  server decides and holds no logic of its own, so the JavaScript has
+  no unit tests.
 - **Idle release and reconnect.** `Host` owns the device lifecycle and
   is itself the `session.Controller` the server and every route group
   receive, so a route never captures a controller that a release or a
