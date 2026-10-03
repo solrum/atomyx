@@ -522,9 +522,12 @@ The page works only on this machine, because the command listens on
   same steps as at startup, and the page resumes and reloads the tree
   and screenshot. The command never reconnects on its own, so it does
   not take the device from the next process that wants it. When another
-  process holds the device by then, the banner shows `DEVICE_HELD` and
-  what to do, and the button stays available. The page keeps its login
-  across a release and a reconnect.
+  process holds the device by then, the button takes it over if that
+  process is idle and can give it up, and that process is told who took
+  it. Otherwise the page watches that process when it serves a socket, and
+  the banner shows `DEVICE_HELD` and what to do when it does not. The
+  button stays available. The page keeps its login across a release and a
+  reconnect.
 - **The server is gone.** When the command has stopped or crashed, the
   page cannot reach it. After several failed attempts in a row it shows
   a banner saying it lost contact and to check the terminal. When the

@@ -79,7 +79,7 @@ func Inspect(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 
 	logger := logging.NewStructuredLogger(stderr, logging.LevelInfo)
 	host, err := inspector.NewHost(inspector.HostConfig{ //nolint:contextcheck // the idle timer outlives the command's call context
-		Target: held, Open: opener, Follow: inspectFollower(deps, desc), Clock: deps.clock(), IdleMs: deps.Timeouts.WithDefaults().McpIdleMs, Logger: logger,
+		Target: held, Open: inspectReconnectOpener(deps, desc, &refresher, &yielder, opener), Follow: inspectFollower(deps, desc), Clock: deps.clock(), IdleMs: deps.Timeouts.WithDefaults().McpIdleMs, Logger: logger,
 	})
 	if err != nil {
 		_ = held.Close()
@@ -203,6 +203,24 @@ func inspectOpener(deps Deps, desc device.Descriptor, socketRefresher session.Re
 			held = err
 		}
 		return nil, held
+	}
+}
+
+// inspectReconnectOpener is the opener of the operator's reconnect. It
+// takes the device when it is free or held by an idle process that can
+// yield it, and otherwise falls back to watch, which attaches to the
+// holder. Only an explicit reconnect borrows, because the inspector's
+// own paths must never take a device from another process unasked.
+func inspectReconnectOpener(deps Deps, desc device.Descriptor, socketRefresher session.Refresher, yielder session.Yielder, watch inspector.Opener) inspector.Opener {
+	return func(ctx context.Context) (inspector.Target, error) {
+		opened, err := borrowSession(ctx, deps, inspectCommandName, inspectCommandName, session.Request{Descriptor: desc, SocketRefresher: socketRefresher, Yielder: yielder})
+		if err == nil {
+			return opened, nil
+		}
+		if _, _, isHeld := heldHolder(err); !isHeld {
+			return nil, err
+		}
+		return watch(ctx)
 	}
 }
 

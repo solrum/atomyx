@@ -63,13 +63,19 @@ func openDevice(ctx context.Context, deps Deps, command string, desc device.Desc
 // idle holder able to yield it. borrower is the command string the holder
 // shows to its own user, for example "atomyx run login.yml".
 func borrowDevice(ctx context.Context, deps Deps, command, borrower string, desc device.Descriptor) (*deviceSession, error) {
-	opened, err := acquireWith(ctx, deps, command, session.Request{Descriptor: desc}, func(sessionDeps session.Deps, req session.Request, acq session.Acquisition) (*session.Session, error) {
-		return session.Borrow(ctx, sessionDeps, req, acq, borrower)
-	})
+	opened, err := borrowSession(ctx, deps, command, borrower, session.Request{Descriptor: desc})
 	if err != nil {
 		return nil, err
 	}
 	return &deviceSession{Session: opened}, nil
+}
+
+// borrowSession is borrowDevice for a command that manages its release
+// itself and shapes the request, for example to serve viewers.
+func borrowSession(ctx context.Context, deps Deps, command, borrower string, req session.Request) (*session.Session, error) {
+	return acquireWith(ctx, deps, command, req, func(sessionDeps session.Deps, req session.Request, acq session.Acquisition) (*session.Session, error) {
+		return session.Borrow(ctx, sessionDeps, req, acq, borrower)
+	})
 }
 
 // acquireSession is the acquisition openDevice performs, returning the
