@@ -53,15 +53,8 @@ func openDevice(ctx context.Context, deps Deps, command string, desc device.Desc
 	if err != nil {
 		return nil, err
 	}
-	if sessionOpened != nil {
-		sessionOpened(opened)
-	}
 	return &deviceSession{Session: opened}, nil
 }
-
-// sessionOpened lets a test observe the session a command opened. It is
-// nil in production.
-var sessionOpened func(*session.Session)
 
 // acquireSession is the acquisition openDevice performs, returning the
 // bare session for a command that manages its release itself.

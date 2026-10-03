@@ -11,13 +11,13 @@ import (
 	mockdriver "dev.atomyx/internal/driver/mock"
 	"dev.atomyx/internal/lease"
 	"dev.atomyx/internal/orchestra"
-	"dev.atomyx/internal/session"
 	"dev.atomyx/internal/session/sessiontest"
 )
 
 // holderObservation is what a probe saw while a command drove the device.
 type holderObservation struct {
-	state session.HolderState
+	known bool
+	idle  bool
 	runID string
 }
 
@@ -26,20 +26,15 @@ type holderObservation struct {
 type holderProbe struct {
 	mu       sync.Mutex
 	manager  *lease.Manager
-	sess     *session.Session
 	observed []holderObservation
 }
 
 func (p *holderProbe) observe(ctx context.Context) {
-	p.mu.Lock()
-	s := p.sess
-	p.mu.Unlock()
-	if s == nil {
-		return
-	}
-	obs := holderObservation{state: s.Info().State}
+	var obs holderObservation
 	status, err := p.manager.Probe(ctx, lease.KeyFor("android", "emulator-5554"))
 	if err == nil && status.HolderKnown {
+		obs.known = true
+		obs.idle = status.Holder.IdleSince != nil
 		obs.runID = status.Holder.RunID
 	}
 	p.mu.Lock()
@@ -84,12 +79,6 @@ func probedDeps(t *testing.T, stdout, stderr *bytes.Buffer) (Deps, *holderProbe)
 	probe := &holderProbe{manager: newLeaseManager(t)}
 	deps := leaseDeps(t, probe.manager, stdout, stderr)
 	deps.Factory = probingFactory{probe: probe}
-	sessionOpened = func(s *session.Session) {
-		probe.mu.Lock()
-		probe.sess = s
-		probe.mu.Unlock()
-	}
-	t.Cleanup(func() { sessionOpened = nil })
 	return deps, probe
 }
 
@@ -101,8 +90,10 @@ func requireAllRunning(t *testing.T, probe *holderProbe) holderObservation {
 		t.Fatal("the command never called the device")
 	}
 	for i, obs := range probe.observed {
-		if obs.state != session.StateRunning {
-			t.Errorf("observation %d: state = %q, want running for the whole command", i, obs.state)
+		if !obs.known {
+			t.Errorf("observation %d: the lease holder record was unreadable", i)
+		} else if obs.idle {
+			t.Errorf("observation %d: lease holder is idle, want running for the whole command", i)
 		}
 	}
 	return probe.observed[len(probe.observed)-1]
