@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -30,6 +31,12 @@ const (
 	DefaultQueueBytes = 2 * MaxFrameBytes
 
 	socketMode = 0o600
+
+	// acceptBackoffMin and acceptBackoffMax bound the pause before the
+	// accept loop retries after an accept error such as running out of
+	// file descriptors. The pause doubles on each consecutive error.
+	acceptBackoffMin = 5 * time.Millisecond
+	acceptBackoffMax = time.Second
 )
 
 // ServerConfig configures Listen. Zero values select the defaults.
@@ -54,6 +61,11 @@ type ServerConfig struct {
 type testHooks struct {
 	// beforeWrite runs in the writer before each queued frame is written.
 	beforeWrite func()
+	// accept replaces the listener's accept call.
+	accept func(ln *net.UnixListener) (*net.UnixConn, error)
+	// wait replaces the pause between accept retries. It reports false
+	// when the server is closing.
+	wait func(ctx context.Context, d time.Duration) bool
 	// afterDispatch runs in the read loop after each request is answered.
 	afterDispatch func()
 }
@@ -96,7 +108,10 @@ type Server struct {
 }
 
 // Listen binds cfg.Path, restricts it to its owner, and starts accepting.
-// The socket file is not removed by Close, so the owner that created the
+// The caller must place the socket in a directory it owns with mode 0700,
+// and Listen refuses any other directory, because that directory is what
+// keeps other users from reaching the socket between bind and chmod. The
+// socket file is not removed by Close, so the owner that created the
 // directory decides when it goes.
 func Listen(cfg ServerConfig) (*Server, error) {
 	return listen(cfg, time.Now)
@@ -104,6 +119,9 @@ func Listen(cfg ServerConfig) (*Server, error) {
 
 func listen(cfg ServerConfig, now func() time.Time) (*Server, error) {
 	cfg = cfg.withDefaults()
+	if err := checkSocketDir(filepath.Dir(cfg.Path), uint32(os.Getuid())); err != nil {
+		return nil, err
+	}
 	ln, err := net.ListenUnix("unix", &net.UnixAddr{Name: cfg.Path, Net: "unix"})
 	if err != nil {
 		return nil, fmt.Errorf("attach: listening on %s: %w", cfg.Path, err)
@@ -151,14 +169,47 @@ func (s *Server) Close() error {
 	return err
 }
 
+// acceptLoop admits viewers until the listener is closed. Any other
+// accept error is treated as temporary, so the loop pauses with a growing
+// delay and tries again.
 func (s *Server) acceptLoop() {
 	defer s.wg.Done()
+	delay := acceptBackoffMin
 	for {
-		nc, err := s.ln.AcceptUnix()
+		nc, err := s.acceptOne()
 		if err != nil {
-			return
+			if errors.Is(err, net.ErrClosed) {
+				return
+			}
+			if !s.pause(delay) {
+				return
+			}
+			delay = min(delay*2, acceptBackoffMax)
+			continue
 		}
+		delay = acceptBackoffMin
 		s.admit(nc)
+	}
+}
+
+func (s *Server) acceptOne() (*net.UnixConn, error) {
+	if accept := s.cfg.hooks.accept; accept != nil {
+		return accept(s.ln)
+	}
+	return s.ln.AcceptUnix()
+}
+
+func (s *Server) pause(d time.Duration) bool {
+	if wait := s.cfg.hooks.wait; wait != nil {
+		return wait(s.ctx, d)
+	}
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return true
+	case <-s.ctx.Done():
+		return false
 	}
 }
 

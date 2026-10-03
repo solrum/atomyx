@@ -6,8 +6,10 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -362,5 +364,81 @@ func TestClientNameOverTheBoundIsRefusedAndNotAnnounced(t *testing.T) {
 	}
 	if e := rec.next(t); !e.attached || e.info.Client != atBound {
 		t.Fatalf("attach event = %+v", e)
+	}
+}
+
+func TestAcceptLoopSurvivesAcceptErrorsWithGrowingBoundedPauses(t *testing.T) {
+	const firstRun, secondRun = 12, 2
+	var attempts atomic.Int32
+	var pauses []time.Duration
+	cfg := ServerConfig{}
+	cfg.hooks.accept = func(ln *net.UnixListener) (*net.UnixConn, error) {
+		n := attempts.Add(1)
+		if n <= firstRun || (n > firstRun+1 && n <= firstRun+1+secondRun) {
+			return nil, syscall.EMFILE
+		}
+		return ln.AcceptUnix()
+	}
+	cfg.hooks.wait = func(_ context.Context, d time.Duration) bool {
+		pauses = append(pauses, d)
+		return true
+	}
+	srv := startServer(t, cfg, nil)
+
+	for range 2 {
+		client := dialRaw(t, srv.Path())
+		if ok := client.hello().Ok; ok == nil || !*ok {
+			t.Fatal("a viewer was not served after the accept errors")
+		}
+	}
+	if err := srv.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	var want []time.Duration
+	for _, run := range []int{firstRun, secondRun} {
+		delay := acceptBackoffMin
+		for range run {
+			want = append(want, delay)
+			delay = min(delay*2, acceptBackoffMax)
+		}
+	}
+	if len(pauses) != len(want) {
+		t.Fatalf("pauses = %v, want %v", pauses, want)
+	}
+	for i := range want {
+		if pauses[i] != want[i] {
+			t.Fatalf("pause %d = %v, want %v (all: %v)", i, pauses[i], want[i], pauses)
+		}
+	}
+	if want[firstRun-1] != acceptBackoffMax {
+		t.Fatalf("the first run never reached the bound %v", acceptBackoffMax)
+	}
+}
+
+func TestListenRefusesADirectoryOthersCanReach(t *testing.T) {
+	path := shortSocketPath(t)
+	dir := filepath.Dir(path)
+	if err := os.Chmod(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := listen(ServerConfig{Path: path}, time.Now); err == nil {
+		t.Fatal("Listen accepted a directory open to group and others")
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("a socket was created in the refused directory: %v", err)
+	}
+}
+
+func TestCheckSocketDirRequiresTheOwningUser(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := checkSocketDir(dir, uint32(os.Getuid())); err != nil {
+		t.Fatalf("an owned 0700 directory was refused: %v", err)
+	}
+	if err := checkSocketDir(dir, uint32(os.Getuid())+1); err == nil {
+		t.Fatal("a directory owned by another user was accepted")
 	}
 }
