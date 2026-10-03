@@ -14,3 +14,10 @@ type LeaseAcquirer interface {
 	Acquire(ctx context.Context, key lease.Key, holder lease.Holder) (*lease.Lease, error)
 	Dir() string
 }
+
+// SocketNamer is implemented by a LeaseAcquirer that also says where the
+// holder of a device serves viewers. *lease.Manager satisfies it. Open
+// binds no attach socket for an acquirer that does not.
+type SocketNamer interface {
+	SocketPath(key lease.Key) string
+}

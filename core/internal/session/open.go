@@ -115,6 +115,11 @@ func observingFactory(factory device.WrappingFactory, hub *Hub) device.Factory {
 // An identity failure, such as an unauthorized Android device, fails
 // with a coded error before the lease is taken. On any failure nothing
 // is left held.
+//
+// Once the driver is built, a leased session binds its attach socket,
+// replacing a stale file at that path, and records the path in the lease
+// metadata. A socket that cannot be bound is logged and the session
+// proceeds without one.
 func Open(ctx context.Context, deps Deps, req Request) (*Session, error) {
 	deps = deps.withDefaults()
 	desc := req.Descriptor
@@ -170,6 +175,9 @@ func Open(ctx context.Context, deps Deps, req Request) (*Session, error) {
 	}
 	s := newSession(ctx, deps, desc, identity, held, built, hub, gate)
 	s.relaunched = relaunched
+	if namer, ok := deps.Leases.(SocketNamer); ok && held != nil {
+		s.bindAttach(namer.SocketPath(key))
+	}
 	if err := s.persistActivity(); err != nil {
 		_ = s.Close()
 		return nil, fmt.Errorf("record the holder state: %w", err)

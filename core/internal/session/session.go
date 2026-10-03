@@ -53,6 +53,14 @@ type Session struct {
 
 	relaunched bool
 
+	// socket is the attach socket path recorded in the lease metadata,
+	// empty when the session serves none. It is set before the session is
+	// shared and never changes.
+	socket     string
+	attach     *attachListener
+	attachDone bool
+	attachOnce sync.Once
+
 	closeOnce sync.Once
 	closeErr  error
 	closed    chan struct{}
@@ -122,6 +130,7 @@ func (s *Session) markLost(err error) {
 		s.mu.Unlock()
 		s.deps.Logger.Warn("lost the device", logging.LogContext{"id": s.desc.ID, "error": err.Error()})
 		close(s.lost)
+		go s.stopAttach()
 	})
 }
 
@@ -198,17 +207,21 @@ func (s *Session) updateHolder(mutate func(*lease.Holder)) error {
 	if s.lease == nil {
 		return nil
 	}
-	err := s.lease.UpdateHolder(mutate)
+	err := s.lease.UpdateHolder(func(h *lease.Holder) {
+		mutate(h)
+		h.Socket = s.socket
+	})
 	if errors.Is(err, lease.ErrReleased) {
 		return nil
 	}
 	return err
 }
 
-// Close ends the session: it stops the lease watcher, disconnects the
-// driver, which stops a runner the factory launched, and releases the
-// lease. The disconnect is bounded by the shared shutdown grace
-// period. Close is idempotent and returns the first call's result.
+// Close ends the session: it stops the lease watcher, stops the attach
+// server and closes every viewer connection, removes the socket file,
+// disconnects the driver, which stops a runner the factory launched, and
+// releases the lease. The server stop and the disconnect together are
+// bounded by the shared shutdown grace period. Close is idempotent and returns the first call's result.
 func (s *Session) Close() error {
 	s.closeOnce.Do(func() {
 		s.watchCancel()
@@ -221,7 +234,10 @@ func (s *Session) Close() error {
 
 		disconnected := make(chan error, 1)
 		var disconnectErr error
-		if shutdown.Bounded(s.deps.Clock, shutdown.GracePeriod, func() { disconnected <- s.built.Driver.Disconnect() }) {
+		if shutdown.Bounded(s.deps.Clock, shutdown.GracePeriod, func() {
+			s.stopAttach()
+			disconnected <- s.built.Driver.Disconnect()
+		}) {
 			disconnectErr = <-disconnected
 		} else {
 			disconnectErr = ErrDisconnectTimeout
