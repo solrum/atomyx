@@ -6,8 +6,10 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"dev.atomyx/internal/attach"
 	"dev.atomyx/internal/clock"
@@ -139,7 +141,7 @@ func TestClose_RemovesTheSocketFileAndEndsEveryViewerConnection(t *testing.T) {
 		t.Fatalf("Close() error = %v", err)
 	}
 
-	<-viewer.Done()
+	awaitClosed(t, "the viewer connection ending", viewer.Done())
 	requireNoFile(t, path)
 	if _, err := rawDial(path); err == nil {
 		t.Fatal("a listener answers after Close")
@@ -208,12 +210,13 @@ func TestSession_ALostSessionStopsItsServerAndLeavesTheSocketPathToTheNewHolder(
 		manual.AwaitSleepers(1)
 		manual.Advance(lease.AcquirePollInterval.Milliseconds())
 	}
-	<-s.Lost()
+	awaitClosed(t, "the session reporting the device lost", s.Lost())
 
-	<-viewer.Done()
+	awaitClosed(t, "the viewer connection ending", viewer.Done())
 	if _, err := rawDial(socketPathFor(m)); err == nil {
 		t.Fatal("a lost session still answers on its socket")
 	}
+	awaitNoFile(t, socketPathFor(m))
 }
 
 func rawDial(path string) (net.Conn, error) {
@@ -306,4 +309,30 @@ func TestOpen_WithoutSocketsTheHolderServesNoSocket(t *testing.T) {
 		t.Fatalf("Info().Holder.Socket = %q, want none without Deps.Sockets", got)
 	}
 	requireNoFile(t, socketPathFor(m))
+}
+
+const socketWaitGuard = 5 * time.Second
+
+func awaitClosed(t *testing.T, what string, ch <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-ch:
+	case <-time.After(socketWaitGuard):
+		t.Fatalf("%s did not happen within %s", what, socketWaitGuard)
+	}
+}
+
+// awaitNoFile waits for the socket file to be removed. The holder removes
+// it just after the last viewer connection closes, and no event announces
+// it, so the wait yields the processor between checks, bounded by a guard.
+func awaitNoFile(t *testing.T, path string) {
+	t.Helper()
+	deadline := time.Now().Add(socketWaitGuard)
+	for time.Now().Before(deadline) {
+		if _, err := os.Lstat(path); errors.Is(err, os.ErrNotExist) {
+			return
+		}
+		runtime.Gosched()
+	}
+	t.Fatalf("the socket file %s was not removed within %s", path, socketWaitGuard)
 }

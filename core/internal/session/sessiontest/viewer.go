@@ -2,6 +2,7 @@ package sessiontest
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 
@@ -20,6 +21,7 @@ type Viewer struct {
 	mu    sync.Mutex
 	cond  *sync.Cond
 	lines []StepLine
+	ended bool
 }
 
 // DialViewer connects to the holder socket at path under the client name
@@ -72,6 +74,12 @@ func (v *Viewer) FollowSteps(t testing.TB) {
 }
 
 func (v *Viewer) collect() {
+	defer func() {
+		v.mu.Lock()
+		v.ended = true
+		v.mu.Unlock()
+		v.cond.Broadcast()
+	}()
 	for f := range v.client.Notices() {
 		if f.Type != attach.NoticeStep {
 			continue
@@ -87,13 +95,22 @@ func (v *Viewer) collect() {
 	}
 }
 
-// WaitForLines blocks until the viewer has collected n step lines.
-func (v *Viewer) WaitForLines(n int) {
+// ErrViewerEnded is returned by WaitForLines when the connection to the
+// holder ended before enough step lines arrived.
+var ErrViewerEnded = errors.New("the holder connection ended before the expected step lines arrived")
+
+// WaitForLines blocks until the viewer has collected n step lines. It
+// returns ErrViewerEnded when the connection ends first.
+func (v *Viewer) WaitForLines(n int) error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	for len(v.lines) < n {
+		if v.ended {
+			return ErrViewerEnded
+		}
 		v.cond.Wait()
 	}
+	return nil
 }
 
 // Lines returns the step lines collected so far, oldest first.

@@ -94,7 +94,9 @@ func stepLinesOverTheSocket(t *testing.T, root string, command func(Deps) int) [
 			viewer = sessiontest.DialViewer(t, holderSocket(t, manager), "atomyx inspect")
 			viewer.FollowSteps(t)
 		}
-		viewer.WaitForLines(countFileLines(singleRunDir(t, root)))
+		if err := viewer.WaitForLines(countFileLines(singleRunDir(t, root))); err != nil {
+			t.Errorf("waiting for step lines: %v", err)
+		}
 	}}
 
 	if code := command(deps); code != 0 {
