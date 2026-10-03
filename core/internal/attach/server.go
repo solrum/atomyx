@@ -30,7 +30,8 @@ const (
 // ServerConfig configures Listen. Zero values select the defaults.
 type ServerConfig struct {
 	// Path is the unix socket path, at most 104 bytes on macOS.
-	Path string
+	Path     string
+	Handlers Handlers
 	// PeerUID reads the uid of a connecting peer. The platform lookup is
 	// the default.
 	PeerUID        PeerCredFunc

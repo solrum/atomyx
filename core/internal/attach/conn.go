@@ -26,7 +26,8 @@ type conn struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	closeOnce sync.Once
+	closeOnce  sync.Once
+	subscribed bool
 	// draining is set once the last frame is queued, so the writer closes
 	// the socket after writing everything before it.
 	draining atomic.Bool
@@ -181,7 +182,7 @@ func (c *conn) handshake() bool {
 			c.fail(f, err)
 			continue
 		}
-		if !c.respond(f, HelloResult{Protocol: version, Features: []string{}}) {
+		if !c.respond(f, HelloResult{Protocol: version, Features: c.srv.cfg.Handlers.features()}) {
 			return false
 		}
 		return c.nc.SetReadDeadline(zeroTime) == nil
@@ -215,6 +216,14 @@ func (c *conn) dispatch(f Frame) bool {
 			c.drain()
 		}
 		return false
+	case TypeStatus:
+		if h := c.srv.cfg.Handlers.Session; h != nil {
+			return c.respond(f, h.Status())
+		}
+	case TypeSubscribe, TypeTreeLatest, TypeScreenshotLatest, TypeTreeFresh:
+		if h := c.srv.cfg.Handlers.Observe; h != nil {
+			return c.observe(h, f)
+		}
 	}
 	return c.fail(f, diag.NewUnsupported(f.Type))
 }
