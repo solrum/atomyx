@@ -37,8 +37,9 @@ type OwnerResolver interface {
 
 // YieldRequester asks the holder serving the socket named by cfg to give
 // up its device to the process described by command.
-// attach.RequestYield satisfies it.
-type YieldRequester func(ctx context.Context, cfg attach.ClientConfig, command string) error
+// attach.RequestYield satisfies it. The result says how far the request
+// got even when the error is not nil.
+type YieldRequester func(ctx context.Context, cfg attach.ClientConfig, command string) (attach.YieldResult, error)
 
 // Borrow acquires the device like Acquire and, when another process
 // holds it, asks that holder to yield and takes the device from it.
@@ -71,9 +72,11 @@ func Borrow(ctx context.Context, deps Deps, req Request, acq Acquisition, borrow
 // can yield, refuses because it is busy, cannot be reached, or still
 // holds the device when YieldBudgetMs ends. When another process takes
 // the device between the holder's release and this acquisition, the
-// error names that process instead. A connection that ends after the
-// request was sent counts as a yield that may have happened, so the
-// acquisition still goes ahead.
+// error names that process instead. A request the holder acknowledged
+// counts as a yield even when the wait for its close is cut short, and a
+// connection that ends after the request was sent counts as a yield that
+// may have happened, so the acquisition still goes ahead. A request that
+// was never sent does not wait.
 //
 // The holder is recorded as the lender of the new session, so a runner
 // left running by the holder is handed back to it when this process
@@ -145,15 +148,22 @@ func (d Deps) lenderFor(source lease.Holder) device.RunnerOwner {
 }
 
 // requestYield sends the yield request and reports whether the
-// acquisition should go ahead.
+// acquisition should go ahead. It does when the holder acknowledged the
+// request, because the holder is giving the device up whatever happens to
+// the wait that follows. It also does when the request was sent and the
+// connection then ended, because the holder may have acted on it. It never
+// does when the request was not sent, because the holder was not asked.
 func (d Deps) requestYield(ctx context.Context, source lease.Holder, borrower string) bool {
 	request := d.RequestYield
 	if request == nil {
 		request = attach.RequestYield
 	}
-	err := request(ctx, attach.ClientConfig{Path: source.Socket, Client: d.Command}, borrower)
-	if err == nil {
+	result, err := request(ctx, attach.ClientConfig{Path: source.Socket, Client: d.Command}, borrower)
+	if result.Acknowledged || err == nil {
 		return true
+	}
+	if !result.Sent {
+		return false
 	}
 	switch code, _, _ := diag.Describe(err); code {
 	case diag.CodeHolderBusy, diag.CodeUnsupported:

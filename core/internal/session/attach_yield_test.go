@@ -59,7 +59,7 @@ func TestAttachYieldRefusalReachesTheBorrower(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = s.Close() })
 
-	err = attach.RequestYield(context.Background(), attach.ClientConfig{Path: socketPathFor(m), Client: "test"}, "atomyx run login.yml")
+	_, err = attach.RequestYield(context.Background(), attach.ClientConfig{Path: socketPathFor(m), Client: "test"}, "atomyx run login.yml")
 	if code, _, _ := diag.Describe(err); code != diag.CodeHolderBusy {
 		t.Fatalf("err = %v, want %s", err, diag.CodeHolderBusy)
 	}
@@ -79,7 +79,7 @@ func TestAttachYieldLetsTheHostCloseItsSessionAfterTheReply(t *testing.T) {
 	yielder.closeFn = func() { _ = s.Close() }
 	t.Cleanup(func() { _ = s.Close() })
 
-	if err := attach.RequestYield(context.Background(), attach.ClientConfig{Path: socketPathFor(m), Client: "test"}, "atomyx run login.yml"); err != nil {
+	if _, err := attach.RequestYield(context.Background(), attach.ClientConfig{Path: socketPathFor(m), Client: "test"}, "atomyx run login.yml"); err != nil {
 		t.Fatalf("RequestYield() error = %v, want ok before the connection ends", err)
 	}
 }

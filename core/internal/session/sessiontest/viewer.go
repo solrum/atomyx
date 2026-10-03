@@ -125,5 +125,6 @@ func (v *Viewer) Lines() []StepLine {
 // has ended the connection. It returns the error the holder answered, which
 // carries its stable code, for example when it is busy.
 func RequestYield(ctx context.Context, path, client, command string) error {
-	return attach.RequestYield(ctx, attach.ClientConfig{Path: path, Client: client}, command)
+	_, err := attach.RequestYield(ctx, attach.ClientConfig{Path: path, Client: client}, command)
+	return err
 }

@@ -3,6 +3,7 @@ package session_test
 import (
 	"context"
 	"errors"
+	"io"
 	"net"
 	"os"
 	"strconv"
@@ -43,8 +44,8 @@ func TestBorrow_AHolderWithoutTheControlFeatureFallsBackToDeviceHeld(t *testing.
 
 func TestBorrow_AHolderThatCannotBeReachedFallsBackToDeviceHeld(t *testing.T) {
 	f := newBorrowFixture(t, &closingYielder{})
-	f.deps.RequestYield = func(_ context.Context, _ attach.ClientConfig, _ string) error {
-		return &net.OpError{Op: "dial", Err: errors.New("connection refused")}
+	f.deps.RequestYield = func(_ context.Context, _ attach.ClientConfig, _ string) (attach.YieldResult, error) {
+		return attach.YieldResult{}, &net.OpError{Op: "dial", Err: errors.New("connection refused")}
 	}
 
 	s, err := f.borrow(t)
@@ -57,9 +58,9 @@ func TestBorrow_AHolderThatCannotBeReachedFallsBackToDeviceHeld(t *testing.T) {
 
 func TestBorrow_AReacquireNeverBorrows(t *testing.T) {
 	f := newBorrowFixture(t, &closingYielder{})
-	f.deps.RequestYield = func(context.Context, attach.ClientConfig, string) error {
+	f.deps.RequestYield = func(context.Context, attach.ClientConfig, string) (attach.YieldResult, error) {
 		t.Error("a re-acquire asked the holder to yield")
-		return nil
+		return attach.YieldResult{}, nil
 	}
 
 	_, err := session.Borrow(context.Background(), f.deps, session.Request{Descriptor: androidDesc("A"), Reacquire: true}, session.Acquisition{}, borrowCommand)
@@ -80,7 +81,7 @@ func TestBorrow_PreparesTheDeviceBeforeAskingTheHolderToYield(t *testing.T) {
 	f := newBorrowFixture(t, &closingYielder{})
 	preparer := &orderPreparer{}
 	f.deps.Preparer = preparer
-	f.deps.RequestYield = func(ctx context.Context, cfg attach.ClientConfig, command string) error {
+	f.deps.RequestYield = func(ctx context.Context, cfg attach.ClientConfig, command string) (attach.YieldResult, error) {
 		if !preparer.prepared.Load() {
 			t.Error("the holder was asked to yield before the device was prepared")
 		}
@@ -99,5 +100,33 @@ func (f *borrowFixture) requireHeldBySource(t *testing.T, err error) {
 	}
 	if !strings.Contains(err.Error(), "pid "+strconv.Itoa(os.Getpid())) {
 		t.Fatalf("err = %q, want it to name the source", err.Error())
+	}
+}
+
+func TestBorrow_AHelloThatFailsBeforeTheRequestWasSentDoesNotWait(t *testing.T) {
+	f := newBorrowFixture(t, &closingYielder{})
+	f.deps.RequestYield = func(context.Context, attach.ClientConfig, string) (attach.YieldResult, error) {
+		return attach.YieldResult{}, &attach.ConnectionError{Cause: io.ErrUnexpectedEOF}
+	}
+
+	s, err := f.borrow(t)
+
+	if s != nil {
+		t.Fatal("Borrow() returned a session from a holder that was never asked")
+	}
+	f.requireHeldBySource(t, err)
+}
+
+func TestBorrow_AnAcknowledgedRequestWhoseWaitIsCutShortStillAcquires(t *testing.T) {
+	f := newBorrowFixture(t, &closingYielder{})
+	f.deps.RequestYield = func(context.Context, attach.ClientConfig, string) (attach.YieldResult, error) {
+		_ = f.source.Close() //nolint:contextcheck // the close runs after the reply, on its own goroutine
+		return attach.YieldResult{Sent: true, Acknowledged: true}, context.DeadlineExceeded
+	}
+
+	s, err := f.borrow(t)
+
+	if err != nil || s == nil {
+		t.Fatalf("Borrow() = %v, %v, want a session after the holder acknowledged the request", s, err)
 	}
 }

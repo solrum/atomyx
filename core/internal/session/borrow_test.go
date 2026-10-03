@@ -150,9 +150,9 @@ func TestBorrow_AThirdProcessThatWinsTheGapIsNamedInDeviceHeld(t *testing.T) {
 
 func TestBorrow_AConnectionThatEndsAfterTheRequestStillAcquiresWhenTheHolderReleased(t *testing.T) {
 	f := newBorrowFixture(t, &closingYielder{})
-	f.deps.RequestYield = func(_ context.Context, _ attach.ClientConfig, _ string) error {
+	f.deps.RequestYield = func(_ context.Context, _ attach.ClientConfig, _ string) (attach.YieldResult, error) {
 		_ = f.source.Close() //nolint:contextcheck // the close runs after the reply, on its own goroutine
-		return &attach.ConnectionError{Cause: io.ErrUnexpectedEOF}
+		return attach.YieldResult{Sent: true}, &attach.ConnectionError{Cause: io.ErrUnexpectedEOF}
 	}
 
 	s, err := f.borrow(t)

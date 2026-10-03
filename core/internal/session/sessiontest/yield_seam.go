@@ -16,8 +16,8 @@ type YieldSeam struct {
 }
 
 // Requester returns the function to set as session.Deps.RequestYield.
-func (y *YieldSeam) Requester() func(context.Context, attach.ClientConfig, string) error {
-	return func(ctx context.Context, cfg attach.ClientConfig, command string) error {
+func (y *YieldSeam) Requester() func(context.Context, attach.ClientConfig, string) (attach.YieldResult, error) {
+	return func(ctx context.Context, cfg attach.ClientConfig, command string) (attach.YieldResult, error) {
 		y.calls.Add(1)
 		y.borrower.Store(command)
 		return attach.RequestYield(ctx, cfg, command)
