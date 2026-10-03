@@ -1,3 +1,5 @@
+import { containsPoint, parseBounds } from './geometry.js';
+
 export const DEFAULT_EXPAND_DEPTH = 2;
 
 const SEARCH_FIELDS = ['id', 'label', 'text', 'hint', 'role'];
@@ -96,4 +98,34 @@ export function displayName(node) {
 
 export function displayRole(node) {
   return (node.attributes || {}).role || 'node';
+}
+
+// The deepest entry whose bounds contain the point, in the device's own
+// units. Among entries at equal depth the later one wins, because a
+// later sibling is drawn over an earlier one.
+export function deepestAt(top, x, y) {
+  let best = null;
+  const stack = [top];
+  while (stack.length > 0) {
+    const entry = stack.pop();
+    const bounds = parseBounds((entry.node.attributes || {}).bounds);
+    if (bounds && containsPoint(bounds, x, y) && (best === null || entry.depth >= best.depth)) {
+      best = entry;
+    }
+    for (let i = entry.children.length - 1; i >= 0; i -= 1) {
+      stack.push(entry.children[i]);
+    }
+  }
+  return best;
+}
+
+export function entryAtPath(top, path) {
+  let entry = top;
+  for (const index of path) {
+    entry = entry.children[index];
+    if (!entry) {
+      return null;
+    }
+  }
+  return entry;
 }

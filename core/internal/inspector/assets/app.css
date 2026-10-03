@@ -147,3 +147,12 @@ button:disabled { cursor: default; opacity: 0.6; }
 .props { width: 100%; border-collapse: collapse; }
 .props th, .props td { padding: 2px 6px 2px 0; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
 .props th { width: 28%; font-weight: 600; color: var(--muted); }
+
+.shot-frame img.pickable { cursor: crosshair; }
+.highlight {
+  position: absolute;
+  pointer-events: none;
+  border: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.pane-shot .note { align-self: stretch; margin: 8px 0 0; }

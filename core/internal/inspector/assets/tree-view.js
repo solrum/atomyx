@@ -1,6 +1,6 @@
 import { emit } from './bus.js';
 import {
-  buildEntries, displayName, displayRole, isOpenEntry, search, visibleRows,
+  buildEntries, deepestAt, displayName, displayRole, entryAtPath, isOpenEntry, search, visibleRows,
 } from './tree-model.js';
 
 export const ROW_HEIGHT_PX = 22;
@@ -106,6 +106,22 @@ export function createTreeView({ viewport, rowsEl, spacer, emptyEl, countEl }) {
     draw();
   }
 
+  function reveal(entry) {
+    for (let up = entry.parent; up; up = up.parent) {
+      overrides.set(up.key, true);
+    }
+    relayout();
+  }
+
+  function selectRevealed(entry) {
+    if (entry === null) {
+      return false;
+    }
+    reveal(entry);
+    select(entry);
+    return true;
+  }
+
   function toggle(entry) {
     overrides.set(entry.key, !isOpenEntry(entry, state()));
     relayout();
@@ -181,6 +197,12 @@ export function createTreeView({ viewport, rowsEl, spacer, emptyEl, countEl }) {
       matchIndex = (matchIndex + direction + count) % count;
       countEl.textContent = countText();
       select(found.matches[matchIndex]);
+    },
+    selectPath(path) {
+      return top !== null && selectRevealed(entryAtPath(top, path));
+    },
+    selectAt(x, y) {
+      return top !== null && selectRevealed(deepestAt(top, x, y));
     },
     query() {
       return query;

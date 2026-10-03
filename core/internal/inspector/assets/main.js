@@ -2,6 +2,7 @@ import { ApiError, coalesced, getJson, postJson } from './api.js';
 import { bootstrap } from './bootstrap.js';
 import { hideReleased, showFatal, showNotice, showReleased } from './banners.js';
 import { createEventStream } from './events.js';
+import { createHighlight } from './highlight.js';
 import { createPropertiesPanel } from './properties-panel.js';
 import { refreshScreenshot } from './screenshot.js';
 import { refreshSession } from './session-header.js';
@@ -91,6 +92,12 @@ async function start() {
   }
   byId('layout').hidden = false;
   createPropertiesPanel(byId('panels'));
+  createHighlight({
+    img: byId('screenshot'),
+    overlay: byId('highlight'),
+    noteEl: byId('highlight-note'),
+    onPick: (x, y) => view.selectAt(x, y),
+  });
   bindSearch(byId('search'), view);
   byId('refresh').addEventListener('click', refreshCapture);
   events = createEventStream({
