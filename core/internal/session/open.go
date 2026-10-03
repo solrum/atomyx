@@ -78,6 +78,14 @@ type Request struct {
 	// tool call in flight keeps excluding fresh captures across a
 	// re-acquire. Nil gives the session its own gate.
 	Gate *ActivityGate
+	// SocketRefresher answers a viewer's fresh capture request on the
+	// session's attach socket. Nil selects the session's own capture,
+	// which the holder state admits only while the session is idle. A host
+	// that manages the holder state itself, such as the inspector, sets
+	// its own, so a capture it already guards is not refused by the
+	// session's state check, and an idle release cannot close the session
+	// mid-capture.
+	SocketRefresher Refresher
 }
 
 // LaunchState is the launched-app state of an iOS driver, carried
@@ -175,6 +183,7 @@ func Open(ctx context.Context, deps Deps, req Request) (*Session, error) {
 	}
 	s := newSession(ctx, deps, desc, identity, held, built, hub, gate)
 	s.relaunched = relaunched
+	s.socketRefresher = req.SocketRefresher
 	if namer, ok := deps.Leases.(SocketNamer); ok && held != nil {
 		s.bindAttach(namer.SocketPath(key))
 	}

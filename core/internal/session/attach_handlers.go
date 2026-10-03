@@ -60,11 +60,17 @@ func (h *attachHandlers) ScreenshotLatest() attach.ScreenshotResult {
 	return screenshotResult(h.s.Latest())
 }
 
-// TreeFresh implements attach.ObserveHandler. A viewer may ask for a fresh
-// capture only while the holder is idle, because a run or a tool call in
-// flight owns the device.
+// TreeFresh implements attach.ObserveHandler. Unless the host injected its
+// own refresher, a viewer may ask for a fresh capture only while the
+// holder is idle, because a run or a tool call in flight owns the device.
 func (h *attachHandlers) TreeFresh(ctx context.Context) (attach.FreshResult, error) {
-	snap, err := h.s.FreshTreeIf(ctx, h.admitFresh)
+	var snap Snapshot
+	var err error
+	if refresher := h.s.socketRefresher; refresher != nil {
+		snap, err = refresher.FreshTree(ctx)
+	} else {
+		snap, err = h.s.FreshTreeIf(ctx, h.admitFresh)
+	}
 	if err != nil {
 		return attach.FreshResult{}, err
 	}

@@ -189,24 +189,8 @@ type StepSource interface {
 	SubscribeSince(ctx context.Context, runID string, sinceSeq int64) (<-chan Observation, error)
 }
 
-// Refresher captures a fresh tree only when the caller's own check
-// passes.
+// Refresher captures a fresh tree and screenshot from the device.
 type Refresher interface {
-	// FreshTreeIf behaves like Controller.FreshTree, except that admit
-	// runs after the exclusive activity gate is taken and before any
-	// driver call. A non-nil error from admit is returned unchanged and
-	// the device is not touched. admit runs under the gate, so it must
-	// not enter the gate itself, because the gate is not reentrant. A
-	// held gate still wins: the call returns a diag.CodeHolderBusy
-	// error without running admit.
-	FreshTreeIf(ctx context.Context, admit func() error) (Snapshot, error)
-}
-
-// Controller is a Viewer that can also ask the device for a matched
-// pair of captures. Only the process that holds the device lease has
-// one.
-type Controller interface {
-	Viewer
 	// FreshTree captures a tree and a screenshot back to back, with no
 	// tool call between them, and returns what a viewer would now read
 	// from Latest. The pair is paired and highlightable when the
@@ -215,6 +199,14 @@ type Controller interface {
 	// it, it returns a diag.CodeHolderBusy error at once, because a
 	// capture taken beside a running call would interleave with it.
 	FreshTree(ctx context.Context) (Snapshot, error)
+}
+
+// Controller is a Viewer that can also ask the device for a matched
+// pair of captures. Only the process that holds the device lease has
+// one.
+type Controller interface {
+	Viewer
+	Refresher
 	// Gate reports the activity gate that guards FreshTree. Only a
 	// lease-holding local session has one, so a remote handle cannot
 	// satisfy Controller.

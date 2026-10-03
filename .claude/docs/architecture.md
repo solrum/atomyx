@@ -486,6 +486,8 @@ reaches the driver:
   `HOLDER_BUSY` unless the holder state is `idle`. The check runs under
   the activity gate, so a tool call in flight, an open run with no call
   in flight, and every CLI command are all refused. Only an idle MCP
+  A host that sets `Request.SocketRefresher` replaces this capture with
+  its own `Refresher`, and that refresher then owns the busy check.
   session or an idle inspector admits a viewer's fresh capture.
 - `observe.subscribe` maps hub observations to notices. A tree or
   screenshot observation becomes a notice with its revision and epoch.

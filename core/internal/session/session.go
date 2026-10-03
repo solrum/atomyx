@@ -61,10 +61,14 @@ type Session struct {
 	// socket is the attach socket path recorded in the lease metadata,
 	// empty when the session serves none. It is set before the session is
 	// shared and never changes.
-	socket     string
-	attach     *attachListener
-	attachDone bool
-	attachOnce sync.Once
+	socket string
+	// socketRefresher replaces the session's own idle-guarded capture for
+	// a viewer's fresh request. It is nil by default and never changes
+	// after Open.
+	socketRefresher Refresher
+	attach          *attachListener
+	attachDone      bool
+	attachOnce      sync.Once
 
 	// interventionMu guards the pending interventions and the recorder, and
 	// is held while a line is appended so entries reach the run folder in
