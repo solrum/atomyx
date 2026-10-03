@@ -40,7 +40,7 @@ func main() {
 		device.NewIosBootedSimulatorProbe(procRunner),
 	)
 	provisioner, keeper := runnerprovision.New(procRunner, background, clock, logger)
-	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Background: background, Clock: clock, Logger: logger, Provisioner: provisioner})
+	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Background: background, Clock: clock, Logger: logger, Provisioner: provisioner, OwnAndroidForwards: true})
 
 	sessionDeps, err := sessionwire.Deps(procRunner, clock, logger, "", "cli")
 	if err != nil {

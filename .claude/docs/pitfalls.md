@@ -136,7 +136,9 @@ corresponding area. For the high-level map see
   picks a free one per device, and supply `Options.NewTransport` so the
   client is built after the port is known. `Connect` reuses a forward
   that already maps this serial to the device port, and
-  `Disconnect` removes only a forward this `Connect` created. With a
+  `Disconnect` removes only a forward this `Connect` created, or a
+  reused one whose agent answered when `Options.OwnAnsweringForward` is
+  set (only for a caller holding the device lease). With a
   fixed `HostPort`, a port already forwarded to a different device
   fails with `HOST_PORT_IN_USE`, not `DEVICE_BUSY`, which is reserved
   for a foreign automation session.

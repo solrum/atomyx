@@ -127,6 +127,12 @@ type DriverFactoryDeps struct {
 	// connects and before the Orchestra is built over it. Nil leaves
 	// the driver unwrapped.
 	WrapDriver DriverWrap
+	// OwnAndroidForwards makes an Android driver remove an adb forward
+	// it reused once the agent answered through it. Only a composition
+	// root whose sessions hold a device lease sets it, because a host
+	// without the lease cannot know another process is done with the
+	// forward.
+	OwnAndroidForwards bool
 }
 
 // DriverFactory picks the concrete driver family for a device's
@@ -144,6 +150,8 @@ type DriverFactory struct {
 
 	provisioner AgentProvisioner
 	wrap        DriverWrap
+
+	ownAndroidForwards bool
 
 	// probeAdopted proves an adopted runner serves commands.
 	probeAdopted func(ctx context.Context, d driver.Driver) error
@@ -165,7 +173,7 @@ func NewDriverFactory(deps DriverFactoryDeps) *DriverFactory {
 	}
 	return &DriverFactory{
 		runner: deps.Runner, background: background, clock: clock, simHid: deps.SimHid, logger: logger,
-		provisioner: deps.Provisioner, wrap: deps.WrapDriver,
+		provisioner: deps.Provisioner, wrap: deps.WrapDriver, ownAndroidForwards: deps.OwnAndroidForwards,
 		probeAdopted: probeHierarchy,
 	}
 }
@@ -271,9 +279,10 @@ type createdDriver struct {
 func (f *DriverFactory) createDriverWatched(ctx context.Context, desc Descriptor, onLost func(error), opts ProvisionOptions) (createdDriver, error) {
 	if desc.Platform == PlatformAndroid {
 		androidOpts := androiddriver.Options{
-			Serial:           desc.ID,
-			AllocateHostPort: true,
-			DevicePort:       androidControlPort,
+			Serial:              desc.ID,
+			AllocateHostPort:    true,
+			DevicePort:          androidControlPort,
+			OwnAnsweringForward: f.ownAndroidForwards,
 			NewTransport: func(hostPort int) androiddriver.Transport {
 				return transport.NewHTTPClient("127.0.0.1", hostPort, transport.WithHTTPLogger(f.logger))
 			},

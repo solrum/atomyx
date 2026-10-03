@@ -76,3 +76,39 @@ func TestDriverFactory_Build_Android_StaleAgentIsReinstalledThroughTheProvisione
 		t.Fatalf("reinstall calls = %v, want exactly one for serial A", calls)
 	}
 }
+
+func TestDriverFactory_Build_Android_ForwardOwnershipFollowsTheDeps(t *testing.T) {
+	cases := []struct {
+		name        string
+		own         bool
+		wantRemoved int
+	}{
+		{"lease-holding host removes a reused forward", true, 1},
+		{"host without a lease leaves it", false, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			port := startHealthyAgent(t)
+			runner := process.NewFake()
+			runner.Stub(process.ExactMatch("adb", "forward", "--list"),
+				process.Result{Stdout: "A tcp:" + strconv.Itoa(port) + " tcp:8765\n"}, nil)
+			f := NewDriverFactory(DriverFactoryDeps{Runner: runner, Background: process.NewFakeBackground(), OwnAndroidForwards: tc.own})
+
+			built, err := f.Build(context.Background(), Descriptor{ID: "A", Platform: PlatformAndroid})
+			if err != nil {
+				t.Fatalf("Build() error = %v", err)
+			}
+			_ = built.Driver.Disconnect()
+
+			removed := 0
+			for _, inv := range runner.Invocations() {
+				if strings.Join(inv.Args, " ") == "-s A forward --remove tcp:"+strconv.Itoa(port) {
+					removed++
+				}
+			}
+			if removed != tc.wantRemoved {
+				t.Fatalf("forward removals = %d, want %d", removed, tc.wantRemoved)
+			}
+		})
+	}
+}

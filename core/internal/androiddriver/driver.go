@@ -50,6 +50,14 @@ type Options struct {
 	// otherwise.
 	NewTransport func(hostPort int) Transport
 
+	// OwnAnsweringForward makes Connect take ownership of a forward it
+	// reused when the agent answered /health through it, so Disconnect
+	// removes it. Set it only when the caller holds the device
+	// exclusively, because no other process then relies on that forward.
+	// A forward whose agent did not answer is never owned. Applies only
+	// with AllocateHostPort.
+	OwnAnsweringForward bool
+
 	// DevicePort is the device-side port the agent's HTTP server
 	// listens on. Defaults to 8765.
 	DevicePort int
@@ -213,7 +221,11 @@ func (d *AndroidDriver) connectAllocated(ctx context.Context, forwards []adbForw
 		d.forwardOwnedByThis = false
 		d.transport = d.opts.NewTransport(port)
 		err := d.finishConnect(ctx)
-		if err == nil || !isStaleForwardFailure(err) {
+		if err == nil {
+			d.forwardOwnedByThis = d.opts.OwnAnsweringForward
+			return nil
+		}
+		if !isStaleForwardFailure(err) {
 			return err
 		}
 		_, _ = d.proc.Run(ctx, "adb", "-s", d.opts.Serial, "forward", "--remove", fmt.Sprintf("tcp:%d", port))

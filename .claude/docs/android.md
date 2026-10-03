@@ -157,7 +157,11 @@ the whole workstation, `Connect` first checks `adb forward --list`.
 `Options.AllocateHostPort`, which works as follows:
 
 - A forward that already maps this serial to the device port is
-  reused, and `Disconnect` leaves it in place.
+  reused. `Disconnect` leaves it in place, unless the factory was built
+  with `DriverFactoryDeps.OwnAndroidForwards` (set by `atomyx` and
+  `atomyx-mcp`, whose sessions hold the device lease) and the agent
+  answered /health through it, in which case `Disconnect` removes it.
+  The Studio sidecar never sets it.
 - Otherwise `Connect` runs `adb -s <serial> forward tcp:0
   tcp:<devicePort>`, takes the host port adb prints, and removes that
   forward on `Disconnect`. Empty or non-numeric output from adb is an

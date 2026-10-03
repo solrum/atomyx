@@ -131,7 +131,7 @@ func run(opts options) int {
 		device.NewIosProbe(procRunner),
 	)
 	provisioner, keeper := runnerprovision.New(procRunner, background, clock, logger)
-	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Background: background, Clock: clock, Logger: logger, Provisioner: provisioner})
+	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Background: background, Clock: clock, Logger: logger, Provisioner: provisioner, OwnAndroidForwards: true})
 
 	// storage.NewFileStorage resolves its root as opts.Root, then the
 	// ATOMYX_STORAGE_DIR environment variable, then "~/.atomyx". An

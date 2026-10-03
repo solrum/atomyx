@@ -246,3 +246,64 @@ func TestAndroidDriver_AllocateHostPort_WithoutTransportConstructor_IsTypedError
 		t.Fatalf("Connect() code = %q, want %q", code, diag.CodeAgentUnreachable)
 	}
 }
+
+func ownedForwardDriver(runner process.Runner, rec *transportRecorder, own bool) *androiddriver.AndroidDriver {
+	return androiddriver.New(nil, runner, androiddriver.Options{
+		Serial: "S1", AllocateHostPort: true, DevicePort: 8765, NewTransport: rec.build,
+		OwnAnsweringForward: own,
+	})
+}
+
+func TestAndroidDriver_OwnAnsweringForward_ReusedForwardWithAnsweringAgent_IsRemovedOnDisconnect(t *testing.T) {
+	runner := process.NewFake()
+	runner.Stub(process.ExactMatch("adb", "forward", "--list"),
+		process.Result{Stdout: "S1 tcp:41001 tcp:8765\n"}, nil)
+	d := ownedForwardDriver(runner, newTransportRecorder(), true)
+
+	if err := d.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	if err := d.Disconnect(); err != nil {
+		t.Fatalf("Disconnect() error = %v", err)
+	}
+	if countInvocations(runner, "-s", "S1", "forward", "--remove", "tcp:41001") != 1 {
+		t.Fatalf("adb invocations = %+v, want the reused forward removed once", runner.Invocations())
+	}
+}
+
+func TestAndroidDriver_OwnAnsweringForward_ReusedForwardWithSilentAgent_IsNeverRemoved(t *testing.T) {
+	runner := process.NewFake()
+	runner.Stub(process.ExactMatch("adb", "forward", "--list"),
+		process.Result{Stdout: "S1 tcp:41001 tcp:8765\n"}, nil)
+	rec := newTransportRecorder()
+	rec.byPort[41001] = newFakeTransport()
+	rec.byPort[41001].healthErr = &transport.AgentError{Route: "/health", StatusCode: 503, Message: "accessibility service not connected"}
+	d := ownedForwardDriver(runner, rec, true)
+
+	if err := d.Connect(context.Background()); err == nil {
+		t.Fatal("Connect() error = nil, want the not-ready agent reported")
+	}
+	if err := d.Disconnect(); err != nil {
+		t.Fatalf("Disconnect() error = %v", err)
+	}
+	if countInvocations(runner, "-s", "S1", "forward", "--remove", "tcp:41001") != 0 {
+		t.Fatalf("adb invocations = %+v, want a forward the agent never answered through left in place", runner.Invocations())
+	}
+}
+
+func TestAndroidDriver_OwnAnsweringForward_Off_ReusedForwardWithAnsweringAgent_IsLeftInPlace(t *testing.T) {
+	runner := process.NewFake()
+	runner.Stub(process.ExactMatch("adb", "forward", "--list"),
+		process.Result{Stdout: "S1 tcp:41001 tcp:8765\n"}, nil)
+	d := ownedForwardDriver(runner, newTransportRecorder(), false)
+
+	if err := d.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	if err := d.Disconnect(); err != nil {
+		t.Fatalf("Disconnect() error = %v", err)
+	}
+	if countInvocations(runner, "-s", "S1", "forward", "--remove", "tcp:41001") != 0 {
+		t.Fatalf("adb invocations = %+v, want the reused forward left in place", runner.Invocations())
+	}
+}
