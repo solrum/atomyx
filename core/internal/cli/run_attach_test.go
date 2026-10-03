@@ -12,6 +12,7 @@ import (
 
 	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/device"
+	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/driver/mock"
 	"dev.atomyx/internal/lease"
 	"dev.atomyx/internal/logging"
@@ -234,6 +235,9 @@ func TestRunMakesTheSameDriverCallsWithAViewerAttachedAsWithout(t *testing.T) {
 				t.Errorf("%s: %v", request.name, err)
 			}
 		}
+		if got := freshCode(viewer.TreeFresh()); got != diag.CodeHolderBusy {
+			t.Errorf("fresh capture during a run = %q, want %s", got, diag.CodeHolderBusy)
+		}
 		attached = true
 	})
 
@@ -265,4 +269,9 @@ func TestRunRecordsAViewerThatAttachesDuringItInTheRunFolder(t *testing.T) {
 	if line.Kind != session.InterventionViewerAttached || line.Client != "atomyx inspect" || line.AtMs <= 0 {
 		t.Fatalf("intervention line = %+v, want viewerAttached by atomyx inspect with a time", line)
 	}
+}
+
+func freshCode(err error) string {
+	code, _, _ := diag.Describe(err)
+	return code
 }
