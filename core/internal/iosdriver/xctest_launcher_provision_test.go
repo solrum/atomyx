@@ -193,7 +193,8 @@ func TestXctestLauncher_EnsureRunning_ReportsBuildAndStartProgress(t *testing.T)
 
 func TestXctestLauncher_EnsureRunning_AfterSpawnRunsBeforeTheReadinessWait(t *testing.T) {
 	projectDir, _ := newTestProjectDir(t)
-	createFreshRunnerApp(t, projectDir, iosdriver.KindDevice, time.Now())
+	stamp := time.Now().Add(time.Minute).Truncate(time.Second)
+	runnerApp := createFreshRunnerApp(t, projectDir, iosdriver.KindDevice, stamp)
 	gate := make(chan struct{})
 	hostPort := freeTCPPort(t)
 	runner := &fakeXcodebuildRunner{port: hostPort, spawnReady: true, spawnGate: gate}
@@ -213,7 +214,10 @@ func TestXctestLauncher_EnsureRunning_AfterSpawnRunsBeforeTheReadinessWait(t *te
 	}
 	defer func() { _ = kill() }()
 
-	want := iosdriver.SpawnedRunner{HostPort: hostPort, RunnerPort: 22087, Pid: fakeRunnerPidBase + 1}
+	want := iosdriver.SpawnedRunner{
+		HostPort: hostPort, RunnerPort: 22087, Pid: fakeRunnerPidBase + 1,
+		Product: iosdriver.BuildProduct{Path: runnerApp, ModTime: stamp.UTC()},
+	}
 	if got != want {
 		t.Errorf("AfterSpawn received %+v, want %+v", got, want)
 	}

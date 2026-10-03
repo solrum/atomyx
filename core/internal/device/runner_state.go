@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"dev.atomyx/internal/iosdriver"
 )
 
 // RunnerStateSuffix is appended to a device's lease key to name the file
@@ -33,6 +35,10 @@ const runnerStateFileMode = 0o600
 // tunnel leads its own process group. TunnelPid is zero for a simulator
 // runner and for a tunnel the launcher reused instead of starting.
 //
+// BuildProductPath and BuildProductModTime identify the compiled runner
+// product the runner was started from, so a later reader adopts the
+// runner only while the product on disk is still that build.
+//
 // OwnerPid and OwnerStartTime identify the process that answers for the
 // runner, the one that stops it when it exits. The owner is not the
 // runner's parent and not any single session: a session closing leaves
@@ -52,6 +58,14 @@ type RunnerState struct {
 	TunnelStartTime  time.Time `json:"tunnelStartTime"`
 	OwnerPid         int       `json:"ownerPid,omitempty"`
 	OwnerStartTime   time.Time `json:"ownerStartTime"`
+
+	BuildProductPath    string    `json:"buildProductPath,omitempty"`
+	BuildProductModTime time.Time `json:"buildProductModTime"`
+}
+
+// BuildProduct returns the build product the record names.
+func (s RunnerState) BuildProduct() iosdriver.BuildProduct {
+	return iosdriver.BuildProduct{Path: s.BuildProductPath, ModTime: s.BuildProductModTime}
 }
 
 // RunnerOwner identifies one host process. The start time pairs with the

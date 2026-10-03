@@ -237,6 +237,25 @@ type SpawnedRunner struct {
 	// Pid is the process id of the xcodebuild process, which leads its
 	// own process group.
 	Pid int
+	// Product identifies the compiled runner product the process was
+	// started from. It is the zero value when the product cannot be read.
+	Product BuildProduct
+}
+
+// BuildProduct identifies one compiled runner product. A build stamps the
+// product's modification time, so a rebuilt product never shares its
+// identity with the one it replaced.
+type BuildProduct struct {
+	// Path is the location of the compiled runner app.
+	Path string
+	// ModTime is the product's modification time in UTC.
+	ModTime time.Time
+}
+
+// Matches reports whether other names the same product at the same
+// build. A zero product matches nothing.
+func (p BuildProduct) Matches(other BuildProduct) bool {
+	return p.Path != "" && p.Path == other.Path && p.ModTime.Equal(other.ModTime)
 }
 
 // scheme returns c.Scheme, falling back to the standard Atomyx driver
@@ -416,12 +435,8 @@ func (l *XctestLauncher) ensureBuilt(ctx context.Context, alwaysLock bool) error
 	if _, err := l.signOverrides(); err != nil {
 		return err
 	}
-	buildConfig := xctestConfigSimulator
-	if l.cfg.Kind == KindDevice {
-		buildConfig = xctestConfigDevice
-	}
 	buildDir := l.buildDir()
-	runnerApp := filepath.Join(buildDir, "Build", "Products", buildConfig, l.cfg.runnerAppName())
+	runnerApp := l.runnerAppPath()
 	if !alwaysLock && !l.needsBuild(runnerApp) {
 		return nil
 	}
@@ -429,6 +444,36 @@ func (l *XctestLauncher) ensureBuilt(ctx context.Context, alwaysLock bool) error
 }
 
 func (l *XctestLauncher) buildDir() string { return filepath.Join(l.cfg.ProjectDir, "build") }
+
+// runnerAppPath is the compiled runner product for this launch's platform.
+func (l *XctestLauncher) runnerAppPath() string {
+	buildConfig := xctestConfigSimulator
+	if l.cfg.Kind == KindDevice {
+		buildConfig = xctestConfigDevice
+	}
+	return filepath.Join(l.buildDir(), "Build", "Products", buildConfig, l.cfg.runnerAppName())
+}
+
+// CurrentBuildProduct identifies the compiled runner product when it
+// exists and is not older than the project file or a Swift source. It
+// builds nothing. ok is false for a missing or stale product, because
+// a runner started from such a product does not run the current source.
+func (l *XctestLauncher) CurrentBuildProduct() (product BuildProduct, ok bool) {
+	product, ok = l.statProduct()
+	if !ok || l.needsBuild(product.Path) {
+		return BuildProduct{}, false
+	}
+	return product, true
+}
+
+func (l *XctestLauncher) statProduct() (BuildProduct, bool) {
+	path := l.runnerAppPath()
+	info, err := os.Stat(path)
+	if err != nil {
+		return BuildProduct{}, false
+	}
+	return BuildProduct{Path: path, ModTime: info.ModTime().UTC()}, true
+}
 
 func (l *XctestLauncher) progress(message string) {
 	if l.cfg.Progress != nil {
@@ -850,7 +895,8 @@ func (l *XctestLauncher) spawnAndWait(ctx context.Context, port int, runDerived 
 
 	teardown := stopRunner
 	if l.cfg.AfterSpawn != nil {
-		stopHook, err := l.cfg.AfterSpawn(ctx, SpawnedRunner{HostPort: port, RunnerPort: runnerPort, Pid: proc.Pid()})
+		product, _ := l.statProduct()
+		stopHook, err := l.cfg.AfterSpawn(ctx, SpawnedRunner{HostPort: port, RunnerPort: runnerPort, Pid: proc.Pid(), Product: product})
 		if err != nil {
 			stopRunner()
 			return noopKill, err

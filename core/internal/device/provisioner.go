@@ -512,6 +512,9 @@ func (p *DriverProvisioner) recordRunner(udid string, kind IosAgentKind, runnerI
 		StartedAt:        p.now().UTC(),
 		OwnerPid:         ownerPid,
 		OwnerStartTime:   ownerInfo.StartTime,
+
+		BuildProductPath:    spawned.Product.Path,
+		BuildProductModTime: spawned.Product.ModTime,
 	}
 	if err := WriteRunnerState(path, state); err != nil {
 		return "", RunnerState{}, err

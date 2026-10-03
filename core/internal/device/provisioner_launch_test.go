@@ -723,3 +723,29 @@ func TestDriverProvisioner_Kill_KeepsTheRecordOfTheSameRunnerOwnedByAnotherProce
 		t.Fatalf("record after kill = %+v (%v), want the record another process owns untouched", got, err)
 	}
 }
+
+func TestDriverProvisioner_EnsureIOSAgent_Simulator_RecordsTheBuildProductItWasStartedFrom(t *testing.T) {
+	fx := newLaunchFixture(t)
+	p := fx.provisioner(nil)
+	_, kill, err := p.EnsureIOSAgent(context.Background(), "SIM-1", IosAgentKindSimulator)
+	if err != nil {
+		t.Fatalf("EnsureIOSAgent() error = %v", err)
+	}
+	defer func() { _ = kill() }()
+
+	app := filepath.Join(fx.projectDir, "build", "Build", "Products", "Debug-iphonesimulator", "AtomyxDriverAgent-Runner.app")
+	info, err := os.Stat(app)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := ReadRunnerState(fx.statePath("SIM-1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.BuildProductPath != app {
+		t.Errorf("BuildProductPath = %q, want %q", state.BuildProductPath, app)
+	}
+	if !state.BuildProductModTime.Equal(info.ModTime()) {
+		t.Errorf("BuildProductModTime = %v, want %v", state.BuildProductModTime, info.ModTime())
+	}
+}
