@@ -400,6 +400,40 @@ corresponding area. For the high-level map see
   gets mode 0600 by an explicit chmod right after bind, and the runtime
   directory is 0700.
 
+## Holder socket lifecycle
+
+- **Bind the holder socket only after the driver is built.** A failed
+  build must leave no listener and no file, and the binding code runs in
+  `session.Open` after `factory.Build` succeeds.
+- **Remove a stale socket only while holding the lease.** The flock is
+  what proves the previous holder is gone, so any file at the socket path
+  then belongs to a dead process. Without the lease, removing the file
+  could unbind a live holder.
+- **Unlink the socket only while the path still names the file this
+  session bound.** After a lost lease another holder may have bound the
+  same path, and a blind remove would take that holder's socket away.
+  `Session.Close` and a lost session both go through the same check.
+- **Stop the attach server before the driver disconnects and the lease
+  is released.** A viewer must see its connection end before the device
+  is free for another process, and a request in flight must not reach a
+  driver that is being torn down. Keep the stop inside the shared
+  shutdown grace period together with the disconnect.
+- **Keep the fresh-capture state check inside the activity gate.**
+  `observe.tree.fresh` admits a viewer only when the holder state is
+  `idle`, and the check runs after the gate is taken. Checking the state
+  before the gate leaves a window in which a tool call starts between the
+  check and the capture. A host that never calls `SetIdle`, such as a CLI
+  command, refuses every fresh capture, which is the intended result.
+- **Clear the intervention recorder before the run folder is
+  finalized.** A viewer that detaches after `Finalize` would otherwise
+  append to a closed writer and log a failure. A script that owns its own
+  run must not replace the recorder of an open run, and must clear only
+  its own.
+- **Keep socket paths under 104 bytes in tests.** A longer path fails the
+  bind, which the session logs and survives by serving no socket, so a
+  test that needs a socket places its lease root under a short directory
+  such as one made by `os.MkdirTemp("", "a")`.
+
 ## Tool layer (cross-platform)
 
 - **Never branch on the session's platform inside a tool handler.**

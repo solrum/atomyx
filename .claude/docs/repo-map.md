@@ -98,8 +98,8 @@ atomyx/
 | `stepstream` | Turns the step events of a script run into the lines of a run folder's `steps.jsonl`. Depends on `runner` and `runfolder`. |
 | `script` | Owns the test-script schema, parser, and expression engine. |
 | `core/internal/script/expression` | Implements the test-script expression language: tokenizing, parsing, and evaluating. |
-| `session` | Opens a device for one process: a lease-free prepare phase that builds the runner, then identity, lease, orphaned runner and tunnel reaping, then the driver inside an observing decorator that counts mutating calls and reports captures, and the owner's lifecycle of the result. |
-| `core/internal/session/sessiontest` | Test-only helpers for a session host, such as a lease manager over a throwaway directory. Only `_test.go` files import it. |
+| `session` | Opens a device for one process: a lease-free prepare phase that builds the runner, then identity, lease, orphaned runner and tunnel reaping, then the driver inside an observing decorator that counts mutating calls and reports captures, and the owner's lifecycle of the result. It also binds the holder socket, answers viewers from the hub, and records viewer attach and detach as interventions. |
+| `core/internal/session/sessiontest` | Test-only helpers for a session host, such as a lease manager over a throwaway directory and a socket viewer of a holder. Only `_test.go` files import it. |
 | `sidecar` | Implements the host-side control process: a JSON-RPC bridge, method dispatcher, session, and event bus. |
 | `skills` | Embeds and copies the Atomyx skill and agent markdown files a consumer project installs. |
 | `storage` | Persistence primitives the MCP tool layer builds on: a JSON and markdown record store, the in-flight run tracker, and the run catalog that reads versioned run folders and flat records. |
@@ -123,7 +123,8 @@ that imports `core/internal/session/sessiontest` or
 run folder layout name spelled as a string literal outside
 `core/internal/runfolder`), `core/scripts/check-listen-loopback/` (a Go
 program that rejects any production listen address it cannot prove
-loopback), `core/scripts/check-inspector-boundary.sh` (rejects the
+loopback, except a call through the `attach` package, which binds only a
+unix socket path), `core/scripts/check-inspector-boundary.sh` (rejects the
 `.Built(` and `.Orchestra(` accessors, `orchestra.Orchestra` and any
 `driver` import under `core/internal/inspector`), and
 `core/scripts/check-schema-fresh.sh` (the schema-freshness gate), plus

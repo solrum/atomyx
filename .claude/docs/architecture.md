@@ -365,14 +365,31 @@ for a host that does not need to split them.
    same launch id as the one that launched the app. When the new driver
    could not take it, the session reports `Relaunched`, and the MCP
    server tells the agent that the app was relaunched on a new runner.
+6. Binds the holder socket, `<key>.sock` in the runtime directory beside
+   the lock file, through `attach.Listen`, and records its path in the
+   lease metadata. The process holds the flock, so any file already at
+   that path belongs to a holder that is gone and is removed first. The
+   bind comes after the driver is built, so a failed build leaves no
+   listener and no file. A bind failure is logged and the session
+   proceeds without a socket. A `Deps.Leases` that is nil, or that does
+   not implement `session.SocketNamer`, gives the session no socket.
 
-The returned `Session` owns the lease, the driver and a goroutine that
-runs `Lease.Watch`. A replaced lock file that cannot be re-acquired
-closes `Session.Lost()`. `Session.Close` stops the watcher, disconnects
-the driver within the shared shutdown grace period, which also stops a
-runner the factory launched, and then releases the lease. The lock-file
-metadata follows the holder through `SetRunning` and `SetIdle`, so a
-second process that finds the device held can report why.
+The returned `Session` owns the lease, the driver, the attach server and a
+goroutine that runs `Lease.Watch`. A replaced lock file that cannot be
+re-acquired closes `Session.Lost()` and also stops the attach server.
+`Session.Close` runs in this order:
+
+1. Stops the lease watcher.
+2. Stops the attach server, which closes every viewer connection, then
+   removes the socket file only while the path still names the file this
+   session bound. After a lost lease another holder may own that path.
+3. Disconnects the driver, which also stops a runner the factory
+   launched. Steps 2 and 3 together stay within the shared shutdown
+   grace period.
+4. Releases the lease.
+
+The lock-file metadata follows the holder through `SetRunning` and
+`SetIdle`, so a second process that finds the device held can report why.
 
 The CLI commands `run`, `suite`, `doctor` and `inspect` go through `session.Acquire`,
 and the MCP server's device selection and re-acquire go through
@@ -387,8 +404,8 @@ A session is observable through the `session.Viewer` port, which
   and a typed `session.HolderState`. The values are `idle`, `running`,
   `released`, `borrowed`, `lost` and `closed`. A session derives its state
   from its own record, never from the lease metadata, so it is the same
-  with or without a lease. A session starts `idle`, its owner moves it
-  with `SetRunning` and `SetIdle`, `lost` and `closed` follow from its
+  with or without a lease. A session starts `running`, so only an owner
+  that manages the activity gate moves it with `SetIdle`. `lost` and `closed` follow from its
   lifecycle, and `closed` wins over `lost`. A session never reports
   `released` or `borrowed`, because a holder in either state has no
   session, so the layer that owns the lifecycle reports them.
@@ -458,9 +475,45 @@ outlives its sessions, such as `DeviceSession`, passes one gate in
 `session.Request.Gate` to every `Open`, so the exclusion holds across a
 re-acquire.
 
-`session` may depend on `device`, `lease`, `diag`, `orchestra`, `driver`,
-`shutdown` and the common leaves. It never imports `mcp`, `cli` or
-`inspector`.
+The session answers the attach protocol from the hub, so a viewer never
+reaches the driver:
+
+- `session.status` comes from `Info()`.
+- `observe.tree.latest` serializes only `Latest().Tree`, which is already
+  masked. `observe.screenshot.latest` returns the newest image with its
+  revision and epoch, unmasked.
+- `observe.tree.fresh` calls `FreshTreeIf` with a check that refuses with
+  `HOLDER_BUSY` unless the holder state is `idle`. The check runs under
+  the activity gate, so a tool call in flight, an open run with no call
+  in flight, and every CLI command are all refused. Only an idle MCP
+  session or an idle inspector admits a viewer's fresh capture.
+- `observe.subscribe` maps hub observations to notices. A tree or
+  screenshot observation becomes a notice with its revision and epoch.
+  A step observation is read from the hub's step ring, which resumes
+  after a run id and sequence number, and becomes one step notice per
+  line, preceded by a gap notice when lines left the ring. Lines that
+  arrive in a burst may be delivered before a capture notice that was
+  published between them, so a viewer orders by revision and sequence
+  number and not by arrival.
+- A viewer that falls behind, or a hub that closes, ends the stream with
+  a closed notice.
+
+Each viewer that attaches or detaches becomes a `session.Intervention`
+with the kind `viewerAttached` or `viewerDetached`, the time in epoch
+milliseconds and the viewer's client name. `session.InterventionSource`
+drains the pending entries, and a session that nobody drains keeps only
+the newest 256. While a run is open, the host sets a
+`session.InterventionRecorder` with `Session.SetInterventionRecorder`
+and clears it with nil before it finalizes the run folder, and the
+session appends each entry as it happens to the run's
+`interventions.jsonl` through `runfolder.Writer.AppendIntervention`. The
+CLI `run` and `suite` set it when the run folder exists. The MCP server
+sets it for `start_run` and for a `run_script` that owns its own run, and
+it hands the recorder to a session installed after the run opened.
+
+`session` may depend on `device`, `lease`, `attach`, `runfolder`, `diag`,
+`orchestra`, `driver`, `shutdown` and the common leaves. It never imports
+`mcp`, `cli` or `inspector`.
 
 The two hosts own a session differently. A CLI command holds it for the
 length of the command and cancels its run when `Session.Lost()` closes.
@@ -537,9 +590,10 @@ Connections:
 - Each connection has one writer fed by a bounded queue under a write
   deadline. A viewer that stops reading is disconnected, and no other
   viewer and no holder code waits on it.
-- The owner supplies a `SessionHandler` and an `ObserveHandler`. A group
-  without a handler is answered with `UNSUPPORTED` and left out of the
-  hello feature list.
+- The owner supplies a `SessionHandler` and an `ObserveHandler`, and
+  may supply a `ViewerHandler` that is told when a viewer attaches and
+  detaches. A group without a handler is answered with `UNSUPPORTED` and
+  left out of the hello feature list.
 - `Server.Close` ends every connection and every goroutine, but leaves
   the socket file for its owner to remove.
 
