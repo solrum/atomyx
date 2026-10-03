@@ -88,6 +88,10 @@ func attachCorpusTree() *wire.TreeNodeWire {
 	}
 }
 
+func attachCorpusState(stable bool) attach.CaptureState {
+	return attach.CaptureState{Stable: stable, Paired: stable, Highlightable: stable, Scale: 2.5}
+}
+
 func attachHandshakeTranscript() (AttachTranscript, error) {
 	var b attachTranscriptBuilder
 	b.request(1, attach.TypeHello, attach.Hello{
@@ -113,23 +117,25 @@ func attachObserveTranscript() (AttachTranscript, error) {
 	var b attachTranscriptBuilder
 	b.request(1, attach.TypeSubscribe, attach.Subscribe{RunID: "20261003-101500-smoke", SinceSeq: 4})
 	b.response(1, attach.TypeSubscribe, nil)
-	b.notice(attach.NoticeTree, attach.TreeNotice{Revision: 4, Epoch: 2})
-	b.notice(attach.NoticeScreenshot, attach.ScreenshotNotice{Revision: 3, Epoch: 2})
+	b.notice(attach.NoticeTree, attach.TreeNotice{Revision: 4, Epoch: 2, CaptureState: attachCorpusState(true)})
+	b.notice(attach.NoticeScreenshot, attach.ScreenshotNotice{Revision: 3, Epoch: 2, CaptureState: attachCorpusState(true)})
 	b.notice(attach.NoticeStep, attach.StepNotice{Epoch: 2, Line: attach.StepLine{
 		SchemaVersion: 1, RunID: "20261003-101500-smoke", Seq: 5, StepIndex: 1, Command: "assertExists", Phase: "completed",
 		Ok: true, DurationMs: 12, Detail: &detail, Artifacts: []string{},
 	}})
+	b.notice(attach.NoticeTree, attach.TreeNotice{Revision: 5, Epoch: 3, CaptureState: attach.CaptureState{Stable: false, Scale: 2.5}})
 	b.notice(attach.NoticeStepGap, attach.StepGapNotice{OldestSeq: 40})
 	b.request(2, attach.TypeTreeLatest, nil)
-	b.response(2, attach.TypeTreeLatest, attach.TreeResult{Revision: 4, Epoch: 2, Tree: attachCorpusTree()})
+	b.response(2, attach.TypeTreeLatest, attach.TreeResult{Revision: 4, Epoch: 2, Tree: attachCorpusTree(), CaptureState: attachCorpusState(true)})
 	b.request(3, attach.TypeScreenshotLatest, nil)
 	b.response(3, attach.TypeScreenshotLatest, attach.ScreenshotResult{
 		Revision: 3, Epoch: 2, Format: "png", Image: []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a},
+		CaptureState: attachCorpusState(true),
 	})
 	b.request(4, attach.TypeTreeFresh, nil)
 	b.response(4, attach.TypeTreeFresh, attach.FreshResult{
-		Tree:          attach.TreeResult{Revision: 5, Epoch: 3, Tree: attachCorpusTree()},
-		Screenshot:    attach.ScreenshotResult{Revision: 4, Epoch: 3, Format: "png", Image: []byte{0x89, 'P', 'N', 'G'}},
+		Tree:          attach.TreeResult{Revision: 5, Epoch: 3, Tree: attachCorpusTree(), CaptureState: attachCorpusState(true)},
+		Screenshot:    attach.ScreenshotResult{Revision: 4, Epoch: 3, Format: "png", Image: []byte{0x89, 'P', 'N', 'G'}, CaptureState: attachCorpusState(true)},
 		Paired:        true,
 		Highlightable: true,
 		Scale:         2.5,

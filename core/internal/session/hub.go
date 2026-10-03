@@ -117,12 +117,9 @@ func (h *Hub) Latest() Snapshot {
 		HasTree: h.hasTree, TreeEpoch: h.treeEpoch, TreeRevision: h.treeSeq,
 		Screenshot: h.shot, HasScreenshot: h.hasShot, ScreenshotFormat: h.shotFormat,
 		ScreenshotEpoch: h.shotEpoch, ScreenshotRevision: h.shotSeq,
+		TreeStable: h.hasTree && h.treeStable, ScreenshotStable: h.hasShot && h.shotStable,
 	}
-	if h.sizeMatchesShotLocked() {
-		snap.Scale = float64(h.shotWidth) / h.size.Width
-	}
-	snap.Paired = h.hasTree && h.hasShot && h.treeStable && h.shotStable && h.treeEpoch == h.shotEpoch
-	snap.Highlightable = snap.Paired && snap.Scale > 0
+	snap.Paired, snap.Highlightable, snap.Scale = h.pairingLocked()
 	if !h.hasTree {
 		h.mu.Unlock()
 		return snap
@@ -143,6 +140,24 @@ func (h *Hub) Latest() Snapshot {
 	h.mu.Unlock()
 	snap.Tree = masked
 	return snap
+}
+
+// pairingLocked reports whether the newest tree and screenshot describe
+// the same screen, whether a node's bounds can be drawn on the screenshot,
+// and the scale between them.
+func (h *Hub) pairingLocked() (paired, highlightable bool, scale float64) {
+	if h.sizeMatchesShotLocked() {
+		scale = float64(h.shotWidth) / h.size.Width
+	}
+	paired = h.hasTree && h.hasShot && h.treeStable && h.shotStable && h.treeEpoch == h.shotEpoch
+	return paired, paired && scale > 0, scale
+}
+
+// pairing is pairingLocked for a caller that holds no lock.
+func (h *Hub) pairing() (paired, highlightable bool, scale float64) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.pairingLocked()
 }
 
 // sizeMatchesShotLocked reports whether the newest screen size can scale

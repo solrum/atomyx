@@ -21,6 +21,15 @@ const typedPassword = "hunter2-correct-horse"
 // and returns it with the in-memory driver it drives.
 func socketHolder(t *testing.T) (*session.Session, *mockdriver.Driver, string) {
 	t.Helper()
+	s, drv, path := socketHolderDriver(t)
+	return s, drv.Driver, path
+}
+
+// socketHolderDriver is socketHolder that also returns the recording
+// driver, whose onHierarchy hook lets a test overlap a mutating call with
+// a capture.
+func socketHolderDriver(t *testing.T) (*session.Session, *recordingDriver, string) {
+	t.Helper()
 	m := newSocketManager(t, clock.SystemClock{})
 	factory := &recordingFactory{events: &eventLog{}}
 	s, err := session.Open(context.Background(), socketDeps(t, factory, m), session.Request{Descriptor: androidDesc("A")})
@@ -28,7 +37,7 @@ func socketHolder(t *testing.T) (*session.Session, *mockdriver.Driver, string) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = s.Close() })
-	return s, factory.drivers[0].Driver, socketPathFor(m)
+	return s, factory.drivers[0], socketPathFor(m)
 }
 
 func nextFrame(t *testing.T, c *attach.Client) attach.Frame {
@@ -226,5 +235,65 @@ func TestAttachSubscribe_AnnouncesLinesTheRingNoLongerHolds(t *testing.T) {
 	var first attach.StepNotice
 	if f := nextFrame(t, c); f.Type != attach.NoticeStep || f.Decode(&first) != nil || first.Line.Seq != gap.OldestSeq {
 		t.Fatalf("second notice = %+v %+v, want the oldest held line %d", f, first, gap.OldestSeq)
+	}
+}
+
+// overlapTap makes every hierarchy capture of drv overlap a tap, which
+// the observing driver reports as an unstable capture.
+func overlapTap(s *session.Session, drv *recordingDriver) {
+	drv.onHierarchy = func(ctx context.Context) {
+		_ = s.Built().Driver.Tap(ctx, wire.Point{X: 1, Y: 1})
+	}
+}
+
+func TestAttachCaptureState_NoticesAndResultsCarryStabilityAndPairing(t *testing.T) {
+	s, drv, path := socketHolderDriver(t)
+	c := dialHolder(t, path)
+	ctx := context.Background()
+	subscribe(t, c, "", 0)
+	drv.Screen = wire.Size{Width: 430, Height: 932}
+	drv.ScreenshotData = encodedPNG(t, 860, 1864)
+	drv.StageHierarchy(rootTree("r"))
+	drv.StageHierarchy(rootTree("r"))
+
+	overlapTap(s, drv)
+	if _, err := s.Orchestra().Hierarchy(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var tree attach.TreeNotice
+	if f := nextFrame(t, c); f.Type != attach.NoticeTree || f.Decode(&tree) != nil || tree.Stable || tree.Paired {
+		t.Fatalf("tree notice = %+v %+v, want an unstable, unpaired tree", f, tree)
+	}
+	var latest attach.TreeResult
+	if err := c.Call(ctx, attach.TypeTreeLatest, nil, &latest); err != nil || latest.Stable {
+		t.Fatalf("tree.latest = %+v, %v, want an unstable tree", latest, err)
+	}
+
+	drv.onHierarchy = nil
+	if _, err := s.Orchestra().ScreenSize(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Orchestra().Hierarchy(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Orchestra().Screenshot(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for f := nextFrame(t, c); f.Type != attach.NoticeScreenshot; f = nextFrame(t, c) {
+		if f.Type != attach.NoticeTree {
+			t.Fatalf("notice = %+v, want a tree or screenshot notice", f)
+		}
+	}
+	want := s.Latest()
+	if !want.Paired || !want.Highlightable || want.Scale != 2 || !want.TreeStable || !want.ScreenshotStable {
+		t.Fatalf("holder snapshot = %+v, want a stable highlightable pair at scale 2", want)
+	}
+	var shotResult attach.ScreenshotResult
+	if err := c.Call(ctx, attach.TypeScreenshotLatest, nil, &shotResult); err != nil {
+		t.Fatal(err)
+	}
+	wantState := attach.CaptureState{Stable: true, Paired: true, Highlightable: true, Scale: 2}
+	if shotResult.CaptureState != wantState {
+		t.Fatalf("screenshot.latest state = %+v, want %+v", shotResult.CaptureState, wantState)
 	}
 }

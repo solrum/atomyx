@@ -90,8 +90,12 @@ func (h *attachHandlers) admitFresh() error {
 	return nil
 }
 
+func captureState(stable bool, snap Snapshot) attach.CaptureState {
+	return attach.CaptureState{Stable: stable, Paired: snap.Paired, Highlightable: snap.Highlightable, Scale: snap.Scale}
+}
+
 func treeResult(snap Snapshot) attach.TreeResult {
-	result := attach.TreeResult{Revision: snap.TreeRevision, Epoch: snap.TreeEpoch}
+	result := attach.TreeResult{Revision: snap.TreeRevision, Epoch: snap.TreeEpoch, CaptureState: captureState(snap.TreeStable, snap)}
 	if snap.HasTree {
 		tree := snap.Tree
 		result.Tree = &tree
@@ -100,7 +104,7 @@ func treeResult(snap Snapshot) attach.TreeResult {
 }
 
 func screenshotResult(snap Snapshot) attach.ScreenshotResult {
-	result := attach.ScreenshotResult{Revision: snap.ScreenshotRevision, Epoch: snap.ScreenshotEpoch}
+	result := attach.ScreenshotResult{Revision: snap.ScreenshotRevision, Epoch: snap.ScreenshotEpoch, CaptureState: captureState(snap.ScreenshotStable, snap)}
 	if snap.HasScreenshot {
 		result.Format = string(snap.ScreenshotFormat)
 		result.Image = snap.Screenshot
@@ -128,7 +132,7 @@ type stepCursor struct {
 
 // relay turns hub observations into notices until the subscription ends.
 // Capture observations carry no payload, so each becomes a notice with
-// its revision and epoch. A step observation is read from the hub
+// its revision, epoch and capture state. A step observation is read from the hub
 // ring, so a burst of lines costs one read.
 func (h *attachHandlers) relay(ctx context.Context, observations <-chan Observation, notices chan<- attach.Notice, cursor stepCursor) {
 	defer close(notices)
@@ -144,11 +148,11 @@ func (h *attachHandlers) relay(ctx context.Context, observations <-chan Observat
 	for o := range observations {
 		switch o.Kind {
 		case ObservedTree:
-			if !send(attach.Notice{Type: attach.NoticeTree, Data: attach.TreeNotice{Revision: o.Revision, Epoch: o.Epoch}}) {
+			if !send(attach.Notice{Type: attach.NoticeTree, Data: attach.TreeNotice{Revision: o.Revision, Epoch: o.Epoch, CaptureState: h.noticeState(o)}}) {
 				return
 			}
 		case ObservedScreenshot:
-			if !send(attach.Notice{Type: attach.NoticeScreenshot, Data: attach.ScreenshotNotice{Revision: o.Revision, Epoch: o.Epoch}}) {
+			if !send(attach.Notice{Type: attach.NoticeScreenshot, Data: attach.ScreenshotNotice{Revision: o.Revision, Epoch: o.Epoch, CaptureState: h.noticeState(o)}}) {
 				return
 			}
 		case ObservedStepGap:
@@ -168,6 +172,13 @@ func (h *attachHandlers) relay(ctx context.Context, observations <-chan Observat
 			return
 		}
 	}
+}
+
+// noticeState reads the pairing the hub holds when the notice is sent,
+// so a notice never reports a pair older than its own capture.
+func (h *attachHandlers) noticeState(o Observation) attach.CaptureState {
+	paired, highlightable, scale := h.s.hub.pairing()
+	return attach.CaptureState{Stable: o.Stable, Paired: paired, Highlightable: highlightable, Scale: scale}
 }
 
 // relaySteps sends the held lines after cursor and returns the new

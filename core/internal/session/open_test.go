@@ -32,6 +32,17 @@ type recordingDriver struct {
 
 	restoredBundle string
 	restoredRunner string
+
+	// onHierarchy runs inside every hierarchy capture before the inner
+	// driver answers, so a test can act on the device mid-capture.
+	onHierarchy func(context.Context)
+}
+
+func (d *recordingDriver) Hierarchy(ctx context.Context) (wire.TreeNodeWire, error) {
+	if d.onHierarchy != nil {
+		d.onHierarchy(ctx)
+	}
+	return d.Driver.Hierarchy(ctx)
 }
 
 func (d *recordingDriver) Disconnect() error {

@@ -110,11 +110,26 @@ type Subscribe struct {
 	SinceSeq int64  `json:"sinceSeq"`
 }
 
+// CaptureState says how far a capture can be trusted when a viewer
+// draws it. Stable is false when a mutating call overlapped the announced
+// or returned capture. Paired, Highlightable and Scale describe the
+// holder's newest tree and screenshot together when the message was
+// produced: Paired means they show the same screen, Highlightable means a
+// node's bounds can be drawn on the screenshot, and Scale is zero while
+// unknown.
+type CaptureState struct {
+	Stable        bool    `json:"stable"`
+	Paired        bool    `json:"paired"`
+	Highlightable bool    `json:"highlightable"`
+	Scale         float64 `json:"scale"`
+}
+
 // TreeNotice announces a new tree. The viewer reads it with
 // observe.tree.latest.
 type TreeNotice struct {
 	Revision uint64 `json:"revision"`
 	Epoch    uint64 `json:"epoch"`
+	CaptureState
 }
 
 // ScreenshotNotice announces a new screenshot. The viewer reads it with
@@ -122,6 +137,7 @@ type TreeNotice struct {
 type ScreenshotNotice struct {
 	Revision uint64 `json:"revision"`
 	Epoch    uint64 `json:"epoch"`
+	CaptureState
 }
 
 // StepLine is one line of a run's step stream. Its JSON is identical to
@@ -158,6 +174,7 @@ type TreeResult struct {
 	Revision uint64             `json:"revision"`
 	Epoch    uint64             `json:"epoch"`
 	Tree     *wire.TreeNodeWire `json:"tree,omitempty"`
+	CaptureState
 }
 
 // ScreenshotResult answers observe.screenshot.latest. Image holds the
@@ -168,6 +185,7 @@ type ScreenshotResult struct {
 	Epoch    uint64 `json:"epoch"`
 	Format   string `json:"format,omitempty"`
 	Image    []byte `json:"image,omitempty"`
+	CaptureState
 }
 
 // FreshResult answers observe.tree.fresh with a tree and a screenshot

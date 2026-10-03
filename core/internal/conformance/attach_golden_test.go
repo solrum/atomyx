@@ -142,3 +142,26 @@ func TestAttachStepLineMatchesRunfolderStepLine(t *testing.T) {
 		t.Fatalf("zero step lines differ: %s versus %s", a, r)
 	}
 }
+
+func TestAttachCaptureStateFieldsMatchTheFreshResultPairingFields(t *testing.T) {
+	state, err := json.Marshal(attach.CaptureState{Stable: true, Paired: true, Highlightable: true, Scale: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fresh, err := json.Marshal(attach.FreshResult{Paired: true, Highlightable: true, Scale: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stateFields, freshFields map[string]any
+	if err := json.Unmarshal(state, &stateFields); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(fresh, &freshFields); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"paired", "highlightable", "scale"} {
+		if stateFields[key] != freshFields[key] {
+			t.Fatalf("%s = %v in a capture state and %v in a fresh result", key, stateFields[key], freshFields[key])
+		}
+	}
+}

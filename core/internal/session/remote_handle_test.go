@@ -10,6 +10,7 @@ import (
 	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/session"
+	"dev.atomyx/internal/wire"
 )
 
 // remoteGuard bounds every wait on a handle, so a hang fails by assertion
@@ -287,5 +288,58 @@ func TestRemoteHandle_ResumesAfterTheLastStoredLineWhenNoticesWereDropped(t *tes
 	}
 	if attached < 2 {
 		t.Fatalf("viewerAttached entries = %d, want the handle to have reconnected once", attached)
+	}
+}
+
+func TestRemoteHandle_CarriesTheHoldersStabilityAndPairing(t *testing.T) {
+	s, drv, path := socketHolderDriver(t)
+	ctx := context.Background()
+	h := dialRemote(t, path)
+	feed, err := h.Subscribe(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	drv.Screen = wire.Size{Width: 430, Height: 932}
+	drv.ScreenshotData = encodedPNG(t, 860, 1864)
+	drv.StageHierarchy(rootTree("r"))
+	drv.StageHierarchy(rootTree("r"))
+
+	overlapTap(s, drv)
+	if _, err := s.Orchestra().Hierarchy(ctx); err != nil {
+		t.Fatal(err)
+	}
+	unstable := s.Latest()
+	if unstable.TreeStable {
+		t.Fatal("the holder reported a tree captured during a tap as stable")
+	}
+	o := awaitObservation(t, feed, session.ObservedTree, unstable.TreeRevision)
+	if o.Stable {
+		t.Fatalf("observation = %+v, want the unstable flag", o)
+	}
+	if got := h.Latest(); got.TreeStable || got.Paired {
+		t.Fatalf("Latest() = stable %t paired %t, want an unstable, unpaired tree", got.TreeStable, got.Paired)
+	}
+
+	drv.onHierarchy = nil
+	if _, err := s.Orchestra().ScreenSize(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Orchestra().Hierarchy(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Orchestra().Screenshot(ctx); err != nil {
+		t.Fatal(err)
+	}
+	want := s.Latest()
+	if !want.Paired || !want.Highlightable || want.Scale != 2 {
+		t.Fatalf("holder snapshot = paired %t highlightable %t scale %v, want a highlightable pair at scale 2", want.Paired, want.Highlightable, want.Scale)
+	}
+	if o := awaitObservation(t, feed, session.ObservedScreenshot, want.ScreenshotRevision); !o.Stable {
+		t.Fatalf("observation = %+v, want a stable screenshot", o)
+	}
+	got := h.Latest()
+	if got.Paired != want.Paired || got.Highlightable != want.Highlightable || got.Scale != want.Scale ||
+		got.TreeStable != want.TreeStable || got.ScreenshotStable != want.ScreenshotStable {
+		t.Fatalf("Latest() = %+v, want the holder's pairing %+v", got, want)
 	}
 }

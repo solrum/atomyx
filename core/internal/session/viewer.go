@@ -83,6 +83,9 @@ type Snapshot struct {
 	// is valid only against the revision of the tree it was read from, so
 	// a client that sends a path back must send this revision with it.
 	TreeRevision uint64
+	// TreeStable reports that no mutating call overlapped the capture of
+	// the newest tree. It is false while HasTree is false.
+	TreeStable bool
 
 	// Screenshot holds the encoded image of the newest screenshot.
 	Screenshot    []byte
@@ -95,6 +98,8 @@ type Snapshot struct {
 	// TreeRevision identifies a tree. It is zero while HasScreenshot is
 	// false.
 	ScreenshotRevision uint64
+	// ScreenshotStable is TreeStable for the newest screenshot.
+	ScreenshotStable bool
 
 	// Scale is the screenshot pixel width divided by the screen width
 	// the driver reports. It is zero while either is unknown.

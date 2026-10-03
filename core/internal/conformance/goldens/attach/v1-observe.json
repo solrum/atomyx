@@ -24,7 +24,11 @@
     "frame": {
       "data": {
         "epoch": 2,
-        "revision": 4
+        "highlightable": true,
+        "paired": true,
+        "revision": 4,
+        "scale": 2.5,
+        "stable": true
       },
       "type": "observe.notice.tree",
       "v": 1
@@ -35,7 +39,11 @@
     "frame": {
       "data": {
         "epoch": 2,
-        "revision": 3
+        "highlightable": true,
+        "paired": true,
+        "revision": 3,
+        "scale": 2.5,
+        "stable": true
       },
       "type": "observe.notice.screenshot",
       "v": 1
@@ -67,6 +75,21 @@
   {
     "frame": {
       "data": {
+        "epoch": 3,
+        "highlightable": false,
+        "paired": false,
+        "revision": 5,
+        "scale": 2.5,
+        "stable": false
+      },
+      "type": "observe.notice.tree",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "data": {
         "oldestSeq": 40
       },
       "type": "observe.notice.stepGap",
@@ -86,7 +109,11 @@
     "frame": {
       "data": {
         "epoch": 2,
+        "highlightable": true,
+        "paired": true,
         "revision": 4,
+        "scale": 2.5,
+        "stable": true,
         "tree": {
           "attributes": {
             "bounds": "[0,0][1080,1920]",
@@ -125,8 +152,12 @@
       "data": {
         "epoch": 2,
         "format": "png",
+        "highlightable": true,
         "image": "iVBORw0KGgo=",
-        "revision": 3
+        "paired": true,
+        "revision": 3,
+        "scale": 2.5,
+        "stable": true
       },
       "id": 3,
       "ok": true,
@@ -152,12 +183,20 @@
         "screenshot": {
           "epoch": 3,
           "format": "png",
+          "highlightable": true,
           "image": "iVBORw==",
-          "revision": 4
+          "paired": true,
+          "revision": 4,
+          "scale": 2.5,
+          "stable": true
         },
         "tree": {
           "epoch": 3,
+          "highlightable": true,
+          "paired": true,
           "revision": 5,
+          "scale": 2.5,
+          "stable": true,
           "tree": {
             "attributes": {
               "bounds": "[0,0][1080,1920]",

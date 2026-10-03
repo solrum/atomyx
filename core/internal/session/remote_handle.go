@@ -53,10 +53,9 @@ func (c RemoteConfig) dial(ctx context.Context) (*attach.Client, error) {
 //
 // Latest serves the newest tree and screenshot the handle pulled from the
 // holder, with the holder's own revisions and the tree already masked.
-// Paired, Highlightable and Scale are known only for the capture a
-// FreshTree returned, because a notice does not say whether a mutating
-// call overlapped a capture. Every snapshot carries the handle's
-// Generation, which is unique to the handle.
+// Paired, Highlightable, Scale and the stable flags are the holder's
+// values when it answered the newest pull. Every snapshot carries the
+// handle's Generation, which is unique to the handle.
 type RemoteHandle struct {
 	cfg        RemoteConfig
 	base       device.Descriptor
@@ -73,7 +72,6 @@ type RemoteHandle struct {
 	client *attach.Client
 	info   Info
 	snap   Snapshot
-	fresh  freshStamp
 	steps  stepRing
 	subs   map[*subscriber]struct{}
 	closed bool
@@ -84,16 +82,6 @@ var (
 	_ StepSource = (*RemoteHandle)(nil)
 	_ Refresher  = (*RemoteHandle)(nil)
 )
-
-// freshStamp is what a fresh capture reported about the pair it returned.
-type freshStamp struct {
-	valid         bool
-	treeRevision  uint64
-	shotRevision  uint64
-	paired        bool
-	highlightable bool
-	scale         float64
-}
 
 // DialRemote connects to the holder at cfg.Path, reads its status and its
 // newest captures, and starts following it. desc supplies the descriptor
@@ -207,15 +195,7 @@ func (h *RemoteHandle) FreshTree(ctx context.Context) (Snapshot, error) {
 	defer h.mu.Unlock()
 	h.storeTreeLocked(result.Tree)
 	h.storeScreenshotLocked(result.Screenshot)
-	h.fresh = freshStamp{
-		valid:         true,
-		treeRevision:  result.Tree.Revision,
-		shotRevision:  result.Screenshot.Revision,
-		paired:        result.Paired,
-		highlightable: result.Highlightable,
-		scale:         result.Scale,
-	}
-	h.deriveLocked()
+	h.snap.Paired, h.snap.Highlightable, h.snap.Scale = result.Paired, result.Highlightable, result.Scale
 	return h.snap, nil
 }
 
@@ -388,7 +368,7 @@ func (h *RemoteHandle) pullTree(ctx context.Context) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.storeTreeLocked(r) {
-		h.notifyLocked(Observation{Kind: ObservedTree, Epoch: r.Epoch, Revision: r.Revision, Stable: true})
+		h.notifyLocked(Observation{Kind: ObservedTree, Epoch: r.Epoch, Revision: r.Revision, Stable: r.Stable})
 	}
 	return nil
 }
@@ -401,7 +381,7 @@ func (h *RemoteHandle) pullScreenshot(ctx context.Context) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.storeScreenshotLocked(r) {
-		h.notifyLocked(Observation{Kind: ObservedScreenshot, Epoch: r.Epoch, Revision: r.Revision, Stable: true})
+		h.notifyLocked(Observation{Kind: ObservedScreenshot, Epoch: r.Epoch, Revision: r.Revision, Stable: r.Stable})
 	}
 	return nil
 }
@@ -413,9 +393,15 @@ func (h *RemoteHandle) pull(ctx context.Context, messageType string, result any)
 }
 
 // storeTreeLocked keeps r when it is newer than the held tree and reports
-// whether it did.
+// whether it did. A result of the held revision still refreshes the
+// holder's pairing, which can change with no new capture.
 func (h *RemoteHandle) storeTreeLocked(r attach.TreeResult) bool {
-	if r.Revision <= h.snap.TreeRevision {
+	if r.Revision < h.snap.TreeRevision {
+		return false
+	}
+	h.applyStateLocked(r.CaptureState)
+	h.snap.TreeStable = r.Stable
+	if r.Revision == h.snap.TreeRevision {
 		return false
 	}
 	h.snap.HasTree = r.Tree != nil
@@ -425,12 +411,16 @@ func (h *RemoteHandle) storeTreeLocked(r attach.TreeResult) bool {
 	}
 	h.snap.TreeEpoch, h.snap.TreeRevision = r.Epoch, r.Revision
 	h.snap.Generation = h.generation
-	h.deriveLocked()
 	return true
 }
 
 func (h *RemoteHandle) storeScreenshotLocked(r attach.ScreenshotResult) bool {
-	if r.Revision <= h.snap.ScreenshotRevision {
+	if r.Revision < h.snap.ScreenshotRevision {
+		return false
+	}
+	h.applyStateLocked(r.CaptureState)
+	h.snap.ScreenshotStable = r.Stable
+	if r.Revision == h.snap.ScreenshotRevision {
 		return false
 	}
 	h.snap.HasScreenshot = len(r.Image) > 0
@@ -438,19 +428,11 @@ func (h *RemoteHandle) storeScreenshotLocked(r attach.ScreenshotResult) bool {
 	h.snap.ScreenshotFormat = ImageFormat(r.Format)
 	h.snap.ScreenshotEpoch, h.snap.ScreenshotRevision = r.Epoch, r.Revision
 	h.snap.Generation = h.generation
-	h.deriveLocked()
 	return true
 }
 
-// deriveLocked sets the fields a notice cannot supply. They hold only
-// while the held pair is the pair the last fresh capture described.
-func (h *RemoteHandle) deriveLocked() {
-	f, s := h.fresh, &h.snap
-	if f.valid && f.treeRevision == s.TreeRevision && f.shotRevision == s.ScreenshotRevision {
-		s.Paired, s.Highlightable, s.Scale = f.paired, f.highlightable, f.scale
-		return
-	}
-	s.Paired, s.Highlightable, s.Scale = false, false, 0
+func (h *RemoteHandle) applyStateLocked(c attach.CaptureState) {
+	h.snap.Paired, h.snap.Highlightable, h.snap.Scale = c.Paired, c.Highlightable, c.Scale
 }
 
 func (h *RemoteHandle) storeStep(n attach.StepNotice) {
