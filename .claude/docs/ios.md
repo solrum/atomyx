@@ -193,7 +193,10 @@ A runner that reports neither, such as one started without the launch
 environment, is taken to serve the single connected iPhone.
 The resulting descriptor carries port 22087, so nothing is launched and
 no runner record is written. A reaper therefore never ends that runner,
-because no Atomyx record names it. No answering runner, or a runner that
+because no Atomyx record names it. A descriptor that carries its own
+port, which is every descriptor resolved this way, does not reap a
+recorded runner either. The next managed acquire, a descriptor with no
+port, adopts or reaps the record. No answering runner, or a runner that
 names no device while the number of connected iPhones is not exactly
 one, fails with `DEVICE_NOT_FOUND` and a remedy. Pass `--device` to have
 the CLI launch its own runner.
@@ -286,7 +289,11 @@ the record as owner.
   in `core/cmd/internal/runnerprovision` and run its `Cleanup` on both
   exit paths: after the command or the server returns, and in the stop
   watchdog that SIGINT and SIGTERM arm. Both are bounded by
-  `shutdown.GracePeriod`.
+  `shutdown.GracePeriod`. `Cleanup` runs the process's own cleanup first,
+  which closes its open sessions and releases their device leases, and
+  then `StopAll`, so the keeper finds the leases free. When the watchdog
+  forces the exit before that cleanup finishes, a runner may outlive the
+  process, and the next acquirer adopts or reaps it.
 - `RunnerKeeper.StopAll` stops each kept runner, its tunnel and its record
   through the provisioner's single kill path. For each runner it first
   takes that device's lease with one non-blocking attempt
@@ -297,6 +304,26 @@ the record as owner.
   lease and skips a runner whose record names another process, because
   that process adopted it. It runs once, and a later call waits for the
   first.
+- A runner adopted from a lender goes back to it. When a process that
+  lent the device on purpose is the source of an adoption, the adopter
+  passes its identity in `ProvisionOptions.Lender` and the record keeps it
+  as `lenderPid` and `lenderStartTime`. At exit, after the keeper takes
+  the lease and finds itself still the owner, it checks the lender with
+  its pid and start time. A live lender becomes the owner again, the
+  lender fields are cleared, and the runner keeps running, so the lender
+  adopts its own runner when it acquires the device again. A lender that
+  is gone, or whose pid now belongs to another process, leaves the
+  keeper to stop the runner as usual. An adoption with no lender records
+  none and clears any lender the record held. A launched runner never
+  records a lender.
+- A stop acts on the state its process holds in memory, never on the
+  record on disk. `RunnerReaper.ReapState` applies the reaper's guards to
+  that state and touches no file, so a runner another process launched
+  since, under another launch id and process, is never signaled. The
+  record is removed only while it still names the stopped runner and its
+  owner. A launched simulator runner's stop uses the same call after it
+  kills the `xcodebuild` group, so the runner app that outlives the group
+  is ended through `simctl`.
 - A Connect failure stops the runner at once, because no session ever
   used it. `device.Built.Release` stops it for a caller that owns the
   driver outright, and the Studio sidecar calls it after it disposes a
@@ -397,6 +424,8 @@ probed.
 | `tunnelStartTime` | Start time of the tunnel process, read from the kernel, in UTC |
 | `ownerPid` | Process id of the process that answers for the runner and stops it on exit |
 | `ownerStartTime` | Start time of the owner process, read from the kernel, in UTC |
+| `lenderPid` | Process id of the process that lent the device to the owner, absent when nobody lent it |
+| `lenderStartTime` | Start time of the lender process, read from the kernel, in UTC |
 | `buildProductPath` | Path of the compiled runner app the runner was started from |
 | `buildProductModTime` | Modification time of that app when the runner started, in UTC |
 

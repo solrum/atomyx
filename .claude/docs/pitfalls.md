@@ -199,7 +199,28 @@ corresponding area. For the high-level map see
   lease with one non-blocking attempt, skips the runner when the lease is
   held, reads the owner from the record again after taking it, and
   releases the lease right after the stop. Stopping a runner without the
-  lease can end the runner a live holder is driving.
+  lease can end the runner a live holder is driving. The process's own
+  cleanup must release its session leases before the keeper runs,
+  because the keeper skips a runner whose lease its own open session
+  still holds.
+- **The keeper can hold the device lease while a process exits.** It
+  holds the lease for as long as it takes to end the runner, which is up
+  to the reaper's grace period for each process group it signals plus the
+  `simctl` terminate of a simulator runner app. An acquire in that window
+  gets `DEVICE_HELD` naming the cleanup as the holder, with the command
+  `atomyx` and the role `runner-cleanup`, and succeeds when retried after
+  the exit.
+- **A runner adopted from a lender goes back to the lender.** The
+  adopter records the lender as `lenderPid` and `lenderStartTime`. Its
+  keeper hands the runner back, after taking the lease, only while the
+  lender's pid still has the recorded start time. Handing it back without
+  that check gives a runner to an unrelated process that reused the pid,
+  and skipping the hand back stops a runner its lender is about to adopt.
+- **Stop a runner from the state the process holds, never from the
+  record on disk.** The record can name a runner another process launched
+  since. `RunnerReaper.ReapState` signals a process only while it is still
+  the one the state recorded. `RunnerReaper.Reap` re-reads the record and
+  belongs to a holder that has just taken the lease.
 - **Use a tunnel only when it can be stopped.** `StartTunnel` refuses a
   listener on the port unless the caller's `Reuse` accounts for it. The
   provisioner accounts only for the recorded `iproxy` that passes
