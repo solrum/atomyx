@@ -209,7 +209,10 @@ type DeviceSession struct {
 	// counts the accepted yields whose follow-up has not finished.
 	borrowGen  uint64
 	borrowStop context.CancelFunc
-	yields     sync.WaitGroup
+	// borrowerHolder describes the process that took the device, in the
+	// words DEVICE_HELD uses. It is empty until that process is watched.
+	borrowerHolder string
+	yields         sync.WaitGroup
 
 	probe   device.Probe
 	runners device.RunnerIdentifier
@@ -518,7 +521,7 @@ func (s *DeviceSession) heldOrRemembered() (*ActiveDevice, *rememberedDevice, er
 	case s.remembered == nil:
 		return nil, nil, errNoActiveDevice
 	case s.state == holderBorrowed:
-		return nil, nil, diag.NewDeviceReleasedHeld("the process that took the device over")
+		return nil, nil, diag.NewDeviceReleasedHeld(s.borrowerLabelLocked())
 	}
 	return nil, s.remembered, nil
 }

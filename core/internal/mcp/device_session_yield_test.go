@@ -2,6 +2,9 @@ package mcp
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -333,5 +336,28 @@ func TestDeviceSessionYield_CheckHealthKeepsTheIdleReasonForAnIdleRelease(t *tes
 	const want = "the session released its device after an idle timeout and has not probed it"
 	if report.State != "released" || report.Message != want {
 		t.Fatalf("CheckHealth() = %+v, want released with message %q", report, want)
+	}
+}
+
+func TestDeviceSessionYield_EnsureWhileBorrowedNamesTheBorrowerLikeDeviceHeld(t *testing.T) {
+	f := newLifecycleFixture(t)
+	f.selectedAndIdle()
+	borrower := f.newDevices("atomyx run", f.factory)
+	t.Cleanup(borrower.Close)
+	if err := f.requestYield(); err != nil {
+		t.Fatal(err)
+	}
+	f.awaitLeaseFree()
+	if err := f.selectDevice(borrower); err != nil {
+		t.Fatal(err)
+	}
+	holder := fmt.Sprintf("pid %d (atomyx run), ", os.Getpid())
+	var err error
+	eventually(t, "Ensure to name the borrower", func() bool {
+		err = ensureErr(f.devices)
+		return err != nil && strings.Contains(err.Error(), holder)
+	})
+	if code := codeOfErr(err); code != diag.CodeDeviceReleasedHeld {
+		t.Fatalf("Ensure while borrowed = %v, want %s", err, diag.CodeDeviceReleasedHeld)
 	}
 }

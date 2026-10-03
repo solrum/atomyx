@@ -91,10 +91,32 @@ func (s *DeviceSession) followBorrower(ctx context.Context, gen uint64, desc dev
 		return
 	}
 	defer func() { _ = handle.Close() }()
+	if holder := handle.Info().Holder; holder.PID != 0 {
+		s.rememberBorrower(gen, holder.Describe())
+	}
 	select {
 	case <-handle.Done():
 	case <-ctx.Done():
 	}
+}
+
+// rememberBorrower stores the description of the watched borrower while
+// the borrow numbered gen is still the current one.
+func (s *DeviceSession) rememberBorrower(gen uint64, holder string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.state == holderBorrowed && s.borrowGen == gen {
+		s.borrowerHolder = holder
+	}
+}
+
+// borrowerLabelLocked names the process that took the device, falling back
+// to a generic phrase until it is watched or when it cannot be identified.
+func (s *DeviceSession) borrowerLabelLocked() string {
+	if s.borrowerHolder == "" {
+		return "the process that took the device over"
+	}
+	return s.borrowerHolder
 }
 
 // endBorrow moves a session that is still in the borrow numbered gen to
@@ -111,6 +133,7 @@ func (s *DeviceSession) endBorrow(gen uint64) {
 
 // stopBorrowViewLocked ends the watch of the device's borrower, if any.
 func (s *DeviceSession) stopBorrowViewLocked() {
+	s.borrowerHolder = ""
 	if s.borrowStop != nil {
 		s.borrowStop()
 		s.borrowStop = nil
