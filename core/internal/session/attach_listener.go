@@ -52,7 +52,7 @@ func (l *attachListener) stop() {
 // lease metadata. A host that cannot bind keeps driving the device
 // without a socket, so viewers cannot attach to it.
 func (s *Session) bindAttach(path string) {
-	l, err := listenAttach(path, attach.Handlers{})
+	l, err := listenAttach(path, s.attachHandlers())
 	if err != nil {
 		s.deps.Logger.Warn("attach.socket_unavailable", logging.LogContext{"id": s.desc.ID, "error": err.Error()})
 		return

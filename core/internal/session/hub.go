@@ -277,3 +277,10 @@ func sniffImage(img []byte) (format ImageFormat, width, height int) {
 	}
 	return ImageUnknown, 0, 0
 }
+
+// currentEpoch reports the newest action epoch any capture was stored in.
+func (h *Hub) currentEpoch() uint64 {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return max(h.treeEpoch, h.shotEpoch, h.sizeEpoch)
+}
