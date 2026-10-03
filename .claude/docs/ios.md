@@ -442,7 +442,9 @@ provisioner ends the remaining process group through its single kill
 path and reports a `device.ProcessExitError` naming which process
 ended. The driver factory hands it to `session.Session` through
 `device.Built.Lost`, and the session moves to lost with a cause that
-wraps `session.ErrDeviceLost`. This costs no polling, because it reads
+wraps `session.ErrDeviceLost`. A runner whose record names another
+process as owner is not reported, and its tunnel and record stay. This
+costs no polling, because it reads
 the exit verdict `process.BackgroundProcess.Wait` already returns. A
 runner that dies without its process exiting, or a cable pull that
 leaves both processes alive, is not signaled, and surfaces as a failed
