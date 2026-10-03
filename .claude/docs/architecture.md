@@ -500,7 +500,9 @@ build on the `.Built(` and `.Orchestra(` accessors, on
   and never a CORS header.
 - **Bootstrap.** `Server.NewBootstrapURL` mints a 256-bit single-use
   code from `crypto/rand` and returns a URL that carries it in the
-  fragment. `POST /api/v1/auth` exchanges it for a 256-bit token that
+  fragment. The code is valid for 60 seconds on the injected clock
+  (`Config.Clock`, the system clock by default), and an exchange after
+  that is refused with `CODE_REFUSED` and discarded. `POST /api/v1/auth` exchanges it for a 256-bit token that
   the page keeps in memory. The server stores only digests and compares
   in constant time. Every exchange is logged through the injected
   logger, refusals included, and never with a secret in the entry.
@@ -526,12 +528,17 @@ build on the `.Built(` and `.Orchestra(` accessors, on
   server decides and holds no logic of its own, so the JavaScript has
   no unit tests.
 - **Page contract with the server.** The page never decides whether a
-  tree and a screenshot belong together. It draws a highlight only when
-  the screenshot headers `X-Atomyx-Paired` and `X-Atomyx-Highlightable`
-  are both `true` and the selected node comes from the current tree
-  revision, and it multiplies bounds by `X-Atomyx-Scale`. Every request
-  that names a node sends the tree revision and the child index path, and
-  a `TREE_STALE` answer means the page must refetch the tree. Page text
+  tree and a screenshot belong together. It draws a highlight, and turns
+  a click on the screenshot into a selection, only when the screenshot
+  headers `X-Atomyx-Paired` and `X-Atomyx-Highlightable` are both `true`,
+  the tree response's `screenshotRevision` equals the shown screenshot's
+  `X-Atomyx-Revision` with the same generation, and the selected node
+  comes from the tree on screen. It multiplies bounds by
+  `X-Atomyx-Scale`. A capture is named by its generation and revision
+  together, and every client comparison uses both. Every request that
+  names a node sends the generation, the tree revision and the child
+  index path, and a `TREE_STALE` answer means the page must refetch the
+  tree. The page ignores a tree older than the one it shows. Page text
   is built with `textContent` and element children only, and a Go test
   fails when a script parses text as markup or code.
 - **Idle release and reconnect.** `Host` owns the device lifecycle and
@@ -545,6 +552,20 @@ build on the `.Built(` and `.Orchestra(` accessors, on
   - While released, every route except `GET /api/v1/session` answers
     `410` with code `DEVICE_RELEASED`, and the session route reports
     state `released`.
+  - The idle release never closes a device while an operator action is
+    driving it. An action that begins on a device that is no longer the
+    current one is refused, so the driving count never outlives a
+    release or a reconnect.
+  - The host watches the held session's lost signal. On a lost device
+    it closes the session, clears the current device and reports state
+    `lost`, and every route except the session route answers `410` with
+    code `DEVICE_LOST`. The inspector stays up and keeps its token,
+    unlike a run, which cancels its work when the device is lost. The
+    same reconnect request recovers it.
+  - The host counts the devices it has adopted as the generation, and
+    stamps it on the session info, the tree and screenshot responses
+    and the selector responses, because each new session numbers its
+    revisions from one again.
   - `POST /api/v1/reconnect` is an operator action that acquires the
     device through the same prepare and open path as the first
     acquisition and swaps it in, without a new server or token. A
@@ -556,14 +577,15 @@ build on the `.Built(` and `.Orchestra(` accessors, on
   and never calls the device, except for the one operator action.
   - `GET /api/v1/session` returns the device, the holder and the
     holder state as JSON.
-  - `GET /api/v1/tree` returns `{epoch, revision, tree,
+  - `GET /api/v1/tree` returns `{generation, epoch, revision, tree,
     screenshotRevision, scale, paired, highlightable}`. The tree is the
     raw masked tree, and `revision` identifies it. `scale`, `paired`
     and `highlightable` are decided by the session, and the page only
     draws what they say. It answers `404` with code `NO_TREE` before the
     first capture.
   - `GET /api/v1/screenshot` returns the image bytes with the content
-    type read from the bytes and the headers `X-Atomyx-Epoch`,
+    type read from the bytes and the headers `X-Atomyx-Generation`,
+    `X-Atomyx-Epoch`,
     `X-Atomyx-Revision`, `X-Atomyx-Scale`, `X-Atomyx-Paired` and
     `X-Atomyx-Highlightable`. It answers `404` with code
     `NO_SCREENSHOT` before the first capture.
@@ -583,25 +605,30 @@ build on the `.Built(` and `.Orchestra(` accessors, on
     snake case, and a failure that carries a diag code keeps it, such
     as `HOLDER_BUSY` and `INVALID_ARGUMENT`. The codes specific to the
     inspector are `NO_TREE`, `NO_SCREENSHOT`, `SESSION_CLOSED`,
-    `TREE_STALE`, `NODE_NOT_FOUND`, `HOST_NOT_ALLOWED`,
-    `ORIGIN_NOT_ALLOWED`, `TOKEN_REQUIRED`, `CODE_REFUSED` and
-    `INTERNAL`. A closed session is `410` with code `SESSION_CLOSED`.
+    `DEVICE_RELEASED`, `DEVICE_LOST`, `TREE_STALE`, `NODE_NOT_FOUND`,
+    `HOST_NOT_ALLOWED`, `ORIGIN_NOT_ALLOWED`, `TOKEN_REQUIRED` and
+    `CODE_REFUSED`. A closed session is `410` with code
+    `SESSION_CLOSED`. A failure with no code is `500` with `UNKNOWN`. A
+    request that ran out of time is `504` with `TOOL_TIMEOUT`, and a
+    request its caller canceled is `499` with `UNKNOWN`, matching how an
+    MCP tool call reports the same two cases.
 - **Selector routes.** `SelectorRoutes` works from the stored tree and
   never calls the device. Every route is an operator action, and a
   request body with an unknown field, trailing data or a wrong type is
   refused with `400` and code `INVALID_ARGUMENT`.
-  - `POST /api/v1/selector/suggest` takes `{treeRevision, path}`, where
-    `path` is the child index chain of the node in the tree the page
-    displays, empty for the root. A `treeRevision` other than the stored
-    one is refused with `409` and code `TREE_STALE`, so a path into a
-    replaced tree never yields a suggestion for another node. Otherwise
-    it returns `{epoch, treeRevision, candidates}`. Each candidate is
+  - `POST /api/v1/selector/suggest` takes `{generation, treeRevision,
+    path}`, where `path` is the child index chain of the node in the tree
+    the page displays, empty for the root. A generation or a
+    `treeRevision` other than the stored one is refused with `409` and
+    code `TREE_STALE`, so a path into a replaced tree never yields a
+    suggestion for another node. Otherwise it returns `{generation,
+    epoch, treeRevision, candidates}`. Each candidate is
     `{selector, unique, matchCount, obscured}`. `unique` comes from the
     runtime resolve path, and `obscured` says whether another element
     renders over the node's midpoint, computed from the tree alone. The
     text and value of a secure node are never used.
   - `POST /api/v1/selector/test` takes `{selector}` and returns
-    `{epoch, treeRevision, count, matches, truncated}`. Each match is
+    `{generation, epoch, treeRevision, count, matches, truncated}`. Each match is
     `{path, bounds}`, listed in resolution order, and at most 100 are
     listed. An empty selector is `400` with code `INVALID_ARGUMENT`.
   - `POST /api/v1/step/yaml` takes `{selector, action, text}` and

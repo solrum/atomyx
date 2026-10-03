@@ -350,8 +350,9 @@ is or when storage failed, and `2` when the command was misused.
 ## driver inspect
 
 Serves a browser inspector for one device until it is stopped. The page
-shows the live UI tree and screenshot of the device and tests selectors
-against the tree.
+shows the live UI tree and screenshot of the device, lets you click a
+node to see its properties and a selector that finds it, and tests
+selectors against the tree.
 
 Usage:
 
@@ -368,114 +369,122 @@ Flags:
 | `--no-open` | Prints the URL without opening a browser. | off | no |
 | `--help`, `-h` | Prints this command's usage and exits. | off | no |
 
-The command takes the device like `run` does, then listens on
-`127.0.0.1` with a system-chosen port and nothing else. It prints one
-line to stdout, the URL, which names `127.0.0.1` and carries a
-single-use code in the fragment:
+### Starting and opening the page
+
+The command takes the device like `run` does, so it fails with
+`DEVICE_HELD` when another Atomyx process already holds it. It then
+prints one line to stdout, the URL, and opens it in your default
+browser unless `--no-open` is set:
 
 ```
 http://127.0.0.1:<port>/#<code>
 ```
 
-Unless `--no-open` is set, the command also opens the URL in the
-default browser. The code then appears in the browser's process
-arguments, where another local account can read it, so every code
-exchange is logged to stderr. A code that is used twice, or a wrong
-one, is logged as refused.
+The page works only on this machine, because the command listens on
+`127.0.0.1` and nothing else.
 
-- **A fresh URL.** A reload loses the page's token. Press Enter in the
-  terminal to print a fresh URL, which the command also opens unless
-  `--no-open` is set. The end of stdin does not stop the server.
-- **Code lifetime.** A URL works for 60 seconds after the command prints
-  it, and for one visit. After that the page says the code was refused
-  because it expired, and the server answers `CODE_REFUSED`. Press
-  Enter in the terminal for a fresh URL. The terminal log records the
-  refusal as `inspector.auth.expired`.
-- **Idle release.** The command keeps the device until
-  `session.mcpIdleTimeoutMs` passes without an action taken in the page,
-  such as asking for a fresh capture, suggesting a selector, testing a
-  selector or copying a step. Reading what the session already holds
-  does not count, so an open page that only polls does not keep the
-  device. After the timeout the command releases the device, so another
-  Atomyx process can take it, and the page shows that it is released.
-- **Reconnect.** The page's reconnect button takes the device again.
-  The command never does so on its own. When another process holds the
-  device by then, reconnect fails with `DEVICE_HELD` and the device
-  stays released. The server and the token keep working across a
-  release and a reconnect.
-  The page shows the released banner with a Reconnect button when the
-  feed or any action answers `410` with `DEVICE_RELEASED`. Pressing it
-  posts to `/api/v1/reconnect`, and on success the page resumes the
-  capture feed and refetches the session, the tree and the screenshot.
-  When the device is held elsewhere, the banner shows the refusal and
-  its remedy and the button stays available.
-- **Lost device.** When the device goes away while the command holds
-  it, for example the cable is pulled or the runner process exits, the
-  command gives the session up, the header shows the holder state
-  `lost`, and the page shows a banner with a Reconnect button. Unlike
-  `run`, which stops when the device is lost, the inspector keeps
-  running. Reconnect takes the device again through the same steps as
-  at startup, and fails with the device's own code, such as
-  `DEVICE_HELD`, when another process holds it by then.
-- **The page.** The header names the device, its platform and kind,
-  and the holder state. The page reads the code from the URL fragment,
-  removes it from the address bar, and trades it for a token that it
-  keeps in memory only. A page opened without a code, or with a code
-  that was already used, says so and tells you to press Enter in the
-  terminal for a fresh URL.
+- **One visit, 60 seconds.** The code in the URL works once and only
+  for 60 seconds after the command printed it. A page opened later, or
+  a second time, says the code was refused and what to do about it.
+- **A fresh URL.** Press Enter in the terminal to print a fresh URL,
+  which the command also opens unless `--no-open` is set. Do this after
+  a reload too, because a reload forgets the page's login. Pressing
+  Enter never stops the inspector, and neither does the end of the
+  terminal's input.
+- **Who used the code.** When the browser opens the URL, the code
+  appears in its process arguments, where another local account could
+  read it. The terminal therefore logs every attempt to use a code, and
+  logs a refused or expired one as a warning, so a hijack is visible.
+
+### What you see and do
+
+- **The header.** It names the device, its platform and kind, and the
+  holder state, which is `idle` while you only look and `running` while
+  a capture is in progress. Refresh asks the device for a new tree and
+  screenshot taken together. When a tool call or another capture is
+  already running, the page shows a short notice and carries on.
 - **The tree.** The middle pane shows the tree as an outline. Each row
   shows the role and the most useful of the id, label and text, with
-  secret values already masked by the server. Only the first three levels
-  show at first, and a twisty, a click or the arrow keys open and
-  close nodes. Only the rows near the viewport are drawn, so a tree
-  of tens of thousands of nodes stays responsive.
-- **Search.** The search box matches the id, label, text, hint and
-  role of every node. It opens only the paths to the matches, marks
-  the matching text, and Enter steps to the next match while Shift
-  and Enter steps back. Selecting a row, by click, arrow key or match
-  step, selects its node for the detail panels.
+  secret values already masked. The first three levels are open at
+  first. A twisty, a click or the arrow keys open and close nodes. Only
+  the rows near the window are drawn, so a tree of tens of thousands of
+  nodes stays responsive.
+- **Search.** The search box matches the id, label, text, hint and role
+  of every node, opens only the paths to the matches and marks the
+  matching text. Enter steps to the next match and Shift with Enter
+  steps back. Stepping to a match selects it.
+- **The screenshot and the highlight.** The selected node is outlined on
+  the screenshot, and a click on the screenshot selects the topmost node
+  under the pointer. When several nodes contain the point, the one drawn
+  last wins, so a dialog drawn over a button wins over the button and
+  over everything inside it. The page outlines and picks only when all
+  of these hold, and otherwise says under the screenshot why not:
+  - The tree and the screenshot were captured together, so they show
+    the same screen.
+  - The device reported its screen size, so positions can be scaled.
+  - The tree on the page names the screenshot on the page as its own.
+    The two are fetched separately, so one may be newer than the other
+    for a moment.
+  - The selected node comes from the tree on the page.
 - **The panels.** The right pane holds four panels, from top to bottom.
-  - Properties lists every attribute of the selected node as the tree
-    response returns it, with the node's path, its bounds and its state
-    flags. A secure node shows its masked values here, and its tree row
-    is labelled by its hint or label.
-  - Selector suggestions asks the server for candidate selectors for
-    the selected node. Each candidate shows `unique` or `ambiguous`, how
-    many nodes it matches, and `obscured` when another node covers the
-    target. A candidate button copies its selector into the tester. A
-    selection from an earlier capture is not sent, and a `TREE_STALE`
-    answer shows a notice and reloads the tree. A capture is named by
-    its session generation and its revision together, so a tree from
-    before a reconnect is never mistaken for one after it, although
-    both may number their revisions alike.
-  - Selector tester takes the selector as one JSON object, the same
-    shape a script step uses: `id`, `label`, `text`, `hint`, `value`,
-    `role`, `enabled`, `clickable`, `focused` and `nth`, where a text
+  - Properties lists every attribute of the selected node with its
+    position in the tree, its bounds and its state flags. A secure
+    field shows its masked values, and its row is labelled by its hint
+    or label.
+  - Selector suggestions lists candidate selectors for the selected
+    node. Each shows `unique` or `ambiguous`, how many nodes it
+    matches, and `obscured` when another node covers the target. A
+    candidate button copies its selector into the tester. A node from
+    an earlier capture gets no suggestions, and a tree that changed
+    while you asked shows a notice and reloads.
+  - Selector tester takes a selector written as one JSON object, the
+    same shape a script step uses: `id`, `label`, `text`, `hint`,
+    `value`, `role`, `enabled`, `clickable`, `focused` and `nth`. A text
     field may also be `{"regex": "..."}`. Test selector lists the
-    matches in resolution order with their paths and bounds, and a match
-    button selects that node in the tree.
-  - Copy as YAML renders one step for the tester's selector. The action
-    is `tap`, `type`, `waitFor`, `assertVisible`, `assertNotVisible` or
-    `assertExists`, and `type` also takes the text. The server renders
-    the YAML, and for a secure target it writes a placeholder such as
-    `${password}` instead of the text, which the panel explains. Copy
-    puts the step on the clipboard through the browser, which may refuse
-    it, in which case the step stays selectable.
-- **The highlight.** The selected node's bounds are drawn over the
-  screenshot only when the server reports that the tree and the
-  screenshot were captured together and can be matched, the tree on
-  screen names the screenshot on screen as its own, and the selection
-  belongs to the tree currently shown. Otherwise no box is drawn and a
-  note under the screenshot says why. While the screenshot is
-  highlightable, a click on it selects the deepest node whose bounds
-  contain the clicked point, and the tree opens the path to that node.
-- **Live updates.** The page follows the capture feed, so the
-  screenshot and the header change as the holder captures. A feed that
-  drops or ends is reopened after a growing pause. When the device has
-  been released, the page shows a banner and stops reading until the
-  device is taken again. The Refresh button asks for a fresh capture,
-  and a tool call or another capture in progress shows as a notice
-  that does not block the page.
+    matches in the order a run resolves them, with their bounds, and a
+    match button selects that node in the tree.
+  - Copy as YAML renders one script step for the tester's selector. The
+    action is `tap`, `type`, `waitFor`, `assertVisible`,
+    `assertNotVisible` or `assertExists`, and `type` also takes the
+    text. For a secure field the step holds a placeholder such as
+    `${password}` instead of the text, and the panel says to supply it
+    as an environment variable when the script runs. Copy puts the step
+    on the clipboard. When the browser refuses, the step stays selectable
+    so you can copy it by hand.
+- **Live updates.** The page follows the device as the holder captures,
+  so the screenshot and the header change on their own. A page and tree
+  from before a reconnect are never mixed with ones after it.
+
+### When the device is released, lost or the server is gone
+
+- **Idle release.** The command keeps the device until the number of
+  milliseconds in `session.mcpIdleTimeoutMs` passes with no action of
+  yours. Refresh, suggestions, tests, rendering a step and the reconnect
+  button each count. A page that only polls does not, and neither does
+  a capture or a test that is still running, which holds the device
+  until it ends. After the timeout the command releases the device so
+  another Atomyx process can take it, and the page shows a banner with a
+  Reconnect button.
+- **Lost device.** When the device goes away while the command holds it,
+  for example the cable is pulled or the runner process exits, the
+  command gives it up, the holder state reads `lost`, and the page shows
+  the same banner. Unlike `run`, which stops when the device is lost,
+  the inspector keeps running.
+- **Reconnect.** The Reconnect button takes the device again, with the
+  same steps as at startup, and the page resumes and reloads the tree
+  and screenshot. The command never reconnects on its own, so it does
+  not take the device from the next process that wants it. When another
+  process holds the device by then, the banner shows `DEVICE_HELD` and
+  what to do, and the button stays available. The page keeps its login
+  across a release and a reconnect.
+- **The server is gone.** When the command has stopped or crashed, the
+  page cannot reach it. After several failed attempts in a row it shows
+  a banner saying it lost contact and to check the terminal. When the
+  server answers with an error that trying again cannot fix, such as a
+  closed session or a refused login, the page shows that banner at once
+  with the server's own message and advice.
+- **Time limits.** A request that runs out of time is reported as
+  `TOOL_TIMEOUT` with advice to try again or to reconnect.
 - **Stopping.** Ctrl-C and SIGTERM stop the server and release the
   device.
 
