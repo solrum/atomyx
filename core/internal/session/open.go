@@ -134,7 +134,9 @@ func observingFactory(factory device.WrappingFactory, hub *Hub) device.Factory {
 // Once the driver is built, a leased session with Deps.Sockets set binds
 // its attach socket, replacing a stale file at that path, and records the
 // path in the lease metadata. A socket that cannot be bound is logged and
-// the session proceeds without one.
+// the session proceeds without one. A leased session with no Deps.Sockets
+// records the reason it serves no socket, so a process that wants to
+// attach learns it at once.
 func Open(ctx context.Context, deps Deps, req Request) (*Session, error) {
 	deps = deps.withDefaults()
 	desc := req.Descriptor
@@ -191,8 +193,12 @@ func Open(ctx context.Context, deps Deps, req Request) (*Session, error) {
 	s := newSession(ctx, deps, desc, identity, held, built, hub, gate)
 	s.relaunched = relaunched
 	s.socketRefresher = req.SocketRefresher
-	if deps.Sockets != nil && held != nil {
-		s.bindAttach(deps.Sockets.SocketPath(key))
+	if held != nil {
+		if deps.Sockets == nil {
+			s.socketError = reasonNoSocketConfigured
+		} else {
+			s.bindAttach(deps.Sockets.SocketPath(key))
+		}
 	}
 	if err := s.persistActivity(); err != nil {
 		_ = s.Close()

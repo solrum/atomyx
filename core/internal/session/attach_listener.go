@@ -79,6 +79,8 @@ const (
 	reasonInUse       = "address already in use"
 	reasonPathTooLong = "socket path too long"
 	reasonBindFailed  = "bind failed"
+
+	reasonNoSocketConfigured = "no attach socket configured"
 )
 
 // bindFailureReason maps a bind error to one of the short reasons.

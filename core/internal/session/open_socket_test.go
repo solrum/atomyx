@@ -311,6 +311,30 @@ func TestOpen_WithoutSocketsTheHolderServesNoSocket(t *testing.T) {
 	requireNoFile(t, socketPathFor(m))
 }
 
+func TestOpen_WithoutSocketsTheLeaseSaysWhyAndAttachFailsAtOnce(t *testing.T) {
+	m := newSocketManager(t, clock.SystemClock{})
+	s, err := session.Open(context.Background(), baseDeps(t, &recordingFactory{events: &eventLog{}}, m), session.Request{Descriptor: androidDesc("A")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	if got := s.Info().Holder.SocketError; got != "no attach socket configured" {
+		t.Fatalf("Info().Holder.SocketError = %q, want the no-socket reason", got)
+	}
+
+	clk := &recordingClock{}
+	var dials int
+	_, err = session.Attach(context.Background(), session.AttachDeps{Leases: m, Clock: clk, Dial: countingDial(&dials)}, androidDesc("A"))
+
+	var noSocket *session.HolderServesNoSocketError
+	if !errors.As(err, &noSocket) {
+		t.Fatalf("Attach() error = %v, want *HolderServesNoSocketError", err)
+	}
+	if noSocket.Holder.SocketError != "no attach socket configured" || dials != 0 || len(clk.waits) != 0 {
+		t.Fatalf("holder %+v, dials %d, waits %v, want the reason and no connection or wait", noSocket.Holder, dials, clk.waits)
+	}
+}
+
 const socketWaitGuard = 5 * time.Second
 
 func awaitClosed(t *testing.T, what string, ch <-chan struct{}) {
