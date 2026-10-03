@@ -119,3 +119,11 @@ func (v *Viewer) Lines() []StepLine {
 	defer v.mu.Unlock()
 	return append([]StepLine(nil), v.lines...)
 }
+
+// RequestYield asks the holder at path to give its device to the process
+// described by command, as a borrower does, and returns once the holder
+// has ended the connection. It returns the error the holder answered, which
+// carries its stable code, for example when it is busy.
+func RequestYield(ctx context.Context, path, client, command string) error {
+	return attach.RequestYield(ctx, attach.ClientConfig{Path: path, Client: client}, command)
+}

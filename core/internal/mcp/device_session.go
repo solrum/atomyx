@@ -171,7 +171,7 @@ type expiredRun struct {
 // The session gives its device up after an idle timeout and takes it
 // again on the next call that needs it. The states and transitions are
 // those of holderState: a held device is idle or running, a given-up one
-// is released or lost, and the descriptor is kept for the last two.
+// is released, borrowed or lost, and the descriptor is kept for those three.
 type DeviceSession struct {
 	// acquireMu serializes every transition of sess: Select, Ensure,
 	// Disconnect, onTimer and watchLost each hold it from the moment they
@@ -192,6 +192,12 @@ type DeviceSession struct {
 	expired    *expiredRun
 	timerGen   uint64
 	timerStop  context.CancelFunc
+	// borrowGen numbers the yields this session accepted. borrowStop ends the
+	// watch of the newest borrower and is nil when none is watched. yields
+	// counts the accepted yields whose follow-up has not finished.
+	borrowGen  uint64
+	borrowStop context.CancelFunc
+	yields     sync.WaitGroup
 
 	probe   device.Probe
 	runners device.RunnerIdentifier
@@ -543,6 +549,7 @@ func (s *DeviceSession) prepare(ctx context.Context, desc device.Descriptor) err
 // install reports once the session is installed. The caller holds acquireMu.
 func (s *DeviceSession) open(ctx context.Context, req session.Request) (*session.Session, error) {
 	req.Gate = s.gate
+	req.Yielder = s
 	sess, err := session.OpenWithinBudget(ctx, s.deps, req, session.Acquisition{
 		BudgetMs: s.timeouts.DeviceAcquireMs,
 		Clock:    s.timers,
@@ -603,6 +610,7 @@ func (s *DeviceSession) install(ctx context.Context, sess *session.Session, plat
 	s.active = active
 	s.remembered = &rememberedDevice{desc: desc}
 	s.bindRecorder(sess)
+	s.stopBorrowViewLocked()
 	s.state = holderRunning
 	s.settleLocked() //nolint:contextcheck // idle timers outlive any call, so they take no call context
 	s.mu.Unlock()
@@ -623,6 +631,7 @@ func (s *DeviceSession) detach(forget bool) *session.Session {
 	s.sess = nil
 	s.active = nil
 	s.cancelTimerLocked()
+	s.stopBorrowViewLocked()
 	if forget {
 		s.remembered = nil
 		s.state = holderUnselected
@@ -885,7 +894,8 @@ func (s *DeviceSession) CheckHealth(ctx context.Context) orchestra.HealthReport 
 }
 
 // Close finalizes the open run as cancelled, cancels the scripts that
-// are their own run, disconnects the active driver, and makes every
+// are their own run, disconnects the active driver, waits for the close
+// of a session handed to a borrower, and makes every
 // later Select release what it builds and fail, so a selection that was
 // still launching when the server stopped cannot leave a child running.
 // It is idempotent.
@@ -898,6 +908,7 @@ func (s *DeviceSession) Close() {
 		s.runs.Close()
 	}
 	_ = s.Disconnect(context.Background())
+	s.yields.Wait()
 }
 
 func (s *DeviceSession) isClosed() bool {

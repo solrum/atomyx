@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 
@@ -59,6 +60,9 @@ type lifecycleFactory struct {
 	// lost, when set, is the loss signal every built driver reports
 	// through.
 	lost chan error
+	// runnerStops counts the Release calls of every built device, which stop
+	// a provisioned runner.
+	runnerStops atomic.Int32
 
 	mu      sync.Mutex
 	drivers []*lifecycleDriver
@@ -88,7 +92,7 @@ func (f *lifecycleFactory) Build(ctx context.Context, _ device.Descriptor) (devi
 	if f.lost != nil {
 		lost = f.lost
 	}
-	return device.Built{Driver: drv, Orchestra: orchestra.New(orchestra.OrchestraDeps{Driver: drv, Clock: orchestra.SystemClock{}}), Lost: lost}, nil
+	return device.Built{Driver: drv, Orchestra: orchestra.New(orchestra.OrchestraDeps{Driver: drv, Clock: orchestra.SystemClock{}}), Lost: lost, Release: func() { f.runnerStops.Add(1) }}, nil
 }
 
 func (f *lifecycleFactory) builds() int {

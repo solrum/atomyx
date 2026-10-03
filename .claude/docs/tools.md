@@ -248,7 +248,7 @@ client disconnects.
 `session.Open`. Every transition of the held session happens under one
 lock, and `select_device` opens the new device before it releases the
 current one, so a failed selection keeps the working device. The states
-are unselected, idle, running, released and lost.
+are unselected, idle, running, released, borrowed and lost.
 
 | From | Event | To |
 |---|---|---|
@@ -258,8 +258,10 @@ are unselected, idle, running, released and lost.
 | running | the last in-flight call ends with a run open | running, open-run idle timer starts |
 | idle | MCP idle timeout (10 minutes by default) | released |
 | running with a run open | open-run idle timeout (10 minutes by default) | released, the run is closed as cancelled |
+| idle | another process sends `control.yield` and the session accepts, which needs no call or capture in flight and no run open | borrowed, the session records `controlBorrowed`, closes without stopping the runner, and watches the new holder |
+| borrowed | the new holder ends, or none took the device within `session.FollowBudgetMs` | released |
 | idle, running | the lease is lost, or the iOS runner or its tunnel exits on its own | lost, running scripts are cancelled with the loss as cause, and an open run is closed with outcome `deviceLost` |
-| released, lost | a tool that needs a device runs | running again, or the call fails with `DEVICE_RELEASED_HELD` when another process holds the device |
+| released, borrowed, lost | a tool that needs a device runs | running again, or the call fails with `DEVICE_RELEASED_HELD` when another process holds the device |
 | any | `disconnect_device` | unselected, the remembered device is forgotten |
 
 Timers and the acquisition budget run on the injectable timer clock of

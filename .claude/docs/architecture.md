@@ -662,6 +662,13 @@ Connections:
   may close the whole session, because no goroutine the server waits for
   runs it. In the session package the host injects the port as
   `Request.Yielder`.
+- A host that yields refuses with `HOLDER_BUSY` unless it is idle, records
+  `controlBorrowed`, and in `afterReply` closes its session, leaving the
+  runner running. It then calls `session.Follow`, which attaches to the
+  process that takes the device, probing a free device every
+  `FollowIntervalMs` for at most `FollowBudgetMs`. The host reports
+  `released` when that process ends or none appears. The MCP
+  `DeviceSession` and the inspector `Host` both yield this way.
 
 ## Inspector server
 
