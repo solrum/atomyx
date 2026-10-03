@@ -366,7 +366,7 @@ for a host that does not need to split them.
    could not take it, the session reports `Relaunched`, and the MCP
    server tells the agent that the app was relaunched on a new runner.
 6. Binds the holder socket, `<key>.sock` in the runtime directory beside
-   the lock file, through `attach.Listen`, and records its path in the
+   the lock file, through `attach.ListenUnix`, and records its path in the
    lease metadata. The process holds the flock, so any file already at
    that path belongs to a holder that is gone and is removed first. The
    bind comes after the driver is built, so a failed build leaves no

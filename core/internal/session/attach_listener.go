@@ -25,7 +25,7 @@ func listenAttach(path string, handlers attach.Handlers) (*attachListener, error
 	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return nil, fmt.Errorf("remove a stale socket: %w", err)
 	}
-	srv, err := attach.Listen(attach.ServerConfig{Path: path, Handlers: handlers})
+	srv, err := attach.ListenUnix(attach.ServerConfig{Path: path, Handlers: handlers})
 	if err != nil {
 		return nil, err
 	}

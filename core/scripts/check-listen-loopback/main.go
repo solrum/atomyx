@@ -11,8 +11,6 @@
 //   - Listen or ListenPacket, whose address is the last argument. A
 //     call naming a unix network is skipped, because a socket path is
 //     not a network address.
-//     A call through the package named attach is skipped too, because
-//     that package binds only unix sockets.
 //   - ListenAndServe or ListenAndServeTLS, whose address is the first
 //     argument.
 //   - ListenTCP, ListenUDP, ListenIP or ListenMulticastUDP, which take
@@ -159,7 +157,7 @@ func checkCall(call *ast.CallExpr, r *resolver, report func(ast.Node, string)) {
 	}
 	switch sel.Sel.Name {
 	case "Listen", "ListenPacket":
-		if len(call.Args) == 0 || isAttachPackage(sel.X) {
+		if len(call.Args) == 0 {
 			return
 		}
 		for _, a := range call.Args[:len(call.Args)-1] {
@@ -285,11 +283,4 @@ func (r *resolver) resolveDepth(expr ast.Expr, depth int) (string, bool) {
 		return left + right, lok && rok
 	}
 	return "", false
-}
-
-// isAttachPackage reports whether x names the attach package, whose
-// Listen binds a unix socket and takes no network address.
-func isAttachPackage(x ast.Expr) bool {
-	pkg, ok := x.(*ast.Ident)
-	return ok && pkg.Name == "attach"
 }

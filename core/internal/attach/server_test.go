@@ -111,7 +111,7 @@ func failureCode(t *testing.T, f Frame) string {
 	return f.Code
 }
 
-func TestListenRestrictsTheSocketToItsOwnerBeforeAcceptingAnyone(t *testing.T) {
+func TestListenUnixRestrictsTheSocketToItsOwnerBeforeAcceptingAnyone(t *testing.T) {
 	path := shortSocketPath(t)
 	modes := make(chan os.FileMode, 1)
 	cfg := ServerConfig{Path: path}
@@ -432,14 +432,14 @@ func TestAcceptLoopSurvivesAcceptErrorsWithGrowingBoundedPauses(t *testing.T) {
 	}
 }
 
-func TestListenRefusesADirectoryOthersCanReach(t *testing.T) {
+func TestListenUnixRefusesADirectoryOthersCanReach(t *testing.T) {
 	path := shortSocketPath(t)
 	dir := filepath.Dir(path)
 	if err := os.Chmod(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := listen(ServerConfig{Path: path}, time.Now); err == nil {
-		t.Fatal("Listen accepted a directory open to group and others")
+		t.Fatal("ListenUnix accepted a directory open to group and others")
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatalf("a socket was created in the refused directory: %v", err)

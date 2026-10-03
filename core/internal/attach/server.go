@@ -39,7 +39,7 @@ const (
 	acceptBackoffMax = time.Second
 )
 
-// ServerConfig configures Listen. Zero values select the defaults.
+// ServerConfig configures ListenUnix. Zero values select the defaults.
 type ServerConfig struct {
 	// Path is the unix socket path, at most 104 bytes on macOS.
 	Path     string
@@ -107,13 +107,13 @@ type Server struct {
 	wg     sync.WaitGroup
 }
 
-// Listen binds cfg.Path, restricts it to its owner, and starts accepting.
+// ListenUnix binds cfg.Path, restricts it to its owner, and starts accepting.
 // The caller must place the socket in a directory it owns with mode 0700,
-// and Listen refuses any other directory, because that directory is what
+// and ListenUnix refuses any other directory, because that directory is what
 // keeps other users from reaching the socket between bind and chmod. The
 // socket file is not removed by Close, so the owner that created the
 // directory decides when it goes.
-func Listen(cfg ServerConfig) (*Server, error) {
+func ListenUnix(cfg ServerConfig) (*Server, error) {
 	return listen(cfg, time.Now)
 }
 
