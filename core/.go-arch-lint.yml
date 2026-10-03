@@ -331,5 +331,6 @@ deps:
       - orchestra
       - script
       - session
+      - runfolder
   cmd:
     anyProjectDeps: true

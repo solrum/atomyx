@@ -27,7 +27,7 @@ const (
 // its info, the latest tree and screenshot, and the capture feed. It
 // also serves the one operator action that refreshes them, a fresh
 // capture. None of the read routes calls the device.
-func ReadRoutes(c session.Controller) []Route {
+func ReadRoutes(c Source) []Route {
 	return []Route{
 		{Method: http.MethodGet, Path: routeSession, Handler: sessionHandler(c)},
 		{Method: http.MethodGet, Path: routeTree, Handler: treeHandler(c)},
@@ -116,7 +116,7 @@ func imageContentType(f session.ImageFormat) string {
 	return "application/octet-stream"
 }
 
-func freshTreeHandler(c session.Controller) http.Handler {
+func freshTreeHandler(c Source) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		snap, err := c.FreshTree(r.Context())
 		if err != nil {

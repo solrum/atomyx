@@ -15,7 +15,6 @@ import (
 	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/logging"
-	"dev.atomyx/internal/session"
 )
 
 const (
@@ -54,12 +53,12 @@ type Route struct {
 // RouteGroup builds the routes of one feature over the controller the
 // server was given. A group is the unit of extension: a feature adds a
 // group to Config.Groups and the server never changes.
-type RouteGroup func(c session.Controller) []Route
+type RouteGroup func(c Source) []Route
 
 // Config assembles a Server.
 type Config struct {
-	// Controller is the held session's read and capture port.
-	Controller session.Controller
+	// Source is the read and fresh-capture port of the device the pages show.
+	Source Source
 	// Logger receives one entry per bootstrap exchange. It is required,
 	// because a hijacked code is visible only through that log.
 	Logger logging.Logger
@@ -89,8 +88,8 @@ type Server struct {
 // missing, when a group yields an invalid or duplicate route, or when
 // the listener cannot bind.
 func New(cfg Config) (*Server, error) {
-	if cfg.Controller == nil {
-		return nil, errors.New("inspector: a session controller is required")
+	if cfg.Source == nil {
+		return nil, errors.New("inspector: a device source is required")
 	}
 	if cfg.Logger == nil {
 		return nil, errors.New("inspector: a logger is required")
@@ -123,7 +122,7 @@ func New(cfg Config) (*Server, error) {
 		return nil, err
 	}
 	for _, group := range cfg.Groups {
-		for _, r := range group(cfg.Controller) {
+		for _, r := range group(cfg.Source) {
 			if err := add(r); err != nil {
 				return nil, err
 			}

@@ -24,6 +24,7 @@ export function showNotice(text) {
 const UNAVAILABLE_TEXT = {
   DEVICE_RELEASED: 'The inspector released the device after it sat idle.',
   DEVICE_LOST: 'The device was lost. Check that it is connected and awake, then reconnect.',
+  HOLDER_EXITED: 'The process that held the device has exited. Reconnect to take the device or to watch its next holder.',
 };
 
 export function unavailableText(code) {

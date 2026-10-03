@@ -11,7 +11,7 @@ import (
 	"dev.atomyx/internal/session"
 )
 
-// stubController is a session.Controller whose answers a test sets.
+// stubController is a Source whose answers a test sets.
 type stubController struct {
 	mu         sync.Mutex
 	info       session.Info
@@ -29,8 +29,6 @@ type stubController struct {
 }
 
 func (c *stubController) Info() session.Info { return c.info }
-
-func (c *stubController) Gate() *session.ActivityGate { return nil }
 
 func (c *stubController) Latest() session.Snapshot {
 	c.mu.Lock()
@@ -88,7 +86,7 @@ type apiHarness struct {
 
 func newAPIHarness(t *testing.T, ctrl *stubController, groups ...RouteGroup) *apiHarness {
 	t.Helper()
-	srv, err := New(Config{Controller: ctrl, Logger: newRecordingLogger(), Entropy: &counterReader{}, Groups: groups})
+	srv, err := New(Config{Source: ctrl, Logger: newRecordingLogger(), Entropy: &counterReader{}, Groups: groups})
 	if err != nil {
 		t.Fatal(err)
 	}

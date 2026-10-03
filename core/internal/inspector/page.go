@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"path"
 	"strings"
-
-	"dev.atomyx/internal/session"
 )
 
 const (
@@ -34,7 +32,7 @@ var assetContentTypes = map[string]string{
 // what exchanges the bootstrap code for one. The group takes no part
 // in the holder's activity accounting and answers while the device is
 // released.
-func PageRoutes(_ session.Controller) []Route {
+func PageRoutes(_ Source) []Route {
 	assets := mustSub(embeddedAssets, "assets")
 	return []Route{
 		{Method: http.MethodGet, Path: pagePath, Handler: assetHandler(assets, func(*http.Request) string { return pageFile })},

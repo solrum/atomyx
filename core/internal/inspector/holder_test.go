@@ -53,7 +53,7 @@ type fakeDevice struct {
 	opens int
 }
 
-func (d *fakeDevice) open(context.Context) (Held, error) {
+func (d *fakeDevice) open(context.Context) (Target, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if d.held {
@@ -89,11 +89,11 @@ func newHostHarness(t *testing.T) *hostHarness {
 	}
 	first := opened.(*fakeHeld)
 	clk := clock.NewManualClock(1_000)
-	host, err := NewHost(HostConfig{Held: first, Open: dev.open, Clock: clk, IdleMs: testIdleMs, Logger: newRecordingLogger()})
+	host, err := NewHost(HostConfig{Target: first, Open: dev.open, Clock: clk, IdleMs: testIdleMs, Logger: newRecordingLogger()})
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv, err := New(Config{Controller: host, Logger: newRecordingLogger(), Entropy: &counterReader{}, Groups: []RouteGroup{host.Routes(ReadRoutes, SelectorRoutes)}})
+	srv, err := New(Config{Source: host, Logger: newRecordingLogger(), Entropy: &counterReader{}, Groups: []RouteGroup{host.Routes(ReadRoutes, SelectorRoutes)}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +212,7 @@ func TestHost_ReconnectReacquiresAndSwapsTheControllerWithoutANewToken(t *testin
 		t.Fatalf("the released controller was read %d times after the release", h.ctrl.latestRead)
 	}
 	cur, _ := h.host.held()
-	if cur == Held(h.first) {
+	if cur == Target(h.first) {
 		t.Fatal("the routes still read the first controller")
 	}
 	h.clk.AwaitSleepers(1)

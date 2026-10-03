@@ -20,6 +20,7 @@ const (
 	codeSessionClosed    = "SESSION_CLOSED"
 	codeDeviceReleased   = "DEVICE_RELEASED"
 	codeDeviceLost       = "DEVICE_LOST"
+	codeHolderExited     = "HOLDER_EXITED"
 	codeTreeStale        = "TREE_STALE"
 	codeNodeNotFound     = "NODE_NOT_FOUND"
 	codeHostNotAllowed   = "HOST_NOT_ALLOWED"
@@ -59,6 +60,10 @@ func writeFailure(w http.ResponseWriter, err error) {
 	case errors.Is(err, ErrReleased):
 		writeCoded(w, http.StatusGone, codeDeviceReleased, "the inspector released the device after it sat idle",
 			"Press reconnect on the page to take the device again.")
+		return
+	case errors.Is(err, ErrHolderExited):
+		writeCoded(w, http.StatusGone, codeHolderExited, "the process that held the device has exited",
+			"Press reconnect on the page to take the device, or to watch its next holder.")
 		return
 	case errors.Is(err, ErrLost):
 		writeCoded(w, http.StatusGone, codeDeviceLost, "the device was lost",

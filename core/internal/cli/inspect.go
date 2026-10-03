@@ -45,8 +45,9 @@ func Inspect(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
-	opener := func(ctx context.Context) (inspector.Held, error) {
-		held, err := acquireSession(ctx, deps, inspectCommandName, desc)
+	var refresher inspector.DeferredRefresher
+	opener := func(ctx context.Context) (inspector.Target, error) {
+		held, err := acquireSession(ctx, deps, inspectCommandName, desc, &refresher)
 		if err != nil {
 			return nil, err
 		}
@@ -59,18 +60,19 @@ func Inspect(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 
 	logger := logging.NewStructuredLogger(stderr, logging.LevelInfo)
 	host, err := inspector.NewHost(inspector.HostConfig{ //nolint:contextcheck // the idle timer outlives the command's call context
-		Held: held, Open: opener, Clock: deps.clock(), IdleMs: deps.Timeouts.WithDefaults().McpIdleMs, Logger: logger,
+		Target: held, Open: opener, Clock: deps.clock(), IdleMs: deps.Timeouts.WithDefaults().McpIdleMs, Logger: logger,
 	})
 	if err != nil {
 		_ = held.Close()
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
+	refresher.Bind(host)
 	defer func() { _ = host.Close() }()
 	srv, err := inspector.New(inspector.Config{ //nolint:contextcheck // the listener is not bound to a call context
-		Controller: host,
-		Logger:     logger,
-		Clock:      deps.clock(),
-		Groups:     []inspector.RouteGroup{inspector.PageRoutes, host.Routes(inspector.ReadRoutes, inspector.SelectorRoutes)},
+		Source: host,
+		Logger: logger,
+		Clock:  deps.clock(),
+		Groups: []inspector.RouteGroup{inspector.PageRoutes, host.Routes(inspector.ReadRoutes, inspector.SelectorRoutes)},
 	})
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)

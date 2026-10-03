@@ -12,7 +12,7 @@ import (
 func newClockedServer(t *testing.T, clk clock.Clock) (*Server, recordingLogger) {
 	t.Helper()
 	logger := newRecordingLogger()
-	srv, err := New(Config{Controller: fakeController{}, Logger: logger, Entropy: &counterReader{}, Clock: clk})
+	srv, err := New(Config{Source: fakeController{}, Logger: logger, Entropy: &counterReader{}, Clock: clk})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -8,6 +8,7 @@ import (
 
 	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/logging"
+	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/session"
 )
 
@@ -22,10 +23,25 @@ var ErrReleased = errors.New("inspector: the device is released")
 // without the inspector choosing to give it up.
 var ErrLost = errors.New("inspector: the device is lost")
 
-// Held is a device the inspector holds: a controller, plus the Close
-// that gives the device back. A *session.Session is one.
-type Held interface {
-	session.Controller
+// ErrHolderExited is returned by a Host's methods while the host
+// follows a holder that has exited, so no device is shown until the
+// operator reconnects.
+var ErrHolderExited = errors.New("inspector: the process that held the device has exited")
+
+// Target is what a host serves: the view of one device and the Close
+// that ends it. A *session.Session that holds the device is one, and so
+// is a *session.RemoteHandle that follows the process holding it.
+type Target interface {
+	Source
+	Close() error
+}
+
+// Lifecycle is the part of a target that only the process holding the
+// device lease has. A host releases the device after an idle timeout,
+// records what the holder is doing in the lease metadata, and watches
+// for a lost device through it, only for a target that implements it.
+// *session.Session implements it.
+type Lifecycle interface {
 	// SetIdle marks the holder idle in the lease metadata, so another
 	// process that finds the device held can see it may be borrowed.
 	SetIdle() error
@@ -38,19 +54,26 @@ type Held interface {
 	// LostErr reports why the session was lost, and is nil until Lost
 	// is closed.
 	LostErr() error
-	Close() error
 }
 
-// Opener acquires the device again after a release. It returns the
-// device's own coded error when another process holds it, so the
-// inspector reports that code unchanged.
-type Opener func(ctx context.Context) (Held, error)
+// Ending is implemented by a target that follows another process. Done
+// is closed when that process is gone.
+type Ending interface {
+	Done() <-chan struct{}
+}
+
+// Opener acquires the device again after a release, or attaches to the
+// process that now holds it. It returns the device's own coded error
+// when the device cannot be reached or held, so the inspector reports
+// that code unchanged.
+type Opener func(ctx context.Context) (Target, error)
 
 // HostConfig assembles a Host.
 type HostConfig struct {
-	// Held is the device the inspector already holds.
-	Held Held
-	// Open re-acquires the device on reconnect.
+	// Target is the device view the inspector starts with.
+	Target Target
+	// Open re-acquires the device, or attaches to its holder, on
+	// reconnect.
 	Open Opener
 	// Clock times the idle release.
 	Clock clock.Clock
@@ -61,11 +84,16 @@ type HostConfig struct {
 	Logger logging.Logger
 }
 
-// Host owns the device lifecycle of one inspector: it releases the
-// device after an idle timeout and re-acquires it on request. It is
-// itself a session.Controller that forwards to the device it holds at
-// that moment, so route groups built over a Host never capture a
-// controller that a release or a reconnect has replaced.
+// Host owns the device lifecycle of one inspector. It is itself a Source
+// and a session.StepSource that forwards to the target it serves at that
+// moment, so route groups built over a Host never capture a view that a
+// release or a reconnect has replaced.
+//
+// When the target holds the device lease, the host releases the device
+// after an idle timeout and counts a fresh capture as driving the
+// device. A target that follows another process has no lease, so the
+// host never releases it and only drops it once that process is gone,
+// after which the host answers as released.
 //
 // A held device that reports itself lost is closed and dropped the same
 // way an idle release drops it, and the host then answers as lost. A
@@ -88,11 +116,13 @@ type Host struct {
 	// taken before mu.
 	opMu sync.Mutex
 
-	mu        sync.Mutex
-	current   Held
-	driving   int
-	last      session.Info
-	lost      bool
+	mu      sync.Mutex
+	current Target
+	driving int
+	last    session.Info
+	// gone is why no target is served: ErrReleased, ErrLost or
+	// ErrHolderExited. It is nil while a target is served.
+	gone      error
 	touchedMs int64
 	stopWatch context.CancelFunc
 	// generation counts the devices the host has adopted, starting at 1.
@@ -102,13 +132,16 @@ type Host struct {
 	generation uint64
 }
 
-var _ session.Controller = (*Host)(nil)
+var (
+	_ Source             = (*Host)(nil)
+	_ session.StepSource = (*Host)(nil)
+)
 
-// NewHost starts the idle timer over cfg.Held. It fails when a field
-// the host cannot work without is missing.
+// NewHost starts serving cfg.Target. It fails when a field the host
+// cannot work without is missing.
 func NewHost(cfg HostConfig) (*Host, error) {
-	if cfg.Held == nil || cfg.Open == nil || cfg.Clock == nil || cfg.Logger == nil {
-		return nil, errors.New("inspector: a host needs a held device, an opener, a clock and a logger")
+	if cfg.Target == nil || cfg.Open == nil || cfg.Clock == nil || cfg.Logger == nil {
+		return nil, errors.New("inspector: a host needs a target, an opener, a clock and a logger")
 	}
 	idle := cfg.IdleMs
 	if idle <= 0 {
@@ -116,61 +149,69 @@ func NewHost(cfg HostConfig) (*Host, error) {
 	}
 	h := &Host{open: cfg.Open, clk: cfg.Clock, idleMs: idle, logger: cfg.Logger}
 	h.mu.Lock()
-	h.adoptLocked(cfg.Held)
+	h.adoptLocked(cfg.Target)
 	h.mu.Unlock()
-	h.markIdle(cfg.Held)
+	h.markIdle(cfg.Target)
 	return h, nil
 }
 
-// adoptLocked makes held the current device and starts its idle timer
-// and its lost watcher.
-func (h *Host) adoptLocked(held Held) {
-	h.current = held
+// adoptLocked makes t the current target. For a target that holds the
+// lease it starts the idle timer and the lost watcher, and for one that
+// follows another process it starts the watcher of that process.
+func (h *Host) adoptLocked(t Target) {
+	h.current = t
 	h.driving = 0
-	h.lost = false
+	h.gone = nil
 	h.generation++
-	h.last = held.Info()
+	h.last = t.Info()
 	h.touchedMs = h.clk.NowMs()
 	ctx, cancel := context.WithCancel(context.Background())
 	h.stopWatch = cancel
-	go h.idleLoop(ctx, held)
-	go h.lostLoop(ctx, held)
+	switch v := t.(type) {
+	case Lifecycle:
+		go h.idleLoop(ctx, t)
+		go h.endLoop(ctx, t, v.Lost(), ErrLost)
+	case Ending:
+		go h.endLoop(ctx, t, v.Done(), ErrHolderExited)
+	}
 }
 
-// dropLocked forgets the current device after it was released or lost,
-// and stops the loops that watch it. The caller closes the device.
-func (h *Host) dropLocked(lost bool) {
+// dropLocked forgets the current target for the reason gone, and stops
+// the loops that watch it. The caller closes the target.
+func (h *Host) dropLocked(gone error) {
 	h.last = h.current.Info()
 	h.current = nil
 	h.driving = 0
-	h.lost = lost
+	h.gone = gone
 	h.stopWatch()
 }
 
-// lostLoop drops the device and closes it when it reports that it lost
-// the device. It ends when the device is replaced or released first.
-func (h *Host) lostLoop(ctx context.Context, held Held) {
+// endLoop drops the target and closes it when ended is closed, with gone
+// as the reason. It ends when the target is replaced or released first.
+func (h *Host) endLoop(ctx context.Context, t Target, ended <-chan struct{}, gone error) {
 	select {
 	case <-ctx.Done():
 		return
-	case <-held.Lost():
+	case <-ended:
 	}
 	h.opMu.Lock()
 	defer h.opMu.Unlock()
 	h.mu.Lock()
-	if h.current != held {
+	if h.current != t {
 		h.mu.Unlock()
 		return
 	}
-	h.dropLocked(true)
+	h.dropLocked(gone)
 	h.mu.Unlock()
 	fields := logging.LogContext{}
-	if err := held.LostErr(); err != nil {
-		fields["error"] = err.Error()
+	if lc, ok := t.(Lifecycle); ok {
+		if err := lc.LostErr(); err != nil {
+			fields["error"] = err.Error()
+		}
 	}
-	h.logger.Warn("inspector.device.lost", fields)
-	if err := held.Close(); err != nil {
-		h.logger.Warn("inspector.lost.close_failed", logging.LogContext{"error": err.Error()})
+	h.logger.Warn("inspector.target.ended", fields)
+	if err := t.Close(); err != nil {
+		h.logger.Warn("inspector.ended.close_failed", logging.LogContext{"error": err.Error()})
 	}
 }
 
@@ -179,7 +220,7 @@ func (h *Host) lostLoop(ctx context.Context, held Held) {
 // wakes, finds the device was used meanwhile, and sleeps the rest. An
 // action that is driving the device never lets it be released, and its
 // end counts as activity.
-func (h *Host) idleLoop(ctx context.Context, held Held) {
+func (h *Host) idleLoop(ctx context.Context, held Target) {
 	wait := h.idleMs
 	for {
 		if h.clk.Sleep(ctx, wait) != nil {
@@ -204,7 +245,7 @@ func (h *Host) idleLoop(ctx context.Context, held Held) {
 			wait = remaining
 			continue
 		}
-		h.dropLocked(false)
+		h.dropLocked(ErrReleased)
 		h.mu.Unlock()
 		err := held.Close()
 		h.opMu.Unlock()
@@ -218,8 +259,12 @@ func (h *Host) idleLoop(ctx context.Context, held Held) {
 
 // markIdle records the holder as idle. A failure only costs the
 // metadata, never the operator's action, so it is logged and dropped.
-func (h *Host) markIdle(held Held) {
-	if err := held.SetIdle(); err != nil {
+func (h *Host) markIdle(t Target) {
+	lc, ok := t.(Lifecycle)
+	if !ok {
+		return
+	}
+	if err := lc.SetIdle(); err != nil {
 		h.logger.Warn("inspector.holder.mark_idle_failed", logging.LogContext{"error": err.Error()})
 	}
 }
@@ -230,8 +275,10 @@ func (h *Host) markIdle(held Held) {
 // when held is no longer the current device, so an action never counts
 // against a device that was released, lost or replaced. The holder
 // returns to idle when the last in-flight action ends, and the end of
-// an action that began on an earlier device changes nothing.
-func (h *Host) beginDriving(held Held) (func(), error) {
+// an action that began on an earlier device changes nothing. A target
+// without a lifecycle has no holder state to record, so the action only
+// counts as activity.
+func (h *Host) beginDriving(held Target) (func(), error) {
 	h.mu.Lock()
 	if h.current != held {
 		err := h.unavailableLocked()
@@ -241,8 +288,9 @@ func (h *Host) beginDriving(held Held) (func(), error) {
 	h.driving++
 	first := h.driving == 1
 	h.mu.Unlock()
-	if first {
-		if err := held.SetRunning(""); err != nil {
+	lc, tracked := held.(Lifecycle)
+	if first && tracked {
+		if err := lc.SetRunning(""); err != nil {
 			h.logger.Warn("inspector.holder.mark_running_failed", logging.LogContext{"error": err.Error()})
 		}
 	}
@@ -255,7 +303,7 @@ func (h *Host) beginDriving(held Held) (func(), error) {
 			last = h.driving == 0
 		}
 		h.mu.Unlock()
-		if last {
+		if last && tracked {
 			h.markIdle(held)
 		}
 	}, nil
@@ -263,10 +311,10 @@ func (h *Host) beginDriving(held Held) (func(), error) {
 
 // unavailableLocked is the error for a device the host does not hold.
 func (h *Host) unavailableLocked() error {
-	if h.lost {
-		return ErrLost
+	if h.gone == nil {
+		return ErrReleased
 	}
-	return ErrReleased
+	return h.gone
 }
 
 func (h *Host) unavailable() error {
@@ -283,7 +331,7 @@ func (h *Host) touch() {
 	}
 }
 
-func (h *Host) held() (Held, bool) {
+func (h *Host) held() (Target, bool) {
 	held, _, ok := h.heldGeneration()
 	return held, ok
 }
@@ -291,7 +339,7 @@ func (h *Host) held() (Held, bool) {
 // heldGeneration returns the current device with the generation it was
 // adopted in, read together so a swap between the two reads cannot pair
 // a device with the next device's generation.
-func (h *Host) heldGeneration() (Held, uint64, bool) {
+func (h *Host) heldGeneration() (Target, uint64, bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return h.current, h.generation, h.current != nil
@@ -310,19 +358,10 @@ func (h *Host) Info() session.Info {
 	info := h.last
 	info.Generation = h.generation
 	info.State = session.StateReleased
-	if h.lost {
+	if errors.Is(h.gone, ErrLost) {
 		info.State = session.StateLost
 	}
 	return info
-}
-
-// Gate reports the activity gate of the held device, or nil while the
-// host holds none.
-func (h *Host) Gate() *session.ActivityGate {
-	if held, ok := h.held(); ok {
-		return held.Gate()
-	}
-	return nil
 }
 
 // Latest reads the held device's newest capture stamped with the host's
@@ -336,8 +375,8 @@ func (h *Host) Latest() session.Snapshot {
 	return session.Snapshot{}
 }
 
-// Subscribe follows the held device, and fails with ErrReleased or
-// ErrLost while the host holds none.
+// Subscribe follows the served device, and fails with the reason the
+// host serves none while it serves none.
 func (h *Host) Subscribe(ctx context.Context) (<-chan session.Observation, error) {
 	held, ok := h.held()
 	if !ok {
@@ -346,8 +385,36 @@ func (h *Host) Subscribe(ctx context.Context) (<-chan session.Observation, error
 	return held.Subscribe(ctx)
 }
 
-// FreshTree captures from the held device, and fails with ErrReleased
-// or ErrLost while the host holds none.
+// StepsSince returns the step lines the served target holds after line
+// sinceSeq of run runID. It returns no lines while the target does not
+// follow step lines, and fails with the reason the host serves none
+// while it serves none.
+func (h *Host) StepsSince(runID string, sinceSeq int64) ([]runfolder.StepLine, bool, error) {
+	held, ok := h.held()
+	if !ok {
+		return nil, false, h.unavailable()
+	}
+	if steps, ok := held.(session.StepSource); ok {
+		return steps.StepsSince(runID, sinceSeq)
+	}
+	return nil, false, nil
+}
+
+// SubscribeSince follows the served target and its step lines. A target
+// that does not follow step lines is followed with Subscribe.
+func (h *Host) SubscribeSince(ctx context.Context, runID string, sinceSeq int64) (<-chan session.Observation, error) {
+	held, ok := h.held()
+	if !ok {
+		return nil, h.unavailable()
+	}
+	if steps, ok := held.(session.StepSource); ok {
+		return steps.SubscribeSince(ctx, runID, sinceSeq)
+	}
+	return held.Subscribe(ctx)
+}
+
+// FreshTree captures from the served device, and fails with the reason
+// the host serves none while it serves none.
 func (h *Host) FreshTree(ctx context.Context) (session.Snapshot, error) {
 	held, generation, ok := h.heldGeneration()
 	if !ok {
@@ -398,7 +465,7 @@ func (h *Host) Close() error {
 	h.mu.Lock()
 	held := h.current
 	if held != nil {
-		h.dropLocked(false)
+		h.dropLocked(ErrReleased)
 	}
 	h.mu.Unlock()
 	if held == nil {
@@ -412,7 +479,7 @@ func (h *Host) Close() error {
 // counts as activity, and every route except the session info answers
 // a coded 410 while the device is released or lost.
 func (h *Host) Routes(groups ...RouteGroup) RouteGroup {
-	return func(c session.Controller) []Route {
+	return func(c Source) []Route {
 		var out []Route
 		for _, g := range groups {
 			for _, r := range g(c) {

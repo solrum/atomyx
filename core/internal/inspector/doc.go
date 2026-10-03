@@ -2,10 +2,10 @@
 // loopback HTTP server that shows what the holder has captured and,
 // for the operator, asks the holder for more.
 //
-// The server reaches the device only through a session.Controller, the
-// read and fresh-capture port of a session. It never takes the built
-// driver or the Orchestra, so every device operation it triggers goes
-// through the session's activity gate.
+// The server reaches the device only through a Source, the read and
+// fresh-capture port of a device view. It never takes the built driver
+// or the Orchestra, so every device operation it triggers is the
+// holder's own guarded capture.
 //
 // Trust boundary. The listener binds 127.0.0.1 with a system-chosen
 // port and nothing else. Every request must name that listener in its

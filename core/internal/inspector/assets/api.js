@@ -7,8 +7,8 @@ export function setToken(value) {
 }
 
 // Codes of a device the inspector does not hold: given up after sitting
-// idle, or lost. The operator brings it back with the reconnect control.
-export const DEVICE_UNAVAILABLE_CODES = new Set(['DEVICE_RELEASED', 'DEVICE_LOST']);
+// idle, lost, or a holder that exited. The operator brings it back with the reconnect control.
+export const DEVICE_UNAVAILABLE_CODES = new Set(['DEVICE_RELEASED', 'DEVICE_LOST', 'HOLDER_EXITED']);
 
 export class ApiError extends Error {
   constructor(status, info) {

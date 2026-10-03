@@ -27,8 +27,6 @@ func (fakeController) FreshTree(context.Context) (session.Snapshot, error) {
 	return session.Snapshot{}, errors.New("not used")
 }
 
-func (fakeController) Gate() *session.ActivityGate { return nil }
-
 type counterReader struct{ next byte }
 
 func (c *counterReader) Read(p []byte) (int, error) {
@@ -81,7 +79,7 @@ func okHandler(body string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, body) })
 }
 
-func testRoutes(session.Controller) []Route {
+func testRoutes(Source) []Route {
 	return []Route{
 		{Method: http.MethodGet, Path: "/", Handler: okHandler("page")},
 		{Method: http.MethodGet, Path: "/api/v1/tree", Handler: okHandler("tree")},
@@ -93,7 +91,7 @@ func testRoutes(session.Controller) []Route {
 func newTestServer(t *testing.T, groups ...RouteGroup) (*Server, recordingLogger) {
 	t.Helper()
 	logger := newRecordingLogger()
-	srv, err := New(Config{Controller: fakeController{}, Logger: logger, Entropy: &counterReader{}, Groups: groups})
+	srv, err := New(Config{Source: fakeController{}, Logger: logger, Entropy: &counterReader{}, Groups: groups})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +182,7 @@ func TestNew_RejectsAMissingControllerOrLogger(t *testing.T) {
 	if _, err := New(Config{Logger: newRecordingLogger()}); err == nil {
 		t.Fatal("New without a controller succeeded")
 	}
-	if _, err := New(Config{Controller: fakeController{}}); err == nil {
+	if _, err := New(Config{Source: fakeController{}}); err == nil {
 		t.Fatal("New without a logger succeeded")
 	}
 }
@@ -365,7 +363,7 @@ func TestBootstrap_AFreshCodeReplacesAnUnusedOneAndKeepsIssuedTokens(t *testing.
 }
 
 func TestBootstrap_AnEntropyFailureIsReportedAndIssuesNothing(t *testing.T) {
-	srv, err := New(Config{Controller: fakeController{}, Logger: newRecordingLogger(), Entropy: failingReader{}})
+	srv, err := New(Config{Source: fakeController{}, Logger: newRecordingLogger(), Entropy: failingReader{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -435,18 +433,18 @@ func TestResponses_CarryNoStoreAndTheCSPAndNoCORSHeaders(t *testing.T) {
 }
 
 func TestRoutes_GroupsReceiveTheControllerAndRegisterWithoutEditingTheServer(t *testing.T) {
-	var got session.Controller
-	group := func(c session.Controller) []Route {
+	var got Source
+	group := func(c Source) []Route {
 		got = c
 		return []Route{{Method: http.MethodGet, Path: "/api/v1/extra", Handler: okHandler("extra")}}
 	}
 	ctrl := fakeController{}
-	srv, err := New(Config{Controller: ctrl, Logger: newRecordingLogger(), Entropy: &counterReader{}, Groups: []RouteGroup{group, testRoutes}})
+	srv, err := New(Config{Source: ctrl, Logger: newRecordingLogger(), Entropy: &counterReader{}, Groups: []RouteGroup{group, testRoutes}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = srv.Close() })
-	if got != session.Controller(ctrl) {
+	if got != Source(ctrl) {
 		t.Fatal("the group did not receive the configured controller")
 	}
 	token := authorize(t, srv)
@@ -466,7 +464,7 @@ func TestRoutes_InvalidAndDuplicateRoutesAreRejected(t *testing.T) {
 	}
 	for name, routes := range bad {
 		routes := routes
-		srv, err := New(Config{Controller: fakeController{}, Logger: newRecordingLogger(), Groups: []RouteGroup{func(session.Controller) []Route { return routes }}})
+		srv, err := New(Config{Source: fakeController{}, Logger: newRecordingLogger(), Groups: []RouteGroup{func(Source) []Route { return routes }}})
 		if err == nil {
 			_ = srv.Close()
 			t.Errorf("%s: New succeeded", name)
