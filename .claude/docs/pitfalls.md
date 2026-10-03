@@ -181,10 +181,23 @@ corresponding area. For the high-level map see
 
 - **Reap a recorded runner only after the lease is held.** The
   provisioner reaps while it launches, which runs after `session.Open`
-  took the lease. A held lease proves no other session drives the device. A free lease does not prove
-  the record's owner is gone, because a runner outlives the session that
-  used it. Reaping before the lease, or without it, can signal the runner
-  of a live holder.
+  took the lease. A held lease proves no other session drives the
+  device. A free lease does not prove the record's owner is gone,
+  because a runner outlives the session that used it. Reaping before the
+  lease, or without it, can signal the runner of a live holder.
+- **Adopt a recorded runner only when every condition holds.** The
+  record must name this device, its owner must be this process or gone,
+  the recorded `xcodebuild` process must still be the recorded one, the
+  runner must answer with the recorded launch id, and the record's build
+  product must match the product on disk. Dropping the build check
+  adopts a runner that runs old Swift code. Dropping the identity check
+  adopts whatever now answers on a recycled port. Only one runner fits
+  per simulator, so an adopted runner that fails the post-connect probe
+  is ended before a fresh one is launched.
+- **An adopted runner has no child process.** Its loss is found by
+  polling the recorded pid and start time, so a change to that watcher
+  must keep comparing the start time, because a recycled pid is a
+  different process.
 - **Never signal a recorded process group without proving it is the
   recorded process.** The pid, start time, user, command (`xcodebuild`
   for the runner, `iproxy` for the tunnel of a physical device) and

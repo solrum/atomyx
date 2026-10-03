@@ -298,6 +298,51 @@ itself into the record as owner.
   another owner for the same runner id. It stops no tunnel, removes no
   record, and reports no loss.
 
+#### Runner adoption
+
+A simulator runner left running by an earlier holder is reused instead of
+relaunched. `device.DriverProvisioner.ProvisionIOSAgent` decides, under
+the device lease and before it reaps. It adopts the
+recorded runner only when all of these hold:
+
+- The record names this device and a simulator runner, and carries a
+  launch id and a port.
+- The recorded owner is this process, or is no longer alive. An owner
+  whose pid now belongs to a process that started later counts as gone.
+- The reaper's checks pass: the host has not rebooted since the record
+  was written, and the recorded pid is still the live `xcodebuild`
+  process that was recorded.
+- The runner answers `ping` on the recorded `hostPort` with the recorded
+  launch id (`iosdriver.CheckRunnerIdentity`).
+- The record's build product identity matches the current build. The
+  record carries `buildProductPath` and `buildProductModTime`, which
+  `XctestLauncher.CurrentBuildProduct` reproduces from the compiled
+  runner app. A product that is missing or older than a Swift source or
+  the project file matches nothing.
+
+When any condition fails, the provisioner logs the reason, ends the
+recorded runner through the reaper, and launches a new one. A physical
+device runner is never adopted.
+
+An adopting process:
+
+- writes itself into the record as owner, and registers the runner with
+  its `RunnerKeeper`, so the keeper stops it when the process exits
+- passes the recorded port and launch id to the driver
+- watches the runner's `xcodebuild` pid and start time every
+  `adoptedRunnerWatchPeriod` (2 s), because an adopted runner has no
+  child process whose exit could be awaited. A process that is gone, or
+  whose pid now belongs to a different process, ends the runner through
+  the reaper and reports a loss like a launched runner that exited.
+  A record that names another owner is left alone.
+
+`DriverFactory.Build` proves an adopted runner after `Connect` with one
+`Hierarchy` call bounded by `adoptedRunnerProbeTimeout` (10 s). A
+runner that fails to connect or to answer is ended, and the build
+repeats once with `ProvisionOptions{Fresh: true}`, which skips adoption
+and launches a new runner. A runner launched by the same call is not
+probed.
+
 #### Runner record
 
 `<runtime dir>/<key>.ios-runner.json` is written at launch and removed by
@@ -318,6 +363,8 @@ itself into the record as owner.
 | `tunnelStartTime` | Start time of the tunnel process, read from the kernel, in UTC |
 | `ownerPid` | Process id of the process that answers for the runner and stops it on exit |
 | `ownerStartTime` | Start time of the owner process, read from the kernel, in UTC |
+| `buildProductPath` | Path of the compiled runner app the runner was started from |
+| `buildProductModTime` | Modification time of that app when the runner started, in UTC |
 
 `kill` removes the file only while it still names its own `runnerId` and
 owner. A record that survives while its owner is alive belongs to a
@@ -330,10 +377,12 @@ name an unrelated process, so a reader trusts it only when
 
 `device.DriverProvisioner` reads the record before it launches a runner,
 and it runs only under the device lease that `session.Open` holds,
-because a held lease proves no other session drives the device. A
-provisioner built with `FixedIosPort` writes no record and reaps nothing.
-The reaper reads no owner field, so it ends a recorded runner even when
-its owner is alive and idle. `device.RunnerReaper` ends the orphan. It reads the process through
+because a held lease proves no other session drives the device. It
+first tries to adopt the recorded runner (see Runner adoption), and
+reaps only when adoption fails. A provisioner built with `FixedIosPort`
+writes no record and reaps nothing. The reaper reads no owner field, so
+it ends a recorded runner even when its owner is alive and idle.
+`device.RunnerReaper` ends the orphan. It reads the process through
 `process.Inspector`, which asks the kernel for the pid's start time,
 user, command name and process group, and it signals the recorded group
 only when all of these hold:
@@ -444,9 +493,10 @@ path and reports a `device.ProcessExitError` naming which process
 ended. The driver factory hands it to `session.Session` through
 `device.Built.Lost`, and the session moves to lost with a cause that
 wraps `session.ErrDeviceLost`. A runner whose record names another
-process as owner is not reported, and its tunnel and record stay. This
-costs no polling, because it reads
-the exit verdict `process.BackgroundProcess.Wait` already returns. A
+process as owner is not reported, and its tunnel and record stay. For a
+launched runner this costs no polling, because it reads the exit verdict
+`process.BackgroundProcess.Wait` already returns. An adopted runner has
+no child process, so its `xcodebuild` pid is polled instead. A
 runner that dies without its process exiting, or a cable pull that
 leaves both processes alive, is not signaled, and surfaces as a failed
 step that the liveness probe classifies as `RunAbortDeviceLost`.
