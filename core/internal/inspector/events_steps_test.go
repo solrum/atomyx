@@ -35,10 +35,21 @@ func TestHostOverAViewer_StepLinesReachTheEventsFeed(t *testing.T) {
 	}
 }
 
+// eventView decodes any line of the feed, a step line or a state line.
+type eventView struct {
+	stepEventLine
+	State string `json:"state"`
+}
+
 // readStepEvents serves the events feed of v until its feed closes and
-// returns every line, decoded as a step event, so a line of another kind
+// returns every line, decoded as an eventView, so a line of another kind
 // shows through its Kind.
-func readStepEvents(t *testing.T, v *fakeViewer) []stepEventLine {
+func readStepEvents(t *testing.T, v *fakeViewer) []eventView {
+	t.Helper()
+	return readStepEventsAt(t, v, routeEvents)
+}
+
+func readStepEventsAt(t *testing.T, v *fakeViewer, target string) []eventView {
 	t.Helper()
 	srv, err := New(Config{Source: v, Logger: newRecordingLogger(), Entropy: &counterReader{}, Groups: []RouteGroup{ReadRoutes}})
 	if err != nil {
@@ -46,16 +57,16 @@ func readStepEvents(t *testing.T, v *fakeViewer) []stepEventLine {
 	}
 	t.Cleanup(func() { _ = srv.Close() })
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, routeEvents, nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, target, nil)
 	req.Host = srv.hostPort()
 	req.Header.Set(tokenHeader, authorize(t, srv))
 
 	srv.Handler().ServeHTTP(rec, req)
 
-	var got []stepEventLine
+	var got []eventView
 	sc := bufio.NewScanner(strings.NewReader(rec.Body.String()))
 	for sc.Scan() {
-		var l stepEventLine
+		var l eventView
 		if err := json.Unmarshal(sc.Bytes(), &l); err != nil {
 			t.Fatalf("line %q: %v", sc.Text(), err)
 		}
@@ -102,5 +113,50 @@ func TestHostOverAViewer_AStartedLineCarriesNoOutcome(t *testing.T) {
 	}
 	if got[1].Ok == nil || *got[1].Ok {
 		t.Errorf("completed failing line ok = %v, want a present false", got[1].Ok)
+	}
+}
+
+func TestHostOverAViewer_AHolderStateTransitionIsRelayedAsAStateEvent(t *testing.T) {
+	v := newFakeViewer()
+	v.feed <- session.Observation{Kind: session.ObservedState, State: session.StateRunning, Command: "tap", RunID: "run-1", Stable: true}
+	close(v.feed)
+
+	got := readStateEvents(t, v)
+
+	want := stateEventLine{Kind: "state", State: "running", Command: "tap", RunID: "run-1"}
+	if len(got) != 1 || got[0] != want {
+		t.Fatalf("events = %+v, want [%+v]", got, want)
+	}
+}
+
+func readStateEvents(t *testing.T, v *fakeViewer) []stateEventLine {
+	t.Helper()
+	var out []stateEventLine
+	for _, l := range readStepEvents(t, v) {
+		out = append(out, stateEventLine{Kind: l.Kind, State: l.State, Command: l.Command, RunID: l.RunID})
+	}
+	return out
+}
+
+func TestHostOverAViewer_AReconnectingClientResumesAfterItsLastStepLine(t *testing.T) {
+	v := newFakeViewer()
+	close(v.feed)
+
+	readStepEventsAt(t, v, routeEvents+"?runId=run-1&seq=7")
+
+	if len(v.resumes) != 1 || v.resumes[0] != (resume{runID: "run-1", seq: 7}) {
+		t.Fatalf("subscribe calls = %+v, want one resume after run-1 line 7", v.resumes)
+	}
+}
+
+func TestHostOverAViewer_ARefusedResumeFallsBackToTheFirstHeldLine(t *testing.T) {
+	v := newFakeViewer()
+	v.rejectResume = true
+	close(v.feed)
+
+	readStepEventsAt(t, v, routeEvents+"?runId=run-1&seq=99")
+
+	if len(v.resumes) != 2 || v.resumes[1] != (resume{}) {
+		t.Fatalf("subscribe calls = %+v, want the refused resume then one from the start", v.resumes)
 	}
 }

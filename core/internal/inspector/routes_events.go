@@ -3,12 +3,17 @@ package inspector
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/session"
 )
 
-const eventStreamContentType = "application/x-ndjson"
+const (
+	eventStreamContentType = "application/x-ndjson"
+	queryRunID             = "runId"
+	querySeq               = "seq"
+)
 
 // Event kinds of the capture feed. The two terminal kinds are the last
 // line of a stream that ends because the session said so.
@@ -18,6 +23,7 @@ const (
 	eventScreenSize = "screen_size"
 	eventDropped    = "dropped"
 	eventClosed     = "closed"
+	eventState      = "state"
 	eventStep       = "step"
 	eventStepGap    = "step_gap"
 	eventUnknown    = "unknown"
@@ -31,6 +37,17 @@ type eventLine struct {
 	Epoch    uint64 `json:"epoch"`
 	Revision uint64 `json:"revision"`
 	Stable   bool   `json:"stable"`
+}
+
+// stateEventLine announces a holder state transition with the new state,
+// so a page shows it without asking for the session again. Command and
+// RunID name the call and run the holder is in, and are empty when it is
+// in none.
+type stateEventLine struct {
+	Kind    string `json:"kind"`
+	State   string `json:"state"`
+	Command string `json:"command,omitempty"`
+	RunID   string `json:"runId,omitempty"`
 }
 
 // stepEventLine is one step line of a run the holder drives. It carries
@@ -74,14 +91,22 @@ func eventKind(k session.ObservationKind) string {
 // reports are sent as a final line first. When the viewer also follows
 // step lines, each line of a run is sent as a step event in order, and a
 // step_gap event reports that lines were lost. The handler never calls
-// the device.
+// the device. A client that reconnects passes the run id and sequence
+// number of the last step line it read as the runId and seq query
+// values, and the stream then sends only the lines after it. A state
+// transition of the holder is sent as a state event.
 func eventsHandler(c session.Viewer) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		steps, followsSteps := c.(session.StepSource)
 		var feed <-chan session.Observation
 		var err error
+		cursor := resumeCursor(r)
 		if followsSteps {
-			feed, err = steps.SubscribeSince(r.Context(), "", 0)
+			feed, err = steps.SubscribeSince(r.Context(), cursor.runID, cursor.seq)
+			if err != nil && cursor.runID != "" {
+				cursor = stepCursor{}
+				feed, err = steps.SubscribeSince(r.Context(), "", 0)
+			}
 		} else {
 			feed, err = c.Subscribe(r.Context())
 		}
@@ -97,7 +122,6 @@ func eventsHandler(c session.Viewer) http.Handler {
 			return
 		}
 		enc := json.NewEncoder(w)
-		var cursor stepCursor
 		for {
 			select {
 			case <-r.Context().Done():
@@ -107,6 +131,10 @@ func eventsHandler(c session.Viewer) http.Handler {
 					return
 				}
 				if obs.Kind == session.ObservedState {
+					line := stateEventLine{Kind: eventState, State: string(obs.State), Command: obs.Command, RunID: obs.RunID}
+					if enc.Encode(line) != nil || flusher.Flush() != nil {
+						return
+					}
 					continue
 				}
 				if followsSteps && (obs.Kind == session.ObservedStep || obs.Kind == session.ObservedStepGap) {
@@ -122,6 +150,18 @@ func eventsHandler(c session.Viewer) http.Handler {
 			}
 		}
 	})
+}
+
+// resumeCursor reads the step cursor a reconnecting client sent. A
+// missing or malformed pair starts from the first held line.
+func resumeCursor(r *http.Request) stepCursor {
+	q := r.URL.Query()
+	runID := q.Get(queryRunID)
+	seq, err := strconv.ParseInt(q.Get(querySeq), 10, 64)
+	if runID == "" || err != nil || seq < 0 {
+		return stepCursor{}
+	}
+	return stepCursor{runID: runID, seq: seq}
 }
 
 // stepCursor remembers the last step line a stream sent, so the next

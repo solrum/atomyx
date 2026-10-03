@@ -26,6 +26,15 @@ type fakeViewer struct {
 	done      chan struct{}
 	closed    chan struct{}
 	closeOnce sync.Once
+	// resumes records the arguments of every SubscribeSince call, and
+	// rejectResume makes a call with a run id fail.
+	resumes      []resume
+	rejectResume bool
+}
+
+type resume struct {
+	runID string
+	seq   int64
 }
 
 func newFakeViewer() *fakeViewer {
@@ -44,7 +53,13 @@ func (v *fakeViewer) Subscribe(context.Context) (<-chan session.Observation, err
 	return v.feed, nil
 }
 
-func (v *fakeViewer) SubscribeSince(context.Context, string, int64) (<-chan session.Observation, error) {
+func (v *fakeViewer) SubscribeSince(_ context.Context, runID string, since int64) (<-chan session.Observation, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.resumes = append(v.resumes, resume{runID: runID, seq: since})
+	if v.rejectResume && runID != "" {
+		return nil, diag.New(diag.CodeInvalidArgument, "the sequence number is beyond the newest line", "", nil)
+	}
 	return v.feed, nil
 }
 
