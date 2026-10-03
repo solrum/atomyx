@@ -63,7 +63,7 @@ atomyx/
 | `core/cmd/gen-run-schema` | `gen-run-schema` | Regenerates the checked-in JSON Schema for the run folder `meta.json` from `core/internal/runfolder`'s Go types. |
 | `core/cmd/gen-script-schema` | `gen-script-schema` | Regenerates the checked-in JSON Schema for the script definition type from `core/internal/script`'s Go types. |
 | `core/cmd/internal/browseropen` | none | Opens a URL in the platform's default browser through the platform's own opener command, the real browser opener `atomyx inspect` is given. |
-| `core/cmd/internal/runnerprovision` | none | Builds the iOS runner provisioner that `atomyx` and `atomyx-mcp` wire into their driver factory, including where runner records live. |
+| `core/cmd/internal/runnerprovision` | none | Builds the iOS runner provisioner that `atomyx` and `atomyx-mcp` wire into their driver factory, including where runner records live, and the runner keeper whose cleanup stops the runners the process owns when it exits. |
 | `core/cmd/internal/sessionwire` | none | Builds the lease manager, identity resolver, orphaned runner reaper and session timeouts that `atomyx` and `atomyx-mcp` hand to `session.Open`, so both arbitrate devices the same way. |
 
 ## `core/internal/`: one package per concern

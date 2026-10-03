@@ -179,10 +179,11 @@ corresponding area. For the high-level map see
 
 ## Session ownership
 
-- **Reap an orphaned runner only after the lease is held.** A free lease
-  is the proof that the process that wrote the runner record is gone.
-  Reaping before the lease, or without it, can signal the runner of a
-  live holder.
+- **Reap a recorded runner only after the lease is held.** A held lease
+  proves no other session drives the device. A free lease does not prove
+  the record's owner is gone, because a runner outlives the session that
+  used it. Reaping before the lease, or without it, can signal the runner
+  of a live holder.
 - **Never signal a recorded process group without proving it is the
   recorded process.** The pid, start time, user, command (`xcodebuild`
   for the runner, `iproxy` for the tunnel of a physical device) and
@@ -702,11 +703,18 @@ first.
   lock is held. Each target then runs `test-without-building -xctestrun`
   from its own `build/run-<udid>` derived data path. A second build or a
   second runner writing into the same path corrupts the other's session.
-- **Attach the runner's `kill` to the driver's teardown, never to a
-  caller's own cleanup.** The provisioned driver stops its runner in
-  `Disconnect` through `Options.OnDisconnect`, so every path that
-  disconnects it also stops the runner. A new caller that builds a driver
-  and forgets `Disconnect` leaks an `xcodebuild` process group.
+- **A runner lives as long as its owning process, never as long as a
+  session.** `IosDriver.Disconnect` and `Session.Close` leave the runner
+  running. Every composition root that builds a `DriverProvisioner` without
+  `FixedIosPort` must pass it a `device.RunnerKeeper` and run the keeper's cleanup
+  (`runnerprovision.Cleanup`) on its normal exit path and in its stop
+  watchdog, or the process leaks an `xcodebuild` process group. A runner
+  stops at once only on a Connect failure, and through `Built.Release`
+  for a caller that owns the driver outright, such as the Studio sidecar.
+- **Never stop a tunnel or remove a record another process owns.** The
+  provisioner's loss hook, the record removal and `RunnerKeeper.StopAll`
+  all compare the record's `runnerId` and owner with their own, and leave
+  the runner alone when the owner differs.
 - **Long-lived child processes go through `BackgroundRunner`, never
   `Runner.Run`.** `iproxy` and the XCUITest runner
   (`xcodebuild test-without-building`) are started with

@@ -221,10 +221,9 @@ mode appears.
 
 For an iOS descriptor that has an id and no port of its own, `Build` calls
 `EnsureIOSAgent(ctx, udid, kind)`, which returns `(port, kill, err)`, and
-dials `port`. The returned `kill` is attached to the driver's
-`Options.OnDisconnect`, so every path that disconnects the driver also
-stops the runner: `run`, `suite`, `doctor`, and the MCP session. A
-provisioning failure is reported with `AGENT_UNREACHABLE`, carrying the
+dials `port`. The returned `kill` is not attached to the driver, so
+disconnecting the driver, and therefore closing a session, never stops
+the runner. See "Runner ownership" below. A provisioning failure is reported with `AGENT_UNREACHABLE`, carrying the
 launcher's own message, so a signing problem still names
 `ATOMYX_DEV_TEAM`.
 
@@ -242,6 +241,8 @@ Each launch does the following:
   launcher's `AfterSpawn` hook, before the ping wait, and stops it in
   `kill`.
 - Writes the runner record described below as soon as the process exists.
+- Hands the runner to the process's `device.RunnerKeeper` when the
+  provisioner was built with one.
 
 Build and run layout, both under `platforms/ios-agent/build`:
 
@@ -271,6 +272,32 @@ Build and run layout, both under `platforms/ios-agent/build`:
   `DriverProvisionerDeps`. The CLI and the MCP server write both lines to
   stderr as log records.
 
+#### Runner ownership
+
+A runner lives as long as the process that launched it, not as long as
+the session that first used it. The process that launches a runner writes
+itself into the record as owner.
+
+- Closing a session, whether a normal close or an idle release, ends the
+  driver's connection and leaves the runner running.
+- `device.RunnerKeeper` (`core/internal/device/runner_keeper.go`) holds
+  every runner its process launched. `atomyx` and `atomyx-mcp` build one
+  in `core/cmd/internal/runnerprovision` and run its `Cleanup` on both
+  exit paths: after the command or the server returns, and in the stop
+  watchdog that SIGINT and SIGTERM arm. Both are bounded by
+  `shutdown.GracePeriod`.
+- `RunnerKeeper.StopAll` stops each kept runner, its tunnel and its record
+  through the provisioner's single kill path, and skips a runner whose
+  record names another process as owner. It runs once, and a later call
+  waits for the first.
+- A Connect failure stops the runner at once, because no session ever
+  used it. `device.Built.Release` stops it for a caller that owns the
+  driver outright, and the Studio sidecar calls it after it disposes a
+  device.
+- The provisioner's loss hook leaves a runner alone when the record names
+  another owner for the same runner id. It stops no tunnel, removes no
+  record, and reports no loss.
+
 #### Runner record
 
 `<runtime dir>/<key>.ios-runner.json` is written at launch and removed by
@@ -289,17 +316,22 @@ Build and run layout, both under `platforms/ios-agent/build`:
 | `startedAt` | Time the record was written, in UTC |
 | `tunnelPid` | Process id of the `iproxy` tunnel of a physical device, absent for a simulator |
 | `tunnelStartTime` | Start time of the tunnel process, read from the kernel, in UTC |
+| `ownerPid` | Process id of the process that answers for the runner and stops it on exit |
+| `ownerStartTime` | Start time of the owner process, read from the kernel, in UTC |
 
-`kill` removes the file only while it still names its own `runnerId`. A
-record that survives means the launching process ended without stopping
-its runner. The same `pid` after a reboot or after the process ended can
+`kill` removes the file only while it still names its own `runnerId` and
+owner. A record that survives while its owner is alive belongs to a
+runner that outlived its session. A record whose owner is gone means the
+owner ended without its exit path. The same `pid` after a reboot or after the process ended can
 name an unrelated process, so a reader trusts it only when
 `processStartTime` and `hostBootTime` still match.
 
 #### Orphan reaping
 
 `session.Open` reads the record after it has acquired the device lease,
-because a free lease proves the process that wrote the record is gone.
+because a held lease proves no other session drives the device. The
+reaper reads no owner field, so it ends a recorded runner even when its
+owner is alive and idle.
 `device.RunnerReaper` then ends the orphan. It reads the process through
 `process.Inspector`, which asks the kernel for the pid's start time,
 user, command name and process group, and it signals the recorded group
