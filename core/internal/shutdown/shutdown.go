@@ -120,7 +120,11 @@ type StopHooks struct {
 	// the cancellation.
 	CloseInput func() error
 	// Cleanup releases every child process. It may be called while the
-	// graceful path is still running it, so it must be idempotent.
+	// graceful path is still running it, so it must be idempotent. When
+	// the watchdog bounds it by ForcedCleanupBudget and it has not
+	// finished, the process exits anyway, so a child it was still
+	// releasing, such as an iOS runner, may outlive the process. The next
+	// holder of that device adopts or reaps it.
 	Cleanup func()
 	// Exit ends the process with the given code.
 	Exit func(code int)

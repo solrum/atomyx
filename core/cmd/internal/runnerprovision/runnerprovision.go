@@ -47,15 +47,17 @@ func New(runner process.Runner, background process.BackgroundRunner, clock orche
 	return device.NewDriverProvisioner(deps), keeper
 }
 
-// Cleanup returns the exit cleanup of a process: it stops every runner
-// the keeper holds, then runs base when it is non-nil. The runners stop
-// first so a base that hangs cannot keep them alive. It is safe to call
-// more than once.
+// Cleanup returns the exit cleanup of a process: it runs base when it is
+// non-nil, then stops every runner the keeper holds. base runs first
+// because it releases the device leases the process's own sessions still
+// hold, and the keeper stops a runner only after it takes that device's
+// lease. A base that hangs therefore keeps the runners alive until the
+// next acquirer adopts or reaps them. It is safe to call more than once.
 func Cleanup(keeper *device.RunnerKeeper, base func()) func() {
 	return func() {
-		keeper.StopAll()
 		if base != nil {
 			base()
 		}
+		keeper.StopAll()
 	}
 }

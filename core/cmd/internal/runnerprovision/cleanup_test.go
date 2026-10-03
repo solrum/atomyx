@@ -66,13 +66,16 @@ func TestCleanup_InterruptStopsTheRunnerTheProcessOwns(t *testing.T) {
 	}
 }
 
-func TestCleanup_StopsTheRunnersBeforeTheBaseCleanup(t *testing.T) {
+func TestCleanup_StopsTheRunnersAfterTheBaseCleanup(t *testing.T) {
 	keeper, prov := keptRunner(t)
 	var stoppedBeforeBase int
 
 	runnerprovision.Cleanup(keeper, func() { stoppedBeforeBase = prov.IOSKillCount("SIM-1") })()
 
-	if stoppedBeforeBase != 1 {
-		t.Fatalf("runner stop count seen by the base cleanup = %d, want 1 so a hung base cannot keep a runner alive", stoppedBeforeBase)
+	if stoppedBeforeBase != 0 {
+		t.Fatalf("runner stop count seen by the base cleanup = %d, want 0 so the base releases the session lease first", stoppedBeforeBase)
+	}
+	if got := prov.IOSKillCount("SIM-1"); got != 1 {
+		t.Fatalf("runner stop count after the cleanup = %d, want 1", got)
 	}
 }
