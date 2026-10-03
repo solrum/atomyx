@@ -50,7 +50,10 @@ func newBorrowFixture(t *testing.T, yielder *closingYielder) *borrowFixture {
 	if yielder != nil {
 		req.Yielder = yielder
 	}
-	source, err := session.Open(context.Background(), socketDeps(t, &recordingFactory{events: &eventLog{}}, m), req)
+	owner := device.RunnerOwner{Pid: os.Getpid(), StartTime: time.Unix(1_700_000_000, 0).UTC()}
+	sourceDeps := socketDeps(t, &recordingFactory{events: &eventLog{}}, m)
+	sourceDeps.Owners = fixedOwners{owner: owner}
+	source, err := session.Open(context.Background(), sourceDeps, req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +66,6 @@ func newBorrowFixture(t *testing.T, yielder *closingYielder) *borrowFixture {
 	deps := socketDeps(t, factory, m)
 	deps.PID = borrowerPID
 	deps.Command = "atomyx run"
-	owner := device.RunnerOwner{Pid: os.Getpid(), StartTime: time.Unix(1_700_000_000, 0).UTC()}
 	deps.Owners = fixedOwners{owner: owner}
 	return &borrowFixture{manager: m, source: source, yielder: yielder, factory: factory, deps: deps, owner: owner}
 }
@@ -196,5 +198,64 @@ func TestBorrow_PreparesTheDeviceOnceAcrossTheYield(t *testing.T) {
 
 	if got := preparer.calls.Load(); got != 1 {
 		t.Fatalf("builds = %d, want 1", got)
+	}
+}
+
+func TestOpen_RecordsTheHolderProcessStartTimeInTheLease(t *testing.T) {
+	f := newBorrowFixture(t, &closingYielder{})
+
+	status, err := f.manager.Probe(context.Background(), lease.KeyFor("android", "A"))
+
+	if err != nil || status.Holder.ProcessStartedAt == nil || !status.Holder.ProcessStartedAt.Equal(f.owner.StartTime) {
+		t.Fatalf("probe = %+v, %v, want the holder start time %v recorded", status.Holder, err, f.owner.StartTime)
+	}
+}
+
+func (f *borrowFixture) lenderOfTheBuild(t *testing.T) device.RunnerOwner {
+	t.Helper()
+	f.factory.mu.Lock()
+	defer f.factory.mu.Unlock()
+	if len(f.factory.ctxs) != 1 {
+		t.Fatalf("builds = %d, want 1", len(f.factory.ctxs))
+	}
+	return device.LenderFrom(f.factory.ctxs[0])
+}
+
+func TestBorrow_AHolderWhosePidNowBelongsToAnotherProcessIsNotTheLender(t *testing.T) {
+	f := newBorrowFixture(t, &closingYielder{})
+	reused := device.RunnerOwner{Pid: f.owner.Pid, StartTime: f.owner.StartTime.Add(time.Hour)}
+	f.deps.Owners = fixedOwners{owner: reused}
+
+	if _, err := f.borrow(t); err != nil {
+		t.Fatalf("Borrow() error = %v", err)
+	}
+
+	if got := f.lenderOfTheBuild(t); got != (device.RunnerOwner{}) {
+		t.Fatalf("lender = %+v, want none because the live process is not the recorded holder", got)
+	}
+}
+
+func TestBorrow_AHolderThatRecordedNoStartTimeIsNotTheLender(t *testing.T) {
+	m := newSocketManager(t, clock.SystemClock{})
+	yielder := &closingYielder{}
+	sourceDeps := socketDeps(t, &recordingFactory{events: &eventLog{}}, m)
+	source, err := session.Open(context.Background(), sourceDeps, session.Request{Descriptor: androidDesc("A"), Yielder: yielder})
+	if err != nil {
+		t.Fatal(err)
+	}
+	yielder.closeFn = func() { _ = source.Close() }
+	t.Cleanup(func() { _ = source.Close() })
+	factory := &recordingFactory{events: &eventLog{}}
+	deps := socketDeps(t, factory, m)
+	deps.PID = borrowerPID
+	deps.Owners = fixedOwners{owner: device.RunnerOwner{Pid: os.Getpid(), StartTime: time.Unix(1_700_000_000, 0).UTC()}}
+	f := &borrowFixture{manager: m, source: source, yielder: yielder, factory: factory, deps: deps}
+
+	if _, err := f.borrow(t); err != nil {
+		t.Fatalf("Borrow() error = %v", err)
+	}
+
+	if got := f.lenderOfTheBuild(t); got != (device.RunnerOwner{}) {
+		t.Fatalf("lender = %+v, want none because the holder did not record its start time", got)
 	}
 }

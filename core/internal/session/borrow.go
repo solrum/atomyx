@@ -135,16 +135,29 @@ func withoutLaunching(report func(Phase)) func(Phase) {
 	}
 }
 
+// lenderFor names the holder as the lender when the live process with its
+// pid is the process that recorded the lease, judged by the start time the
+// holder wrote. A pid reused by an unrelated process, or a holder that
+// recorded no start time, yields no lender, so a runner is never handed to
+// a process that did not own it.
 func (d Deps) lenderFor(source lease.Holder) device.RunnerOwner {
 	if d.Owners == nil {
 		return device.RunnerOwner{}
 	}
-	lender, err := d.Owners.ResolveOwner(source.PID)
+	if source.ProcessStartedAt == nil {
+		d.Logger.Warn("the holder of the device recorded no start time, so it is not recorded as the lender", logging.LogContext{"pid": source.PID})
+		return device.RunnerOwner{}
+	}
+	live, err := d.Owners.ResolveOwner(source.PID)
 	if err != nil {
 		d.Logger.Warn("could not identify the holder as the lender of the device", logging.LogContext{"pid": source.PID, "error": err.Error()})
 		return device.RunnerOwner{}
 	}
-	return lender
+	if !live.StartTime.Equal(*source.ProcessStartedAt) {
+		d.Logger.Warn("the process with the holder's pid started after the lease was taken, so it is not recorded as the lender", logging.LogContext{"pid": source.PID})
+		return device.RunnerOwner{}
+	}
+	return device.RunnerOwner{Pid: source.PID, StartTime: *source.ProcessStartedAt}
 }
 
 // requestYield sends the yield request and reports whether the

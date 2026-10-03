@@ -175,9 +175,12 @@ corresponding area. For the high-level map see
   `Manager.Probe`, which takes and releases the real flock but never
   creates the lock file or writes holder metadata. Only the process that
   keeps the flock for its session owns that write.
-- **Lock file contents are display only.** Liveness comes from the
+- **Lock file contents never prove liveness.** Liveness comes from the
   flock, never from the pid or command in the file, because a dead
   holder's metadata can linger until the next acquirer overwrites it.
+  The pid and `processStartedAt` only name a process a borrower may ask
+  to yield, and a lender is recorded only when the live process with that
+  pid started at the recorded time.
 
 ## Session ownership
 

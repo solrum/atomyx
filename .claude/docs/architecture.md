@@ -277,11 +277,16 @@ Contract:
   `InodeRecheckPeriod` (5 seconds). A failed re-acquire returns an error
   wrapping `ErrLost`.
 - **Lock file.** It is never unlinked. It carries the holder's
-  `{pid, command, role, runId, socket, socketError, startedAt, idleSince}`
-  for display only, and nothing reads that metadata to make a control
-  decision. `socketError` is a short reason without paths and is set
-  only when the holder could not bind its socket, so a viewer can tell
-  a holder that serves none from one that is still starting.
+  `{pid, processStartedAt, command, role, runId, socket, socketError,
+  startedAt, idleSince}`. Most fields are for display. `pid` and
+  `processStartedAt` together identify the holder process, so a borrower
+  records it as the lender of a runner only when the live process with
+  that pid started at the recorded time.
+  `processStartedAt` is absent when the holder could not read it, and a
+  reader treats absence as an unverifiable holder. `socketError` is a
+  short reason without paths and is set only when the holder could not
+  bind its socket, so a viewer can tell a holder that serves none from
+  one that is still starting.
 - **Probe.** `Manager.Probe` takes the same real flock and releases it
   immediately. It never creates the lock file and never writes holder
   metadata.

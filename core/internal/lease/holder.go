@@ -9,16 +9,23 @@ import (
 	"dev.atomyx/internal/diag"
 )
 
-// Holder is the display-only metadata a lease holder writes into its
-// lock file. It never drives a control decision.
+// Holder is the metadata a lease holder writes into its lock file. Most
+// fields are for display. PID and ProcessStartedAt together name the
+// process a borrower asks to yield and records as the lender of the
+// runner it leaves behind.
 type Holder struct {
-	PID       int        `json:"pid"`
-	Command   string     `json:"command"`
-	Role      string     `json:"role"`
-	RunID     string     `json:"runId,omitempty"`
-	Socket    string     `json:"socket,omitempty"`
-	StartedAt time.Time  `json:"startedAt"`
-	IdleSince *time.Time `json:"idleSince,omitempty"`
+	PID       int       `json:"pid"`
+	Command   string    `json:"command"`
+	Role      string    `json:"role"`
+	RunID     string    `json:"runId,omitempty"`
+	Socket    string    `json:"socket,omitempty"`
+	StartedAt time.Time `json:"startedAt"`
+	// ProcessStartedAt is when the holder process started. Paired with PID
+	// it identifies one process, because the operating system can give the
+	// pid to an unrelated process after the holder exits. It is nil when
+	// the holder could not read it, and in metadata written without it.
+	ProcessStartedAt *time.Time `json:"processStartedAt,omitempty"`
+	IdleSince        *time.Time `json:"idleSince,omitempty"`
 	// SocketError is a short reason, without paths, that the holder serves
 	// no socket. It is empty while the socket is bound or not yet tried, so
 	// a viewer tells a holder that serves none from one still starting.

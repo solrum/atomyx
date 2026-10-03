@@ -165,10 +165,11 @@ func Open(ctx context.Context, deps Deps, req Request) (*Session, error) {
 	if deps.Leases != nil {
 		key = lease.KeyFor(string(identity.Platform), identity.HardwareID)
 		held, err = deps.Leases.Acquire(ctx, key, lease.Holder{
-			PID:       deps.PID,
-			Command:   deps.Command,
-			Role:      deps.Role,
-			StartedAt: time.UnixMilli(deps.Clock.NowMs()).UTC(),
+			PID:              deps.PID,
+			Command:          deps.Command,
+			Role:             deps.Role,
+			StartedAt:        time.UnixMilli(deps.Clock.NowMs()).UTC(),
+			ProcessStartedAt: deps.processStart(),
 		})
 		if err != nil {
 			return nil, mapLeaseError(err, req.Reacquire)
@@ -225,6 +226,22 @@ func relaunchedApp(carrier launchedAppCarrier, restore LaunchState) bool {
 	}
 	_, connectedRunnerID := carrier.LaunchedApp()
 	return restore.RunnerID == "" || connectedRunnerID != restore.RunnerID
+}
+
+// processStart reads when this process started, or nil when Owners is
+// unset or cannot identify it. A holder without it can still be asked to
+// yield, but a borrower will not record it as the lender of a runner.
+func (d Deps) processStart() *time.Time {
+	if d.Owners == nil {
+		return nil
+	}
+	self, err := d.Owners.ResolveOwner(d.PID)
+	if err != nil {
+		d.Logger.Warn("could not read the start time of this process for the lease", logging.LogContext{"pid": d.PID, "error": err.Error()})
+		return nil
+	}
+	started := self.StartTime.UTC()
+	return &started
 }
 
 func (d Deps) withDefaults() Deps {
