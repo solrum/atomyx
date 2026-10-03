@@ -5,6 +5,7 @@ import (
 	"math"
 	"regexp"
 	"strconv"
+	"unicode/utf8"
 )
 
 // Lookup resolves a variable name to its current value. It returns
@@ -247,7 +248,7 @@ func castToNumber(value Value, position int) (Value, error) {
 	case KindString:
 		s := value.Str()
 		if !strictNumberPattern.MatchString(s) {
-			return Value{}, &EvalError{Message: fmt.Sprintf(`cannot convert "%s" to a number`, s), Position: position}
+			return Value{}, &EvalError{Message: fmt.Sprintf("cannot convert a string of length %d to a number", utf8.RuneCountInString(s)), Position: position}
 		}
 		// strictNumberPattern guarantees a form strconv.ParseFloat
 		// accepts. A magnitude beyond a 64-bit float's range still
@@ -287,7 +288,7 @@ func castToBool(value Value, position int) (Value, error) {
 			return BoolValue(false), nil
 		}
 		return Value{}, &EvalError{
-			Message:  fmt.Sprintf(`cannot convert "%s" to a boolean, expected "true" or "false"`, s),
+			Message:  fmt.Sprintf(`cannot convert a string of length %d to a boolean, expected "true" or "false"`, utf8.RuneCountInString(s)),
 			Position: position,
 		}
 	default: // KindNumber
@@ -321,16 +322,16 @@ func describeLogicalRejection(value Value) string {
 	return fmt.Sprintf("cannot use %s in a logical operation, convert it with bool(...)", describeValue(value))
 }
 
+// describeValue names a value's type only. Error text must never carry
+// a runtime value, because a value can be a secret and error text reaches
+// logs, step records and viewers.
 func describeValue(value Value) string {
 	switch value.Kind() {
 	case KindString:
-		return fmt.Sprintf(`string value "%s"`, value.Str())
+		return "a string"
 	case KindBool:
-		if value.Bool() {
-			return "boolean value true"
-		}
-		return "boolean value false"
+		return "a boolean"
 	default: // KindNumber
-		return fmt.Sprintf("number value %s", FormatNumber(value.Num()))
+		return "a number"
 	}
 }

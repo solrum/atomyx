@@ -2,7 +2,7 @@
   "booleanValue": false,
   "errorKind": "eval",
   "kind": "error",
-  "message": "cannot convert \"TRUE\" to a boolean, expected \"true\" or \"false\" at position 5",
+  "message": "cannot convert a string of length 4 to a boolean, expected \"true\" or \"false\" at position 5",
   "numberBits": "",
   "numberText": "",
   "position": 5,

@@ -212,3 +212,24 @@ func TestScenarioRunPublishesItsChildrensStepLinesToTheSessionHub(t *testing.T) 
 
 	requireSameLines(t, lines(), singleRunDir(t, root))
 }
+
+func TestRunKeepsAnEnvValueOutOfTheStepFileWhenAnExpressionCannotConvertIt(t *testing.T) {
+	root := t.TempDir()
+	var stdout, stderr bytes.Buffer
+	flow := "appId: com.test\nenv:\n  TOKEN: " + typedSecret + "\n---\n- assertExpr:\n    expr: number(TOKEN) > 1\n"
+
+	code := RunScript(context.Background(), stepsDeps(&stdout, &stderr), map[string]FlagValue{
+		"--file": writeScript(t, "flow.yml", flow), "--report-dir": root,
+	})
+	if code == 0 {
+		t.Fatal("the run passed, want a failed assertion")
+	}
+
+	lines, body := readStepLines(t, singleRunDir(t, root))
+	if strings.Contains(body, typedSecret) {
+		t.Errorf("steps file carries the env value:\n%s", body)
+	}
+	if detail, _ := lines[len(lines)-1]["detail"].(string); !strings.Contains(detail, "cannot convert a string of length") {
+		t.Errorf("completed detail = %q, want the conversion failure described by length", detail)
+	}
+}

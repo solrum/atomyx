@@ -2,7 +2,7 @@
   "booleanValue": false,
   "errorKind": "eval",
   "kind": "error",
-  "message": "cannot use number value 3 in a logical operation, a number cannot be used as a boolean at position 9",
+  "message": "cannot use a number in a logical operation, a number cannot be used as a boolean at position 9",
   "numberBits": "",
   "numberText": "",
   "position": 9,

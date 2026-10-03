@@ -15,7 +15,7 @@ func (TapCommand) Execute(step script.ScriptStep, ctx *CommandContext) CommandRe
 	selector := compileScriptSelector(s.Selector)
 	result := must(ctx.Orchestra.Tap(ctx.Context, selector, orchestra.TapOptions{}))
 	if !result.Ok {
-		return CommandResult{Ok: false, Detail: strPtr(result.Reason)}
+		return CommandResult{Ok: false, Detail: strPtr(actionFailureDetail(result))}
 	}
 	return CommandResult{Ok: true, Detail: strPtr(result.Detail)}
 }

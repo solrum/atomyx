@@ -2,7 +2,7 @@
   "booleanValue": false,
   "errorKind": "eval",
   "kind": "error",
-  "message": "cannot compare number value 3 and boolean value true, both sides must be numbers at position 0",
+  "message": "cannot compare a number and a boolean, both sides must be numbers at position 0",
   "numberBits": "",
   "numberText": "",
   "position": 0,

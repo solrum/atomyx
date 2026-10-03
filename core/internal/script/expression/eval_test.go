@@ -2,7 +2,9 @@ package expression
 
 import (
 	"errors"
+	"fmt"
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -95,11 +97,11 @@ func TestEvalUnaryMinus(t *testing.T) {
 
 	stringLookup := lookupFrom(map[string]Value{"x": StringValue("a")})
 	expectEvalError(t, "-x", stringLookup,
-		`cannot use string value "a" in arithmetic, convert it with number(...)`, 0)
+		"cannot use a string in arithmetic, convert it with number(...)", 0)
 
 	boolLookup := lookupFrom(map[string]Value{"x": BoolValue(true)})
 	expectEvalError(t, "-x", boolLookup,
-		"cannot use boolean value true in arithmetic, a boolean has no valid numeric conversion", 0)
+		"cannot use a boolean in arithmetic, a boolean has no valid numeric conversion", 0)
 }
 
 func TestEvalUnaryNot(t *testing.T) {
@@ -108,11 +110,11 @@ func TestEvalUnaryNot(t *testing.T) {
 
 	numberLookup := lookupFrom(map[string]Value{"x": NumberValue(5)})
 	expectEvalError(t, "not x", numberLookup,
-		"cannot use number value 5 in a logical operation, a number cannot be used as a boolean", 0)
+		"cannot use a number in a logical operation, a number cannot be used as a boolean", 0)
 
 	stringLookup := lookupFrom(map[string]Value{"x": StringValue("a")})
 	expectEvalError(t, "not x", stringLookup,
-		`cannot use string value "a" in a logical operation, convert it with bool(...)`, 0)
+		"cannot use a string in a logical operation, convert it with bool(...)", 0)
 }
 
 // --- and / or short-circuiting ---
@@ -141,25 +143,25 @@ func TestEvalLogicalShortCircuit(t *testing.T) {
 	t.Run("and reports a wrong-type left at the left operand's position", func(t *testing.T) {
 		lookup := lookupFrom(map[string]Value{"x": NumberValue(1)})
 		expectEvalError(t, "x and y", lookup,
-			"cannot use number value 1 in a logical operation, a number cannot be used as a boolean", 0)
+			"cannot use a number in a logical operation, a number cannot be used as a boolean", 0)
 	})
 
 	t.Run("or reports a wrong-type left at the left operand's position", func(t *testing.T) {
 		lookup := lookupFrom(map[string]Value{"x": NumberValue(1)})
 		expectEvalError(t, "x or y", lookup,
-			"cannot use number value 1 in a logical operation, a number cannot be used as a boolean", 0)
+			"cannot use a number in a logical operation, a number cannot be used as a boolean", 0)
 	})
 
 	t.Run("and reports a wrong-type right at the right operand's position", func(t *testing.T) {
 		lookup := lookupFrom(map[string]Value{"x": BoolValue(true), "y": NumberValue(1)})
 		expectEvalError(t, "x and y", lookup,
-			"cannot use number value 1 in a logical operation, a number cannot be used as a boolean", 6)
+			"cannot use a number in a logical operation, a number cannot be used as a boolean", 6)
 	})
 
 	t.Run("or reports a wrong-type right at the right operand's position", func(t *testing.T) {
 		lookup := lookupFrom(map[string]Value{"x": BoolValue(false), "y": NumberValue(1)})
 		expectEvalError(t, "x or y", lookup,
-			"cannot use number value 1 in a logical operation, a number cannot be used as a boolean", 5)
+			"cannot use a number in a logical operation, a number cannot be used as a boolean", 5)
 	})
 }
 
@@ -210,13 +212,13 @@ func TestEvalComparison(t *testing.T) {
 	t.Run("both sides evaluated before the type check, left invalid", func(t *testing.T) {
 		badLeft := lookupFrom(map[string]Value{"x": StringValue("a"), "y": NumberValue(2)})
 		expectEvalError(t, "x < y", badLeft,
-			`cannot compare string value "a" and number value 2, both sides must be numbers`, 0)
+			"cannot compare a string and a number, both sides must be numbers", 0)
 	})
 
 	t.Run("right invalid still reports the binary node's own start, not the right operand's", func(t *testing.T) {
 		badRight := lookupFrom(map[string]Value{"x": NumberValue(1), "y": StringValue("a")})
 		expectEvalError(t, "x < y", badRight,
-			`cannot compare number value 1 and string value "a", both sides must be numbers`, 0)
+			"cannot compare a number and a string, both sides must be numbers", 0)
 	})
 }
 
@@ -232,19 +234,19 @@ func TestEvalArithmetic(t *testing.T) {
 	t.Run("left checked first when both operands are invalid", func(t *testing.T) {
 		lookup := lookupFrom(map[string]Value{"x": BoolValue(true), "y": BoolValue(true)})
 		expectEvalError(t, "x + y", lookup,
-			"cannot use boolean value true in arithmetic, a boolean has no valid numeric conversion", 0)
+			"cannot use a boolean in arithmetic, a boolean has no valid numeric conversion", 0)
 	})
 
 	t.Run("left invalid reports the left operand's own start", func(t *testing.T) {
 		lookup := lookupFrom(map[string]Value{"x": BoolValue(true), "y": NumberValue(1)})
 		expectEvalError(t, "x + y", lookup,
-			"cannot use boolean value true in arithmetic, a boolean has no valid numeric conversion", 0)
+			"cannot use a boolean in arithmetic, a boolean has no valid numeric conversion", 0)
 	})
 
 	t.Run("right invalid reports the right operand's own start", func(t *testing.T) {
 		lookup := lookupFrom(map[string]Value{"x": NumberValue(1), "y": BoolValue(true)})
 		expectEvalError(t, "x + y", lookup,
-			"cannot use boolean value true in arithmetic, a boolean has no valid numeric conversion", 4)
+			"cannot use a boolean in arithmetic, a boolean has no valid numeric conversion", 4)
 	})
 
 	t.Run("division by zero", func(t *testing.T) {
@@ -303,7 +305,7 @@ func TestEvalCastToNumber(t *testing.T) {
 	badStrings := []string{"abc", "", ".5", "5.", "1e5"}
 	for _, s := range badStrings {
 		source := `number("` + s + `")`
-		expectEvalError(t, source, nil, `cannot convert "`+s+`" to a number`, 7)
+		expectEvalError(t, source, nil, fmt.Sprintf("cannot convert a string of length %d to a number", len(s)), 7)
 	}
 
 	trueLookup := lookupFrom(map[string]Value{"x": BoolValue(true)})
@@ -345,7 +347,7 @@ func TestEvalCastToBool(t *testing.T) {
 	badStrings := []string{"True", "1", ""}
 	for _, s := range badStrings {
 		source := `bool("` + s + `")`
-		expectEvalError(t, source, nil, `cannot convert "`+s+`" to a boolean, expected "true" or "false"`, 5)
+		expectEvalError(t, source, nil, fmt.Sprintf(`cannot convert a string of length %d to a boolean, expected "true" or "false"`, len(s)), 5)
 	}
 
 	zeroLookup := lookupFrom(map[string]Value{"x": NumberValue(0)})
@@ -355,4 +357,19 @@ func TestEvalCastToBool(t *testing.T) {
 	oneLookup := lookupFrom(map[string]Value{"x": NumberValue(1)})
 	expectEvalError(t, "bool(x)", oneLookup,
 		"cannot convert a number to a boolean, compare it directly instead", 5)
+}
+
+func TestEvalErrorsNeverCarryARuntimeValue(t *testing.T) {
+	const secret = "s3cr3t-token"
+	secretString := lookupFrom(map[string]Value{"x": StringValue(secret), "y": NumberValue(48151623)})
+	sources := []string{"number(x)", "bool(x)", "x + 1", "-x", "not x", "x < 1", "1 < x", "x and true", "y and true", "1 + true"}
+	for _, source := range sources {
+		_, err := Evaluate(source, secretString)
+		if err == nil {
+			t.Fatalf("Evaluate(%q) succeeded, want an error", source)
+		}
+		if strings.Contains(err.Error(), secret) || strings.Contains(err.Error(), "48151623") {
+			t.Errorf("Evaluate(%q) error %q carries a runtime value", source, err.Error())
+		}
+	}
 }

@@ -2,7 +2,7 @@
   "booleanValue": false,
   "errorKind": "eval",
   "kind": "error",
-  "message": "cannot use string value \"a\" in a logical operation, convert it with bool(...) at position 7",
+  "message": "cannot use a string in a logical operation, convert it with bool(...) at position 7",
   "numberBits": "",
   "numberText": "",
   "position": 7,

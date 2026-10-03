@@ -7,6 +7,7 @@ import (
 	"unicode/utf8"
 
 	"dev.atomyx/internal/diag"
+	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/script/expression"
 )
 
@@ -57,6 +58,20 @@ func commandFailureFor(err error) (CommandResult, bool) {
 	return CommandResult{Ok: false, Detail: strPtr(coded.Error())}, true
 }
 
+// obscuredDetail is the step detail for an action refused because
+// another element covers its target. The orchestra reason names the
+// covering element's label, which is screen text, so a step record says
+// only that the target is covered.
+const obscuredDetail = "element is visually obscured by another element"
+
+// actionFailureDetail returns the step detail for a failed action.
+func actionFailureDetail(result orchestra.ActionResult) string {
+	if result.Obscurer != nil {
+		return obscuredDetail
+	}
+	return result.Reason
+}
+
 // jsTypeOfValue renders an expression.Value's Kind the way
 // JavaScript's `typeof` operator would, matching assertExpr's
 // non-boolean failure message wording.
@@ -95,8 +110,10 @@ func describeCapturedValue(v any) string {
 		return fmt.Sprintf("an array of %d items", len(t))
 	case map[string]any:
 		return fmt.Sprintf("an object with %d members", len(t))
-	case bool, float64, int, int64, json.Number:
-		return jsonStringifyJS(v)
+	case bool:
+		return "a boolean"
+	case float64, int, int64, json.Number:
+		return "a number"
 	default:
 		return "a value of an unreadable type"
 	}

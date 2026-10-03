@@ -172,12 +172,14 @@ const capturedSecret = "tok-s3cr3t-9f3a"
 
 func runWithCapturedToken(t *testing.T, steps string) capturedRun {
 	t.Helper()
+	return runWithCapturedBody(t, map[string]any{"token": capturedSecret, "profile": map[string]any{"a": "1", "b": "2"}}, steps)
+}
+
+func runWithCapturedBody(t *testing.T, body map[string]any, steps string) capturedRun {
+	t.Helper()
 	tr := newTestRunner()
 	tr.driver.StageHierarchy(rootTree())
-	tr.capture.queue = []CapturedRequest{{
-		Method: "POST", URL: "/login", Status: 200,
-		Body: map[string]any{"token": capturedSecret, "profile": map[string]any{"a": "1", "b": "2"}},
-	}}
+	tr.capture.queue = []CapturedRequest{{Method: "POST", URL: "/login", Status: 200, Body: body}}
 	result := run(t, tr, "appId: com.test\nproxy: required\n---\n- capture: \"POST /login as: r\"\n"+steps)
 	return capturedRun{result: result, last: detail(lastStep(t, result))}
 }
@@ -227,5 +229,33 @@ func TestAssertExprCommand_NonBooleanFailureNeverPrintsTheValue(t *testing.T) {
 	}
 	if want := `Assertion "token" must evaluate to a boolean, got string`; view.last != want {
 		t.Fatalf("detail = %q, want %q", view.last, want)
+	}
+}
+
+func TestAssertExprCommand_ConversionFailureNeverPrintsTheValue(t *testing.T) {
+	for _, expr := range []string{"number(token) > 1", "bool(token)", "token + 1", "token < 1"} {
+		view := runWithCapturedToken(t, "- extract:\n    from: r\n    values:\n      token: $.body.token\n- assertExpr:\n    expr: "+expr+"\n")
+
+		if view.result.Ok {
+			t.Fatalf("%q unexpectedly passed", expr)
+		}
+		if strings.Contains(view.last, capturedSecret) {
+			t.Fatalf("%q: detail carries the variable value: %q", expr, view.last)
+		}
+	}
+}
+
+func TestAssertApiCommand_NumericFailureNeverPrintsTheCapturedNumber(t *testing.T) {
+	const balance = 48151623
+	body := map[string]any{"balance": float64(balance)}
+	for _, check := range []string{"$between:1,2", "$gt:999999999", "$lt:1", "$not_exists", "other"} {
+		view := runWithCapturedBody(t, body, "- assertApi:\n    from: r\n    body:\n      $.balance: \""+check+"\"\n")
+
+		if view.result.Ok {
+			t.Fatalf("%q unexpectedly passed", check)
+		}
+		if strings.Contains(view.last, "48151623") {
+			t.Fatalf("%q: detail carries the captured number: %q", check, view.last)
+		}
 	}
 }

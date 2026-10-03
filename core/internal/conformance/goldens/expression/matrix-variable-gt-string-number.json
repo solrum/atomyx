@@ -2,7 +2,7 @@
   "booleanValue": false,
   "errorKind": "eval",
   "kind": "error",
-  "message": "cannot compare string value \"a\" and number value 3, both sides must be numbers at position 0",
+  "message": "cannot compare a string and a number, both sides must be numbers at position 0",
   "numberBits": "",
   "numberText": "",
   "position": 0,

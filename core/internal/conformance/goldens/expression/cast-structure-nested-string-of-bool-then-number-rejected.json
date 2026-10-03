@@ -2,7 +2,7 @@
   "booleanValue": false,
   "errorKind": "eval",
   "kind": "error",
-  "message": "cannot convert \"true\" to a number at position 7",
+  "message": "cannot convert a string of length 4 to a number at position 7",
   "numberBits": "",
   "numberText": "",
   "position": 7,

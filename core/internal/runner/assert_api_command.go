@@ -114,7 +114,7 @@ func assertValue(actual, expected any) assertOutcome {
 			}
 			if num < min || num > max {
 				return assertOutcome{false, fmt.Sprintf(
-					"expected $between:%s,%s, got %s", expression.FormatNumber(min), expression.FormatNumber(max), expression.FormatNumber(num))}
+					"expected $between:%s,%s, got a number outside that range", expression.FormatNumber(min), expression.FormatNumber(max))}
 			}
 			return assertOutcome{true, ""}
 		}
@@ -139,7 +139,7 @@ func assertValue(actual, expected any) assertOutcome {
 				passed = num <= threshold
 			}
 			if !passed {
-				return assertOutcome{false, fmt.Sprintf("expected $%s:%s, got %s", cmp, expression.FormatNumber(threshold), expression.FormatNumber(num))}
+				return assertOutcome{false, fmt.Sprintf("expected $%s:%s, got a number that does not satisfy it", cmp, expression.FormatNumber(threshold))}
 			}
 			return assertOutcome{true, ""}
 		}

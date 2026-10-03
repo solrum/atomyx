@@ -2,7 +2,7 @@
   "booleanValue": false,
   "errorKind": "eval",
   "kind": "error",
-  "message": "cannot use boolean value true in arithmetic, a boolean has no valid numeric conversion at position 0",
+  "message": "cannot use a boolean in arithmetic, a boolean has no valid numeric conversion at position 0",
   "numberBits": "",
   "numberText": "",
   "position": 0,

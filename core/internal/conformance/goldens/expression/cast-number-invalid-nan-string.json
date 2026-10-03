@@ -2,7 +2,7 @@
   "booleanValue": false,
   "errorKind": "eval",
   "kind": "error",
-  "message": "cannot convert \"NaN\" to a number at position 7",
+  "message": "cannot convert a string of length 3 to a number at position 7",
   "numberBits": "",
   "numberText": "",
   "position": 7,

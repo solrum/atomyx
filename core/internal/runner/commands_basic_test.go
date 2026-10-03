@@ -583,3 +583,22 @@ func TestSummarizeStep_TypeNeverShowsTheTypedText(t *testing.T) {
 		}
 	}
 }
+
+func TestTapCommand_ObscuredFailureNeverPrintsTheObscurersText(t *testing.T) {
+	const overlayText = "acct-4417-9981"
+	tr := newTestRunner()
+	tr.driver.StageHierarchy(rootTree(
+		button("target", "Confirm", "100,100,200,150"),
+		button("overlay", overlayText, "0,0,430,932"),
+	))
+
+	result := run(t, tr, "appId: com.test\n---\n- tap:\n    id: target\n")
+
+	if result.Ok {
+		t.Fatal("tap unexpectedly passed")
+	}
+	got := detail(lastStep(t, result))
+	if strings.Contains(got, overlayText) || got != obscuredDetail {
+		t.Fatalf("detail = %q, want %q", got, obscuredDetail)
+	}
+}
