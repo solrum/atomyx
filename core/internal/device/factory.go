@@ -207,7 +207,7 @@ func (f *DriverFactory) Build(ctx context.Context, desc Descriptor) (Built, erro
 		default:
 		}
 	}
-	opts := ProvisionOptions{}
+	opts := ProvisionOptions{Lender: LenderFrom(ctx)}
 	retried := false
 	for {
 		created, err := f.createDriverWatched(ctx, desc, onLost, opts)
