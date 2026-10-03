@@ -66,3 +66,49 @@ func TestClose_ADisconnectThatOutlivesTheGraceIsCanceledBeforeTheLeaseIsReleased
 	}
 	<-closed
 }
+
+type closeValueKey struct{}
+
+// valueRecordingDriver notes the value its disconnect context carries.
+type valueRecordingDriver struct {
+	*mockdriver.Driver
+	seen chan any
+}
+
+func (d *valueRecordingDriver) DisconnectContext(ctx context.Context) error {
+	d.seen <- ctx.Value(closeValueKey{})
+	return nil
+}
+
+type valueRecordingFactory struct{ drv *valueRecordingDriver }
+
+func (f *valueRecordingFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
+}
+
+func (f *valueRecordingFactory) Build(ctx context.Context, _ device.Descriptor) (device.Built, error) {
+	if err := f.drv.Connect(ctx); err != nil {
+		return device.Built{}, err
+	}
+	return device.Built{
+		Driver:    f.drv,
+		Orchestra: orchestra.New(orchestra.OrchestraDeps{Driver: f.drv, Clock: orchestra.SystemClock{}}),
+	}, nil
+}
+
+func TestCloseContext_TheDriverDisconnectsUnderTheCallersValues(t *testing.T) {
+	m := newSocketManager(t, clock.SystemClock{})
+	drv := &valueRecordingDriver{Driver: mockdriver.New(), seen: make(chan any, 1)}
+	s, err := session.Open(context.Background(), socketDeps(t, &valueRecordingFactory{drv: drv}, m), session.Request{Descriptor: androidDesc("A")})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.CloseContext(context.WithValue(context.Background(), closeValueKey{}, "caller")); err != nil {
+		t.Fatalf("CloseContext() error = %v", err)
+	}
+
+	if got := <-drv.seen; got != "caller" {
+		t.Fatalf("disconnect context value = %v, want the caller's value", got)
+	}
+}

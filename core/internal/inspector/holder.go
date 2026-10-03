@@ -115,6 +115,9 @@ type Host struct {
 	// life ends when Close runs, so a follow in flight stops.
 	life       context.Context
 	cancelLife context.CancelFunc
+	// stopFollow ends the follow of the process that took the device, and is
+	// nil when none is running. Close calls it. Guarded by mu.
+	stopFollow context.CancelFunc
 	clk        clock.Clock
 	idleMs     int64
 	logger     logging.Logger
@@ -159,7 +162,7 @@ func NewHost(cfg HostConfig) (*Host, error) {
 	h := &Host{open: cfg.Open, follow: cfg.Follow, life: life, cancelLife: cancelLife, clk: cfg.Clock, idleMs: idle, logger: cfg.Logger}
 	info := cfg.Target.Info()
 	h.mu.Lock()
-	h.adoptLocked(cfg.Target, info)
+	h.adoptLocked(life, cfg.Target, info)
 	h.mu.Unlock()
 	h.markIdle(cfg.Target)
 	return h, nil
@@ -170,21 +173,21 @@ func NewHost(cfg HostConfig) (*Host, error) {
 // call over a socket. For a target that holds the lease it starts the
 // idle timer and the lost watcher, and for one that follows another
 // process it starts the watcher of that process.
-func (h *Host) adoptLocked(t Target, info session.Info) {
+func (h *Host) adoptLocked(ctx context.Context, t Target, info session.Info) {
 	h.current = t
 	h.driving = 0
 	h.gone = nil
 	h.generation++
 	h.last = info
 	h.touchedMs = h.clk.NowMs()
-	ctx, cancel := context.WithCancel(context.Background())
+	watchCtx, cancel := context.WithCancel(ctx)
 	h.stopWatch = cancel
 	switch v := t.(type) {
 	case Lifecycle:
-		go h.idleLoop(ctx, t)
-		go h.endLoop(ctx, t, v.Lost(), ErrLost)
+		go h.idleLoop(watchCtx, t)
+		go h.endLoop(watchCtx, t, v.Lost(), ErrLost)
 	case Ending:
-		go h.endLoop(ctx, t, v.Done(), ErrHolderExited)
+		go h.endLoop(watchCtx, t, v.Done(), ErrHolderExited)
 	}
 }
 
@@ -469,7 +472,7 @@ func (h *Host) Reconnect(ctx context.Context) error {
 	}
 	info := held.Info()
 	h.mu.Lock()
-	h.adoptLocked(held, info) //nolint:contextcheck // the idle timer outlives the request that reconnected
+	h.adoptLocked(h.life, held, info) //nolint:contextcheck // the idle timer outlives the request that reconnected
 	h.mu.Unlock()
 	h.markIdle(held)
 	h.logger.Info("inspector.reconnected", nil)
@@ -480,6 +483,13 @@ func (h *Host) Reconnect(ctx context.Context) error {
 // call after a release and more than once.
 func (h *Host) Close() error {
 	h.cancelLife()
+	h.mu.Lock()
+	stop := h.stopFollow
+	h.stopFollow = nil
+	h.mu.Unlock()
+	if stop != nil {
+		stop()
+	}
 	h.opMu.Lock()
 	defer h.opMu.Unlock()
 	held, ok := h.held()

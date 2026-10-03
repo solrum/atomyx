@@ -24,6 +24,19 @@ type interventionRecorder interface {
 
 var _ session.Yielder = (*Host)(nil)
 
+// contextCloser is implemented by a target whose close takes a context for
+// its values, which *session.Session does.
+type contextCloser interface {
+	CloseContext(ctx context.Context) error
+}
+
+func closeWithin(ctx context.Context, t Target) error {
+	if c, ok := t.(contextCloser); ok {
+		return c.CloseContext(ctx)
+	}
+	return t.Close()
+}
+
 // Yield implements session.Yielder. It accepts only while the host
 // holds the device and no operator action is driving it, because a
 // capture or refresh in flight owns the device.
@@ -33,7 +46,7 @@ var _ session.Yielder = (*Host)(nil)
 // the hand-over. Waiting for it would deadlock, because an idle release
 // holds it while it closes the session, and that close waits for the
 // connection goroutine this call runs on.
-func (h *Host) Yield(_ context.Context, borrower string) (func(), error) {
+func (h *Host) Yield(ctx context.Context, borrower string) (func(), error) {
 	if !h.opMu.TryLock() {
 		return nil, diag.NewHolderBusy("the inspector is changing its device")
 	}
@@ -47,26 +60,29 @@ func (h *Host) Yield(_ context.Context, borrower string) (func(), error) {
 		return nil, diag.NewHolderBusy("the inspector only watches the device")
 	}
 	info := held.Info()
+	followCtx, stopFollow := context.WithCancel(context.WithoutCancel(ctx))
 	h.mu.Lock()
 	if h.driving > 0 {
+		stopFollow()
 		h.mu.Unlock()
 		h.opMu.Unlock()
 		return nil, diag.NewHolderBusy("a capture or an action is running")
 	}
 	h.dropLocked(ErrBorrowed, info)
+	h.stopFollow = stopFollow
 	h.mu.Unlock()
 
 	if rec, ok := held.(interventionRecorder); ok {
 		rec.RecordIntervention(session.InterventionControlBorrowed, borrower)
 	}
-	return func() { //nolint:contextcheck // the hand-over outlives the request that asked for it
-		err := held.Close()
+	return func() {
+		err := closeWithin(followCtx, held)
 		h.opMu.Unlock()
 		if err != nil {
 			h.logger.Warn("inspector.yield.close_failed", logging.LogContext{"error": err.Error()})
 		}
 		h.logger.Info("inspector.yielded", nil)
-		h.followBorrower()
+		h.followBorrower(followCtx, stopFollow)
 	}, nil
 }
 
@@ -74,12 +90,19 @@ func (h *Host) Yield(_ context.Context, borrower string) (func(), error) {
 // the page shows its state and its steps and drops to the released
 // banner when it ends. The host answers released when no follower is
 // configured, when none takes the device in time, and when the watch
-// fails. A reconnect that adopted a device meanwhile wins.
-func (h *Host) followBorrower() {
+// fails. A reconnect that adopted a device meanwhile wins. The watchers of an
+// adopted borrower live under ctx, which Close ends.
+func (h *Host) followBorrower(ctx context.Context, stop context.CancelFunc) {
+	adopted := false
+	defer func() {
+		if !adopted {
+			stop()
+		}
+	}()
 	var target Target
 	var err error
 	if h.follow != nil {
-		target, err = h.follow(h.life)
+		target, err = h.follow(ctx)
 	} else {
 		err = session.ErrNoBorrower
 	}
@@ -91,7 +114,7 @@ func (h *Host) followBorrower() {
 	defer h.opMu.Unlock()
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.current != nil || !errors.Is(h.gone, ErrBorrowed) || h.life.Err() != nil {
+	if h.current != nil || !errors.Is(h.gone, ErrBorrowed) || ctx.Err() != nil {
 		if target != nil {
 			defer func() { _ = target.Close() }()
 		}
@@ -101,5 +124,6 @@ func (h *Host) followBorrower() {
 		h.gone = ErrReleased
 		return
 	}
-	h.adoptLocked(target, info) //nolint:contextcheck // the watchers outlive the yield that started them
+	h.adoptLocked(ctx, target, info)
+	adopted = true
 }

@@ -270,13 +270,13 @@ func (s *Session) updateHolder(mutate func(*lease.Holder)) error {
 //
 // Close is idempotent and returns the first call's result.
 func (s *Session) Close() error {
-	return s.close(context.Background())
+	return s.CloseContext(context.Background())
 }
 
-// close runs the shutdown described on Close. Cleanup always runs to
-// completion within the shutdown grace period, even when the caller's
-// context is already done, so ctx contributes only its values.
-func (s *Session) close(ctx context.Context) error {
+// CloseContext is Close with a context whose values reach the shutdown.
+// Cleanup always runs to completion within the shutdown grace period,
+// even when ctx is already done, so ctx contributes only its values.
+func (s *Session) CloseContext(ctx context.Context) error {
 	s.closeOnce.Do(func() {
 		s.watchCancel()
 		s.watchers.Wait()

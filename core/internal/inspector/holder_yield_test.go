@@ -176,3 +176,24 @@ func TestHostYield_ARaceWithTheIdleReleaseClosesTheSessionOnce(t *testing.T) {
 		t.Fatalf("closes = %d, want exactly one", got)
 	}
 }
+
+func TestHostYield_ClosingTheHostEndsAFollowInFlight(t *testing.T) {
+	following := make(chan struct{})
+	ended := make(chan struct{})
+	h := newHostHarnessFollowing(t, func(ctx context.Context) (Target, error) {
+		close(following)
+		<-ctx.Done()
+		close(ended)
+		return nil, ctx.Err()
+	})
+	afterReply, err := h.host.Yield(context.Background(), yieldBorrower)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go afterReply()
+	<-following
+
+	_ = h.host.Close()
+
+	<-ended
+}

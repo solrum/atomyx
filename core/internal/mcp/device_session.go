@@ -809,14 +809,14 @@ func (s *DeviceSession) onTimer(gen uint64, kind timerKind) {
 			s.mu.Unlock()
 		}
 	}
-	s.closeAndRemember(sess, remembered, "session.released")
+	s.closeAndRemember(context.Background(), sess, remembered, "session.released")
 }
 
 // closeAndRemember closes sess and stores the launched-app state it
 // carried, so a re-acquire can offer it to the next driver.
-func (s *DeviceSession) closeAndRemember(sess *session.Session, remembered *rememberedDevice, event string) {
+func (s *DeviceSession) closeAndRemember(ctx context.Context, sess *session.Session, remembered *rememberedDevice, event string) {
 	desc := sess.Descriptor()
-	err := sess.Close()
+	err := sess.CloseContext(ctx)
 	s.carryInterventions(sess)
 	if err != nil {
 		s.logger.Warn("session.release_failed", logging.LogContext{"id": desc.ID, "error": err.Error()})
@@ -856,7 +856,7 @@ func (s *DeviceSession) watchLost(sess *session.Session) {
 		s.runs.CancelScriptsForLostDevice(sess.LostErr())
 		s.runs.CloseOpenRun(runfolder.OutcomeDeviceLost, "closed because the device was lost")
 	}
-	s.closeAndRemember(sess, remembered, "session.lost")
+	s.closeAndRemember(context.Background(), sess, remembered, "session.lost")
 }
 
 // CheckHealth reports the session state and, when a device is bound,
