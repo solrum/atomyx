@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"runtime"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -257,4 +258,109 @@ func TestCloseLeavesNoGoroutineOrDescriptor(t *testing.T) {
 	}
 
 	waitForNoLeak(t, baseGoroutines, baseFDs)
+}
+
+type viewerEvent struct {
+	attached bool
+	info     ViewerInfo
+}
+
+type viewerRecorder struct{ events chan viewerEvent }
+
+func newViewerRecorder() *viewerRecorder {
+	return &viewerRecorder{events: make(chan viewerEvent, 16)}
+}
+
+func (r *viewerRecorder) ViewerAttached(info ViewerInfo) {
+	r.events <- viewerEvent{attached: true, info: info}
+}
+
+func (r *viewerRecorder) ViewerDetached(info ViewerInfo) {
+	r.events <- viewerEvent{info: info}
+}
+
+func (r *viewerRecorder) next(t *testing.T) viewerEvent {
+	t.Helper()
+	select {
+	case e := <-r.events:
+		return e
+	case <-time.After(testGuard):
+		t.Fatal("no viewer event arrived")
+		return viewerEvent{}
+	}
+}
+
+func (r *viewerRecorder) expectNone(t *testing.T) {
+	t.Helper()
+	select {
+	case e := <-r.events:
+		t.Fatalf("unexpected viewer event %+v", e)
+	default:
+	}
+}
+
+func helloAs(c *rawClient, name string) Frame {
+	return c.call(TypeHello, Hello{Protocol: SupportedVersions, Client: name, Features: []string{}})
+}
+
+func TestViewerHandlerSeesEachConnectionAttachAndDetachOnce(t *testing.T) {
+	rec := newViewerRecorder()
+	srv := startServer(t, ServerConfig{Handlers: Handlers{Viewers: rec}}, nil)
+	first := dialRaw(t, srv.Path())
+	helloAs(first, "viewer one")
+	second := dialRaw(t, srv.Path())
+	helloAs(second, "viewer two")
+
+	a, b := rec.next(t), rec.next(t)
+	if !a.attached || !b.attached || a.info.Client != "viewer one" || b.info.Client != "viewer two" {
+		t.Fatalf("attach events = %+v then %+v", a, b)
+	}
+	if a.info.ID == b.info.ID {
+		t.Fatalf("two connections share id %d", a.info.ID)
+	}
+
+	if ok := first.call(TypeBye, nil).Ok; ok == nil || !*ok {
+		t.Fatal("bye was not acknowledged")
+	}
+	if gone := rec.next(t); gone.attached || gone.info != a.info {
+		t.Fatalf("detach event = %+v, want viewer one", gone)
+	}
+
+	if err := srv.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if gone := rec.next(t); gone.attached || gone.info != b.info {
+		t.Fatalf("detach event on Close = %+v, want viewer two", gone)
+	}
+	rec.expectNone(t)
+}
+
+func TestConnectionThatNeverSaidHelloIsNotAnnounced(t *testing.T) {
+	rec := newViewerRecorder()
+	srv := startServer(t, ServerConfig{Handlers: Handlers{Viewers: rec}}, func() time.Time { return time.Unix(0, 0) })
+	dialRaw(t, srv.Path()).expectClosed()
+	if err := srv.Close(); err != nil {
+		t.Fatal(err)
+	}
+	rec.expectNone(t)
+}
+
+func TestClientNameOverTheBoundIsRefusedAndNotAnnounced(t *testing.T) {
+	rec := newViewerRecorder()
+	srv := startServer(t, ServerConfig{Handlers: Handlers{Viewers: rec}}, nil)
+	client := dialRaw(t, srv.Path())
+
+	tooLong := strings.Repeat("n", MaxClientNameBytes+1)
+	if got := failureCode(t, helloAs(client, tooLong)); got != diag.CodeInvalidArgument {
+		t.Fatalf("code = %q, want %s", got, diag.CodeInvalidArgument)
+	}
+	rec.expectNone(t)
+
+	atBound := strings.Repeat("n", MaxClientNameBytes)
+	if ok := helloAs(client, atBound).Ok; ok == nil || !*ok {
+		t.Fatal("a name of exactly the bound was refused")
+	}
+	if e := rec.next(t); !e.attached || e.info.Client != atBound {
+		t.Fatalf("attach event = %+v", e)
+	}
 }

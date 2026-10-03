@@ -33,12 +33,34 @@ type ObserveHandler interface {
 	Subscribe(ctx context.Context, runID string, sinceSeq int64) (<-chan Notice, error)
 }
 
+// ViewerInfo identifies one attached viewer. ID is unique among the
+// connections a server has accepted, and Client is the name the viewer
+// sent in its hello request.
+type ViewerInfo struct {
+	ID     uint64
+	Client string
+}
+
+// ViewerHandler is told when viewers attach and detach, so the holder can
+// show who is watching. Both methods run on the connection's own
+// goroutine, so they must return promptly.
+type ViewerHandler interface {
+	// ViewerAttached is called once per connection, after its hello
+	// request succeeded.
+	ViewerAttached(info ViewerInfo)
+	// ViewerDetached is called once for each ViewerAttached, when the
+	// connection ends for any reason.
+	ViewerDetached(info ViewerInfo)
+}
+
 // Handlers groups what a server's owner supplies. A nil group is not
 // served: its requests are answered with UNSUPPORTED and its feature is
 // left out of the hello answer.
 type Handlers struct {
 	Session SessionHandler
 	Observe ObserveHandler
+	// Viewers is optional. A nil value skips the attach and detach calls.
+	Viewers ViewerHandler
 }
 
 func (h Handlers) features() []string {

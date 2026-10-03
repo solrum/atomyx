@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"dev.atomyx/internal/diag"
@@ -85,6 +86,8 @@ type Server struct {
 
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	nextConnID atomic.Uint64
 
 	mu     sync.Mutex
 	conns  map[*conn]struct{}

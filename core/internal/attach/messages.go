@@ -52,6 +52,10 @@ func NegotiateVersion(client, server VersionRange) (int, error) {
 	return chosen, nil
 }
 
+// MaxClientNameBytes bounds Hello.Client. A longer name is refused with
+// diag.CodeInvalidArgument.
+const MaxClientNameBytes = 128
+
 // Hello is the data of session.hello, the first request of a connection.
 type Hello struct {
 	Protocol VersionRange `json:"protocol"`

@@ -3,6 +3,7 @@ package attach
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -30,6 +31,9 @@ type conn struct {
 	nc     *net.UnixConn
 	reader *FrameReader
 	out    chan outbound
+	id     uint64
+	// client is the name from the accepted hello request.
+	client string
 
 	// queuedBytes counts the bytes of frames that are queued or being
 	// written, so a viewer that never reads cannot hold more than
@@ -54,6 +58,7 @@ func newConn(s *Server, nc *net.UnixConn) *conn {
 	return &conn{
 		srv:    s,
 		nc:     nc,
+		id:     s.nextConnID.Add(1),
 		reader: NewFrameReader(nc),
 		out:    make(chan outbound, s.cfg.QueueSize),
 		ctx:    ctx,
@@ -77,6 +82,11 @@ func (c *conn) run() {
 	}()
 	if !c.handshake() {
 		return
+	}
+	if h := c.srv.cfg.Handlers.Viewers; h != nil {
+		info := ViewerInfo{ID: c.id, Client: c.client}
+		h.ViewerAttached(info)
+		defer h.ViewerDetached(info)
 	}
 	c.serve()
 }
@@ -212,6 +222,10 @@ func (c *conn) handshake() bool {
 			c.fail(f, invalidFrame(err.Error()))
 			continue
 		}
+		if len(hello.Client) > MaxClientNameBytes {
+			c.fail(f, invalidFrame(fmt.Sprintf("the client name is longer than %d bytes", MaxClientNameBytes)))
+			continue
+		}
 		version, err := NegotiateVersion(hello.Protocol, SupportedVersions)
 		if err != nil {
 			c.fail(f, err)
@@ -220,6 +234,7 @@ func (c *conn) handshake() bool {
 		if !c.respond(f, HelloResult{Protocol: version, Features: c.srv.cfg.Handlers.features()}) {
 			return false
 		}
+		c.client = hello.Client
 		return c.nc.SetReadDeadline(zeroTime) == nil
 	}
 }
