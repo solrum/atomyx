@@ -524,6 +524,25 @@ of `steps.jsonl`. The golden transcripts under
 `core/internal/conformance/goldens/attach/` freeze each version, and the
 conformance suite checks the two step line types against the same JSON.
 
+Connections:
+
+- The server binds the socket, changes its mode to 0600 right after the
+  bind, and never changes the process umask. It closes a connection
+  whose peer uid differs from its own, and the client likewise refuses a
+  holder with another uid. The lookup is `LOCAL_PEERCRED` on macOS and
+  `SO_PEERCRED` on Linux.
+- A connection must send `session.hello` within a deadline, or the
+  server closes it. A server serves at most a fixed number of viewers
+  and answers the next one with `HOLDER_BUSY` on the connection.
+- Each connection has one writer fed by a bounded queue under a write
+  deadline. A viewer that stops reading is disconnected, and no other
+  viewer and no holder code waits on it.
+- The owner supplies a `SessionHandler` and an `ObserveHandler`. A group
+  without a handler is answered with `UNSUPPORTED` and left out of the
+  hello feature list.
+- `Server.Close` ends every connection and every goroutine, but leaves
+  the socket file for its owner to remove.
+
 ## Inspector server
 
 `core/internal/inspector` is the HTTP server behind the browser

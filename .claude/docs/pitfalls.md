@@ -380,6 +380,26 @@ corresponding area. For the high-level map see
   Only `GET /` is exempt from the token, because it delivers the page
   that performs the exchange.
 
+## Attach socket
+
+- **Never treat a screenshot from the attach socket as masked.**
+  `observe.screenshot.latest` and `observe.tree.fresh` return the
+  device image exactly as captured, so a secure field shows on screen.
+  Only the tree is masked. The protection is that the socket has mode
+  0600 inside a 0700 directory and accepts only peers with the same uid
+  as the holder. Never widen either, and never expose the socket
+  through a port or a proxy.
+- **Never push an image in a notice.** Notices carry a revision and an
+  epoch, and the viewer pulls the image, so a slow viewer reads only
+  the newest capture and never queues images.
+- **Never block on a viewer.** Code that answers a request or forwards a
+  notice only enqueues a frame. A full queue or a missed write deadline
+  disconnects that viewer. A new code path that writes to a viewer
+  socket directly would let one stalled viewer stall the holder.
+- **Never change the process umask to protect the socket.** The socket
+  gets mode 0600 by an explicit chmod right after bind, and the runtime
+  directory is 0700.
+
 ## Tool layer (cross-platform)
 
 - **Never branch on the session's platform inside a tool handler.**

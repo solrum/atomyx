@@ -25,17 +25,29 @@ type fakeObserve struct {
 	shot     ScreenshotResult
 	fresh    FreshResult
 	freshErr error
-	subs     chan subscription
+	// freshGate, when set, holds TreeFresh until it is closed or the
+	// connection ends, and freshEntered reports that a call is held.
+	freshGate    chan struct{}
+	freshEntered chan struct{}
+	subs         chan subscription
 }
 
 func newFakeObserve() *fakeObserve {
-	return &fakeObserve{subs: make(chan subscription, 4)}
+	return &fakeObserve{subs: make(chan subscription, 4), freshEntered: make(chan struct{}, 4)}
 }
 
 func (f *fakeObserve) TreeLatest() TreeResult             { return f.tree }
 func (f *fakeObserve) ScreenshotLatest() ScreenshotResult { return f.shot }
 
-func (f *fakeObserve) TreeFresh(context.Context) (FreshResult, error) {
+func (f *fakeObserve) TreeFresh(ctx context.Context) (FreshResult, error) {
+	if f.freshGate != nil {
+		f.freshEntered <- struct{}{}
+		select {
+		case <-f.freshGate:
+		case <-ctx.Done():
+			return FreshResult{}, ctx.Err()
+		}
+	}
 	return f.fresh, f.freshErr
 }
 
