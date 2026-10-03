@@ -208,6 +208,9 @@ func TestDeviceSession_SelectTakesTheLeaseAndASecondProcessGetsDeviceHeld(t *tes
 		t.Fatal("the device lease is not held after select_device")
 	}
 
+	if err := f.devices.BeginCall("tap"); err != nil {
+		t.Fatal(err)
+	}
 	other := f.newDevices("atomyx run", newLifecycleFactory())
 	t.Cleanup(other.Close)
 	err := f.selectDevice(other)
@@ -352,7 +355,7 @@ func TestDeviceSession_AnOpenRunKeepsTheDeviceUntilTheOpenRunTimeout(t *testing.
 		t.Fatalf("held message %q, want the holder reported as running with a run open", message)
 	}
 
-	f.clk.Advance(testOpenRunMs - testIdleMs - 1)
+	f.clk.Advance(testOpenRunMs - testIdleMs - 2)
 	if f.devices.Current() == nil {
 		t.Fatal("the device was released before the open-run timeout elapsed")
 	}
@@ -564,6 +567,9 @@ func TestDeviceSession_CheckHealthReportsTheStateWithoutTouchingTheDevice(t *tes
 func TestSelectDeviceTool_ADeviceAnotherProcessHoldsReportsDeviceHeld(t *testing.T) {
 	f := newLifecycleFixture(t)
 	if err := f.selectDevice(f.devices); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.devices.BeginCall("tap"); err != nil {
 		t.Fatal(err)
 	}
 	drv := mockdriver.New()

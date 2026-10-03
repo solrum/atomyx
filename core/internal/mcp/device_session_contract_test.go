@@ -67,6 +67,9 @@ func TestSelectFailureKeepsCurrentDevice(t *testing.T) {
 	if _, err := other.Select(context.Background(), busy); err != nil {
 		t.Fatal(err)
 	}
+	if err := other.BeginCall("tap"); err != nil {
+		t.Fatal(err)
+	}
 
 	if _, err := f.devices.Select(context.Background(), busy); err == nil {
 		t.Fatal("Select() of a device another process holds succeeded")

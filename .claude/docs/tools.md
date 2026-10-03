@@ -262,6 +262,7 @@ are unselected, idle, running, released, borrowed and lost.
 | borrowed | the new holder ends, or none took the device within `session.FollowBudgetMs` | released |
 | idle, running | the lease is lost, or the iOS runner or its tunnel exits on its own | lost, running scripts are cancelled with the loss as cause, and an open run is closed with outcome `deviceLost` |
 | released, borrowed, lost | a tool that needs a device runs | running again, or the call fails with `DEVICE_RELEASED_HELD` when another process holds the device |
+| unselected, released, borrowed, lost | `select_device` names a device held by a process that is idle and can yield | running, then idle at the end of the call, after the holder yielded through `session.Borrow` with the borrower `atomyx-mcp select_device`. A busy holder keeps the device and the call fails with `DEVICE_HELD` |
 | any | `disconnect_device` | unselected, the remembered device is forgotten |
 
 Timers and the acquisition budget run on the injectable timer clock of

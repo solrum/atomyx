@@ -245,6 +245,10 @@ const maxCarriedInterventions = 256
 
 // errSessionClosed is returned by Select once the session has been
 // closed.
+// selectBorrower is the command string a holder shows to its own user when
+// select_device takes its device.
+const selectBorrower = "atomyx-mcp select_device"
+
 var errSessionClosed = errors.New("session.select: session closed")
 
 // toolsOnTheRun are the tools that only make sense while the run they
@@ -339,7 +343,19 @@ func (s *DeviceSession) SelectedDescriptor() *device.Descriptor {
 // when another process drives the device. A canceled ctx returns its own
 // error. A Select that finishes on a closed session releases what it
 // acquired.
+//
+// Select is the agent's explicit choice of a device, so when another
+// process holds the device and can give it up because it is idle, the
+// device is taken from it and that process is told who took it. A device
+// held by a busy process fails with DEVICE_HELD naming the holder.
 func (s *DeviceSession) Select(ctx context.Context, input SelectDeviceInput) (*ActiveDevice, error) {
+	return s.selectDevice(ctx, input, true)
+}
+
+// selectDevice is Select with the choice of whether a held device may be
+// borrowed. The automatic selection of a pinned device never borrows,
+// because no agent asked for it.
+func (s *DeviceSession) selectDevice(ctx context.Context, input SelectDeviceInput, borrow bool) (*ActiveDevice, error) {
 	if s.isClosed() {
 		return nil, errSessionClosed
 	}
@@ -375,7 +391,7 @@ func (s *DeviceSession) Select(ctx context.Context, input SelectDeviceInput) (*A
 		s.releasePrevious(previous) //nolint:contextcheck // teardown is bounded by its own grace timer, not by a call context
 		s.rememberLaunch(previous)
 	}
-	sess, err := s.open(ctx, session.Request{Descriptor: desc})
+	sess, err := s.open(ctx, session.Request{Descriptor: desc}, borrow)
 	if err != nil {
 		return nil, fmt.Errorf("session.select: driver.connect failed for %s/%s: %w", input.Platform, input.ID, err)
 	}
@@ -427,7 +443,7 @@ func (s *DeviceSession) selectPinned(ctx context.Context) error {
 	if !needed {
 		return nil
 	}
-	_, err := s.Select(ctx, *s.pinned)
+	_, err := s.selectDevice(ctx, *s.pinned, false)
 	return err
 }
 
@@ -513,7 +529,7 @@ func (s *DeviceSession) reacquire(ctx context.Context, prepared *rememberedDevic
 		launch := remembered.launch
 		req.Restore = &launch
 	}
-	sess, err := s.open(ctx, req)
+	sess, err := s.open(ctx, req, false)
 	if err != nil {
 		return nil, false, err
 	}
@@ -552,10 +568,15 @@ func (s *DeviceSession) prepare(ctx context.Context, desc device.Descriptor) err
 // open opens the prepared device within the acquisition timeout. Phases
 // are reported to the calling client, except the connected phase, which
 // install reports once the session is installed. The caller holds acquireMu.
-func (s *DeviceSession) open(ctx context.Context, req session.Request) (*session.Session, error) {
+//
+// With borrow set, a device held by an idle process that can yield is
+// taken from it. A request that re-acquires a remembered device never
+// borrows, whatever borrow says, so two idle sessions cannot pass the
+// device back and forth.
+func (s *DeviceSession) open(ctx context.Context, req session.Request, borrow bool) (*session.Session, error) {
 	req.Gate = s.gate
 	req.Yielder = s
-	sess, err := session.OpenWithinBudget(ctx, s.deps, req, session.Acquisition{
+	acq := session.Acquisition{
 		BudgetMs: s.timeouts.DeviceAcquireMs,
 		Clock:    s.timers,
 		Progress: func(p session.Phase) {
@@ -563,7 +584,22 @@ func (s *DeviceSession) open(ctx context.Context, req session.Request) (*session
 				reportPhase(ctx, acquirePhaseFor(p))
 			}
 		},
-	})
+	}
+	var sess *session.Session
+	var err error
+	if borrow && !req.Reacquire {
+		acq.BuildBudgetMs = s.timeouts.RunnerBuildMs
+		report := acq.Progress
+		// The caller already reported the build phase before it took acquireMu.
+		acq.Progress = func(p session.Phase) {
+			if p != session.PhaseBuilding {
+				report(p)
+			}
+		}
+		sess, err = session.Borrow(ctx, s.deps, req, acq, selectBorrower)
+	} else {
+		sess, err = session.OpenWithinBudget(ctx, s.deps, req, acq)
+	}
 	return sess, canceledOr(ctx, err)
 }
 

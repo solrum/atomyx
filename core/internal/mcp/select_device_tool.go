@@ -41,7 +41,9 @@ func registerSelectDeviceTool(server *mcp.Server, tc *ToolContext) {
 		Description: "Bind the MCP session to a device so subsequent tools (launch_app, " +
 			"tap, get_ui_tree, etc.) operate on it. Enumerate candidates with " +
 			"list_devices first. Calling this again mid-session switches to a " +
-			"different device. The previous driver is disconnected cleanly.",
+			"different device. The previous driver is disconnected cleanly. A device " +
+			"that another session holds idle is taken over from it, and a device " +
+			"that session is using fails with DEVICE_HELD.",
 		InputSchema: selectDeviceInputSchema,
 	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		if err := validateToolArguments(selectDeviceSchema, req.Params.Arguments); err != nil {
