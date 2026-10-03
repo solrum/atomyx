@@ -342,7 +342,8 @@ func TestDeviceSession_AnOpenRunKeepsTheDeviceUntilTheOpenRunTimeout(t *testing.
 	f.devices.EndCall()
 	f.clk.AwaitSleepers(1)
 
-	f.clk.Advance(testIdleMs + 1)
+	const idleElapsed = testIdleMs + 1
+	f.clk.Advance(idleElapsed)
 	if f.devices.Current() == nil {
 		t.Fatal("the plain idle timeout released a device with a run open")
 	}
@@ -355,7 +356,9 @@ func TestDeviceSession_AnOpenRunKeepsTheDeviceUntilTheOpenRunTimeout(t *testing.
 		t.Fatalf("held message %q, want the holder reported as running with a run open", message)
 	}
 
-	f.clk.Advance(testOpenRunMs - testIdleMs - 2)
+	// A timer fires once the clock reaches its deadline, so the last
+	// millisecond before it is the boundary this step must stay short of.
+	f.clk.Advance(testOpenRunMs - idleElapsed - 1)
 	if f.devices.Current() == nil {
 		t.Fatal("the device was released before the open-run timeout elapsed")
 	}
