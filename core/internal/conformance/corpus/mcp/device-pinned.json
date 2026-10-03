@@ -1,0 +1,11 @@
+{
+  "name": "device-pinned",
+  "description": "A server bound to one device accepts selecting that device again, and select_device naming any other device reports DEVICE_PINNED.",
+  "pinned": { "platform": "android", "id": "mock-device" },
+  "steps": [
+    { "tool": "select_device", "args": { "platform": "android", "id": "mock-device" } },
+    { "tool": "select_device", "args": { "platform": "android", "id": "mock-device-2" } },
+    { "tool": "select_device", "args": { "platform": "ios", "id": "mock-device" } },
+    { "tool": "select_device", "args": { "platform": "android", "id": "mock-device" } }
+  ]
+}

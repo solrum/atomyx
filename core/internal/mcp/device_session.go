@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"dev.atomyx/internal/clock"
@@ -106,6 +107,8 @@ type DeviceSessionDeps struct {
 	Session    session.Deps
 	Timeouts   session.Timeouts
 	Runs       *runSession
+	// Pinned binds the session to one device, nil when unbound.
+	Pinned *SelectDeviceInput
 }
 
 // holderState is where the session stands in the holder state machine
@@ -200,6 +203,11 @@ type DeviceSession struct {
 	deps       session.Deps
 	timeouts   session.Timeouts
 	runs       *runSession
+	// pinned is the only device Select accepts, nil when unbound.
+	pinned *SelectDeviceInput
+	// pinMu serializes the first-use selection of the pinned device, so
+	// concurrent first calls select it once.
+	pinMu sync.Mutex
 	// gate keeps a fresh capture of any session this host holds from
 	// interleaving with a tool call. It outlives each held session.
 	gate *session.ActivityGate
@@ -267,7 +275,7 @@ func NewDeviceSession(deps DeviceSessionDeps) *DeviceSession {
 	return &DeviceSession{
 		life: life, cancelLife: cancelLife,
 		state: holderUnselected, probe: deps.Probe, runners: deps.Runners, clock: nowClock, timers: timers, timerBase: context.Background(), logger: logger,
-		deps: sessionDeps, timeouts: deps.Timeouts.WithDefaults(), runs: deps.Runs,
+		deps: sessionDeps, timeouts: deps.Timeouts.WithDefaults(), runs: deps.Runs, pinned: deps.Pinned,
 		gate: session.NewActivityGate(),
 	}
 }
@@ -314,6 +322,9 @@ func (s *DeviceSession) Select(ctx context.Context, input SelectDeviceInput) (*A
 	if s.isClosed() {
 		return nil, errSessionClosed
 	}
+	if err := s.checkPinned(input); err != nil {
+		return nil, err
+	}
 	defer pauseToolBudget(ctx)()
 
 	desc, err := s.resolveDescriptor(ctx, input)
@@ -357,6 +368,48 @@ func (s *DeviceSession) Select(ctx context.Context, input SelectDeviceInput) (*A
 	return active, nil
 }
 
+// checkPinned fails with DEVICE_PINNED when the session is bound to a
+// device and input names another one. An iOS id compares without
+// regard to case, as the scan that resolves it does.
+func (s *DeviceSession) checkPinned(input SelectDeviceInput) error {
+	if s.pinned == nil {
+		return nil
+	}
+	sameID := input.ID == s.pinned.ID
+	if input.Platform == device.PlatformIOS {
+		sameID = strings.EqualFold(input.ID, s.pinned.ID)
+	}
+	if input.Platform == s.pinned.Platform && sameID {
+		return nil
+	}
+	return diag.New(
+		diag.CodeDevicePinned,
+		fmt.Sprintf("This server is bound to device %s and cannot select device %s on %s.",
+			s.pinned.ID, input.ID, input.Platform),
+		"This server is bound to one device. Keep using it, or ask the operator to start a server for the other device.",
+		nil,
+	)
+}
+
+// selectPinned selects the pinned device when nothing was ever selected
+// and the session is still open. A session without a pin, or one that
+// already selected, is left alone.
+func (s *DeviceSession) selectPinned(ctx context.Context) error {
+	if s.pinned == nil {
+		return nil
+	}
+	s.pinMu.Lock()
+	defer s.pinMu.Unlock()
+	s.mu.Lock()
+	needed := !s.closed && s.active == nil && s.remembered == nil
+	s.mu.Unlock()
+	if !needed {
+		return nil
+	}
+	_, err := s.Select(ctx, *s.pinned)
+	return err
+}
+
 // rememberLaunch stores the launched-app state of a session this one gave
 // up on purpose, so a later re-acquire can offer it to the next driver.
 func (s *DeviceSession) rememberLaunch(previous *session.Session) {
@@ -378,6 +431,9 @@ func (s *DeviceSession) rememberLaunch(previous *session.Session) {
 // fails with the no-active-device error. A canceled ctx returns its own
 // error.
 func (s *DeviceSession) Ensure(ctx context.Context) (*ActiveDevice, error) {
+	if err := s.selectPinned(ctx); err != nil {
+		return nil, err
+	}
 	defer pauseToolBudget(ctx)()
 	ctx, stop := s.withLife(ctx)
 	defer stop()

@@ -582,6 +582,10 @@ watched, or when the server failed, `2` when the command was misused,
 the length of the command. Only one Atomyx process, whether this CLI or
 an `atomyx-mcp` server, can drive a device at a time.
 
+- `atomyx-mcp --platform <ios|android> --device <id>` binds an MCP
+  server to one device. It selects that device on the first call that
+  needs one, and `select_device` naming another device fails with code
+  `DEVICE_PINNED`.
 - A second `run`, `suite` or `doctor` command against a device that is
   already owned fails with code `DEVICE_HELD`. The message names the
   holder's process id, command, and state. Stop that process or wait

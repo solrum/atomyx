@@ -6,9 +6,11 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -36,19 +38,76 @@ const (
 )
 
 func main() {
-	if versionRequested(os.Args[1:]) {
+	opts, err := parseArgs(os.Args[1:])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "atomyx-mcp: %v\n", err)
+		fmt.Fprintln(os.Stderr, usage)
+		os.Exit(2)
+	}
+	if opts.version {
 		fmt.Println(versionLine())
 		os.Exit(0)
 	}
-	os.Exit(run())
+	os.Exit(run(opts))
 }
 
-// versionRequested reports whether args asked for this binary's build
-// identity instead of starting the server. atomyx-mcp has no other
-// flags or subcommands, so a bare --version or -v anywhere main
-// forwards it is enough.
-func versionRequested(args []string) bool {
-	return len(args) > 0 && (args[0] == "--version" || args[0] == "-v")
+const usage = "usage: atomyx-mcp [--version] [--platform <ios|android> --device <id>]"
+
+// options is what the command line asked for.
+type options struct {
+	version bool
+	// pinned is the device the server is bound to, nil when the server
+	// lets the agent choose.
+	pinned *mcp.SelectDeviceInput
+}
+
+// parseArgs reads the command line. --device binds the server to one
+// device and needs --platform, because a device id alone does not say
+// which platform's discovery resolves it: select_device takes the same
+// pair. A bare --version or -v asks for the build identity instead of
+// starting the server.
+func parseArgs(args []string) (options, error) {
+	var opts options
+	var platform, id string
+	var sawDevice bool
+	for i := 0; i < len(args); i++ {
+		name, value, hasValue := strings.Cut(args[i], "=")
+		switch name {
+		case "--version", "-v":
+			opts.version = true
+		case "--device", "--platform":
+			if !hasValue {
+				i++
+				if i >= len(args) {
+					return options{}, fmt.Errorf("%s needs a value", name)
+				}
+				value = args[i]
+			}
+			if name == "--device" {
+				id, sawDevice = value, true
+			} else {
+				platform = value
+			}
+		default:
+			return options{}, fmt.Errorf("unknown argument %q", args[i])
+		}
+	}
+	if opts.version {
+		return opts, nil
+	}
+	if !sawDevice && platform == "" {
+		return opts, nil
+	}
+	if !sawDevice || id == "" {
+		return options{}, errors.New("--platform needs --device")
+	}
+	switch device.Platform(platform) {
+	case device.PlatformIOS, device.PlatformAndroid:
+	default:
+		return options{}, errors.New("--device needs --platform ios or --platform android")
+	}
+	opts.pinned = &mcp.SelectDeviceInput{Platform: device.Platform(platform), ID: id}
+	return opts, nil
 }
 
 // versionLine is the single line atomyx-mcp reports for --version:
@@ -61,7 +120,7 @@ func versionLine() string {
 // run holds every deferred cleanup so it always runs before the
 // process exits: main only calls os.Exit, on run's returned code,
 // after run itself has returned and every defer inside it has fired.
-func run() int {
+func run(opts options) int {
 	procRunner := process.NewExec()
 	background := process.NewExecBackground()
 	clock := orchestra.SystemClock{}
@@ -104,6 +163,7 @@ func run() int {
 		Clock:      clock,
 		Logger:     logger,
 		Session:    sessionDeps,
+		Pinned:     opts.pinned,
 		Timeouts:   sessionwire.ResolveTimeouts(sessionwire.LoadConfigBestEffort(logger), os.Getenv, logger),
 	})
 	if err != nil {

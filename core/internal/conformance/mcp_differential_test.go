@@ -36,12 +36,17 @@ var mcpConformanceEpoch = time.Date(2026, time.September, 15, 12, 0, 0, 0, time.
 // newGoMcpClientSession wires an in-process Go MCP server against a
 // mcpScriptedMockFactory seeded with program and connects a client
 // session to it over an in-memory transport.
-func newGoMcpClientSession(t *testing.T, ctx context.Context, program *McpDriverProgram) (*mcp.ClientSession, func()) {
+func newGoMcpClientSession(t *testing.T, ctx context.Context, program *McpDriverProgram, pinned *McpPinnedDevice) (*mcp.ClientSession, func()) {
 	t.Helper()
 	root := t.TempDir()
 	store := storage.NewInMemoryStorage()
 	runStore := storage.NewRunStore()
+	var pin *atomcp.SelectDeviceInput
+	if pinned != nil {
+		pin = &atomcp.SelectDeviceInput{Platform: device.Platform(pinned.Platform), ID: pinned.ID}
+	}
 	server, err := atomcp.NewServer(atomcp.Info{Name: "atomyx-conformance", Version: "0.0.0-test"}, atomcp.ServerDeps{
+		Pinned:   pin,
 		Probe:    device.NewStaticProbe(mcpProbeSnapshots(), mcpProbeSnapshots()),
 		Factory:  &mcpScriptedMockFactory{program: program},
 		Storage:  store,
@@ -119,7 +124,7 @@ func TestMcpToolSchemaDifferential(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), mcpConformanceTimeout)
 	defer cancel()
 
-	goSession, closeGo := newGoMcpClientSession(t, ctx, nil)
+	goSession, closeGo := newGoMcpClientSession(t, ctx, nil, nil)
 	defer closeGo()
 
 	goTools, err := goSession.ListTools(ctx, nil)
@@ -382,7 +387,7 @@ func TestMcpToolCallDifferential(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), mcpConformanceTimeout)
 			defer cancel()
 
-			goSession, closeGo := newGoMcpClientSession(t, ctx, c.Driver)
+			goSession, closeGo := newGoMcpClientSession(t, ctx, c.Driver, c.Pinned)
 			defer closeGo()
 
 			goTrace, err := replayMcpSteps(ctx, goSession, c.Steps)

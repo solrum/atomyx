@@ -55,6 +55,10 @@ type ServerDeps struct {
 	Logger     logging.Logger
 	Session    session.Deps
 	Timeouts   session.Timeouts
+	// Pinned binds the server to one device. The server selects it on
+	// the first call that needs a device, and select_device naming any
+	// other device fails with DEVICE_PINNED. Nil lets the agent choose.
+	Pinned *SelectDeviceInput
 }
 
 // NewServer constructs the Atomyx MCP server and registers its tool
@@ -101,7 +105,7 @@ func NewServer(info Info, deps ServerDeps) (*Server, error) {
 	})
 	devices = NewDeviceSession(DeviceSessionDeps{
 		Factory: deps.Factory, Probe: deps.Probe, Runners: deps.Runners, Clock: clk, TimerClock: timers, Logger: logger,
-		Session: deps.Session, Timeouts: deps.Timeouts, Runs: runSession,
+		Session: deps.Session, Timeouts: deps.Timeouts, Runs: runSession, Pinned: deps.Pinned,
 	})
 	traits := newToolTraits()
 	tc := &ToolContext{

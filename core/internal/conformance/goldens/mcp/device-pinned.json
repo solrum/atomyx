@@ -1,0 +1,64 @@
+[
+  {
+    "result": {
+      "content": [
+        {
+          "active": {
+            "connectedAt": "\u003cnormalized\u003e",
+            "id": "mock-device",
+            "kind": "simulator",
+            "platform": "android"
+          },
+          "ok": true
+        }
+      ],
+      "isError": false
+    },
+    "tool": "select_device"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "code": "DEVICE_PINNED",
+          "hint": "This server is bound to one device. Keep using it, or ask the operator to start a server for the other device.",
+          "ok": false,
+          "reason": "This server is bound to device mock-device and cannot select device mock-device-2 on android."
+        }
+      ],
+      "isError": false
+    },
+    "tool": "select_device"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "code": "DEVICE_PINNED",
+          "hint": "This server is bound to one device. Keep using it, or ask the operator to start a server for the other device.",
+          "ok": false,
+          "reason": "This server is bound to device mock-device and cannot select device mock-device on ios."
+        }
+      ],
+      "isError": false
+    },
+    "tool": "select_device"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "active": {
+            "connectedAt": "\u003cnormalized\u003e",
+            "id": "mock-device",
+            "kind": "simulator",
+            "platform": "android"
+          },
+          "ok": true
+        }
+      ],
+      "isError": false
+    },
+    "tool": "select_device"
+  }
+]

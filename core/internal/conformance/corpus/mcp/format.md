@@ -36,6 +36,10 @@ Every case has:
   override merged onto the mock's default capabilities), and `screen`
   (`{width, height}`). Omitted when no case step ever selects a
   device.
+- `pinned` (object `{platform, id}`, optional): starts the server bound
+  to that device, as `atomyx-mcp --platform <platform> --device <id>`
+  does. A `select_device` step naming another device then reports
+  `DEVICE_PINNED`.
 - `steps` (array, required): an ordered list of `{tool, args}` calls,
   replayed sequentially, each response awaited before the next call is
   sent.

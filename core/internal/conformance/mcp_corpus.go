@@ -26,7 +26,16 @@ type McpCase struct {
 	Name        string            `json:"name"`
 	Description string            `json:"description"`
 	Driver      *McpDriverProgram `json:"driver,omitempty"`
-	Steps       []McpStep         `json:"steps"`
+	// Pinned starts the server bound to one device, as
+	// atomyx-mcp --platform <platform> --device <id> does.
+	Pinned *McpPinnedDevice `json:"pinned,omitempty"`
+	Steps  []McpStep        `json:"steps"`
+}
+
+// McpPinnedDevice names the device a case's server is bound to.
+type McpPinnedDevice struct {
+	Platform string `json:"platform"`
+	ID       string `json:"id"`
 }
 
 func loadMcpCase(path string) (*McpCase, error) {

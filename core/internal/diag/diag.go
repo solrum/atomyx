@@ -55,6 +55,11 @@ const (
 	// lease, or lost it, needs the device again and another process now
 	// holds the lease.
 	CodeDeviceReleasedHeld = "DEVICE_RELEASED_HELD"
+	// CodeDevicePinned means a device selection named a device other
+	// than the one the server was started bound to. The condition is
+	// permanent for the life of the server, so only a server started
+	// for the other device can drive it.
+	CodeDevicePinned = "DEVICE_PINNED"
 	// CodeRunExpired means a tool call targeted a run that was closed
 	// because it sat idle past the open-run idle timeout.
 	CodeRunExpired = "RUN_EXPIRED"
