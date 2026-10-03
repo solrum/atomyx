@@ -34,6 +34,20 @@ func (c *skipClock) Sleep(ctx context.Context, ms int64) error {
 	return ctx.Err()
 }
 
+// idleBudgetClock behaves like skipClock except that a sleep of the
+// device acquisition budget waits for its context, because that sleep is
+// the timer of the acquisition and must not fire while the lease retries
+// at the pace of the instant clock.
+type idleBudgetClock struct{ *skipClock }
+
+func (c idleBudgetClock) Sleep(ctx context.Context, ms int64) error {
+	if ms == session.DefaultDeviceAcquireTimeoutMs {
+		<-ctx.Done()
+		return ctx.Err()
+	}
+	return c.skipClock.Sleep(ctx, ms)
+}
+
 func servingSockets(manager *lease.Manager) func(*Deps) {
 	return func(d *Deps) { d.Session.Sockets = manager }
 }
@@ -260,7 +274,10 @@ func TestInspect_ReconnectOnADeviceWhoseHolderServesNoSocketKeepsTheReleasedPage
 	clk := &skipClock{}
 	manager := newShortLeaseManagerWithClock(t, clk)
 	first := holdDeviceServingASocket(t, manager)
-	run := startInspectWith(t, manager, heldDevice, nil, withAttachClock(manager, clk))
+	run := startInspectWith(t, manager, heldDevice, nil, func(d *Deps) {
+		d.Session.Sockets = manager
+		d.Session.Clock = idleBudgetClock{clk}
+	})
 	client := connectClient(t, awaitInspectURL(t, run))
 	first.Close()
 	run.stderr.awaitLine(t, "inspector.target.ended")

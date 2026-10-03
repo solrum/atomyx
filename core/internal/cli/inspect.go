@@ -208,10 +208,9 @@ func inspectOpener(deps Deps, desc device.Descriptor, socketRefresher session.Re
 
 // inspectReconnectOpener is the opener of the operator's reconnect. It
 // takes the device when it is free or held by an idle process that can
-// yield it, and otherwise falls back to watch, which attaches to the
-// holder or reports the device's own coded error. Any borrow failure falls
-// back, because the borrow attempt acquires before it probes the holder and
-// must not replace the error the probing path reports.
+// yield it. When the device stays held, it falls back to watch, which
+// attaches to the holder or reports the device's own coded error. Every
+// other failure is returned as it is, so a failed launch is not repeated.
 // Only an explicit reconnect borrows, because the inspector's own paths
 // must never take a device from another process unasked.
 func inspectReconnectOpener(deps Deps, desc device.Descriptor, socketRefresher session.Refresher, yielder session.Yielder, watch inspector.Opener) inspector.Opener {
@@ -220,7 +219,7 @@ func inspectReconnectOpener(deps Deps, desc device.Descriptor, socketRefresher s
 		if err == nil {
 			return opened, nil
 		}
-		if ctx.Err() != nil {
+		if _, _, isHeld := heldHolder(err); !isHeld {
 			return nil, err
 		}
 		return watch(ctx)
