@@ -49,8 +49,11 @@ var iosDeviceEnvPath = filepath.Join("platforms", "ios-agent", "device.env")
 // deviceEnvName is the bare file name of that configuration.
 const deviceEnvName = "device.env"
 
-// stepLogPattern matches the per-step log files of a run.
-var stepLogPattern = regexp.MustCompile(`^step-\d+-log\.jsonl$`)
+// stepLogPattern matches the per-step log files of a run, with or without
+// the sink prefix that scopes failure evidence: a lowercase slug of
+// letters, digits, and hyphens that ends in a hyphen, such as
+// `script-001-` or `login-flow-`.
+var stepLogPattern = regexp.MustCompile(`^(?:[a-z0-9][a-z0-9-]*-)?step-\d+-log\.jsonl$`)
 
 // bundleTools are the host tools whose versions a bundle records, with
 // the arguments that print the version.

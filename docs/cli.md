@@ -300,7 +300,8 @@ The zip holds:
   the reason. Each entry carries `healthChecked: false`, because a health
   check needs the device lease and a bundle never takes one.
 - `runs/<id>/meta.json`, `runs/<id>/log.jsonl`, and every
-  `step-NNN-log.jsonl` log file of the five newest runs under the run
+  `step-NNN-log.jsonl` log file, including prefixed names such as
+  `script-NNN-step-NNN-log.jsonl`, of the five newest runs under the run
   root. No screenshot, accessibility tree, or other artifact is included.
 
 Every file is scrubbed before it is written. The scrubber masks the

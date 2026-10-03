@@ -55,14 +55,18 @@ func seedRun(t *testing.T, root, id string, startedAt int64, logBody string) str
 		t.Fatal(err)
 	}
 	files := map[string]string{
-		filepath.Join(dir, runfolder.MetaFileName):                string(body),
-		filepath.Join(dir, runfolder.LogFileName):                 logBody,
-		filepath.Join(dir, "step-001-log.jsonl"):                  "step " + bundleSecret + "\n",
-		filepath.Join(artifacts, "step-002-log.jsonl"):            "artifact log\n",
-		filepath.Join(artifacts, "step-001-failure.png"):          "PNGDATA",
-		filepath.Join(artifacts, "tree.json"):                     "{}",
-		filepath.Join(dir, runfolder.StepsFileName):               "{}\n",
-		filepath.Join(runfolder.ReportDir(dir), "screenshot.png"): "PNGDATA",
+		filepath.Join(dir, runfolder.MetaFileName):                                         string(body),
+		filepath.Join(dir, runfolder.LogFileName):                                          logBody,
+		filepath.Join(dir, "step-001-log.jsonl"):                                           "step " + bundleSecret + "\n",
+		filepath.Join(artifacts, "step-002-log.jsonl"):                                     "artifact log\n",
+		filepath.Join(artifacts, "script-001-step-003-log.jsonl"):                          "session log\n",
+		filepath.Join(artifacts, evidencePrefix("Login flow: happy")+"step-004-log.jsonl"): "child log\n",
+		filepath.Join(artifacts, "step-002-tree.json"):                                     "{}",
+		filepath.Join(artifacts, "script-001-step-003-failure.png"):                        "PNGDATA",
+		filepath.Join(artifacts, "step-001-failure.png"):                                   "PNGDATA",
+		filepath.Join(artifacts, "tree.json"):                                              "{}",
+		filepath.Join(dir, runfolder.StepsFileName):                                        "{}\n",
+		filepath.Join(runfolder.ReportDir(dir), "screenshot.png"):                          "PNGDATA",
 	}
 	for p, c := range files {
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
@@ -161,7 +165,12 @@ func TestBundleKeepsFiveNewestRunsAndScrubsSecrets(t *testing.T) {
 		t.Error("the oldest run must be left out")
 	}
 	newest := "runs/20261002-100006-run-aaaa/"
-	for _, name := range []string{runfolder.MetaFileName, runfolder.LogFileName, "step-001-log.jsonl"} {
+	for _, name := range []string{
+		runfolder.MetaFileName, runfolder.LogFileName, "step-001-log.jsonl",
+		"artifacts/step-002-log.jsonl",
+		"artifacts/script-001-step-003-log.jsonl",
+		"artifacts/login-flow-happy-step-004-log.jsonl",
+	} {
 		if _, ok := files[newest+name]; !ok {
 			t.Errorf("missing %s%s", newest, name)
 		}
