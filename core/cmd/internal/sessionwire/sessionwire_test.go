@@ -1,9 +1,12 @@
 package sessionwire
 
 import (
+	"os"
 	"testing"
 
+	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/config"
+	"dev.atomyx/internal/lease"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/session"
 )
@@ -43,5 +46,32 @@ func TestResolveTimeouts_AnInvalidEnvironmentValueIsIgnored(t *testing.T) {
 		if got.McpIdleMs != session.DefaultMcpIdleTimeoutMs {
 			t.Fatalf("%q gave %d, want the default", bad, got.McpIdleMs)
 		}
+	}
+}
+
+func TestDeps_NamesTheSocketPathThroughTheSameLeaseManager(t *testing.T) {
+	root, err := os.MkdirTemp("", "w")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(root) })
+	t.Setenv("HOME", root)
+	t.Setenv("XDG_RUNTIME_DIR", root)
+
+	deps, err := Deps(nil, clock.SystemClock{}, logging.NoopLogger{}, "atomyx", "cli")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if deps.Sockets == nil {
+		t.Fatal("Deps().Sockets is nil, want the lease manager so every holder serves a socket")
+	}
+	manager, ok := deps.Leases.(*lease.Manager)
+	if !ok {
+		t.Fatalf("Deps().Leases is %T, want *lease.Manager", deps.Leases)
+	}
+	key := lease.KeyFor("android", "A")
+	if got, want := deps.Sockets.SocketPath(key), manager.SocketPath(key); got != want {
+		t.Fatalf("socket path = %q, want %q", got, want)
 	}
 }

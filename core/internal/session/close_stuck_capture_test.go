@@ -57,7 +57,7 @@ func (f *stuckHierarchyFactory) Build(ctx context.Context, _ device.Descriptor) 
 func TestClose_DisconnectsEvenWhenAViewerCaptureIsStuckInTheDriver(t *testing.T) {
 	m := newSocketManager(t, clock.SystemClock{})
 	drv := &stuckHierarchyDriver{Driver: mockdriver.New(), entered: make(chan struct{}), disconnected: make(chan struct{})}
-	s, err := session.Open(context.Background(), baseDeps(t, &stuckHierarchyFactory{drv: drv}, m), session.Request{Descriptor: androidDesc("A")})
+	s, err := session.Open(context.Background(), socketDeps(t, &stuckHierarchyFactory{drv: drv}, m), session.Request{Descriptor: androidDesc("A")})
 	if err != nil {
 		t.Fatal(err)
 	}

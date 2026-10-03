@@ -22,7 +22,7 @@ func (r *countingRefresher) FreshTree(context.Context) (session.Snapshot, error)
 func TestAttachTreeFresh_UsesTheRefresherTheHostInjected(t *testing.T) {
 	m := newSocketManager(t, clock.SystemClock{})
 	refresher := &countingRefresher{}
-	s, err := session.Open(context.Background(), baseDeps(t, &recordingFactory{events: &eventLog{}}, m),
+	s, err := session.Open(context.Background(), socketDeps(t, &recordingFactory{events: &eventLog{}}, m),
 		session.Request{Descriptor: androidDesc("A"), SocketRefresher: refresher})
 	if err != nil {
 		t.Fatal(err)

@@ -87,7 +87,7 @@ func stepLinesOverTheSocket(t *testing.T, root string, command func(Deps) int) [
 	manager := newShortLeaseManager(t)
 	var stderr bytes.Buffer
 	deps := stepsDeps(&bytes.Buffer{}, &stderr)
-	deps.Session = session.Deps{Leases: manager, Clock: clock.SystemClock{}}
+	deps.Session = session.Deps{Leases: manager, Sockets: manager, Clock: clock.SystemClock{}}
 	var viewer *sessiontest.Viewer
 	deps.Stdout = &stdoutHook{onWrite: func() {
 		if viewer == nil {
@@ -209,7 +209,7 @@ func runWithHook(t *testing.T, root string, hook func(manager *lease.Manager)) (
 	deps := mockDeps(&stdout, &stderr)
 	deps.Factory = factory
 	deps.Logger = logging.NewStructuredLogger(&logs, logging.LevelWarn)
-	deps.Session = session.Deps{Leases: manager, Clock: clock.SystemClock{}}
+	deps.Session = session.Deps{Leases: manager, Sockets: manager, Clock: clock.SystemClock{}}
 
 	code := RunScript(context.Background(), deps, map[string]FlagValue{
 		"--file": writeScript(t, "flow.yml", secretFlow), "--report-dir": root,

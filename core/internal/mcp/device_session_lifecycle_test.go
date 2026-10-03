@@ -142,7 +142,7 @@ func newLifecycleFixture(t *testing.T) *lifecycleFixture {
 func (f *lifecycleFixture) newDevices(command string, factory device.WrappingFactory) *DeviceSession {
 	return NewDeviceSession(DeviceSessionDeps{
 		Factory: factory, Probe: device.NewStaticProbe(), Clock: f.clk, TimerClock: f.clk, Logger: logging.NoopLogger{},
-		Session:  session.Deps{Leases: f.leases, Clock: clock.SystemClock{}, Command: command},
+		Session:  session.Deps{Leases: f.leases, Sockets: f.leases, Clock: clock.SystemClock{}, Command: command},
 		Timeouts: session.Timeouts{McpIdleMs: testIdleMs, OpenRunIdleMs: testOpenRunMs, DeviceAcquireMs: 120_000},
 		Runs:     f.runs,
 	})
@@ -153,7 +153,7 @@ func (f *lifecycleFixture) newDevices(command string, factory device.WrappingFac
 func (f *lifecycleFixture) newDevicesPreparing(command string, factory device.WrappingFactory, preparer device.RunnerPreparer) *DeviceSession {
 	return NewDeviceSession(DeviceSessionDeps{
 		Factory: factory, Probe: device.NewStaticProbe(), Clock: f.clk, TimerClock: f.clk, Logger: logging.NoopLogger{},
-		Session:  session.Deps{Leases: f.leases, Clock: f.clk, Command: command, Preparer: preparer},
+		Session:  session.Deps{Leases: f.leases, Sockets: f.leases, Clock: f.clk, Command: command, Preparer: preparer},
 		Timeouts: session.Timeouts{McpIdleMs: testIdleMs, OpenRunIdleMs: testOpenRunMs, DeviceAcquireMs: 120_000},
 		Runs:     f.runs,
 	})
@@ -568,7 +568,7 @@ func TestSelectDeviceTool_ADeviceAnotherProcessHoldsReportsDeviceHeld(t *testing
 		Probe:   device.NewStaticProbe(),
 		Factory: singleMockDriverFactory{driver: drv},
 		Storage: storage.NewInMemoryStorage(),
-		Session: session.Deps{Leases: f.leases, Clock: clock.SystemClock{}, Command: "atomyx-mcp", Role: "mcp"},
+		Session: session.Deps{Leases: f.leases, Sockets: f.leases, Clock: clock.SystemClock{}, Command: "atomyx-mcp", Role: "mcp"},
 	})
 
 	result, decoded := callTool(t, cs, ctx, "select_device", map[string]any{"platform": "android", "id": "A"})

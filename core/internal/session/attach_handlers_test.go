@@ -23,7 +23,7 @@ func socketHolder(t *testing.T) (*session.Session, *mockdriver.Driver, string) {
 	t.Helper()
 	m := newSocketManager(t, clock.SystemClock{})
 	factory := &recordingFactory{events: &eventLog{}}
-	s, err := session.Open(context.Background(), baseDeps(t, factory, m), session.Request{Descriptor: androidDesc("A")})
+	s, err := session.Open(context.Background(), socketDeps(t, factory, m), session.Request{Descriptor: androidDesc("A")})
 	if err != nil {
 		t.Fatal(err)
 	}

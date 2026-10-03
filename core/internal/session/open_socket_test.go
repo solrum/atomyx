@@ -11,6 +11,7 @@ import (
 
 	"dev.atomyx/internal/attach"
 	"dev.atomyx/internal/clock"
+	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/lease"
 	"dev.atomyx/internal/session"
 )
@@ -66,7 +67,7 @@ func requireNoFile(t *testing.T, path string) {
 
 func TestOpen_BindsTheHolderSocketAndRecordsItInTheLease(t *testing.T) {
 	m := newSocketManager(t, clock.SystemClock{})
-	s, err := session.Open(context.Background(), baseDeps(t, &recordingFactory{events: &eventLog{}}, m), session.Request{Descriptor: androidDesc("A")})
+	s, err := session.Open(context.Background(), socketDeps(t, &recordingFactory{events: &eventLog{}}, m), session.Request{Descriptor: androidDesc("A")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +93,7 @@ func TestOpen_BindsTheHolderSocketAndRecordsItInTheLease(t *testing.T) {
 func TestOpen_AFailedBuildLeavesNoListenerAndNoSocketFile(t *testing.T) {
 	m := newSocketManager(t, clock.SystemClock{})
 	factory := &recordingFactory{events: &eventLog{}, err: errors.New("build failed")}
-	if _, err := session.Open(context.Background(), baseDeps(t, factory, m), session.Request{Descriptor: androidDesc("A")}); err == nil {
+	if _, err := session.Open(context.Background(), socketDeps(t, factory, m), session.Request{Descriptor: androidDesc("A")}); err == nil {
 		t.Fatal("Open() succeeded, want the build error")
 	}
 
@@ -113,7 +114,7 @@ func TestOpen_ReplacesAStaleSocketFileLeftByAnEarlierHolder(t *testing.T) {
 	stale.SetUnlinkOnClose(false)
 	_ = stale.Close()
 
-	s, err := session.Open(context.Background(), baseDeps(t, &recordingFactory{events: &eventLog{}}, m), session.Request{Descriptor: androidDesc("A")})
+	s, err := session.Open(context.Background(), socketDeps(t, &recordingFactory{events: &eventLog{}}, m), session.Request{Descriptor: androidDesc("A")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +128,7 @@ func TestOpen_ReplacesAStaleSocketFileLeftByAnEarlierHolder(t *testing.T) {
 
 func TestClose_RemovesTheSocketFileAndEndsEveryViewerConnection(t *testing.T) {
 	m := newSocketManager(t, clock.SystemClock{})
-	s, err := session.Open(context.Background(), baseDeps(t, &recordingFactory{events: &eventLog{}}, m), session.Request{Descriptor: androidDesc("A")})
+	s, err := session.Open(context.Background(), socketDeps(t, &recordingFactory{events: &eventLog{}}, m), session.Request{Descriptor: androidDesc("A")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +148,7 @@ func TestClose_RemovesTheSocketFileAndEndsEveryViewerConnection(t *testing.T) {
 
 func TestClose_LeavesASocketAnotherProcessBoundAtTheSamePath(t *testing.T) {
 	m := newSocketManager(t, clock.SystemClock{})
-	s, err := session.Open(context.Background(), baseDeps(t, &recordingFactory{events: &eventLog{}}, m), session.Request{Descriptor: androidDesc("A")})
+	s, err := session.Open(context.Background(), socketDeps(t, &recordingFactory{events: &eventLog{}}, m), session.Request{Descriptor: androidDesc("A")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +179,7 @@ func TestClose_LeavesASocketAnotherProcessBoundAtTheSamePath(t *testing.T) {
 func TestSession_ALostSessionStopsItsServerAndLeavesTheSocketPathToTheNewHolder(t *testing.T) {
 	manual := clock.NewManualClock(0)
 	m := newSocketManager(t, manual)
-	s, err := session.Open(context.Background(), baseDeps(t, &recordingFactory{events: &eventLog{}}, m), session.Request{Descriptor: androidDesc("A")})
+	s, err := session.Open(context.Background(), socketDeps(t, &recordingFactory{events: &eventLog{}}, m), session.Request{Descriptor: androidDesc("A")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,7 +226,7 @@ func TestOpen_ABindFailureIsRecordedInTheLeaseWithoutAPath(t *testing.T) {
 	if err := os.Chmod(filepath.Dir(path), 0o750); err != nil {
 		t.Fatal(err)
 	}
-	s, err := session.Open(context.Background(), baseDeps(t, &recordingFactory{events: &eventLog{}}, m), session.Request{Descriptor: androidDesc("A")})
+	s, err := session.Open(context.Background(), socketDeps(t, &recordingFactory{events: &eventLog{}}, m), session.Request{Descriptor: androidDesc("A")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,7 +247,7 @@ func TestOpen_ABindFailureIsRecordedInTheLeaseWithoutAPath(t *testing.T) {
 
 func TestOpen_ABoundSocketLeavesTheLeaseSocketErrorEmpty(t *testing.T) {
 	m := newSocketManager(t, clock.SystemClock{})
-	s, err := session.Open(context.Background(), baseDeps(t, &recordingFactory{events: &eventLog{}}, m), session.Request{Descriptor: androidDesc("A")})
+	s, err := session.Open(context.Background(), socketDeps(t, &recordingFactory{events: &eventLog{}}, m), session.Request{Descriptor: androidDesc("A")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,4 +257,53 @@ func TestOpen_ABoundSocketLeavesTheLeaseSocketErrorEmpty(t *testing.T) {
 	if err != nil || status.Holder.Socket == "" || status.Holder.SocketError != "" {
 		t.Fatalf("holder = %+v, %v, want a socket and no socketError", status.Holder, err)
 	}
+}
+
+// socketDeps is baseDeps with the lease manager also naming the socket,
+// as every production composition root does.
+func socketDeps(t *testing.T, f device.WrappingFactory, m *lease.Manager) session.Deps {
+	t.Helper()
+	deps := baseDeps(t, f, m)
+	deps.Sockets = m
+	return deps
+}
+
+// wrappingAcquirer hides the manager's other methods behind the plain
+// LeaseAcquirer contract, like a decorator that adds logging would.
+type wrappingAcquirer struct{ inner session.LeaseAcquirer }
+
+func (w wrappingAcquirer) Acquire(ctx context.Context, key lease.Key, holder lease.Holder) (*lease.Lease, error) {
+	return w.inner.Acquire(ctx, key, holder)
+}
+
+func (w wrappingAcquirer) Dir() string { return w.inner.Dir() }
+
+func TestOpen_AWrappedAcquirerStillServesTheSocketTheDepsName(t *testing.T) {
+	m := newSocketManager(t, clock.SystemClock{})
+	deps := socketDeps(t, &recordingFactory{events: &eventLog{}}, m)
+	deps.Leases = wrappingAcquirer{inner: m}
+	s, err := session.Open(context.Background(), deps, session.Request{Descriptor: androidDesc("A")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+
+	if got, want := s.Info().Holder.Socket, socketPathFor(m); got != want {
+		t.Fatalf("Info().Holder.Socket = %q, want %q", got, want)
+	}
+	dialHolder(t, socketPathFor(m))
+}
+
+func TestOpen_WithoutSocketsTheHolderServesNoSocket(t *testing.T) {
+	m := newSocketManager(t, clock.SystemClock{})
+	s, err := session.Open(context.Background(), baseDeps(t, &recordingFactory{events: &eventLog{}}, m), session.Request{Descriptor: androidDesc("A")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+
+	if got := s.Info().Holder.Socket; got != "" {
+		t.Fatalf("Info().Holder.Socket = %q, want none without Deps.Sockets", got)
+	}
+	requireNoFile(t, socketPathFor(m))
 }

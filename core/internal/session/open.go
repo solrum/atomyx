@@ -41,6 +41,13 @@ type Deps struct {
 	// exclusion entirely, which only a single-process host such as a test
 	// wants. Every production composition root sets it.
 	Leases LeaseAcquirer
+	// Sockets says where the holder of each device serves viewers. Nil
+	// binds no attach socket, and so does a nil Leases, because a session
+	// without a lease has no exclusive claim on the path. It is a separate
+	// dependency from Leases, so wrapping the acquirer never drops the
+	// socket silently. Every production composition root sets it to the
+	// same lease manager it sets as Leases.
+	Sockets SocketNamer
 	// Preparer does the lease-free work Prepare runs before Open, such as
 	// building the iOS runner. Nil makes Prepare a no-op.
 	Preparer device.RunnerPreparer
@@ -124,10 +131,10 @@ func observingFactory(factory device.WrappingFactory, hub *Hub) device.Factory {
 // with a coded error before the lease is taken. On any failure nothing
 // is left held.
 //
-// Once the driver is built, a leased session binds its attach socket,
-// replacing a stale file at that path, and records the path in the lease
-// metadata. A socket that cannot be bound is logged and the session
-// proceeds without one.
+// Once the driver is built, a leased session with Deps.Sockets set binds
+// its attach socket, replacing a stale file at that path, and records the
+// path in the lease metadata. A socket that cannot be bound is logged and
+// the session proceeds without one.
 func Open(ctx context.Context, deps Deps, req Request) (*Session, error) {
 	deps = deps.withDefaults()
 	desc := req.Descriptor
@@ -184,8 +191,8 @@ func Open(ctx context.Context, deps Deps, req Request) (*Session, error) {
 	s := newSession(ctx, deps, desc, identity, held, built, hub, gate)
 	s.relaunched = relaunched
 	s.socketRefresher = req.SocketRefresher
-	if namer, ok := deps.Leases.(SocketNamer); ok && held != nil {
-		s.bindAttach(namer.SocketPath(key))
+	if deps.Sockets != nil && held != nil {
+		s.bindAttach(deps.Sockets.SocketPath(key))
 	}
 	if err := s.persistActivity(); err != nil {
 		_ = s.Close()

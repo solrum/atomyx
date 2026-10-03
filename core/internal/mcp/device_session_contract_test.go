@@ -94,7 +94,7 @@ func TestReacquireReportsAppRelaunch(t *testing.T) {
 		Storage:    storage.NewInMemoryStorage(),
 		Clock:      f.clk,
 		TimerClock: f.clk,
-		Session:    session.Deps{Leases: f.leases, Clock: clock.SystemClock{}, Command: "atomyx-mcp", Role: "mcp"},
+		Session:    session.Deps{Leases: f.leases, Sockets: f.leases, Clock: clock.SystemClock{}, Command: "atomyx-mcp", Role: "mcp"},
 		Timeouts:   session.Timeouts{McpIdleMs: testIdleMs, OpenRunIdleMs: testOpenRunMs, DeviceAcquireMs: contractAcquireBudgetMs},
 	})
 	callTool(t, cs, ctx, "select_device", map[string]any{"platform": "android", "id": "A"})
