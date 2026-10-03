@@ -95,6 +95,11 @@ type Host struct {
 	lost      bool
 	touchedMs int64
 	stopWatch context.CancelFunc
+	// generation counts the devices the host has adopted, starting at 1.
+	// It stamps everything the host reports, so a client can tell a
+	// capture of one session from a capture of the next even when the
+	// two sessions number their revisions alike.
+	generation uint64
 }
 
 var _ session.Controller = (*Host)(nil)
@@ -123,6 +128,7 @@ func (h *Host) adoptLocked(held Held) {
 	h.current = held
 	h.driving = 0
 	h.lost = false
+	h.generation++
 	h.last = held.Info()
 	h.touchedMs = h.clk.NowMs()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -278,20 +284,31 @@ func (h *Host) touch() {
 }
 
 func (h *Host) held() (Held, bool) {
+	held, _, ok := h.heldGeneration()
+	return held, ok
+}
+
+// heldGeneration returns the current device with the generation it was
+// adopted in, read together so a swap between the two reads cannot pair
+// a device with the next device's generation.
+func (h *Host) heldGeneration() (Held, uint64, bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	return h.current, h.current != nil
+	return h.current, h.generation, h.current != nil
 }
 
 // Info reports the held device, or the last device with state released
 // after an idle release and lost after the device was lost.
 func (h *Host) Info() session.Info {
-	if held, ok := h.held(); ok {
-		return held.Info()
+	if held, generation, ok := h.heldGeneration(); ok {
+		info := held.Info()
+		info.Generation = generation
+		return info
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	info := h.last
+	info.Generation = h.generation
 	info.State = session.StateReleased
 	if h.lost {
 		info.State = session.StateLost
@@ -299,11 +316,13 @@ func (h *Host) Info() session.Info {
 	return info
 }
 
-// Latest reads the held device's newest capture, and is empty while the
-// device is released.
+// Latest reads the held device's newest capture stamped with the host's
+// generation, and is empty while the device is released.
 func (h *Host) Latest() session.Snapshot {
-	if held, ok := h.held(); ok {
-		return held.Latest()
+	if held, generation, ok := h.heldGeneration(); ok {
+		snap := held.Latest()
+		snap.Generation = generation
+		return snap
 	}
 	return session.Snapshot{}
 }
@@ -321,7 +340,7 @@ func (h *Host) Subscribe(ctx context.Context) (<-chan session.Observation, error
 // FreshTree captures from the held device, and fails with ErrReleased
 // or ErrLost while the host holds none.
 func (h *Host) FreshTree(ctx context.Context) (session.Snapshot, error) {
-	held, ok := h.held()
+	held, generation, ok := h.heldGeneration()
 	if !ok {
 		return session.Snapshot{}, h.unavailable()
 	}
@@ -330,7 +349,9 @@ func (h *Host) FreshTree(ctx context.Context) (session.Snapshot, error) {
 		return session.Snapshot{}, err
 	}
 	defer end()
-	return held.FreshTree(ctx)
+	snap, err := held.FreshTree(ctx)
+	snap.Generation = generation
+	return snap, err
 }
 
 // Reconnect re-acquires the device after a release or a loss through the opener

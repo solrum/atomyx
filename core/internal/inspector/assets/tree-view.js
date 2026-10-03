@@ -1,6 +1,7 @@
 import { emit } from './bus.js';
 import {
-  buildEntries, deepestAt, displayName, displayRole, entryAtPath, isOpenEntry, search, visibleRows,
+  buildEntries, deepestAt, displayName, displayRole, entryAtPath, isOlderCapture, isOpenEntry, sameCapture, search,
+  visibleRows,
 } from './tree-model.js';
 
 export const ROW_HEIGHT_PX = 22;
@@ -16,14 +17,14 @@ export function createTreeView({ viewport, rowsEl, spacer, emptyEl, countEl }) {
   document.documentElement.style.setProperty('--row-height', `${ROW_HEIGHT_PX}px`);
 
   let top = null;
-  let revision = 0;
+  let capture = null;
   let rows = [];
   let overrides = new Map();
   let query = '';
   let found = { matches: [], openPaths: null };
   let matchIndex = -1;
   let selectedKey = null;
-  let selectedRevision = null;
+  let selectedCapture = null;
 
   const state = () => ({ overrides, openPaths: query.trim() === '' ? null : found.openPaths });
 
@@ -48,7 +49,7 @@ export function createTreeView({ viewport, rowsEl, spacer, emptyEl, countEl }) {
     el.setAttribute('role', 'treeitem');
     el.dataset.index = String(index);
     el.style.paddingLeft = `${entry.depth * INDENT_PX}px`;
-    if (entry.key === selectedKey && revision === selectedRevision) {
+    if (entry.key === selectedKey && sameCapture(capture, selectedCapture)) {
       el.classList.add('selected');
     }
     if (found.matches[matchIndex] === entry) {
@@ -97,8 +98,10 @@ export function createTreeView({ viewport, rowsEl, spacer, emptyEl, countEl }) {
 
   function select(entry) {
     selectedKey = entry.key;
-    selectedRevision = revision;
-    emit('selection', { path: entry.path, revision, node: entry.node });
+    selectedCapture = capture;
+    emit('selection', {
+      path: entry.path, generation: capture.generation, revision: capture.revision, node: entry.node,
+    });
     const index = rows.indexOf(entry);
     if (index >= 0) {
       scrollToRow(index);
@@ -170,8 +173,15 @@ export function createTreeView({ viewport, rowsEl, spacer, emptyEl, countEl }) {
   });
 
   return {
+    // Takes in a tree and reports whether it was shown. A tree older than
+    // the one on screen is ignored, so a slow response never replaces a
+    // newer capture.
     setTree(response) {
-      revision = response.revision;
+      const incoming = { generation: response.generation, revision: response.revision };
+      if (capture !== null && isOlderCapture(incoming, capture)) {
+        return false;
+      }
+      capture = incoming;
       top = buildEntries(response.tree);
       if (query.trim() !== '') {
         found = search(top, query);
@@ -180,6 +190,7 @@ export function createTreeView({ viewport, rowsEl, spacer, emptyEl, countEl }) {
       countEl.textContent = countText();
       relayout();
       emit('tree', response);
+      return true;
     },
     setQuery(next) {
       query = next;

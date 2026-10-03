@@ -26,7 +26,8 @@ func sampleTree() wire.TreeNodeWire {
 
 func sampleSnapshot() session.Snapshot {
 	return session.Snapshot{
-		Tree: sampleTree(), HasTree: true, TreeEpoch: 4, TreeRevision: 9,
+		Generation: 3,
+		Tree:       sampleTree(), HasTree: true, TreeEpoch: 4, TreeRevision: 9,
 		Screenshot: []byte("\x89PNG-bytes"), HasScreenshot: true, ScreenshotFormat: session.ImagePNG,
 		ScreenshotEpoch: 4, ScreenshotRevision: 7,
 		Scale: 2.5, Paired: true, Highlightable: true,
@@ -110,6 +111,9 @@ func TestTree_ServesTheStoredTreeWithEpochRevisionAndFlags(t *testing.T) {
 	if got.Epoch != 4 || got.Revision != 9 || got.ScreenshotRevision != 7 {
 		t.Errorf("epoch, revision, screenshot revision = %d, %d, %d", got.Epoch, got.Revision, got.ScreenshotRevision)
 	}
+	if got.Generation != 3 {
+		t.Errorf("generation = %d, want 3", got.Generation)
+	}
 	if got.Scale != 2.5 || !got.Paired || !got.Highlightable {
 		t.Errorf("scale, paired, highlightable = %v, %v, %v", got.Scale, got.Paired, got.Highlightable)
 	}
@@ -158,7 +162,7 @@ func TestScreenshot_ServesBytesWithTypeAndHeaders(t *testing.T) {
 			t.Errorf("%q: body = %q", format, rec.Body.String())
 		}
 		for header, want := range map[string]string{
-			headerEpoch: "4", headerRevision: "7", headerScale: "2.5", headerPaired: "true", headerHighlightable: "true",
+			headerGeneration: "3", headerEpoch: "4", headerRevision: "7", headerScale: "2.5", headerPaired: "true", headerHighlightable: "true",
 		} {
 			if got := rec.Header().Get(header); got != want {
 				t.Errorf("%q: %s = %q, want %q", format, header, got, want)

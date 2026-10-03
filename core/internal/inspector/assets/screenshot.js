@@ -10,10 +10,13 @@ function numberHeader(res, name) {
 // Fetches the newest screenshot and announces it on the bus together
 // with what the server says about it: its revision, the scale from
 // device units to screenshot pixels, and whether it is paired with the
-// tree and can carry a highlight.
+// tree and can carry a highlight. The generation and revision together
+// name the screenshot, and the highlight compares them with the ones
+// the tree response names.
 export async function refreshScreenshot() {
   const res = await request('/api/v1/screenshot');
   const facts = {
+    generation: numberHeader(res, 'X-Atomyx-Generation'),
     revision: numberHeader(res, 'X-Atomyx-Revision'),
     scale: numberHeader(res, 'X-Atomyx-Scale'),
     paired: res.headers.get('X-Atomyx-Paired') === 'true',

@@ -18,8 +18,9 @@ const (
 
 // SelectorRoutes is the route group that turns the stored tree into
 // selectors and script steps: it suggests selectors for a node, tests a
-// selector against the tree, and renders one step as YAML. Every route is an operator action and none of them
-// calls the device, so they work from the tree the page displays.
+// selector against the tree, and renders one step as YAML. Every route
+// is an operator action and none of them calls the device, so they work
+// from the tree the page displays.
 func SelectorRoutes(c session.Controller) []Route {
 	return []Route{
 		{Method: http.MethodPost, Path: routeSelectorSuggest, Handler: suggestHandler(c), Operator: true},
@@ -41,6 +42,10 @@ func storedTree(w http.ResponseWriter, c session.Viewer) (session.Snapshot, bool
 }
 
 type suggestRequest struct {
+	// Generation and TreeRevision name the tree the path was read from.
+	// A request that omits Generation names generation zero, which is
+	// the generation of a session that has no host stamping it.
+	Generation   uint64 `json:"generation"`
 	TreeRevision uint64 `json:"treeRevision"`
 	// Path is the child index chain of the target node in the tree of
 	// TreeRevision, empty for the root. It is required, so a client
@@ -57,15 +62,18 @@ type suggestion struct {
 }
 
 type suggestResponse struct {
+	Generation   uint64       `json:"generation"`
 	Epoch        uint64       `json:"epoch"`
 	TreeRevision uint64       `json:"treeRevision"`
 	Candidates   []suggestion `json:"candidates"`
 }
 
 // suggestHandler suggests selectors for one node of the stored tree.
-// The request names the revision of the tree its path was read from,
-// and a request for any other revision is refused with a coded 409,
-// because a path into a replaced tree addresses a different node.
+// The request names the generation and revision of the tree its path
+// was read from, and a request for any other pair is refused with a
+// coded 409, because a path into a replaced tree, or into a tree of
+// an earlier session whose revisions coincide, addresses a different
+// node.
 func suggestHandler(c session.Viewer) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req suggestRequest
@@ -81,7 +89,7 @@ func suggestHandler(c session.Viewer) http.Handler {
 		if !ok {
 			return
 		}
-		if req.TreeRevision != snap.TreeRevision {
+		if req.Generation != snap.Generation || req.TreeRevision != snap.TreeRevision {
 			writeCoded(w, http.StatusConflict, codeTreeStale, "the tree on screen is no longer the stored tree",
 				"Reload the tree, select the node again, then ask for suggestions.")
 			return
@@ -96,7 +104,7 @@ func suggestHandler(c session.Viewer) http.Handler {
 			writeFailure(w, invalidArgument(err.Error(), "Send the path of a node in the tree."))
 			return
 		}
-		out := suggestResponse{Epoch: snap.TreeEpoch, TreeRevision: snap.TreeRevision, Candidates: make([]suggestion, 0, len(candidates))}
+		out := suggestResponse{Generation: snap.Generation, Epoch: snap.TreeEpoch, TreeRevision: snap.TreeRevision, Candidates: make([]suggestion, 0, len(candidates))}
 		for _, cand := range candidates {
 			out.Candidates = append(out.Candidates, suggestion{SuggestedSelector: cand, Obscured: obscured.Obscured})
 		}
@@ -114,6 +122,7 @@ type selectorMatch struct {
 }
 
 type selectorTestResponse struct {
+	Generation   uint64          `json:"generation"`
 	Epoch        uint64          `json:"epoch"`
 	TreeRevision uint64          `json:"treeRevision"`
 	Count        int             `json:"count"`
@@ -143,7 +152,7 @@ func selectorTestHandler(c session.Viewer) http.Handler {
 		}
 		cursors := orchestra.Find(orchestra.CompileSelector(req.Selector), snap.Tree)
 		out := selectorTestResponse{
-			Epoch: snap.TreeEpoch, TreeRevision: snap.TreeRevision,
+			Generation: snap.Generation, Epoch: snap.TreeEpoch, TreeRevision: snap.TreeRevision,
 			Count: len(cursors), Matches: make([]selectorMatch, 0, min(len(cursors), maxReportedMatches)),
 			Truncated: len(cursors) > maxReportedMatches,
 		}

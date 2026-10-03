@@ -119,6 +119,24 @@ export function deepestAt(top, x, y) {
   return best;
 }
 
+// A capture is named by its generation and revision together. A
+// reconnect starts a new session whose revisions begin again, so a
+// revision alone can name two different trees, and every comparison
+// between captures uses this pair. A value that is missing never
+// matches.
+export function sameCapture(a, b) {
+  return Boolean(a) && Boolean(b) && a.generation === b.generation && a.revision === b.revision;
+}
+
+// True when candidate was stored before shown: an earlier generation, or
+// the same generation with an earlier revision.
+export function isOlderCapture(candidate, shown) {
+  if (candidate.generation !== shown.generation) {
+    return candidate.generation < shown.generation;
+  }
+  return candidate.revision < shown.revision;
+}
+
 export function entryAtPath(top, path) {
   let entry = top;
   for (const index of path) {

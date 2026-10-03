@@ -15,6 +15,7 @@ import (
 const (
 	secretText = "S3cretPass"
 	treeRev    = 3
+	treeGen    = 2
 )
 
 func node(attrs map[string]string, children ...wire.TreeNodeWire) wire.TreeNodeWire {
@@ -38,7 +39,7 @@ func loginTree() wire.TreeNodeWire {
 }
 
 func storedLogin() *stubController {
-	return &stubController{snap: session.Snapshot{Tree: loginTree(), HasTree: true, TreeEpoch: 2, TreeRevision: treeRev}}
+	return &stubController{snap: session.Snapshot{Generation: treeGen, Tree: loginTree(), HasTree: true, TreeEpoch: 2, TreeRevision: treeRev}}
 }
 
 func selectorHarness(t *testing.T, ctrl *stubController) *apiHarness {
@@ -70,7 +71,7 @@ func TestSelectorRoutes_RefuseAFetchWithoutTheTokenOrOrigin(t *testing.T) {
 }
 
 func suggestBody(rev uint64, path string) string {
-	return fmt.Sprintf(`{"treeRevision":%d,"path":%s}`, rev, path)
+	return fmt.Sprintf(`{"generation":%d,"treeRevision":%d,"path":%s}`, treeGen, rev, path)
 }
 
 type suggestOut struct {
@@ -99,6 +100,41 @@ func TestSuggest_ARevisionThatIsNotTheStoredOneIsRefused(t *testing.T) {
 		if rec.Code != http.StatusConflict || codeOf(t, rec) != codeTreeStale {
 			t.Errorf("revision %d: status = %d code = %q, want 409 %s", rev, rec.Code, codeOf(t, rec), codeTreeStale)
 		}
+	}
+}
+
+func TestSuggest_ARevisionOfAnotherGenerationIsRefusedEvenWhenTheRevisionMatches(t *testing.T) {
+	h := selectorHarness(t, storedLogin())
+	bodies := map[string]string{
+		"an earlier generation": fmt.Sprintf(`{"generation":%d,"treeRevision":%d,"path":[0]}`, treeGen-1, treeRev),
+		"a later generation":    fmt.Sprintf(`{"generation":%d,"treeRevision":%d,"path":[0]}`, treeGen+1, treeRev),
+		"no generation":         fmt.Sprintf(`{"treeRevision":%d,"path":[0]}`, treeRev),
+	}
+	for name, body := range bodies {
+		rec := h.post(routeSelectorSuggest, body)
+		if rec.Code != http.StatusConflict || codeOf(t, rec) != codeTreeStale {
+			t.Errorf("%s: status = %d code = %q, want 409 %s", name, rec.Code, codeOf(t, rec), codeTreeStale)
+		}
+	}
+}
+
+func TestSuggest_AResponseCarriesTheGeneration(t *testing.T) {
+	rec := selectorHarness(t, storedLogin()).post(routeSelectorSuggest, suggestBody(treeRev, "[0]"))
+	var out struct {
+		Generation uint64 `json:"generation"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || out.Generation != treeGen {
+		t.Fatalf("generation = %d (%v), want %d", out.Generation, err, treeGen)
+	}
+}
+
+func TestSelectorTest_AResponseCarriesTheGeneration(t *testing.T) {
+	rec := selectorHarness(t, storedLogin()).post(routeSelectorTest, `{"selector":{"id":"email"}}`)
+	var out struct {
+		Generation uint64 `json:"generation"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || out.Generation != treeGen {
+		t.Fatalf("generation = %d (%v), want %d", out.Generation, err, treeGen)
 	}
 }
 

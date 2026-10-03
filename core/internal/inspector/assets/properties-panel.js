@@ -1,5 +1,6 @@
 import { on } from './bus.js';
 import { addPanel, el } from './panel-dom.js';
+import { sameCapture } from './tree-model.js';
 
 const STATE_FLAGS = ['clickable', 'enabled', 'focused', 'selected', 'checked', 'visible'];
 
@@ -25,16 +26,16 @@ function flagText(value) {
 // readable and says so.
 export function createPropertiesPanel(host) {
   const body = addPanel(host, 'Properties');
-  let revision = null;
+  let shown = null;
 
   function showEmpty() {
     body.replaceChildren(el('p', 'muted', 'Select a node in the tree.'));
   }
 
-  function render({ path, revision: selectedRevision, node }) {
+  function render({ path, generation, revision, node }) {
     const attrs = node.attributes || {};
     const parts = [];
-    if (revision !== null && selectedRevision !== revision) {
+    if (shown !== null && !sameCapture({ generation, revision }, shown)) {
       parts.push(el('p', 'note', 'This node comes from an earlier capture.'));
     }
     const names = Object.keys(attrs).sort();
@@ -57,7 +58,7 @@ export function createPropertiesPanel(host) {
     render(selection);
   });
   on('tree', (response) => {
-    revision = response.revision;
+    shown = { generation: response.generation, revision: response.revision };
     if (current) {
       render(current);
     }

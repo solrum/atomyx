@@ -1,5 +1,6 @@
 import { on } from './bus.js';
 import { addPanel, describeError, el, summarizeSelector } from './panel-dom.js';
+import { sameCapture } from './tree-model.js';
 
 const EXAMPLE = '{\n  "id": "login_button"\n}';
 
@@ -21,7 +22,7 @@ export function createTesterPanel(host, { operate, notify, selectPath }) {
   run.type = 'button';
   const result = el('div', 'tester-result');
   body.append(input, run, result);
-  let treeRevision = null;
+  let shownTree = null;
 
   function readSelector() {
     let parsed;
@@ -36,12 +37,12 @@ export function createTesterPanel(host, { operate, notify, selectPath }) {
     return parsed;
   }
 
-  function matchRow(match, revision) {
+  function matchRow(match, tested) {
     const label = match.path.length === 0 ? 'root' : match.path.join(' / ');
     const button = el('button', 'candidate', label);
     button.type = 'button';
     button.addEventListener('click', () => {
-      if (revision !== treeRevision || !selectPath(match.path)) {
+      if (!sameCapture(tested, shownTree) || !selectPath(match.path)) {
         notify('The tree changed since this test. Test the selector again.');
       }
     });
@@ -69,7 +70,8 @@ export function createTesterPanel(host, { operate, notify, selectPath }) {
         ? 'No node matches.'
         : `${out.count} ${out.count === 1 ? 'match' : 'matches'}${out.truncated ? `, first ${out.matches.length} shown` : ''}.`;
       const list = el('ul', 'candidates');
-      list.append(...out.matches.map((m) => matchRow(m, out.treeRevision)));
+      const tested = { generation: out.generation, revision: out.treeRevision };
+      list.append(...out.matches.map((m) => matchRow(m, tested)));
       result.replaceChildren(el('p', null, `${summarizeSelector(selector)}: ${summary}`), list);
     } catch (err) {
       result.replaceChildren(el('p', 'note', describeError(err)));
@@ -80,7 +82,7 @@ export function createTesterPanel(host, { operate, notify, selectPath }) {
 
   run.addEventListener('click', test);
   on('tree', (response) => {
-    treeRevision = response.revision;
+    shownTree = { generation: response.generation, revision: response.revision };
   });
 
   return {

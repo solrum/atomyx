@@ -444,7 +444,10 @@ one, is logged as refused.
     many nodes it matches, and `obscured` when another node covers the
     target. A candidate button copies its selector into the tester. A
     selection from an earlier capture is not sent, and a `TREE_STALE`
-    answer shows a notice and reloads the tree.
+    answer shows a notice and reloads the tree. A capture is named by
+    its session generation and its revision together, so a tree from
+    before a reconnect is never mistaken for one after it, although
+    both may number their revisions alike.
   - Selector tester takes the selector as one JSON object, the same
     shape a script step uses: `id`, `label`, `text`, `hint`, `value`,
     `role`, `enabled`, `clickable`, `focused` and `nth`, where a text
@@ -460,10 +463,11 @@ one, is logged as refused.
     it, in which case the step stays selectable.
 - **The highlight.** The selected node's bounds are drawn over the
   screenshot only when the server reports that the tree and the
-  screenshot were captured together and can be matched, and the
-  selection belongs to the tree currently shown. Otherwise no box is
-  drawn and a note under the screenshot says why. While the screenshot
-  is highlightable, a click on it selects the deepest node whose bounds
+  screenshot were captured together and can be matched, the tree on
+  screen names the screenshot on screen as its own, and the selection
+  belongs to the tree currently shown. Otherwise no box is drawn and a
+  note under the screenshot says why. While the screenshot is
+  highlightable, a click on it selects the deepest node whose bounds
   contain the clicked point, and the tree opens the path to that node.
 - **Live updates.** The page follows the capture feed, so the
   screenshot and the header change as the holder captures. A feed that

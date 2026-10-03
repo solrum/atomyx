@@ -1,10 +1,12 @@
 import { on } from './bus.js';
 import { parseBounds } from './geometry.js';
+import { sameCapture } from './tree-model.js';
 
 const PERCENT = 100;
 
 const REASONS = {
   stale: 'The selected node comes from an earlier capture, so no highlight is drawn.',
+  mismatch: 'The screenshot shown is not the one captured with this tree, so no highlight is drawn.',
   unpaired: 'The tree and the screenshot were captured at different moments, so no highlight is drawn.',
   unmatched: 'This screenshot cannot be matched to the tree, so no highlight is drawn.',
   noBounds: 'The selected node reports no bounds, so no highlight is drawn.',
@@ -14,14 +16,20 @@ const REASONS = {
 // on the screenshot into a selection. The server decides whether the
 // tree and the screenshot belong together and what scale takes device
 // units to screenshot pixels, so this module only multiplies by that
-// scale. Position is expressed as a share of the image's own pixel size,
+// scale. The one check it makes itself is identity: the tree on screen
+// must name the screenshot on screen as its own, by generation and
+// revision, because the two are fetched separately and either may be
+// newer than the other. Position is expressed as a share of the image's own pixel size,
 // which keeps the box aligned however the image is scaled on screen.
 export function createHighlight({ img, overlay, noteEl, onPick }) {
   let shot = null;
-  let treeRevision = null;
+  let tree = null;
   let selection = null;
 
-  const canMatch = () => shot !== null && shot.paired && shot.highlightable && shot.scale > 0;
+  const shotBelongsToTree = () => shot !== null && tree !== null
+    && tree.generation === shot.generation && tree.screenshotRevision === shot.revision;
+
+  const canMatch = () => shotBelongsToTree() && shot.paired && shot.highlightable && shot.scale > 0;
 
   function hide(reason) {
     overlay.hidden = true;
@@ -33,8 +41,11 @@ export function createHighlight({ img, overlay, noteEl, onPick }) {
     if (selection === null || shot === null) {
       return '';
     }
-    if (selection.revision !== treeRevision) {
+    if (!sameCapture(selection, tree)) {
       return REASONS.stale;
+    }
+    if (!shotBelongsToTree()) {
+      return REASONS.mismatch;
     }
     if (!shot.paired) {
       return REASONS.unpaired;
@@ -83,7 +94,11 @@ export function createHighlight({ img, overlay, noteEl, onPick }) {
     update();
   });
   on('tree', (response) => {
-    treeRevision = response.revision;
+    tree = {
+      generation: response.generation,
+      revision: response.revision,
+      screenshotRevision: response.screenshotRevision,
+    };
     update();
   });
   on('selection', (next) => {

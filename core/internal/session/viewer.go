@@ -96,6 +96,14 @@ type Snapshot struct {
 	// Highlightable reports that a tree node's bounds can be drawn on
 	// the screenshot: the pair matches and a scale is known.
 	Highlightable bool
+
+	// Generation names the held session the snapshot came from. A
+	// Session leaves it zero. A host that opens a new session after a
+	// release or a loss stamps its own count, because every session
+	// numbers its revisions from one, so a revision repeats across
+	// sessions and only the pair of generation and revision identifies
+	// a capture.
+	Generation uint64
 }
 
 // HolderState is where a device holder stands in the holder state
@@ -132,6 +140,9 @@ type Info struct {
 	Device device.Descriptor `json:"device"`
 	Holder lease.Holder      `json:"holder"`
 	State  HolderState       `json:"state"`
+	// Generation is the host's count of sessions opened so far, as for
+	// Snapshot.Generation. A Session leaves it zero.
+	Generation uint64 `json:"generation"`
 }
 
 // Viewer reads what a session has captured. It never calls the device,

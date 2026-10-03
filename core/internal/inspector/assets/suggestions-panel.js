@@ -1,6 +1,7 @@
 import { ApiError } from './api.js';
 import { on } from './bus.js';
 import { addPanel, describeError, el, summarizeSelector } from './panel-dom.js';
+import { sameCapture } from './tree-model.js';
 
 const STALE_CODE = 'TREE_STALE';
 
@@ -13,12 +14,13 @@ function matchText(count) {
 }
 
 // Lists ranked selector candidates for the selected node. The request
-// carries the revision of the tree the path was read from, and the
+// carries the generation and revision of the tree the path was read
+// from, and the
 // server decides whether each candidate is unique and whether the node
 // is obscured. A candidate button hands its selector to onUse.
 export function createSuggestionsPanel(host, { operate, notify, reloadTree, onUse }) {
   const body = addPanel(host, 'Selector suggestions');
-  let treeRevision = null;
+  let shownTree = null;
   let asked = 0;
 
   function say(text, className = 'muted') {
@@ -48,7 +50,9 @@ export function createSuggestionsPanel(host, { operate, notify, reloadTree, onUs
     const mine = asked;
     say('Loading suggestions.');
     try {
-      const out = await operate('/api/v1/selector/suggest', { treeRevision: selection.revision, path: selection.path });
+      const out = await operate('/api/v1/selector/suggest', {
+        generation: selection.generation, treeRevision: selection.revision, path: selection.path,
+      });
       if (mine !== asked) {
         return;
       }
@@ -75,10 +79,10 @@ export function createSuggestionsPanel(host, { operate, notify, reloadTree, onUs
 
   say('Select a node in the tree.');
   on('tree', (response) => {
-    treeRevision = response.revision;
+    shownTree = { generation: response.generation, revision: response.revision };
   });
   on('selection', (selection) => {
-    if (treeRevision !== null && selection.revision !== treeRevision) {
+    if (shownTree !== null && !sameCapture(selection, shownTree)) {
       asked += 1;
       say('This node comes from an earlier capture. Select it again in the current tree.');
       return;

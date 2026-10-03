@@ -15,6 +15,7 @@ const (
 	routeScreenshot = "/api/v1/screenshot"
 	routeEvents     = "/api/v1/events"
 
+	headerGeneration    = "X-Atomyx-Generation"
 	headerEpoch         = "X-Atomyx-Epoch"
 	headerRevision      = "X-Atomyx-Revision"
 	headerScale         = "X-Atomyx-Scale"
@@ -43,10 +44,14 @@ func sessionHandler(c session.Viewer) http.Handler {
 }
 
 // treeResponse is the stored tree with the facts a page needs to use
-// it. Revision identifies this tree, so a node path sent back with
-// it is checked against the right tree. Scale and Highlightable come
-// from the session, so the page never computes them.
+// it. Generation and Revision together identify this tree, because a
+// reconnect starts a new session whose revisions begin again, so a node
+// path sent back with them is checked against the right tree. The
+// screenshot revision names the screenshot of the same generation that
+// belongs to this tree. Scale and Highlightable come from the session,
+// so the page never computes them.
 type treeResponse struct {
+	Generation         uint64            `json:"generation"`
 	Epoch              uint64            `json:"epoch"`
 	Revision           uint64            `json:"revision"`
 	Tree               wire.TreeNodeWire `json:"tree"`
@@ -69,6 +74,7 @@ func writeTree(w http.ResponseWriter, snap session.Snapshot) {
 		return
 	}
 	writeJSON(w, http.StatusOK, treeResponse{
+		Generation:         snap.Generation,
 		Epoch:              snap.TreeEpoch,
 		Revision:           snap.TreeRevision,
 		Tree:               snap.Tree,
@@ -89,6 +95,7 @@ func screenshotHandler(c session.Viewer) http.Handler {
 		}
 		h := w.Header()
 		h.Set("Content-Type", imageContentType(snap.ScreenshotFormat))
+		h.Set(headerGeneration, strconv.FormatUint(snap.Generation, 10))
 		h.Set(headerEpoch, strconv.FormatUint(snap.ScreenshotEpoch, 10))
 		h.Set(headerRevision, strconv.FormatUint(snap.ScreenshotRevision, 10))
 		h.Set(headerScale, strconv.FormatFloat(snap.Scale, 'f', -1, 64))
