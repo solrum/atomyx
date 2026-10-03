@@ -91,7 +91,7 @@ func (s *DeviceSession) followBorrower(ctx context.Context, gen uint64, desc dev
 		return
 	}
 	defer func() { _ = handle.Close() }()
-	if holder := handle.Info().Holder; holder.PID != 0 {
+	if holder := handle.Info().Holder; holder.PID != 0 { //nolint:contextcheck // the handle bounds its status call with its own timeout
 		s.rememberBorrower(gen, holder.Describe())
 	}
 	select {
