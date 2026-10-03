@@ -184,10 +184,42 @@ func (r *RunnerReaper) Reap(ctx context.Context, statePath, udid string) (ReapOu
 	if err != nil {
 		return r.discard(statePath, "the runner record cannot be decoded"), nil
 	}
-	outcome := ReapOutcome{Found: true, PGID: state.Pgid}
-	if reason := r.unusableRecord(state, udid); reason != "" {
-		return r.discard(statePath, reason), nil
+	outcome, err := r.endRecorded(ctx, state, udid)
+	if err != nil {
+		return outcome, err
 	}
+	if outcome.Discarded != "" {
+		r.deps.Logger.Warn("discarded a runner record without signaling", logging.LogContext{"reason": outcome.Discarded})
+	}
+	_ = os.Remove(statePath)
+	return outcome, nil
+}
+
+// ReapState ends the runner and tunnel that state names, and touches no
+// record file. It is the stop of a runner a process holds in memory. It
+// applies the same guards as Reap, so it signals a process only while
+// that process is still the one state recorded, and it ends a simulator
+// runner app through simctl only while the app still answers state's
+// launch id. A runner another process launched since, under another
+// launch id and process, is therefore never touched.
+//
+// A state that fails a guard is left alone and reported through
+// ReapOutcome.Discarded. The returned error reports a runner or tunnel
+// that could not be ended.
+func (r *RunnerReaper) ReapState(ctx context.Context, state RunnerState) (ReapOutcome, error) {
+	outcome, err := r.endRecorded(ctx, state, state.UDID)
+	if err == nil && outcome.Discarded != "" {
+		r.deps.Logger.Debug("left a runner state alone", logging.LogContext{"reason": outcome.Discarded})
+	}
+	return outcome, err
+}
+
+// endRecorded applies the guards to state and ends what passes them.
+func (r *RunnerReaper) endRecorded(ctx context.Context, state RunnerState, udid string) (ReapOutcome, error) {
+	if reason := r.unusableRecord(state, udid); reason != "" {
+		return ReapOutcome{Found: true, Discarded: reason}, nil
+	}
+	outcome := ReapOutcome{Found: true, PGID: state.Pgid}
 	tunnelSignaled, tunnelKilled, err := r.reapTunnel(ctx, state)
 	outcome.TunnelSignaled, outcome.TunnelKilled = tunnelSignaled, tunnelKilled
 	if err != nil {
@@ -195,9 +227,7 @@ func (r *RunnerReaper) Reap(ctx context.Context, statePath, udid string) (ReapOu
 	}
 	alive, reason := r.isRecordedRunner(state)
 	if reason != "" {
-		discarded := r.discard(statePath, reason)
-		discarded.TunnelSignaled, discarded.TunnelKilled = tunnelSignaled, tunnelKilled
-		return discarded, nil
+		return ReapOutcome{Found: true, Discarded: reason, TunnelSignaled: tunnelSignaled, TunnelKilled: tunnelKilled}, nil
 	}
 	if alive {
 		outcome.Signaled = true
@@ -214,7 +244,6 @@ func (r *RunnerReaper) Reap(ctx context.Context, statePath, udid string) (ReapOu
 			return outcome, err
 		}
 	}
-	_ = os.Remove(statePath)
 	return outcome, nil
 }
 

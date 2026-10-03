@@ -171,15 +171,25 @@ func (p *DriverProvisioner) ownOwner() (RunnerOwner, error) {
 // reaper's guarded path, unless another process now owns them. A tunnel
 // this process started is stopped first, so its supervisor reports no
 // exit.
-func (p *DriverProvisioner) endAdopted(ctx context.Context, a adoption, held launchRecord, udid string) error {
+//
+// It acts on the state this process adopted, never on the record on disk
+// now, so a runner another process launched since is never signaled. The
+// record is removed only while it still names this runner and this owner.
+func (p *DriverProvisioner) endAdopted(ctx context.Context, a adoption, held launchRecord) error {
 	if held.ownedByAnotherProcess() {
 		return nil
 	}
 	if a.tunnelStop != nil {
 		a.tunnelStop()
 	}
-	_, err := p.deps.Reaper.Reap(ctx, held.path, udid)
-	return err
+	_, err := p.deps.Reaper.ReapState(ctx, a.state)
+	if err != nil {
+		return err
+	}
+	if held.path != "" {
+		removeRunnerStateOf(held.path, a.state.RunnerID, held.owner)
+	}
+	return nil
 }
 
 // watchAdopted reports through lostRunner once when the process of the
@@ -226,7 +236,7 @@ func (p *DriverProvisioner) adoptedAgent(ctx context.Context, a adoption, held l
 	watchCtx, stopWatching := context.WithCancel(stopCtx)
 	stop := sync.OnceValue(func() error {
 		stopWatching()
-		err := p.endAdopted(stopCtx, a, held, udid)
+		err := p.endAdopted(stopCtx, a, held)
 		if p.deps.Keeper != nil {
 			p.deps.Keeper.forget(state.RunnerID)
 		}

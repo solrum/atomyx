@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -372,7 +373,7 @@ func (p *DriverProvisioner) ProvisionIOSAgent(ctx context.Context, udid string, 
 		if !opts.Fresh {
 			if adopted, ok := p.adopt(ctx, udid, kind, cfg, lostHook(LostTunnel)); ok {
 				state := adopted.state
-				held = launchRecord{udid: udid, path: p.statePath(udid), runnerID: state.RunnerID, owner: RunnerOwner{Pid: state.OwnerPid, StartTime: state.OwnerStartTime}}
+				held = launchRecord{udid: udid, path: p.statePath(udid), runnerID: state.RunnerID, owner: RunnerOwner{Pid: state.OwnerPid, StartTime: state.OwnerStartTime}, state: state}
 				return p.adoptedAgent(ctx, adopted, held, udid, lostHook(LostRunner), lostHook(LostTunnel), func(stop func() error) { ended = stop }), nil
 			}
 		}
@@ -393,8 +394,10 @@ func (p *DriverProvisioner) ProvisionIOSAgent(ctx context.Context, udid string, 
 		return IOSAgent{Port: launcher.Port(), Kill: kill}, nil
 	}
 	port := launcher.Port()
+	stopCtx := context.WithoutCancel(ctx)
 	stop := sync.OnceValue(func() error {
 		err := kill()
+		err = errors.Join(err, p.reapLaunched(stopCtx, held))
 		p.releasePorts(port)
 		if p.deps.Keeper != nil {
 			p.deps.Keeper.forget(cfg.RunnerID)
@@ -406,6 +409,19 @@ func (p *DriverProvisioner) ProvisionIOSAgent(ctx context.Context, udid string, 
 		p.deps.Keeper.keep(held, stop)
 	}
 	return IOSAgent{Port: port, RunnerID: cfg.RunnerID, Kill: stop}, nil
+}
+
+// reapLaunched ends what outlives the kill of a launched runner, which is
+// the runner app of a simulator that runs under the simulator's own
+// launchd and so outside the process group the kill signals. It acts on
+// the state recorded at launch only, so a runner another process
+// launched since is never touched.
+func (p *DriverProvisioner) reapLaunched(ctx context.Context, held launchRecord) error {
+	if p.deps.Reaper == nil || held.state.RunnerID == "" {
+		return nil
+	}
+	_, err := p.deps.Reaper.ReapState(ctx, held.state)
+	return err
 }
 
 // statePath returns the runner record path for udid, or an empty string
@@ -507,7 +523,7 @@ func (p *DriverProvisioner) afterSpawn(udid string, kind IosAgentKind, runnerID 
 		if err != nil {
 			return nil, err
 		}
-		*held = launchRecord{udid: udid, path: statePath, runnerID: runnerID, owner: RunnerOwner{Pid: state.OwnerPid, StartTime: state.OwnerStartTime}}
+		*held = launchRecord{udid: udid, path: statePath, runnerID: runnerID, owner: RunnerOwner{Pid: state.OwnerPid, StartTime: state.OwnerStartTime}, state: state}
 		removeRecord := func() {
 			if statePath != "" {
 				removeRunnerStateOf(statePath, runnerID, held.owner)
@@ -892,6 +908,9 @@ type launchRecord struct {
 	path     string
 	runnerID string
 	owner    RunnerOwner
+	// state is the record this launch wrote, as it was written. Stopping
+	// the runner acts on it and never on the record on disk.
+	state RunnerState
 }
 
 // ownedByAnotherProcess reports whether the record of this launch now
