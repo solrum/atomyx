@@ -30,7 +30,7 @@ var scenarioKnownKeys = map[string]struct{}{
 // field ScenarioDefinitionSchema leaves unset. Neither the schema nor
 // ParseScenario applies them: `format` and `onFailure` carry no zod
 // `.default(...)`, so a scenario that omits them parses with those
-// fields absent, exactly as TypeScript's parseScenario does. A caller
+// fields absent, as ParseScenario does. A caller
 // that runs a parsed scenario is the one that substitutes these
 // values.
 var ScenarioDefaults = struct {
@@ -70,8 +70,8 @@ func (i zodIssue) pathString() string {
 	return strings.Join(i.path, ".")
 }
 
-// formatZodIssues renders issues the way parseScenario in TypeScript
-// renders a caught ZodError: one "  - <path>: <message>" line per
+// formatZodIssues renders issues the way ParseScenario reports a
+// validation failure: one "  - <path>: <message>" line per
 // issue, in encounter order, path defaulting to "<root>" when empty.
 func formatZodIssues(issues []zodIssue) string {
 	lines := make([]string, len(issues))

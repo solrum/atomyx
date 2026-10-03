@@ -48,8 +48,8 @@ func init() {
 }
 
 // normalizeStep normalizes a raw YAML step (bare string or object)
-// into a canonical ScriptStep, expanding shorthand the same way
-// TypeScript's step-normalizer does. stepIndex is 0-based and only
+// into a canonical ScriptStep, expanding shorthand through the registered
+// step normalizers. stepIndex is 0-based and only
 // used to number error messages.
 func normalizeStep(raw any, stepIndex int) (ScriptStep, error) {
 	if s, ok := asString(raw); ok {

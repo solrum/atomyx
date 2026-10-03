@@ -973,13 +973,10 @@ func utf16Len(s string) int {
 // treeSnapshotKey produces a full-fidelity comparison key for
 // WaitForIdle's tree-diff polling: two snapshots of an unchanged
 // hierarchy produce the same key, and any attribute, structural, or
-// state-boolean change produces a different one. Mirrors the
-// TypeScript implementation's JSON.stringify(tree) equality check;
-// the exact byte encoding differs (encoding/json sorts map keys,
-// JSON.stringify preserves insertion order) but that has no
-// behavioral effect, since nothing compares this key across the
-// language boundary. Only two Go-side snapshots are ever compared
-// against each other.
+// state-boolean change produces a different one. The exact byte
+// encoding is unspecified (encoding/json sorts map keys), which has no
+// behavioral effect because only two snapshots produced by this
+// function are ever compared against each other.
 func treeSnapshotKey(tree wire.TreeNodeWire) (string, error) {
 	b, err := json.Marshal(tree)
 	if err != nil {

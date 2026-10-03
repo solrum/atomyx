@@ -45,7 +45,7 @@ func (ExtractCommand) Execute(step script.ScriptStep, ctx *CommandContext) Comma
 }
 
 // capturedRequestAsAny renders a CapturedRequest as the generic
-// object shape its TypeScript counterpart carries, so resolveDotPath
+// object shape of a decoded JSON body, so resolveDotPath
 // can walk it the same way it walks a decoded JSON body.
 func capturedRequestAsAny(c CapturedRequest) map[string]any {
 	headers := make(map[string]any, len(c.Headers))

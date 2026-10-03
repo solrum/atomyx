@@ -3,13 +3,13 @@ package script
 import "gopkg.in/yaml.v3"
 
 // ParseScenario parses a YAML scenario document into a validated
-// ScenarioDefinition, mirroring TypeScript's parseScenario: the YAML
+// ScenarioDefinition, where the YAML
 // is decoded, its root is checked to be a mapping, and every field is
 // checked against the rules ScenarioDefinitionSchema enforces at
 // runtime. It returns a non-nil error for malformed YAML, a
 // non-mapping root, or any schema violation; a schema violation's
 // error text is the same "Scenario validation failed:" listing
-// TypeScript's caught ZodError renders.
+// of every issue.
 func ParseScenario(yamlContent string) (*ScenarioDefinition, error) {
 	var raw any
 	if err := yaml.Unmarshal([]byte(yamlContent), &raw); err != nil {

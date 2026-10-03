@@ -9,7 +9,7 @@ import Foundation
 /// populate `Driver.capabilities` without a second RPC: the YAML
 /// validator reads `canMultiPointer` / `canPressure` at dispatch
 /// time to reject unsupported gesture shapes before they leave the
-/// TypeScript side.
+/// host.
 ///
 /// Reports the launch identity (`runnerId`, `targetUdid`,
 /// `simulatorUdid`) so the host can tell its own runner apart from

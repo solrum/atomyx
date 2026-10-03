@@ -6,8 +6,8 @@ import (
 )
 
 // newRunID generates an RFC 4122 version 4 UUID using only the
-// standard library, matching the shape of the identifiers the
-// TypeScript sidecar generates via Node's crypto.randomUUID.
+// standard library, which is the shape the
+// frontend expects for a run identifier.
 func newRunID() string {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {

@@ -1,7 +1,7 @@
 // Package conformance drives the Go runtime's implementation of an
 // operation and asserts its output matches a frozen golden fixture
 // under goldens/, at the unit, stdio, and schema levels. Each golden
-// was captured once from the reference TypeScript implementation;
+// is a frozen capture of known-good output;
 // `go test ./internal/conformance/... -update` regenerates a
 // suite's goldens from the Go implementation's own current output.
 //

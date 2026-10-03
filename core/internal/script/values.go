@@ -7,8 +7,7 @@ import (
 	"strconv"
 )
 
-// The generic YAML decode result carries the same dynamic shapes the
-// TypeScript parser sees from the `yaml` package: map[string]any (or,
+// The generic YAML decode result carries these dynamic shapes: map[string]any (or,
 // for a mapping reachable from a script's step list, an OrderedMap, see
 // see decodeGenericValue) for mappings, []any for sequences, and
 // string/int/float64/bool/nil for scalars.

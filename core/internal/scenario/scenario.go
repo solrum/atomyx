@@ -55,8 +55,8 @@ type ScenarioResult struct {
 	DurationMs    int64                  `json:"durationMs"`
 }
 
-// ScenarioEventType discriminates a ScenarioEvent's variant, matching
-// TypeScript's ScenarioEvent union's own `type` discriminant.
+// ScenarioEventType discriminates a ScenarioEvent's variant, carried
+// in the event's own `type` field.
 type ScenarioEventType string
 
 const (

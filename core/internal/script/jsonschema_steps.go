@@ -1,7 +1,7 @@
 package script
 
-// stepCommandOrder lists every step definition name in the same order
-// ScriptStep's TypeScript union declares its variants, so the
+// stepCommandOrder lists every step definition name in the order the
+// ScriptStep union declares its variants, so the
 // generated schema's "oneOf" reads in the order a script author
 // encounters the commands in the reference documentation.
 var stepCommandOrder = []string{

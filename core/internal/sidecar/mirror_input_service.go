@@ -18,9 +18,8 @@ import (
 // the gap grows on zoom-in and shrinks on zoom-out.
 const pinchHalfGapFraction = 0.18
 
-// defaultLongPressMs, defaultSwipeMs, and defaultPinchMs match the
-// TypeScript sidecar's InputService defaults, used when a caller
-// omits durationMs.
+// defaultLongPressMs, defaultSwipeMs, and defaultPinchMs are the
+// input service defaults, used when a caller omits durationMs.
 const (
 	defaultLongPressMs = 500
 	defaultSwipeMs     = 200

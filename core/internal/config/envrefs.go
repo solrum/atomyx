@@ -10,9 +10,8 @@ import (
 var envRefPattern = regexp.MustCompile(`\$\{ENV:([A-Za-z_][A-Za-z0-9_]*)\}`)
 
 // ResolveEnvRefs substitutes every `${ENV:NAME}` occurrence inside
-// each environment's vars values with os.Getenv(NAME), mirroring the
-// TypeScript loader's resolveEnvRefs exactly, including its error
-// message text: a config value that needs a secret references a
+// each environment's vars values with os.Getenv(NAME), with a fixed
+// error message text: a config value that needs a secret references a
 // process environment variable instead of holding it literally, and a
 // reference to an unset variable is a hard failure rather than a
 // silent empty substitution. Fields outside vars are not scanned:

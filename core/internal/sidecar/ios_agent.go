@@ -35,13 +35,11 @@ type IosAgentStatus struct {
 	Port    int           `json:"port"`
 }
 
-// SimHidStatus is the iosSimHidStatus result shape, matching the
-// TypeScript sidecar's SimHidStatus field names and device.SimHidState
-// values byte for byte. Port is a pointer so a helper that has reached
+// SimHidStatus is the iosSimHidStatus result shape, with the
+// field names and device.SimHidState values the frontend reads. Port is a pointer so a helper that has reached
 // the ready state serializes its port even when the port happens to
-// be 0, while every other state omits the field entirely. This is the same
-// distinction TypeScript's optional `port?: number` makes by leaving
-// the field unset rather than assigning it 0.
+// be 0, while every other state omits the field entirely. The frontend
+// reads an absent field as unset rather than as 0.
 type SimHidStatus struct {
 	UDID    string             `json:"udid"`
 	State   device.SimHidState `json:"state"`

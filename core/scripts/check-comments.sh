@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Forbids two classes of problem in Go source: comments that anchor
-# current behavior to the TypeScript implementation ("the TypeScript
-# CLI", "mirrors the TypeScript port", and similar phrasing), and
+# Forbids two classes of problem in Go source: any mention of
+# TypeScript in a production file (a comment that anchors current
+# behavior to the TypeScript implementation, such as "the TypeScript
+# CLI" or "mirrors the TypeScript port", or any other use of the
+# word), and
 # prose that uses the em dash or the right arrow as a stand-in for a
 # connecting word. Once the TypeScript implementation retires, a
 # comment pointing at it becomes a ghost reference: it names something
@@ -11,7 +13,8 @@
 # arrow for "then" or "maps to") should instead be the word itself, so
 # a reader never has to infer the missing connective from punctuation.
 #
-# Scope for the TypeScript-reference check: production *.go files
+# Scope for the TypeScript-reference check: every case-insensitive
+# occurrence of the word "typescript" in production *.go files
 # only. Test files (*_test.go) and generated files (path contains
 # zz_generated) are exempt, because a test comparing Go output against
 # a reference fixture legitimately names that fixture.
@@ -37,7 +40,7 @@ violations=0
 # Check 1: no comment anchors current behavior to the TypeScript implementation.
 # ---------------------------------------------------------------------------
 
-FORBIDDEN_PATTERN='the typescript|typescript port|typescript cli|typescript server|mirrors the typescript|matching the typescript|ports the typescript'
+FORBIDDEN_PATTERN='typescript'
 TS_ALLOWLIST_FILE="scripts/comment-gate-allowlist.txt"
 
 # is_ts_allowlisted PATH LINE_CONTENT
@@ -75,7 +78,7 @@ while IFS= read -r raw_hit; do
   if [ -f "$TS_ALLOWLIST_FILE" ] && is_ts_allowlisted "$file" "$content"; then
     continue
   fi
-  echo "${file}:${line}: forbidden TypeScript self-reference in comment"
+  echo "${file}:${line}: forbidden TypeScript reference; describe what the Go code does instead"
   violations=$((violations + 1))
 done < <(grep -rniE "$FORBIDDEN_PATTERN" --include="*.go" . \
   | grep -v '_test\.go:' \

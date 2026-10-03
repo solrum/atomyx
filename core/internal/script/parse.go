@@ -3,7 +3,7 @@ package script
 import "strings"
 
 // ParseScript parses a YAML test script string into a validated
-// ScriptDefinition, mirroring TypeScript's parseScript: YAML
+// ScriptDefinition, where YAML
 // shorthand is expanded into canonical steps, `${var}` placeholders
 // are resolved against externalEnv merged over the script's own
 // `env:` block (externalEnv wins on key collision), and the result is

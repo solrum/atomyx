@@ -123,9 +123,8 @@ func NewServer(info Info, deps ServerDeps) (*Server, error) {
 	// packages/mcp/src/tools/index.ts: device + app lifecycle first,
 	// then orientation/discovery, core actions, wait/verification, run
 	// lifecycle + reporting, run/bug queries, run/bug CRUD, guidance,
-	// then script execution. check_health has no TypeScript
-	// counterpart; it is registered here, alongside the other
-	// device-session tools it reports on.
+	// then script execution. check_health is registered alongside the
+	// other device-session tools it reports on.
 	registerListDevicesTool(server, traits, deps.Probe)
 	registerSelectDeviceTool(server, tc)
 	registerDisconnectDeviceTool(server, tc)

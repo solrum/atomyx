@@ -12,10 +12,9 @@ package script
 // objectSchema, which always sets `additionalProperties: false`. That
 // matches every object schema in ScriptDefinitionSchema, since all of
 // them are declared with zod's `.strict()`. Two categories of
-// constraint are NOT representable in JSON Schema, matching the
-// equivalent gap in the current TypeScript schema, because
-// zod-to-json-schema drops a schema's `.refine` and `.superRefine`
-// callbacks the same way:
+// constraint are NOT representable in JSON Schema, because a
+// zod-to-json-schema conversion drops a schema's `.refine` and
+// `.superRefine` callbacks:
 //
 //   - Cross-field rules enforced by Validate instead: a precondition
 //     check's `visible` versus `notVisible` (exactly one), and a
@@ -46,25 +45,21 @@ package script
 // the schema or Validate and is never there for either to reject.
 // The `.strict()` and `additionalProperties: false` rejection instead
 // applies to a caller that validates an already-canonical object
-// directly: `validateDefinition` and `ScriptDefinitionSchema.safeParse`
-// in TypeScript, and this generated schema in Monaco or the MCP
+// directly: `validateDefinition` and `ScriptDefinitionSchema.safeParse`,
+// and this generated schema in Monaco or the MCP
 // surface.
 //
 // A document nested inside a `handle` branch, a `branch` case, or a
 // precondition's inline `setup` is validated against the full
-// ScriptStep union via `$ref`, at any depth. The current TypeScript
-// artifact cannot do this: it is generated with zod-to-json-schema's
-// `$refStrategy: "none"` option, which inlines every definition
-// instead of emitting `$ref`, and a schema generator that inlines
-// cannot express a cycle, so the second time the generator would need
-// to re-enter ScriptStepSchema along the same path (for example
-// steps[].handle.branches[].do), it emits an unconstrained schema
-// instead. The generated schema below has no such gap, because it
-// uses `$ref` for every recursive occurrence of ScriptStep. Where
-// this makes the schema below reject a document two or more levels
-// deep that the current TypeScript schema wrongly accepts (a missing
-// required field or an unknown key inside a nested handle or branch),
-// the schema below correctly rejects such a document, because
+// ScriptStep union via `$ref`, at any depth. A schema generator that
+// inlines every definition instead of emitting `$ref` cannot express
+// a cycle, so it would have to emit an unconstrained schema the
+// second time it re-enters ScriptStepSchema along the same path (for
+// example steps[].handle.branches[].do). The generated schema below
+// has no such gap, because it uses `$ref` for every recursive
+// occurrence of ScriptStep. It therefore rejects a document two or
+// more levels deep with a missing required field or an unknown key
+// inside a nested handle or branch, because
 // every such document is one Validate and the zod runtime both
 // already reject. This closes a gap rather than opening one: the
 // script conformance corpus carries a valid, deeply nested handle and

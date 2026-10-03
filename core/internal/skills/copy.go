@@ -9,8 +9,7 @@ import (
 )
 
 // versionStampFile is the file CopyTo writes at the target
-// directory's root recording the installed version, matching the
-// TypeScript skills package's own VERSION_STAMP name.
+// directory's root recording the installed version, under a fixed name.
 const versionStampFile = "atomyx-skills.version.json"
 
 // CopyResult reports what CopyTo wrote. Skipped is always empty:

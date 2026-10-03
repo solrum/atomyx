@@ -184,8 +184,8 @@ type extractValueTypeIssue struct {
 
 // extractValuesError carries every non-string `values` entry found by
 // normalizeExtract, deferred so normalizeStep, the caller that knows
-// the step's index, can render TypeScript's exact zod issue message
-// for a `z.record(z.string(), z.string())` failure: one
+// the step's index, can render the zod-style issue message
+// for a string-record failure: one
 // "Expected string, received <type>" line per entry, addressed by its
 // full "steps.<n>.values.<key>" path.
 type extractValuesError struct {
@@ -197,8 +197,8 @@ func (e *extractValuesError) Error() string {
 }
 
 // renderExtractValuesError turns ev, discovered while normalizing the
-// step at stepIndex, into the exact "Invalid script:" message
-// TypeScript's zod schema produces for the same extract.values input:
+// step at stepIndex, into the "Invalid script:" message for
+// the extract.values input:
 // one "  at steps.<n>.values.<key>: Expected string, received <type>"
 // line per non-string entry, in declaration order.
 func renderExtractValuesError(stepIndex int, ev *extractValuesError) *ParseError {
@@ -211,12 +211,10 @@ func renderExtractValuesError(stepIndex int, ev *extractValuesError) *ParseError
 
 // zodReceivedType renders v's dynamic shape using zod's own
 // `getParsedType` vocabulary (object/array/string/boolean/number/
-// null), for a Go value decoded from the same YAML source
-// TypeScript's `yaml` package would hand to the identical zod schema.
-// The token appears verbatim in a script error message this
-// package's differential test proves byte-equal to TypeScript's, so
-// it must not drift from zod's own naming even where goType (used for
-// this package's own, unmatched messages) picks a different word.
+// null), for a decoded Go value. The token appears
+// verbatim in a script error message that a golden pins, so it must
+// keep zod's naming even where goType (used for this package's other
+// messages) picks a different word.
 func zodReceivedType(v any) string {
 	if v == nil {
 		return "null"

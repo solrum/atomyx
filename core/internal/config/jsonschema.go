@@ -9,18 +9,16 @@ package config
 // them are declared with zod's `.strict()`).
 //
 // Two rules ValidateDocument enforces are NOT representable here,
-// matching the equivalent gap in the current TypeScript schema,
-// because zod-to-json-schema drops a schema's `.refine` and
-// `.superRefine` callbacks the same way:
+// because a zod-to-json-schema conversion drops a schema's
+// `.refine` and `.superRefine` callbacks:
 //
 //   - The top-level rule that every environment's `app` names a
 //     declared app id (AtomyxConfigSchema's superRefine).
 //   - The rule that a suite entry sets at least one of `tags` or
 //     `globs` (SuiteEntrySchema's refine).
 //
-// A document violating either rule is accepted by this schema and by
-// the current TypeScript one alike; ValidateDocument is what rejects
-// it at runtime.
+// A document violating either rule is accepted by this schema, and
+// ValidateDocument is what rejects it at runtime.
 func GenerateJSONSchema() map[string]any {
 	return map[string]any{
 		"$schema":     "http://json-schema.org/draft-07/schema#",

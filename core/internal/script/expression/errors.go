@@ -6,9 +6,8 @@ import "fmt"
 // parentheses, trailing tokens after a complete expression, empty
 // source, or a call to a name outside the number, string, bool
 // whitelist. Position is the zero-based UTF-16 code-unit offset into the
-// expression source where the problem was found, matching how the
-// TypeScript engine (and therefore any script author's mental model of
-// "column N") counts positions. Message is a behavioral contract: its
+// expression source where the problem was found, which is how a
+// script author's mental model of "column N" counts positions. Message is a behavioral contract: its
 // exact wording is a stable value that a script's assertions or a
 // test fixture may depend on directly, so changing it is a breaking
 // change.
@@ -27,8 +26,7 @@ func (e *ParseError) Error() string {
 // zero-based UTF-16 code-unit offset into the expression source of the
 // node responsible for the failure (which node depends on the operator;
 // see Eval). Message is a behavioral contract: assertExpr and
-// branch-condition failure reasons depend on this text matching the
-// TypeScript engine's wording exactly.
+// branch-condition failure reasons depend on this exact text.
 type EvalError struct {
 	Message  string
 	Position int

@@ -131,11 +131,11 @@ func isMergedSemanticLeaf(elementType, label string, childCount int, bounds *ios
 }
 
 // utf16Len counts UTF-16 code units in s, the same unit JavaScript's
-// String.prototype.length measures in the iOS driver's TypeScript
-// tree normalizer. A rune outside the Basic Multilingual Plane (for
-// example an emoji) encodes as a two-unit surrogate pair there, so it
-// must also count as two here for the merged-leaf thresholds to trip
-// at the same label length on both implementations.
+// String.prototype.length measures. A rune outside the Basic
+// Multilingual Plane (for example an emoji) encodes as a two-unit
+// surrogate pair in UTF-16, so it counts as two here, which keeps the
+// merged-leaf thresholds tripping at the label length the on-device
+// agents expect.
 func utf16Len(s string) int {
 	n := 0
 	for _, r := range s {

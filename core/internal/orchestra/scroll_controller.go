@@ -63,8 +63,8 @@ type ScrollControllerOptions struct {
 	ViewportInsets     ViewportInsets
 }
 
-// DefaultScrollControllerOptions returns the same defaults the
-// TypeScript ScrollController applies when a caller omits an option.
+// DefaultScrollControllerOptions returns the defaults the
+// ScrollController applies when a caller omits an option.
 func DefaultScrollControllerOptions() ScrollControllerOptions {
 	return ScrollControllerOptions{
 		MaxIterations:      8,

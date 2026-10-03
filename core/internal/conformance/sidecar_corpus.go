@@ -28,8 +28,8 @@ type SidecarStep struct {
 // rather than a graceful failed-step runCompleted (see
 // corpus/sidecar/format.md for why). StepDelayMs must be large enough
 // that StopAfterMs reliably lands before the script's inter-step
-// delay elapses on both a subprocess-spoken TypeScript sidecar and an
-// in-process Go one; the corpus case that sets this field documents
+// delay elapses on both a subprocess-spoken sidecar and an
+// in-process one; the corpus case that sets this field documents
 // the margin its two literal values were chosen for.
 type SidecarConcurrentStop struct {
 	Yaml        string `json:"yaml"`
