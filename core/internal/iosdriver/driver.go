@@ -8,7 +8,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"dev.atomyx/internal/clock"
@@ -78,12 +77,6 @@ type Options struct {
 	// start an iproxy of its own. A driver built without a provisioner
 	// leaves it false and starts and stops its own tunnel.
 	ExternalTunnel bool
-
-	// OnDisconnect runs once, after Disconnect has closed the transport
-	// and stopped any tunnel the driver started. A factory that
-	// provisioned the runner itself sets it to stop that runner, so
-	// every path that disconnects the driver also releases the runner.
-	OnDisconnect func()
 }
 
 // IosDriver implements driver.Driver over the Swift XCUITest runner's
@@ -117,8 +110,6 @@ type IosDriver struct {
 	connectedRunnerID string
 
 	iproxyStop func()
-
-	disconnectOnce sync.Once
 }
 
 // New constructs an IosDriver bound to opts.UDID. conn and proc are
@@ -252,17 +243,14 @@ func (d *IosDriver) RestoreLaunchedApp(ctx context.Context, bundleID, fromRunner
 }
 
 // Disconnect closes the transport, stops the iproxy tunnel if one was
-// launched, clears launch-tracked state, and runs Options.OnDisconnect
-// the first time it is called. It is idempotent: the
-// underlying Conn.Close and the iproxy stop are both safe to call
-// when nothing is running.
+// launched, and clears launch-tracked state. It never stops a runner,
+// which outlives the connection. It is idempotent: the underlying
+// Conn.Close and the iproxy stop are both safe to call when nothing is
+// running.
 func (d *IosDriver) Disconnect() error {
 	_ = d.conn.Close()
 	d.stopIproxy()
 	d.lastLaunchedBundleID = ""
-	if d.opts.OnDisconnect != nil {
-		d.disconnectOnce.Do(d.opts.OnDisconnect)
-	}
 	return nil
 }
 

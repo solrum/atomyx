@@ -259,11 +259,11 @@ func (s *Session) updateHolder(mutate func(*lease.Holder)) error {
 // releases the lease.
 //
 // Stopping the server closes every viewer connection and removes the
-// socket file. Disconnecting the driver stops a runner the factory
-// launched. The two run side by side because a viewer's fresh capture can
-// be stuck in a driver call that only Disconnect ends, so the disconnect
-// must never wait behind the server. Both are bounded by the shared
-// shutdown grace period.
+// socket file. Disconnecting the driver closes its connection and leaves
+// the runner running. The two run side by side because a viewer's fresh
+// capture can be stuck in a driver call that only Disconnect ends, so the
+// disconnect must never wait behind the server. Both are bounded by the
+// shared shutdown grace period.
 //
 // Close is idempotent and returns the first call's result.
 func (s *Session) Close() error {

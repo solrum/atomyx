@@ -192,3 +192,54 @@ func TestDevice_SelectDevice_ConcurrentSameID_BuildsExactlyOnce(t *testing.T) {
 		t.Fatalf("factory.Build was called %d times total for concurrent selects of the same id, want 1", got)
 	}
 }
+
+// TestDevice_Deselect_StopsTheRunnerTheBuildLaunched guards the sidecar
+// exception to runners outliving their driver: the sidecar never hands a
+// runner to another session, so disposing its device must stop it.
+func TestDevice_Deselect_StopsTheRunnerTheBuildLaunched(t *testing.T) {
+	ctx := newTestContext()
+	var log []string
+	factory := &releasingFactory{orderRecordingFactory: newOrderRecordingFactory(&log)}
+
+	desc := device.Descriptor{ID: "device-1", Platform: device.PlatformAndroid, Name: "Device 1", Kind: device.KindDevice, State: device.StateOnline}
+	RegisterDeviceFeature(ctx, device.NewStaticProbe([]device.Descriptor{desc}), factory)
+	params, _ := json.Marshal(map[string]string{"id": desc.ID})
+	if _, err := ctx.Dispatcher.Dispatch(context.Background(), "selectDevice", params); err != nil {
+		t.Fatalf("selectDevice: %v", err)
+	}
+
+	ctx.Session.SetDevice(nil)
+
+	want := []string{"build", "dispose", "release"}
+	if len(log) != len(want) {
+		t.Fatalf("log = %v, want %v", log, want)
+	}
+	for i, event := range want {
+		if log[i] != event {
+			t.Fatalf("log = %v, want %v", log, want)
+		}
+	}
+}
+
+// releasingFactory is an orderRecordingFactory whose builds also record
+// the release of what they launched.
+type releasingFactory struct {
+	*orderRecordingFactory
+}
+
+func (f *releasingFactory) Build(ctx context.Context, desc device.Descriptor) (device.Built, error) {
+	built, err := f.orderRecordingFactory.Build(ctx, desc)
+	if err != nil {
+		return built, err
+	}
+	built.Release = func() {
+		f.mu.Lock()
+		*f.log = append(*f.log, "release")
+		f.mu.Unlock()
+	}
+	return built, nil
+}
+
+func (f *releasingFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
+}

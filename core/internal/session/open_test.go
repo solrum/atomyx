@@ -86,6 +86,7 @@ type recordingFactory struct {
 	ctxs    []context.Context
 	script  func(*recordingDriver)
 	lost    <-chan error
+	release func()
 }
 
 func (f *recordingFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
@@ -110,7 +111,7 @@ func (f *recordingFactory) Build(ctx context.Context, _ device.Descriptor) (devi
 	f.mu.Lock()
 	f.drivers = append(f.drivers, drv)
 	f.mu.Unlock()
-	return device.Built{Driver: drv, Orchestra: orchestra.New(orchestra.OrchestraDeps{Driver: drv, Clock: orchestra.SystemClock{}}), Lost: f.lost}, nil
+	return device.Built{Driver: drv, Orchestra: orchestra.New(orchestra.OrchestraDeps{Driver: drv, Clock: orchestra.SystemClock{}}), Lost: f.lost, Release: f.release}, nil
 }
 
 func (f *recordingFactory) buildCount() int {
@@ -228,6 +229,24 @@ func TestOpen_BuildsTheDriverUnderTheLeaseAndCloseReleasesIt(t *testing.T) {
 	}
 	if got := events.snapshot(); len(got) != 1 {
 		t.Fatalf("events = %v, want Close to disconnect once", got)
+	}
+}
+
+func TestOpen_CloseLeavesWhatTheBuildLaunchedForTheDriver(t *testing.T) {
+	events := &eventLog{}
+	factory := &recordingFactory{events: events, release: func() { events.add("release") }}
+	m := newManager(t, clock.SystemClock{})
+
+	s, err := session.Open(context.Background(), baseDeps(t, factory, m), session.Request{Descriptor: iosDesc("A")})
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	if got := events.snapshot(); len(got) != 1 || got[0] != "disconnect" {
+		t.Fatalf("events = %v, want only the disconnect because a runner outlives the session", got)
 	}
 }
 

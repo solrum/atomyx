@@ -151,7 +151,13 @@ func (s *deviceService) selectKnown(ctx context.Context, desc device.Descriptor)
 		Platform:  string(desc.Platform),
 		Driver:    drv,
 		Orchestra: built.Orchestra,
-		Dispose:   drv.Disconnect,
+		Dispose: func() error {
+			err := drv.Disconnect()
+			if built.Release != nil {
+				built.Release()
+			}
+			return err
+		},
 	})
 	return desc, nil
 }

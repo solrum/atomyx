@@ -57,7 +57,7 @@ func hangupPort(t *testing.T) int {
 	return l.Addr().(*net.TCPAddr).Port
 }
 
-func TestDriverFactory_Build_Provisioned_DialsTheProvisionedPortAndStopsTheRunnerOnDisconnect(t *testing.T) {
+func TestDriverFactory_Build_Provisioned_DisconnectLeavesTheRunnerAndReleaseStopsIt(t *testing.T) {
 	port := serveIdentityOn(t, `"simulatorUdid":"SIM-1"`)
 	prov := NewFakeProvisioner()
 	prov.SetIOSPort("SIM-1", port)
@@ -79,8 +79,14 @@ func TestDriverFactory_Build_Provisioned_DialsTheProvisionedPortAndStopsTheRunne
 		t.Fatalf("Disconnect() error = %v", err)
 	}
 	_ = built.Driver.Disconnect()
+	if got := prov.IOSKillCount("SIM-1"); got != 0 {
+		t.Fatalf("kill count after Disconnect = %d, want 0 because the runner outlives the connection", got)
+	}
+
+	built.Release()
+	built.Release()
 	if got := prov.IOSKillCount("SIM-1"); got != 1 {
-		t.Fatalf("kill count after Disconnect = %d, want exactly 1", got)
+		t.Fatalf("kill count after Release = %d, want exactly 1", got)
 	}
 }
 
@@ -99,8 +105,8 @@ func TestDriverFactory_Build_ProvisionedDevice_LeavesTheTunnelToTheProvisioner(t
 		t.Fatalf("background starts = %+v, want no iproxy from the driver because the provisioner owns the tunnel", got)
 	}
 	_ = built.Driver.Disconnect()
-	if got := prov.IOSKillCount("DEV-1"); got != 1 {
-		t.Fatalf("kill count = %d, want 1", got)
+	if got := prov.IOSKillCount("DEV-1"); got != 0 {
+		t.Fatalf("kill count = %d, want 0 because Disconnect leaves the runner running", got)
 	}
 }
 
