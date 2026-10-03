@@ -232,6 +232,11 @@ func (c *Client) Close() error {
 	return nil
 }
 
+// beforeReplyWait is a seam set only by a test, which uses it to hold a
+// call until its reply and the end of the connection are both ready, the
+// one state in which the select below has two live cases.
+var beforeReplyWait func(c *Client)
+
 // Call sends one request and decodes the data of its success response
 // into result, which may be nil. A failure response returns a
 // *RemoteError, and a connection that ended returns the *ConnectionError.
@@ -272,6 +277,9 @@ func (c *Client) Call(ctx context.Context, messageType string, data, result any)
 		case <-ctx.Done():
 			return err
 		}
+	}
+	if beforeReplyWait != nil {
+		beforeReplyWait(c)
 	}
 	select {
 	case response := <-reply:
