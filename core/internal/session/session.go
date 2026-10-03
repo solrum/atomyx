@@ -61,6 +61,13 @@ type Session struct {
 	attachDone bool
 	attachOnce sync.Once
 
+	// interventionMu guards the pending interventions and the recorder, and
+	// is held while a line is appended so entries reach the run folder in
+	// the order they were recorded.
+	interventionMu sync.Mutex
+	interventions  []Intervention
+	recorder       InterventionRecorder
+
 	closeOnce sync.Once
 	closeErr  error
 	closed    chan struct{}
