@@ -232,6 +232,27 @@ func TestDeviceSessionYield_ASourceThatNobodyTakesTheDeviceFromReleasesAfterTheF
 	eventually(t, "the source to give up waiting", func() bool { return f.state(source) == holderReleased })
 }
 
+func TestDeviceSessionYield_ACallDuringTheHandOverDoesNotTakeTheDeviceBack(t *testing.T) {
+	f := newLifecycleFixture(t)
+	f.selectedAndIdle()
+	borrower := f.newDevices("atomyx run", f.factory)
+	t.Cleanup(borrower.Close)
+	if err := f.requestYield(); err != nil {
+		t.Fatal(err)
+	}
+	f.awaitLeaseFree()
+
+	if got := codeOfErr(ensureErr(f.devices)); got != diag.CodeDeviceReleasedHeld {
+		t.Fatalf("Ensure while the hand-over is open = %q, want %s", got, diag.CodeDeviceReleasedHeld)
+	}
+	if f.leaseHeld() {
+		t.Fatal("a call during the hand-over took the lease back")
+	}
+	if err := f.selectDevice(borrower); err != nil {
+		t.Fatalf("borrower select after the source's call: %v", err)
+	}
+}
+
 func ensureErr(ds *DeviceSession) error {
 	_, err := ds.Ensure(context.Background())
 	return err

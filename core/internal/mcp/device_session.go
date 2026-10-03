@@ -475,7 +475,10 @@ func (s *DeviceSession) Ensure(ctx context.Context) (*ActiveDevice, error) {
 }
 
 // heldOrRemembered snapshots what Ensure needs: the bound device, or
-// else the remembered one to take again.
+// else the remembered one to take again. A session that handed its device
+// to a borrower may not take it again until it stops following that
+// borrower, because a call queued behind the yield would otherwise win
+// the device back before the borrower acquires it.
 func (s *DeviceSession) heldOrRemembered() (*ActiveDevice, *rememberedDevice, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -486,6 +489,8 @@ func (s *DeviceSession) heldOrRemembered() (*ActiveDevice, *rememberedDevice, er
 		return s.active, nil, nil
 	case s.remembered == nil:
 		return nil, nil, errNoActiveDevice
+	case s.state == holderBorrowed:
+		return nil, nil, diag.NewDeviceReleasedHeld("the process that took the device over")
 	}
 	return nil, s.remembered, nil
 }
