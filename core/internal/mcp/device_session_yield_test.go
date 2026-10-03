@@ -16,6 +16,9 @@ import (
 const (
 	yieldBorrower = "atomyx run login.yml"
 	yieldWait     = 5 * time.Second
+	// releasedWithin bounds how long the source takes to notice that its
+	// borrower ended, which must stay well under the follow budget.
+	releasedWithin = time.Second
 )
 
 func (f *lifecycleFixture) requestYield() error {
@@ -204,11 +207,15 @@ func TestDeviceSessionYield_TheSourceReportsReleasedOnceTheBorrowerEnds(t *testi
 		t.Fatalf("state while the borrower runs = %q, want borrowed", got)
 	}
 
+	started := time.Now()
 	if err := borrower.Disconnect(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
 	eventually(t, "the source to report released", func() bool { return f.state(f.devices) == holderReleased })
+	if took := time.Since(started); took > releasedWithin {
+		t.Fatalf("the source reported released after %v, want under %v", took, releasedWithin)
+	}
 	if report := f.devices.CheckHealth(context.Background()); report.State != "released" {
 		t.Fatalf("CheckHealth() = %+v, want released after the borrower ended", report)
 	}
