@@ -514,6 +514,10 @@ session appends each entry as it happens to the run's
 CLI `run` and `suite` set it when the run folder exists. The MCP server
 sets it for `start_run` and for a `run_script` that owns its own run, and
 it hands the recorder to a session installed after the run opened.
+The first call also writes the newest 64 entries recorded before it, so a
+viewer that attached between the session opening and the host's decision
+still appears in the run folder. Clearing the recorder returns only after
+an append in flight has finished.
 
 `session` may depend on `device`, `lease`, `attach`, `runfolder`, `diag`,
 `orchestra`, `driver`, `shutdown` and the common leaves. It never imports

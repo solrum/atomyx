@@ -102,3 +102,16 @@ func TestInterventions_ARecorderFailureNeverLosesThePendingEntry(t *testing.T) {
 		t.Fatalf("Interventions() = %+v, want the entry kept when the run folder write failed", got)
 	}
 }
+
+func TestInterventions_AViewerAttachingBeforeTheHostSetsTheRecorderIsStillWrittenToTheRun(t *testing.T) {
+	s, _, path := socketHolder(t)
+	attachNamed(t, path, "early viewer")
+	recorder := &fakeRecorder{}
+
+	s.SetInterventionRecorder(recorder)
+
+	lines := recorder.recorded()
+	if len(lines) != 1 || lines[0].Kind != session.InterventionViewerAttached || lines[0].Client != "early viewer" {
+		t.Fatalf("recorded %+v, want the viewerAttached entry of the early viewer", lines)
+	}
+}

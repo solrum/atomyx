@@ -73,12 +73,17 @@ type Session struct {
 	attachDone      bool
 	attachOnce      sync.Once
 
-	// interventionMu guards the pending interventions and the recorder, and
-	// is held while a line is appended so entries reach the run folder in
-	// the order they were recorded.
+	// interventionMu guards the pending interventions, the entries kept
+	// for a recorder not yet set, and the recorder. It is held while a
+	// line is appended, so entries reach the run folder in the order they
+	// were recorded.
 	interventionMu sync.Mutex
 	interventions  []Intervention
 	recorder       InterventionRecorder
+	// recorderDecided is true once the host has called
+	// SetInterventionRecorder, with a recorder or with nil.
+	recorderDecided bool
+	unrecorded      []Intervention
 
 	closeOnce sync.Once
 	closeErr  error
