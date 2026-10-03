@@ -117,8 +117,11 @@ func TestSession_InfoReportsTheHolderAndTheSessionsOwnState(t *testing.T) {
 	if info.Holder.Role != "cli" || info.Holder.Command != "atomyx run" || info.Device.ID != "A" {
 		t.Fatalf("Info() = %+v, want the opener's role, command and device", info)
 	}
-	if info.State != session.StateIdle {
-		t.Fatalf("state = %q, want a freshly opened session to be idle", info.State)
+	if info.State != session.StateRunning {
+		t.Fatalf("state = %q, want a freshly opened session to be running", info.State)
+	}
+	if info.Holder.IdleSince != nil {
+		t.Fatalf("holder idleSince = %v, want unset while the session is running", info.Holder.IdleSince)
 	}
 	if err := s.SetRunning("run-1"); err != nil {
 		t.Fatal(err)
@@ -140,16 +143,16 @@ func TestSession_InfoReportsTheHolderAndTheSessionsOwnState(t *testing.T) {
 	}
 }
 
-func TestSession_InfoWithoutALeaseDoesNotDefaultToRunning(t *testing.T) {
+func TestSession_InfoWithoutALeaseStartsRunningAndOnlyItsOwnerSetsItIdle(t *testing.T) {
 	s, _ := openMock(t)
-	if got := s.Info().State; got != session.StateIdle {
-		t.Fatalf("state = %q, want idle for an open session with no lease and no call", got)
+	if got := s.Info().State; got != session.StateRunning {
+		t.Fatalf("state = %q, want running for an open session with no lease", got)
 	}
-	if err := s.SetRunning(""); err != nil {
+	if err := s.SetIdle(); err != nil {
 		t.Fatal(err)
 	}
-	if got := s.Info().State; got != session.StateRunning {
-		t.Fatalf("state = %q, want running after SetRunning with no lease", got)
+	if got := s.Info().State; got != session.StateIdle {
+		t.Fatalf("state = %q, want idle after SetIdle with no lease", got)
 	}
 }
 

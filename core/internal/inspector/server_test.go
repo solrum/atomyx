@@ -27,6 +27,8 @@ func (fakeController) FreshTree(context.Context) (session.Snapshot, error) {
 	return session.Snapshot{}, errors.New("not used")
 }
 
+func (fakeController) Gate() *session.ActivityGate { return nil }
+
 type counterReader struct{ next byte }
 
 func (c *counterReader) Read(p []byte) (int, error) {

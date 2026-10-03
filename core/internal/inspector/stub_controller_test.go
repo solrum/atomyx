@@ -30,6 +30,8 @@ type stubController struct {
 
 func (c *stubController) Info() session.Info { return c.info }
 
+func (c *stubController) Gate() *session.ActivityGate { return nil }
+
 func (c *stubController) Latest() session.Snapshot {
 	c.mu.Lock()
 	defer c.mu.Unlock()

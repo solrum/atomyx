@@ -113,10 +113,12 @@ type HolderState string
 
 const (
 	// StateIdle: the device is held, no tool call is in flight and no run
-	// is open. A freshly opened session starts here.
+	// is open. Only a host that guards the activity gate, the MCP server
+	// or the inspector, ever marks a session idle.
 	StateIdle HolderState = "idle"
 	// StateRunning: the device is held and a call is in flight or a run is
-	// open.
+	// open. A freshly opened session starts here, so a holder that never
+	// calls SetIdle reports running for its whole life.
 	StateRunning HolderState = "running"
 	// StateReleased: the holder gave the device up after an idle timeout
 	// and remembers which device it had. A Session never reports it,
@@ -173,4 +175,8 @@ type Controller interface {
 	// it, it returns a diag.CodeHolderBusy error at once, because a
 	// capture taken beside a running call would interleave with it.
 	FreshTree(ctx context.Context) (Snapshot, error)
+	// Gate reports the activity gate that guards FreshTree. Only a
+	// lease-holding local session has one, so a remote handle cannot
+	// satisfy Controller.
+	Gate() *ActivityGate
 }

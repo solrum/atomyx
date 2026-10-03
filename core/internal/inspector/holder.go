@@ -316,6 +316,15 @@ func (h *Host) Info() session.Info {
 	return info
 }
 
+// Gate reports the activity gate of the held device, or nil while the
+// host holds none.
+func (h *Host) Gate() *session.ActivityGate {
+	if held, ok := h.held(); ok {
+		return held.Gate()
+	}
+	return nil
+}
+
 // Latest reads the held device's newest capture stamped with the host's
 // generation, and is empty while the device is released.
 func (h *Host) Latest() session.Snapshot {

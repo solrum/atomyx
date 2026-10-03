@@ -152,6 +152,7 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
 	defer record.end(ctx, stderr)
+	opened.recordRun(record.ID())
 
 	suiteRunner := scenario.NewSuiteRunner(scenario.SuiteRunnerDeps{
 		Orchestra:        built.Orchestra,

@@ -46,7 +46,8 @@ type Session struct {
 	mu       sync.Mutex
 	lostErr  error
 	saved    *LaunchState
-	// activity is StateIdle or StateRunning, as the owner last set it.
+	// activity is StateIdle or StateRunning. A session starts running, so
+	// only an owner that manages the activity gate ever marks it idle.
 	activity HolderState
 
 	relaunched bool
@@ -59,7 +60,7 @@ type Session struct {
 func newSession(ctx context.Context, deps Deps, desc device.Descriptor, identity device.Identity, held *lease.Lease, built device.Built, hub *Hub, gate *ActivityGate) *Session {
 	s := &Session{
 		deps: deps, desc: desc, identity: identity, lease: held, built: built, hub: hub, gate: gate,
-		activity: StateIdle,
+		activity: StateRunning,
 		lost:     make(chan struct{}),
 		closed:   make(chan struct{}),
 	}
