@@ -20,7 +20,7 @@ type LeaseAttempt func(udid string) (release func(), err error)
 type RunnerKeeper struct {
 	mu      sync.Mutex
 	attempt LeaseAttempt
-	runners map[string]keptRunner
+	runners map[string]*keptRunner
 	stopAll sync.Once
 }
 
@@ -31,7 +31,7 @@ type keptRunner struct {
 
 // NewRunnerKeeper returns a keeper that holds no runner.
 func NewRunnerKeeper() *RunnerKeeper {
-	return &RunnerKeeper{runners: make(map[string]keptRunner)}
+	return &RunnerKeeper{runners: make(map[string]*keptRunner)}
 }
 
 // TakeLeaseWith sets how the keeper takes a device's lease before it
@@ -44,16 +44,29 @@ func (k *RunnerKeeper) TakeLeaseWith(attempt LeaseAttempt) *RunnerKeeper {
 	return k
 }
 
-func (k *RunnerKeeper) keep(launch launchRecord, stop func() error) {
+// keep registers a runner and returns its entry. A runner kept again under
+// the same launch id, as when this process adopts a runner it launched
+// itself, replaces the earlier entry.
+func (k *RunnerKeeper) keep(launch launchRecord, stop func() error) *keptRunner {
 	k.mu.Lock()
 	defer k.mu.Unlock()
-	k.runners[launch.runnerID] = keptRunner{launch: launch, stop: stop}
+	entry := &keptRunner{launch: launch, stop: stop}
+	k.runners[launch.runnerID] = entry
+	return entry
 }
 
-func (k *RunnerKeeper) forget(runnerID string) {
+// forget removes entry, and only while it is still the entry kept for its
+// launch id. A stop that fires late for an earlier registration of the
+// same runner therefore never drops the newer one.
+func (k *RunnerKeeper) forget(entry *keptRunner) {
+	if entry == nil {
+		return
+	}
 	k.mu.Lock()
 	defer k.mu.Unlock()
-	delete(k.runners, runnerID)
+	if k.runners[entry.launch.runnerID] == entry {
+		delete(k.runners, entry.launch.runnerID)
+	}
 }
 
 // StopAll stops every kept runner this process still owns and can take the
@@ -65,7 +78,7 @@ func (k *RunnerKeeper) StopAll() {
 	k.stopAll.Do(func() {
 		k.mu.Lock()
 		attempt := k.attempt
-		kept := make([]keptRunner, 0, len(k.runners))
+		kept := make([]*keptRunner, 0, len(k.runners))
 		for _, r := range k.runners {
 			kept = append(kept, r)
 		}
@@ -85,7 +98,7 @@ func (k *RunnerKeeper) StopAll() {
 
 // stopIfOwned stops r once the lease of its device is taken, unless the
 // record names another owner by then.
-func stopIfOwned(r keptRunner, attempt LeaseAttempt) {
+func stopIfOwned(r *keptRunner, attempt LeaseAttempt) {
 	if attempt != nil {
 		release, err := attempt(r.launch.udid)
 		if err != nil {

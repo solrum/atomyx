@@ -234,17 +234,18 @@ func (p *DriverProvisioner) adoptedAgent(ctx context.Context, a adoption, held l
 	// stopping it must not depend on that call's cancellation.
 	stopCtx := context.WithoutCancel(ctx)
 	watchCtx, stopWatching := context.WithCancel(stopCtx)
+	var kept *keptRunner
 	stop := sync.OnceValue(func() error {
 		stopWatching()
 		err := p.endAdopted(stopCtx, a, held)
 		if p.deps.Keeper != nil {
-			p.deps.Keeper.forget(state.RunnerID)
+			p.deps.Keeper.forget(kept)
 		}
 		return err
 	})
 	setEnded(stop)
 	if p.deps.Keeper != nil {
-		p.deps.Keeper.keep(held, stop)
+		kept = p.deps.Keeper.keep(held, stop)
 	}
 	if onLost != nil {
 		go p.watchAdopted(watchCtx, a, onLost, onTunnelLost)

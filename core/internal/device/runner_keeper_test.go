@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"syscall"
 	"testing"
 )
 
@@ -172,5 +173,57 @@ func TestRunnerKeeper_StopAll_RereadsTheOwnerAfterTakingTheLease(t *testing.T) {
 	}
 	if len(leases.released) != 1 {
 		t.Errorf("leases released = %v, want the lease released although the runner was skipped", leases.released)
+	}
+}
+
+func TestRunnerKeeper_ForgetOfAnEarlierRegistrationLeavesTheNewerOne(t *testing.T) {
+	keeper := NewRunnerKeeper()
+	var stopped []string
+	earlier := keeper.keep(launchRecord{runnerID: "r1"}, func() error { stopped = append(stopped, "earlier"); return nil })
+	keeper.keep(launchRecord{runnerID: "r1"}, func() error { stopped = append(stopped, "newer"); return nil })
+
+	keeper.forget(earlier)
+	keeper.StopAll()
+
+	if len(stopped) != 1 || stopped[0] != "newer" {
+		t.Fatalf("stopped = %v, want only the newer registration", stopped)
+	}
+}
+
+func TestRunnerKeeper_ForgetRemovesTheEntryItNames(t *testing.T) {
+	keeper := NewRunnerKeeper()
+	stops := 0
+	entry := keeper.keep(launchRecord{runnerID: "r1"}, func() error { stops++; return nil })
+
+	keeper.forget(entry)
+	keeper.StopAll()
+
+	if stops != 0 {
+		t.Fatalf("stop ran %d times, want a forgotten runner left alone", stops)
+	}
+}
+
+func TestDriverProvisioner_StopOfTheOriginalLaunchKeepsTheSameProcessAdoption(t *testing.T) {
+	fx := newLaunchFixture(t)
+	signals := &recordingSignaler{inspector: fx.inspector, exitOn: map[syscall.Signal]bool{syscall.SIGTERM: true}}
+	p := fx.reapingProvisioner(nil, signals)
+	_, launchedKill, err := p.EnsureIOSAgent(context.Background(), "SIM-1", IosAgentKindSimulator)
+	if err != nil {
+		t.Fatalf("EnsureIOSAgent() error = %v", err)
+	}
+	agent, err := p.ProvisionIOSAgent(context.Background(), "SIM-1", IosAgentKindSimulator, nil, ProvisionOptions{})
+	if err != nil || !agent.Adopted {
+		t.Fatalf("ProvisionIOSAgent() = %+v, %v, want this process's own runner adopted", agent, err)
+	}
+
+	if err := launchedKill(); err != nil {
+		t.Fatalf("launchedKill() error = %v", err)
+	}
+
+	fx.keeper.mu.Lock()
+	kept := len(fx.keeper.runners)
+	fx.keeper.mu.Unlock()
+	if kept != 1 {
+		t.Fatalf("kept runners after the original launch stopped = %d, want the adopted registration kept", kept)
 	}
 }

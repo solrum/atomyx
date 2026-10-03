@@ -395,18 +395,19 @@ func (p *DriverProvisioner) ProvisionIOSAgent(ctx context.Context, udid string, 
 	}
 	port := launcher.Port()
 	stopCtx := context.WithoutCancel(ctx)
+	var kept *keptRunner
 	stop := sync.OnceValue(func() error {
 		err := kill()
 		err = errors.Join(err, p.reapLaunched(stopCtx, held))
 		p.releasePorts(port)
 		if p.deps.Keeper != nil {
-			p.deps.Keeper.forget(cfg.RunnerID)
+			p.deps.Keeper.forget(kept)
 		}
 		return err
 	})
 	ended = stop
 	if p.deps.Keeper != nil {
-		p.deps.Keeper.keep(held, stop)
+		kept = p.deps.Keeper.keep(held, stop)
 	}
 	return IOSAgent{Port: port, RunnerID: cfg.RunnerID, Kill: stop}, nil
 }
