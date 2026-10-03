@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/session"
 )
 
@@ -34,8 +35,9 @@ type eventLine struct {
 
 // stepEventLine is one step line of a run the holder drives. It carries
 // the line's run id and sequence number, so a page tells runs apart and
-// resumes in order. Detail is the step's own text and is empty when the
-// step has none.
+// resumes in order. Ok is present only on a completed line, because a
+// started line has no outcome yet. Detail is the step's own text and is
+// empty when the step has none.
 type stepEventLine struct {
 	Kind       string `json:"kind"`
 	RunID      string `json:"runId"`
@@ -43,7 +45,7 @@ type stepEventLine struct {
 	StepIndex  int    `json:"stepIndex"`
 	Command    string `json:"command"`
 	Phase      string `json:"phase"`
-	Ok         bool   `json:"ok"`
+	Ok         *bool  `json:"ok,omitempty"`
 	DurationMs int64  `json:"durationMs"`
 	Detail     string `json:"detail,omitempty"`
 }
@@ -156,7 +158,11 @@ func (s *stepCursor) write(enc *json.Encoder, src session.StepSource, obs sessio
 	for _, l := range lines {
 		event := stepEventLine{
 			Kind: eventStep, RunID: l.RunID, Seq: l.Seq, StepIndex: l.StepIndex, Command: l.Command,
-			Phase: string(l.Phase), Ok: l.Ok, DurationMs: l.DurationMs,
+			Phase: string(l.Phase), DurationMs: l.DurationMs,
+		}
+		if l.Phase == runfolder.StepPhaseCompleted {
+			ok := l.Ok
+			event.Ok = &ok
 		}
 		if l.Detail != nil {
 			event.Detail = *l.Detail
