@@ -59,3 +59,33 @@ func TestResolveDescriptor_AndroidDefaultsAndPassesIdThrough(t *testing.T) {
 		t.Fatalf("explicit: got %+v, %v", d, err)
 	}
 }
+
+func TestResolveDescriptor_AndroidKindComesFromTheProbe(t *testing.T) {
+	probe := NewStaticProbe([]Descriptor{
+		{ID: "emulator-5556", Platform: PlatformAndroid, Kind: KindEmulator, State: StateOnline},
+		{ID: "RF8N90WV5QD", Platform: PlatformAndroid, Kind: KindDevice, State: StateOnline},
+	})
+	cases := map[string]Kind{"emulator-5556": KindEmulator, "RF8N90WV5QD": KindDevice}
+	for id, want := range cases {
+		d, err := ResolveDescriptor(context.Background(), probe, nil, PlatformAndroid, id)
+		if err != nil || d.ID != id || d.Kind != want {
+			t.Errorf("%s: got %+v, %v, want kind %s", id, d, err, want)
+		}
+	}
+}
+
+func TestResolveDescriptor_AnUnlistedAndroidSerialKindFollowsItsName(t *testing.T) {
+	probe := NewStaticProbe(nil)
+	cases := map[string]Kind{
+		"":                 KindEmulator,
+		"emulator-5554":    KindEmulator,
+		"RF8N90WV5QD":      KindDevice,
+		"192.168.1.5:5555": KindDevice,
+	}
+	for id, want := range cases {
+		d, err := ResolveDescriptor(context.Background(), probe, nil, PlatformAndroid, id)
+		if err != nil || d.Kind != want {
+			t.Errorf("%q: got %+v, %v, want kind %s", id, d, err, want)
+		}
+	}
+}

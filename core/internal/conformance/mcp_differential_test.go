@@ -42,9 +42,7 @@ func newGoMcpClientSession(t *testing.T, ctx context.Context, program *McpDriver
 	store := storage.NewInMemoryStorage()
 	runStore := storage.NewRunStore()
 	server, err := atomcp.NewServer(atomcp.Info{Name: "atomyx-conformance", Version: "0.0.0-test"}, atomcp.ServerDeps{
-		Probe: device.NewStaticProbe([]device.Descriptor{
-			{ID: "mock-device-2", Platform: device.PlatformIOS, Kind: device.KindSimulator},
-		}),
+		Probe:    device.NewStaticProbe(mcpProbeSnapshots(), mcpProbeSnapshots()),
 		Factory:  &mcpScriptedMockFactory{program: program},
 		Storage:  store,
 		RunStore: runStore,
@@ -399,5 +397,15 @@ func TestMcpToolCallDifferential(t *testing.T) {
 
 			checkGolden(t, filepath.Join("mcp", c.Name+".json"), goJSON, DiffJSON)
 		})
+	}
+}
+
+// mcpProbeSnapshots is one scan of the device list the program selects
+// from. A static probe serves one snapshot per scan and the program makes
+// two selections that each scan, so the probe is given one snapshot per
+// selection.
+func mcpProbeSnapshots() []device.Descriptor {
+	return []device.Descriptor{
+		{ID: "mock-device-2", Platform: device.PlatformIOS, Kind: device.KindSimulator},
 	}
 }

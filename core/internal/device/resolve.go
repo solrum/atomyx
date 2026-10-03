@@ -35,10 +35,13 @@ func (e *DeviceNotFoundError) Error() string {
 // Platform notes:
 //
 //   - Android: the id is used as given, defaulting to the serial adb
-//     assigns a single booted emulator when empty. No scan runs,
-//     because the Android driver does not depend on the kind and an
-//     adb serial reachable over the network is not always listed by
-//     a probe.
+//     assigns a single booted emulator when empty. The kind is the
+//     one probe reports for a listed serial. A serial the probe does
+//     not list, such as one reachable over the network, or a nil
+//     probe, gets the kind its name implies: an emulator-prefixed
+//     serial is an emulator and any other is a physical device. The
+//     id is never rejected, because the Android driver only needs a
+//     serial adb accepts.
 //   - iOS with an id: probe is scanned for a reachable iOS device
 //     whose id matches, ignoring case, and the match's Kind
 //     (simulator or physical device) is returned. An id no scan finds
@@ -59,7 +62,7 @@ func ResolveDescriptor(ctx context.Context, probe Probe, runners RunnerIdentifie
 		if id == "" {
 			id = defaultAndroidSerial
 		}
-		return Descriptor{ID: id, Platform: PlatformAndroid, Kind: KindEmulator}, nil
+		return Descriptor{ID: id, Platform: PlatformAndroid, Kind: resolveAndroidKind(ctx, probe, id)}, nil
 	}
 	if id == "" {
 		return resolveServedRunner(ctx, probe, runners)
@@ -70,6 +73,20 @@ func ResolveDescriptor(ctx context.Context, probe Probe, runners RunnerIdentifie
 		}
 	}
 	return Descriptor{}, &DeviceNotFoundError{Platform: PlatformIOS, ID: id}
+}
+
+// resolveAndroidKind reports the kind of the Android device id, from
+// probe when it lists the serial and from the serial's own shape
+// otherwise.
+func resolveAndroidKind(ctx context.Context, probe Probe, id string) Kind {
+	if probe != nil {
+		for _, d := range probe.Scan(ctx) {
+			if d.Platform == PlatformAndroid && d.ID == id {
+				return d.Kind
+			}
+		}
+	}
+	return androidKind(id)
 }
 
 // resolveServedRunner names the device behind the runner answering on
