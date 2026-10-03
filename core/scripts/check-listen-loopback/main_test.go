@@ -32,6 +32,7 @@ func TestCheck(t *testing.T) {
 		{"loopback behind a constant", "package p\nimport \"net\"\nconst addr = \"127.0.0.1:0\"\nfunc f() { _, _ = net.Listen(\"tcp\", addr) }\n", 0},
 		{"loopback built by concatenation", "package p\nimport \"net\"\nconst host = \"127.0.0.1\"\nfunc f() { _, _ = net.Listen(\"tcp\", host+\":0\") }\n", 0},
 		{"unix socket", "package p\nimport \"net\"\nfunc f(p string) { _, _ = net.Listen(\"unix\", p) }\n", 0},
+		{"attach package listen", "package p\nimport \"dev.atomyx/internal/attach\"\nfunc f(c attach.ServerConfig) { _, _ = attach.Listen(c) }\n", 0},
 		{"listen config on loopback", "package p\nimport (\"context\"; \"net\")\nfunc f() { _, _ = new(net.ListenConfig).Listen(context.Background(), \"tcp\", \"127.0.0.1:0\") }\n", 0},
 		{"server addr on loopback", "package p\nimport \"net/http\"\nvar s = &http.Server{Addr: \"127.0.0.1:0\"}\n", 0},
 		{"unrelated listen method", "package p\ntype q struct{}\nfunc (q) Listen() {}\nfunc f(x q) { x.Listen() }\n", 0},
