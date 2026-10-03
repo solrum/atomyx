@@ -478,6 +478,52 @@ project config from the working directory.
 `cmd/internal/sessionwire` resolves them. The holder state machine is
 documented in [`tools.md`](./tools.md).
 
+## Attach protocol
+
+`core/internal/attach` defines how a viewer talks to the process that
+holds a device. It carries no session types: it depends only on `wire`
+and `diag`, and the holder supplies the data through interfaces.
+
+Framing:
+
+- One JSON object per line over a unix socket, at most `MaxFrameBytes`
+  (32 MiB) including the newline. A longer frame fails with
+  `ErrFrameTooLarge`. A reader cannot resynchronize after one, so that
+  connection closes. A writer that refuses one writes nothing, so its
+  connection stays usable.
+- A request is `{"v":1,"id":N,"type":"...","data":{}}` with a positive
+  id. A response echoes the id and type and adds `ok`, plus `code`,
+  `message` and `remedy` when `ok` is false. A notice has neither id nor
+  `ok`.
+
+Versioning:
+
+- Every connection starts with `session.hello` carrying the range of
+  major versions the client speaks, its name and its features. The
+  holder answers with the highest shared version and the features it
+  serves, or `UNSUPPORTED_VERSION` when the ranges do not overlap.
+- Additive fields and new types keep the major version. A removed or
+  reshaped field raises it.
+- An unknown message type is answered with `UNSUPPORTED` and the
+  connection stays open.
+
+Message groups:
+
+- `session`: `session.hello`, `session.status`, `session.bye`.
+- `observe`: `observe.subscribe` with `sinceSeq`, then the notices
+  `observe.notice.tree`, `observe.notice.screenshot`,
+  `observe.notice.step`, `observe.notice.stepGap` and
+  `observe.notice.closed`. Tree and screenshot notices carry only a
+  revision and an action epoch, so a viewer pulls the image with
+  `observe.tree.latest` or `observe.screenshot.latest`.
+  `observe.tree.fresh` returns a matched tree and screenshot pair.
+- There is no group that drives the device.
+
+The step line travels as `attach.StepLine`, whose JSON equals one line
+of `steps.jsonl`. The golden transcripts under
+`core/internal/conformance/goldens/attach/` freeze each version, and the
+conformance suite checks the two step line types against the same JSON.
+
 ## Inspector server
 
 `core/internal/inspector` is the HTTP server behind the browser

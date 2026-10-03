@@ -1,0 +1,192 @@
+[
+  {
+    "frame": {
+      "data": {
+        "sinceSeq": 0
+      },
+      "id": 1,
+      "type": "observe.subscribe",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "id": 1,
+      "ok": true,
+      "type": "observe.subscribe",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "data": {
+        "epoch": 2,
+        "revision": 4
+      },
+      "type": "observe.notice.tree",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "data": {
+        "epoch": 2,
+        "revision": 3
+      },
+      "type": "observe.notice.screenshot",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "data": {
+        "epoch": 2,
+        "line": {
+          "artifacts": [],
+          "command": "assertExists",
+          "detail": "Element exists",
+          "durationMs": 12,
+          "ok": true,
+          "phase": "completed",
+          "schemaVersion": 1,
+          "seq": 5,
+          "stepIndex": 1
+        }
+      },
+      "type": "observe.notice.step",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "data": {
+        "oldestSeq": 40
+      },
+      "type": "observe.notice.stepGap",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "id": 2,
+      "type": "observe.tree.latest",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "data": {
+        "epoch": 2,
+        "revision": 4,
+        "tree": {
+          "attributes": {
+            "bounds": "[0,0][1080,1920]",
+            "class": "Screen"
+          },
+          "children": [
+            {
+              "attributes": {
+                "bounds": "[100,200][400,300]",
+                "id": "login",
+                "text": "Log in"
+              },
+              "children": [],
+              "enabled": true
+            }
+          ]
+        }
+      },
+      "id": 2,
+      "ok": true,
+      "type": "observe.tree.latest",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "id": 3,
+      "type": "observe.screenshot.latest",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "data": {
+        "epoch": 2,
+        "format": "png",
+        "image": "iVBORw0KGgo=",
+        "revision": 3
+      },
+      "id": 3,
+      "ok": true,
+      "type": "observe.screenshot.latest",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "id": 4,
+      "type": "observe.tree.fresh",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "data": {
+        "highlightable": true,
+        "paired": true,
+        "scale": 2.5,
+        "screenshot": {
+          "epoch": 3,
+          "format": "png",
+          "image": "iVBORw==",
+          "revision": 4
+        },
+        "tree": {
+          "epoch": 3,
+          "revision": 5,
+          "tree": {
+            "attributes": {
+              "bounds": "[0,0][1080,1920]",
+              "class": "Screen"
+            },
+            "children": [
+              {
+                "attributes": {
+                  "bounds": "[100,200][400,300]",
+                  "id": "login",
+                  "text": "Log in"
+                },
+                "children": [],
+                "enabled": true
+              }
+            ]
+          }
+        }
+      },
+      "id": 4,
+      "ok": true,
+      "type": "observe.tree.fresh",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "type": "observe.notice.closed",
+      "v": 1
+    },
+    "from": "holder"
+  }
+]

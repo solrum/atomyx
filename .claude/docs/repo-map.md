@@ -71,6 +71,7 @@ atomyx/
 | Package | Responsibility |
 |---|---|
 | `androiddriver` | Implements the Driver port over the Android agent's HTTP control server. |
+| `attach` | Defines the line-delimited JSON protocol a device holder speaks to attached viewers over a unix socket, with its envelope framing, version negotiation and message types. It depends only on `wire` and `diag`. |
 | `cli` | Implements the `atomyx` command-line binary: argument parsing, command routing, driver and skills commands, including `inspect.go`, which hosts the inspector through an injected browser opener and stdin reader. |
 | `clock` | Time-source abstraction every polling loop, timeout, and retry uses instead of calling the standard library directly. |
 | `config` | Owns the project config schema, including the `session` timeouts block, its file-discovery and YAML loader, schema validation, and environment reference resolution. |

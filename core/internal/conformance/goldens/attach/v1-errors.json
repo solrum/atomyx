@@ -1,0 +1,133 @@
+[
+  {
+    "frame": {
+      "data": {
+        "client": "future viewer",
+        "features": [],
+        "protocol": {
+          "max": 3,
+          "min": 2
+        }
+      },
+      "id": 1,
+      "type": "session.hello",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "code": "UNSUPPORTED_VERSION",
+      "id": 1,
+      "message": "no shared protocol version: the client speaks 2 to 3 and the holder speaks 1 to 1",
+      "ok": false,
+      "remedy": "Use an Atomyx binary built from the same source as the process that holds the device.",
+      "type": "session.hello",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "data": {
+        "client": "atomyx inspect",
+        "features": [],
+        "protocol": {
+          "max": 1,
+          "min": 1
+        }
+      },
+      "id": 2,
+      "type": "session.hello",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "data": {
+        "features": [
+          "observe"
+        ],
+        "protocol": 1
+      },
+      "id": 2,
+      "ok": true,
+      "type": "session.hello",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "id": 3,
+      "type": "control.borrow",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "code": "UNSUPPORTED",
+      "id": 3,
+      "message": "the message type \"control.borrow\" is not supported",
+      "ok": false,
+      "remedy": "Check the feature list the peer returned in its hello answer, and send only message types that list covers.",
+      "type": "control.borrow",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "id": 4,
+      "type": "observe.tree.fresh",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "code": "HOLDER_BUSY",
+      "id": 4,
+      "message": "the device holder is busy: a tool call is running",
+      "ok": false,
+      "remedy": "Wait for that work to finish, then ask again.",
+      "type": "observe.tree.fresh",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "id": 5,
+      "type": "session.status",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "data": {
+        "device": {
+          "id": "",
+          "name": "",
+          "platform": ""
+        },
+        "generation": 0,
+        "holder": {
+          "command": "",
+          "pid": 0,
+          "role": "",
+          "startedAt": 0
+        },
+        "state": "running"
+      },
+      "id": 5,
+      "ok": true,
+      "type": "session.status",
+      "v": 1
+    },
+    "from": "holder"
+  }
+]

@@ -1,0 +1,13 @@
+{
+  "artifacts": [
+    "step-004-home.png"
+  ],
+  "command": "tap",
+  "detail": "Element exists",
+  "durationMs": 41,
+  "ok": true,
+  "phase": "completed",
+  "schemaVersion": 1,
+  "seq": 9,
+  "stepIndex": 3
+}

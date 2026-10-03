@@ -1,0 +1,84 @@
+[
+  {
+    "frame": {
+      "data": {
+        "client": "atomyx inspect",
+        "features": [
+          "observe"
+        ],
+        "protocol": {
+          "max": 1,
+          "min": 1
+        }
+      },
+      "id": 1,
+      "type": "session.hello",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "data": {
+        "features": [
+          "observe"
+        ],
+        "protocol": 1
+      },
+      "id": 1,
+      "ok": true,
+      "type": "session.hello",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "id": 2,
+      "type": "session.status",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "data": {
+        "device": {
+          "id": "emulator-5554",
+          "name": "Pixel 8",
+          "platform": "android"
+        },
+        "generation": 1,
+        "holder": {
+          "command": "atomyx-mcp",
+          "pid": 4242,
+          "role": "mcp",
+          "startedAt": 1790000000000
+        },
+        "state": "idle"
+      },
+      "id": 2,
+      "ok": true,
+      "type": "session.status",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "id": 3,
+      "type": "session.bye",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "id": 3,
+      "ok": true,
+      "type": "session.bye",
+      "v": 1
+    },
+    "from": "holder"
+  }
+]
