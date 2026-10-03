@@ -8,6 +8,7 @@ import { createHighlight } from './highlight.js';
 import { createPropertiesPanel } from './properties-panel.js';
 import { refreshScreenshot } from './screenshot.js';
 import { refreshSession } from './session-header.js';
+import { createStepsPanel } from './steps-panel.js';
 import { createSuggestionsPanel } from './suggestions-panel.js';
 import { createTesterPanel } from './tester-panel.js';
 import { createYamlPanel } from './yaml-panel.js';
@@ -135,6 +136,7 @@ async function start() {
   createSuggestionsPanel(panels, { operate, notify: showNotice, reloadTree: loadTree, onUse: (selector) => tester.setSelector(selector) });
   const tester = createTesterPanel(panels, { operate, notify: showNotice, selectPath: (path) => view.selectPath(path) });
   createYamlPanel(panels, { operate, notify: showNotice, readSelector: tester.readSelector });
+  const steps = createStepsPanel(panels);
   createHighlight({
     img: byId('screenshot'),
     overlay: byId('highlight'),
@@ -150,6 +152,8 @@ async function start() {
       loadSession();
     },
     onScreenshot: loadScreenshot,
+    onStep: steps.add,
+    onStepGap: steps.gap,
     onReleased: (code) => {
       showReleased(unavailableText(code));
       loadSession();

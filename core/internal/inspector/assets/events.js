@@ -62,8 +62,8 @@ function verdict(err) {
   return 'retry';
 }
 
-// Follows the capture feed. A line of kind tree or screenshot calls the
-// matching handler. A stream that ends for any reason is reopened after
+// Follows the capture feed. A line of kind tree, screenshot, step or
+// step_gap calls the matching handler. A stream that ends for any reason is reopened after
 // a growing pause and the handlers run once on every reopen, so a
 // capture missed in between is picked up. A feed that answers
 // DEVICE_RELEASED or DEVICE_LOST stops for good until start is called
@@ -71,7 +71,7 @@ function verdict(err) {
 // server's own message and remedy, and one that fails
 // MAX_CONSECUTIVE_FAILURES attempts in a row stops with onFatal too. An
 // attempt that opens the feed starts the count over.
-export function createEventStream({ onTree, onScreenshot, onReleased, onFatal }) {
+export function createEventStream({ onTree, onScreenshot, onStep, onStepGap, onReleased, onFatal }) {
   let abort = null;
 
   async function run(signal) {
@@ -90,6 +90,10 @@ export function createEventStream({ onTree, onScreenshot, onReleased, onFatal })
             onTree();
           } else if (event.kind === 'screenshot') {
             onScreenshot();
+          } else if (event.kind === 'step') {
+            onStep(event);
+          } else if (event.kind === 'step_gap') {
+            onStepGap();
           }
         }
       } catch (err) {
