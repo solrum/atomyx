@@ -142,8 +142,11 @@ func listen(cfg ServerConfig, now func() time.Time) (*Server, error) {
 // Path is the socket path the server listens on.
 func (s *Server) Path() string { return s.cfg.Path }
 
-// Close stops accepting, closes every connection, and returns once every
-// goroutine of the server has ended. It is safe to call more than once.
+// Close stops accepting, writes the frames already queued for each
+// connection, closes every connection, and returns once every goroutine
+// of the server has ended. The flush is bounded by one write timeout in
+// total, so a viewer that stopped reading cannot hold Close. It is safe to
+// call more than once.
 func (s *Server) Close() error {
 	s.mu.Lock()
 	if s.closed {
@@ -158,6 +161,7 @@ func (s *Server) Close() error {
 	s.mu.Unlock()
 
 	err := s.ln.Close()
+	s.flush(open)
 	s.cancel()
 	for _, c := range open {
 		c.close()
@@ -167,6 +171,26 @@ func (s *Server) Close() error {
 		return nil
 	}
 	return err
+}
+
+// flush waits until the writer of each connection has written what was
+// queued before Close, or until one write timeout has passed.
+func (s *Server) flush(open []*conn) {
+	flushing := make([]*conn, 0, len(open))
+	for _, c := range open {
+		if c.flush() {
+			flushing = append(flushing, c)
+		}
+	}
+	timer := time.NewTimer(s.cfg.WriteTimeout)
+	defer timer.Stop()
+	for _, c := range flushing {
+		select {
+		case <-c.writerDone:
+		case <-timer.C:
+			return
+		}
+	}
 }
 
 // acceptLoop admits viewers until the listener is closed. Any other

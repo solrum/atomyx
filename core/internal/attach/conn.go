@@ -45,6 +45,9 @@ type conn struct {
 	cancel context.CancelFunc
 
 	closeOnce sync.Once
+	// writerDone is closed when the writer has ended, so Server.Close can
+	// tell that every frame queued before it was written.
+	writerDone chan struct{}
 	// sub is the connection's live notice subscription. Only the read
 	// goroutine touches it.
 	sub *liveSubscription
@@ -72,13 +75,14 @@ func newLiveSubscription(parent context.Context) (context.Context, *liveSubscrip
 func newConn(s *Server, nc *net.UnixConn) *conn {
 	ctx, cancel := context.WithCancel(s.ctx)
 	return &conn{
-		srv:    s,
-		nc:     nc,
-		id:     s.nextConnID.Add(1),
-		reader: NewFrameReader(nc),
-		out:    make(chan outbound, s.cfg.QueueSize),
-		ctx:    ctx,
-		cancel: cancel,
+		srv:        s,
+		nc:         nc,
+		id:         s.nextConnID.Add(1),
+		reader:     NewFrameReader(nc),
+		out:        make(chan outbound, s.cfg.QueueSize),
+		writerDone: make(chan struct{}),
+		ctx:        ctx,
+		cancel:     cancel,
 	}
 }
 
@@ -113,6 +117,7 @@ func (c *conn) run() {
 // before it have been written.
 func (c *conn) writeLoop() {
 	defer c.srv.wg.Done()
+	defer close(c.writerDone)
 	defer c.srv.forget(c)
 	defer c.close()
 	defer c.fireAfter()
@@ -204,6 +209,13 @@ func (c *conn) fireAfter() {
 
 func (c *conn) fail(req Frame, cause error) bool {
 	return c.send(NewErrorResponse(req.ID, req.Type, cause))
+}
+
+// flush asks the writer to stop after the frames already queued. It
+// reports false when the queue had no room for the end marker, in which
+// case the connection is closed at once.
+func (c *conn) flush() bool {
+	return c.enqueue(nil)
 }
 
 // drain queues the end of the stream, after which the writer closes the

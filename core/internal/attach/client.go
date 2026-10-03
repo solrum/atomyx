@@ -275,18 +275,30 @@ func (c *Client) Call(ctx context.Context, messageType string, data, result any)
 	}
 	select {
 	case response := <-reply:
-		if response.Ok == nil || !*response.Ok {
-			return remoteError(response)
-		}
-		if result == nil {
-			return nil
-		}
-		return response.Decode(result)
+		return decodeResponse(response, result)
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-c.done:
-		return c.Err()
+		// The read loop hands a response to its call before it reports the
+		// end of the connection, so a holder that replies and then closes
+		// must still deliver the reply, whichever case select picked.
+		select {
+		case response := <-reply:
+			return decodeResponse(response, result)
+		default:
+			return c.Err()
+		}
 	}
+}
+
+func decodeResponse(response Frame, result any) error {
+	if response.Ok == nil || !*response.Ok {
+		return remoteError(response)
+	}
+	if result == nil {
+		return nil
+	}
+	return response.Decode(result)
 }
 
 // write sends one frame. A context without a deadline still ends the
