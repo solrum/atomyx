@@ -97,7 +97,7 @@ func openWriter(dir, id string, at time.Time, now func() time.Time, base Meta) (
 		_ = os.RemoveAll(dir)
 		return nil, fmt.Errorf("locking run folder: %w", err)
 	}
-	w := &Writer{dir: dir, now: now, meta: meta, lock: lock, maxLogBytes: MaxLogBytes, maxStepsBytes: MaxStepsBytes}
+	w := &Writer{dir: dir, now: now, meta: meta, lock: lock, maxLogBytes: MaxLogBytes, maxStepsBytes: MaxStepsBytes, maxInterventionBytes: MaxInterventionsBytes}
 	if err := w.writeMeta(); err != nil {
 		_ = lock.Close()
 		_ = os.RemoveAll(dir)
@@ -158,10 +158,11 @@ func publishLockedFile(dir string) (*os.File, error) {
 // whose process dies, leaves a meta with no completedAt and no lock, which
 // readers settle as interrupted.
 type Writer struct {
-	dir           string
-	now           func() time.Time
-	maxLogBytes   int
-	maxStepsBytes int
+	dir                  string
+	now                  func() time.Time
+	maxLogBytes          int
+	maxStepsBytes        int
+	maxInterventionBytes int
 
 	mu        sync.Mutex
 	meta      Meta
@@ -175,6 +176,10 @@ type Writer struct {
 	stepsBytes     int
 	stepSeq        int64
 	stepsTruncated bool
+
+	interventions          *os.File
+	interventionBytes      int
+	interventionsTruncated bool
 }
 
 type writerState int
@@ -279,7 +284,7 @@ func (w *Writer) Close() error {
 }
 
 func (w *Writer) releaseLocked() error {
-	var logErr, stepsErr error
+	var logErr, stepsErr, interventionsErr error
 	if w.log != nil {
 		logErr = w.log.Close()
 		w.log = nil
@@ -288,7 +293,11 @@ func (w *Writer) releaseLocked() error {
 		stepsErr = w.steps.Close()
 		w.steps = nil
 	}
-	return errors.Join(logErr, stepsErr, w.lock.Close())
+	if w.interventions != nil {
+		interventionsErr = w.interventions.Close()
+		w.interventions = nil
+	}
+	return errors.Join(logErr, stepsErr, interventionsErr, w.lock.Close())
 }
 
 func (w *Writer) checkOpen() error {
