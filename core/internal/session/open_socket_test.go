@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"dev.atomyx/internal/attach"
@@ -216,4 +217,43 @@ func TestSession_ALostSessionStopsItsServerAndLeavesTheSocketPathToTheNewHolder(
 
 func rawDial(path string) (net.Conn, error) {
 	return (&net.Dialer{}).DialContext(context.Background(), "unix", path)
+}
+
+func TestOpen_ABindFailureIsRecordedInTheLeaseWithoutAPath(t *testing.T) {
+	m := newSocketManager(t, clock.SystemClock{})
+	path := socketPathFor(m)
+	if err := os.Chmod(filepath.Dir(path), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	s, err := session.Open(context.Background(), baseDeps(t, &recordingFactory{events: &eventLog{}}, m), session.Request{Descriptor: androidDesc("A")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+
+	status, err := m.Probe(context.Background(), lease.KeyFor("android", "A"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const want = "runtime directory is not private"
+	if status.Holder.Socket != "" || status.Holder.SocketError != want {
+		t.Fatalf("holder socket = %q, socketError = %q, want no socket and %q", status.Holder.Socket, status.Holder.SocketError, want)
+	}
+	if strings.Contains(status.Holder.SocketError, filepath.Dir(path)) {
+		t.Fatalf("socketError %q names a path", status.Holder.SocketError)
+	}
+}
+
+func TestOpen_ABoundSocketLeavesTheLeaseSocketErrorEmpty(t *testing.T) {
+	m := newSocketManager(t, clock.SystemClock{})
+	s, err := session.Open(context.Background(), baseDeps(t, &recordingFactory{events: &eventLog{}}, m), session.Request{Descriptor: androidDesc("A")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+
+	status, err := m.Probe(context.Background(), lease.KeyFor("android", "A"))
+	if err != nil || status.Holder.Socket == "" || status.Holder.SocketError != "" {
+		t.Fatalf("holder = %+v, %v, want a socket and no socketError", status.Holder, err)
+	}
 }

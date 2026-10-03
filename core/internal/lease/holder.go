@@ -19,6 +19,10 @@ type Holder struct {
 	Socket    string     `json:"socket,omitempty"`
 	StartedAt time.Time  `json:"startedAt"`
 	IdleSince *time.Time `json:"idleSince,omitempty"`
+	// SocketError is a short reason, without paths, that the holder serves
+	// no socket. It is empty while the socket is bound or not yet tried, so
+	// a viewer tells a holder that serves none from one still starting.
+	SocketError string `json:"socketError,omitempty"`
 }
 
 // State summarizes what the holder is doing, for display.

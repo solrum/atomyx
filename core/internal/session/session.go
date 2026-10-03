@@ -62,6 +62,9 @@ type Session struct {
 	// empty when the session serves none. It is set before the session is
 	// shared and never changes.
 	socket string
+	// socketError is the short reason the session serves no socket, empty
+	// when it serves one. Like socket, it is set before the session is shared.
+	socketError string
 	// socketRefresher replaces the session's own idle-guarded capture for
 	// a viewer's fresh request. It is nil by default and never changes
 	// after Open.
@@ -227,6 +230,7 @@ func (s *Session) updateHolder(mutate func(*lease.Holder)) error {
 	err := s.lease.UpdateHolder(func(h *lease.Holder) {
 		mutate(h)
 		h.Socket = s.socket
+		h.SocketError = s.socketError
 	})
 	if errors.Is(err, lease.ErrReleased) {
 		return nil

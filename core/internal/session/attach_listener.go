@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"syscall"
 
 	"dev.atomyx/internal/attach"
 	"dev.atomyx/internal/logging"
@@ -55,6 +56,7 @@ func (s *Session) bindAttach(path string) {
 	l, err := listenAttach(path, s.attachHandlers())
 	if err != nil {
 		s.deps.Logger.Warn("attach.socket_unavailable", logging.LogContext{"id": s.desc.ID, "error": err.Error()})
+		s.socketError = bindFailureReason(err)
 		return
 	}
 	s.socket = path
@@ -66,6 +68,32 @@ func (s *Session) bindAttach(path string) {
 	s.mu.Unlock()
 	if done {
 		l.stop()
+	}
+}
+
+// Reasons a holder records when it serves no socket. They carry no paths,
+// because the lease record is shown to other users of the machine.
+const (
+	reasonUnsafeDir   = "runtime directory is not private"
+	reasonDenied      = "permission denied"
+	reasonInUse       = "address already in use"
+	reasonPathTooLong = "socket path too long"
+	reasonBindFailed  = "bind failed"
+)
+
+// bindFailureReason maps a bind error to one of the short reasons.
+func bindFailureReason(err error) string {
+	switch {
+	case errors.Is(err, attach.ErrUnsafeSocketDir):
+		return reasonUnsafeDir
+	case errors.Is(err, fs.ErrPermission):
+		return reasonDenied
+	case errors.Is(err, syscall.EADDRINUSE):
+		return reasonInUse
+	case errors.Is(err, syscall.ENAMETOOLONG), errors.Is(err, syscall.EINVAL):
+		return reasonPathTooLong
+	default:
+		return reasonBindFailed
 	}
 }
 

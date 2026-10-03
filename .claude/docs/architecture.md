@@ -277,9 +277,11 @@ Contract:
   `InodeRecheckPeriod` (5 seconds). A failed re-acquire returns an error
   wrapping `ErrLost`.
 - **Lock file.** It is never unlinked. It carries the holder's
-  `{pid, command, role, runId, socket, startedAt, idleSince}` for
-  display only, and nothing reads that metadata to make a control
-  decision.
+  `{pid, command, role, runId, socket, socketError, startedAt, idleSince}`
+  for display only, and nothing reads that metadata to make a control
+  decision. `socketError` is a short reason without paths and is set
+  only when the holder could not bind its socket, so a viewer can tell
+  a holder that serves none from one that is still starting.
 - **Probe.** `Manager.Probe` takes the same real flock and releases it
   immediately. It never creates the lock file and never writes holder
   metadata.
