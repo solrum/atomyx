@@ -409,6 +409,14 @@ one, is logged as refused.
   capture feed and refetches the session, the tree and the screenshot.
   When the device is held elsewhere, the banner shows the refusal and
   its remedy and the button stays available.
+- **Lost device.** When the device goes away while the command holds
+  it, for example the cable is pulled or the runner process exits, the
+  command gives the session up, the header shows the holder state
+  `lost`, and the page shows a banner with a Reconnect button. Unlike
+  `run`, which stops when the device is lost, the inspector keeps
+  running. Reconnect takes the device again through the same steps as
+  at startup, and fails with the device's own code, such as
+  `DEVICE_HELD`, when another process holds it by then.
 - **The page.** The header names the device, its platform and kind,
   and the holder state. The page reads the code from the URL fragment,
   removes it from the address bar, and trades it for a token that it

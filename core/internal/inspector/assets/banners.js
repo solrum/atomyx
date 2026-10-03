@@ -21,6 +21,15 @@ export function showNotice(text) {
   }, NOTICE_MS);
 }
 
+const UNAVAILABLE_TEXT = {
+  DEVICE_RELEASED: 'The inspector released the device after it sat idle.',
+  DEVICE_LOST: 'The device was lost. Check that it is connected and awake, then reconnect.',
+};
+
+export function unavailableText(code) {
+  return UNAVAILABLE_TEXT[code] || UNAVAILABLE_TEXT.DEVICE_RELEASED;
+}
+
 export function showReleased(text) {
   document.getElementById('released-text').textContent = text;
   document.getElementById('released').hidden = false;

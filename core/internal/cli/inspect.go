@@ -25,7 +25,10 @@ type BrowserOpener interface {
 // deps.Stdin prints and opens a fresh URL, and the end of stdin
 // stops that without stopping the server. The device is released
 // after the idle timeout without an operator action and taken again
-// only when the page asks.
+// only when the page asks. A device the session loses is dropped the
+// same way and the page offers the same reconnect, so unlike run, suite
+// and doctor, which cancel their work when the device is lost and end,
+// the inspector keeps serving until it is stopped.
 //
 // Exit codes: 0 when the context ended with no stop signal, 1 when
 // the device could not be reached or held or the server failed, 2

@@ -18,6 +18,7 @@ const (
 	codeNoScreenshot     = "NO_SCREENSHOT"
 	codeSessionClosed    = "SESSION_CLOSED"
 	codeDeviceReleased   = "DEVICE_RELEASED"
+	codeDeviceLost       = "DEVICE_LOST"
 	codeTreeStale        = "TREE_STALE"
 	codeNodeNotFound     = "NODE_NOT_FOUND"
 	codeHostNotAllowed   = "HOST_NOT_ALLOWED"
@@ -49,6 +50,10 @@ func writeFailure(w http.ResponseWriter, err error) {
 	case errors.Is(err, ErrReleased):
 		writeCoded(w, http.StatusGone, codeDeviceReleased, "the inspector released the device after it sat idle",
 			"Press reconnect on the page to take the device again.")
+		return
+	case errors.Is(err, ErrLost):
+		writeCoded(w, http.StatusGone, codeDeviceLost, "the device was lost",
+			"Check that the device is connected and awake, then press reconnect on the page.")
 		return
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 		writeCoded(w, http.StatusServiceUnavailable, codeInternal, "the request was cancelled before it finished", "")

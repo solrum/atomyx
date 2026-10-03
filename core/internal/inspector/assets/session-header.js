@@ -10,4 +10,5 @@ export async function refreshSession() {
   setText('session-platform', info.device.platform);
   setText('session-kind', info.device.kind);
   setText('session-holder', info.state);
+  return info;
 }

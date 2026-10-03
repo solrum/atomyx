@@ -20,7 +20,21 @@ type fakeHeld struct {
 	*stubController
 	device *fakeDevice
 	closed chan struct{}
+	lost   chan struct{}
 	once   sync.Once
+}
+
+var errFakeLost = errors.New("the control plane went away")
+
+func (h *fakeHeld) Lost() <-chan struct{} { return h.lost }
+
+func (h *fakeHeld) LostErr() error {
+	select {
+	case <-h.lost:
+		return errFakeLost
+	default:
+		return nil
+	}
 }
 
 func (h *fakeHeld) Close() error {
@@ -49,7 +63,7 @@ func (d *fakeDevice) open(context.Context) (Held, error) {
 	d.opens++
 	ctrl := &stubController{snap: sampleSnapshot(), freshSnap: sampleSnapshot()}
 	ctrl.info.State = session.StateIdle
-	return &fakeHeld{stubController: ctrl, device: d, closed: make(chan struct{})}, nil
+	return &fakeHeld{stubController: ctrl, device: d, closed: make(chan struct{}), lost: make(chan struct{})}, nil
 }
 
 func (d *fakeDevice) release() {

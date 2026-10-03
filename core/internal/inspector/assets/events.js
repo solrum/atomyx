@@ -1,8 +1,7 @@
-import { ApiError, request } from './api.js';
+import { ApiError, DEVICE_UNAVAILABLE_CODES, request } from './api.js';
 
 const BACKOFF_START_MS = 500;
 const BACKOFF_MAX_MS = 8000;
-const RELEASED_CODE = 'DEVICE_RELEASED';
 
 function delay(ms, signal) {
   return new Promise((resolve) => {
@@ -38,7 +37,8 @@ async function* ndjson(body, signal) {
 // matching handler. A stream that ends for any reason is reopened after
 // a growing pause and the handlers run once on every reopen, so a
 // capture missed in between is picked up. A feed that answers
-// DEVICE_RELEASED stops for good until start is called again.
+// DEVICE_RELEASED or DEVICE_LOST stops for good until start is called
+// again.
 export function createEventStream({ onTree, onScreenshot, onReleased, onFatal }) {
   let abort = null;
 
@@ -61,8 +61,8 @@ export function createEventStream({ onTree, onScreenshot, onReleased, onFatal })
         if (signal.aborted) {
           return;
         }
-        if (err instanceof ApiError && err.code === RELEASED_CODE) {
-          onReleased();
+        if (err instanceof ApiError && DEVICE_UNAVAILABLE_CODES.has(err.code)) {
+          onReleased(err.code);
           return;
         }
         if (err instanceof ApiError && err.status === 401) {

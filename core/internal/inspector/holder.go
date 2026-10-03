@@ -17,6 +17,11 @@ const routeReconnect = "/api/v1/reconnect"
 // device is released after an idle timeout.
 var ErrReleased = errors.New("inspector: the device is released")
 
+// ErrLost is returned by a Host's controller methods while the device
+// is lost, after the held session reported that it lost the device
+// without the inspector choosing to give it up.
+var ErrLost = errors.New("inspector: the device is lost")
+
 // Held is a device the inspector holds: a controller, plus the Close
 // that gives the device back. A *session.Session is one.
 type Held interface {
@@ -27,6 +32,12 @@ type Held interface {
 	// SetRunning marks the holder as driving the device in the lease
 	// metadata. An empty runID means no run is open.
 	SetRunning(runID string) error
+	// Lost is closed when the held session lost the device without
+	// being closed by its owner.
+	Lost() <-chan struct{}
+	// LostErr reports why the session was lost, and is nil until Lost
+	// is closed.
+	LostErr() error
 	Close() error
 }
 
@@ -56,6 +67,13 @@ type HostConfig struct {
 // that moment, so route groups built over a Host never capture a
 // controller that a release or a reconnect has replaced.
 //
+// A held device that reports itself lost is closed and dropped the same
+// way an idle release drops it, and the host then answers as lost. A
+// command-line run cancels its work when the device is lost and ends,
+// but the inspector is a long-lived server, so it stays up, keeps its
+// token and waits for the operator to press reconnect, which takes the
+// device again through the opener.
+//
 // Only a route that declares Operator counts as activity. Reading what
 // the session holds never keeps the device, mirroring the observe-only
 // rule of the MCP server.
@@ -74,8 +92,9 @@ type Host struct {
 	current   Held
 	driving   int
 	last      session.Info
+	lost      bool
 	touchedMs int64
-	stopIdle  context.CancelFunc
+	stopWatch context.CancelFunc
 }
 
 var _ session.Controller = (*Host)(nil)
@@ -98,20 +117,62 @@ func NewHost(cfg HostConfig) (*Host, error) {
 	return h, nil
 }
 
-// adoptLocked makes held the current device and starts its idle timer.
+// adoptLocked makes held the current device and starts its idle timer
+// and its lost watcher.
 func (h *Host) adoptLocked(held Held) {
 	h.current = held
 	h.driving = 0
+	h.lost = false
 	h.last = held.Info()
 	h.touchedMs = h.clk.NowMs()
 	ctx, cancel := context.WithCancel(context.Background())
-	h.stopIdle = cancel
+	h.stopWatch = cancel
 	go h.idleLoop(ctx, held)
+	go h.lostLoop(ctx, held)
+}
+
+// dropLocked forgets the current device after it was released or lost,
+// and stops the loops that watch it. The caller closes the device.
+func (h *Host) dropLocked(lost bool) {
+	h.last = h.current.Info()
+	h.current = nil
+	h.driving = 0
+	h.lost = lost
+	h.stopWatch()
+}
+
+// lostLoop drops the device and closes it when it reports that it lost
+// the device. It ends when the device is replaced or released first.
+func (h *Host) lostLoop(ctx context.Context, held Held) {
+	select {
+	case <-ctx.Done():
+		return
+	case <-held.Lost():
+	}
+	h.opMu.Lock()
+	defer h.opMu.Unlock()
+	h.mu.Lock()
+	if h.current != held {
+		h.mu.Unlock()
+		return
+	}
+	h.dropLocked(true)
+	h.mu.Unlock()
+	fields := logging.LogContext{}
+	if err := held.LostErr(); err != nil {
+		fields["error"] = err.Error()
+	}
+	h.logger.Warn("inspector.device.lost", fields)
+	if err := held.Close(); err != nil {
+		h.logger.Warn("inspector.lost.close_failed", logging.LogContext{"error": err.Error()})
+	}
 }
 
 // idleLoop sleeps until the device would have been idle for the full
 // timeout, then releases it. A touch only records the time, so the loop
-// wakes, finds the device was used meanwhile, and sleeps the rest.
+// wakes, finds the device was used meanwhile, and sleeps the rest. An
+// action that is driving the device never lets it be released, and its
+// end counts as activity.
 func (h *Host) idleLoop(ctx context.Context, held Held) {
 	wait := h.idleMs
 	for {
@@ -125,15 +186,19 @@ func (h *Host) idleLoop(ctx context.Context, held Held) {
 			h.opMu.Unlock()
 			return
 		}
+		if h.driving > 0 {
+			h.mu.Unlock()
+			h.opMu.Unlock()
+			wait = h.idleMs
+			continue
+		}
 		if remaining := h.touchedMs + h.idleMs - h.clk.NowMs(); remaining > 0 {
 			h.mu.Unlock()
 			h.opMu.Unlock()
 			wait = remaining
 			continue
 		}
-		h.current = nil
-		h.last = held.Info()
-		h.stopIdle()
+		h.dropLocked(false)
 		h.mu.Unlock()
 		err := held.Close()
 		h.opMu.Unlock()
@@ -155,10 +220,18 @@ func (h *Host) markIdle(held Held) {
 
 // beginDriving marks the holder running while at least one operator
 // action that drives the device is in flight, and returns the call that
-// ends the action. The holder returns to idle when the last in-flight
-// action ends, unless a release or a reconnect replaced the device.
-func (h *Host) beginDriving(held Held) func() {
+// ends the action. It refuses with the error for an unavailable device
+// when held is no longer the current device, so an action never counts
+// against a device that was released, lost or replaced. The holder
+// returns to idle when the last in-flight action ends, and the end of
+// an action that began on an earlier device changes nothing.
+func (h *Host) beginDriving(held Held) (func(), error) {
 	h.mu.Lock()
+	if h.current != held {
+		err := h.unavailableLocked()
+		h.mu.Unlock()
+		return nil, err
+	}
 	h.driving++
 	first := h.driving == 1
 	h.mu.Unlock()
@@ -172,17 +245,31 @@ func (h *Host) beginDriving(held Held) func() {
 		last := false
 		if h.current == held {
 			h.driving--
+			h.touchedMs = h.clk.NowMs()
 			last = h.driving == 0
 		}
 		h.mu.Unlock()
 		if last {
 			h.markIdle(held)
 		}
+	}, nil
+}
+
+// unavailableLocked is the error for a device the host does not hold.
+func (h *Host) unavailableLocked() error {
+	if h.lost {
+		return ErrLost
 	}
+	return ErrReleased
+}
+
+func (h *Host) unavailable() error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.unavailableLocked()
 }
 
 func (h *Host) touch() {
-
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.current != nil {
@@ -196,7 +283,8 @@ func (h *Host) held() (Held, bool) {
 	return h.current, h.current != nil
 }
 
-// Info reports the held device, or the last device with state released.
+// Info reports the held device, or the last device with state released
+// after an idle release and lost after the device was lost.
 func (h *Host) Info() session.Info {
 	if held, ok := h.held(); ok {
 		return held.Info()
@@ -205,6 +293,9 @@ func (h *Host) Info() session.Info {
 	defer h.mu.Unlock()
 	info := h.last
 	info.State = session.StateReleased
+	if h.lost {
+		info.State = session.StateLost
+	}
 	return info
 }
 
@@ -217,28 +308,32 @@ func (h *Host) Latest() session.Snapshot {
 	return session.Snapshot{}
 }
 
-// Subscribe follows the held device, and fails with ErrReleased while
-// it is released.
+// Subscribe follows the held device, and fails with ErrReleased or
+// ErrLost while the host holds none.
 func (h *Host) Subscribe(ctx context.Context) (<-chan session.Observation, error) {
 	held, ok := h.held()
 	if !ok {
-		return nil, ErrReleased
+		return nil, h.unavailable()
 	}
 	return held.Subscribe(ctx)
 }
 
 // FreshTree captures from the held device, and fails with ErrReleased
-// while it is released.
+// or ErrLost while the host holds none.
 func (h *Host) FreshTree(ctx context.Context) (session.Snapshot, error) {
 	held, ok := h.held()
 	if !ok {
-		return session.Snapshot{}, ErrReleased
+		return session.Snapshot{}, h.unavailable()
 	}
-	defer h.beginDriving(held)()
+	end, err := h.beginDriving(held)
+	if err != nil {
+		return session.Snapshot{}, err
+	}
+	defer end()
 	return held.FreshTree(ctx)
 }
 
-// Reconnect re-acquires the device after a release through the opener
+// Reconnect re-acquires the device after a release or a loss through the opener
 // and swaps it in for the routes, without a new token or a new server.
 // It does nothing but count as activity when the device is held. The
 // opener's error is returned unchanged, so a device another process
@@ -272,10 +367,8 @@ func (h *Host) Close() error {
 	defer h.opMu.Unlock()
 	h.mu.Lock()
 	held := h.current
-	h.current = nil
 	if held != nil {
-		h.last = held.Info()
-		h.stopIdle()
+		h.dropLocked(false)
 	}
 	h.mu.Unlock()
 	if held == nil {
@@ -287,7 +380,7 @@ func (h *Host) Close() error {
 // Routes returns the group that serves groups over the host and adds
 // the reconnect route. Every route of groups that declares Operator
 // counts as activity, and every route except the session info answers
-// a coded 410 while the device is released.
+// a coded 410 while the device is released or lost.
 func (h *Host) Routes(groups ...RouteGroup) RouteGroup {
 	return func(c session.Controller) []Route {
 		var out []Route
@@ -304,7 +397,7 @@ func (h *Host) guard(r Route) Route {
 	inner := r.Handler
 	r.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if _, ok := h.held(); !ok && r.Path != routeSession {
-			writeFailure(w, ErrReleased)
+			writeFailure(w, h.unavailable())
 			return
 		}
 		if r.Operator {

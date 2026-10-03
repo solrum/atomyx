@@ -6,6 +6,10 @@ export function setToken(value) {
   token = value;
 }
 
+// Codes of a device the inspector does not hold: given up after sitting
+// idle, or lost. The operator brings it back with the reconnect control.
+export const DEVICE_UNAVAILABLE_CODES = new Set(['DEVICE_RELEASED', 'DEVICE_LOST']);
+
 export class ApiError extends Error {
   constructor(status, info) {
     super(info.message || `request failed with status ${status}`);
