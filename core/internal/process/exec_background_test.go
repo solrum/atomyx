@@ -144,9 +144,12 @@ func TestExecBackground_Kill_SignalsProcessGroupIncludingGrandchildren(t *testin
 		t.Fatal("Kill() did not return")
 	}
 
-	if err := syscall.Kill(grandchildPID, 0); err == nil {
-		t.Fatalf("grandchild pid %d is still running after Kill, want the whole process group signaled", grandchildPID)
-	}
+	// Kill returns once the direct child is reaped. The grandchild receives
+	// the same group signal, but its exit and its reaping by init happen
+	// independently, so the test observes the exit instead of assuming it.
+	waitUntil(t, "the grandchild exiting after Kill signaled the process group", func() bool {
+		return syscall.Kill(grandchildPID, 0) != nil
+	})
 }
 
 // TestExecBackground_Kill_EscalatesToSigkillWhenSigtermIsIgnored
