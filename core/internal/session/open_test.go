@@ -637,3 +637,21 @@ func TestOpen_BuildsEveryDriverInsideAnObservingDecorator(t *testing.T) {
 		t.Fatal("an Orchestra action did not advance the epoch, so the Orchestra bypasses the decorator")
 	}
 }
+
+func TestOpen_RecordsTheStartingStateInTheHolderMetadata(t *testing.T) {
+	factory := &recordingFactory{events: &eventLog{}}
+	m := newManager(t, clock.SystemClock{})
+	deps := baseDeps(t, factory, m)
+	s, err := session.Open(context.Background(), deps, session.Request{Descriptor: androidDesc("A")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+
+	_, err = session.Open(context.Background(), deps, session.Request{Descriptor: androidDesc("A")})
+	_, message, _ := diag.Describe(err)
+
+	if !strings.Contains(message, "running") || strings.Contains(message, "idle") {
+		t.Fatalf("held message %q, want the holder reported running as soon as it opened", message)
+	}
+}

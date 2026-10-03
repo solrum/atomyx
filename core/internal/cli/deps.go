@@ -43,7 +43,7 @@ type Deps struct {
 	Session session.Deps
 	// SessionOpened, when set, receives every session a command acquires,
 	// before the command drives the device. A test uses it to read the
-	// session's own state from inside the command.
+	// step lines the session hub holds.
 	SessionOpened func(*session.Session)
 	// Timeouts bounds a device acquisition. A zero DeviceAcquireMs means
 	// session.DefaultDeviceAcquireTimeoutMs.

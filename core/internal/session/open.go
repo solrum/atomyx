@@ -170,6 +170,10 @@ func Open(ctx context.Context, deps Deps, req Request) (*Session, error) {
 	}
 	s := newSession(ctx, deps, desc, identity, held, built, hub, gate)
 	s.relaunched = relaunched
+	if err := s.persistActivity(); err != nil {
+		_ = s.Close()
+		return nil, fmt.Errorf("record the holder state: %w", err)
+	}
 	return s, nil
 }
 

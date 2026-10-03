@@ -48,6 +48,7 @@ type Session struct {
 	saved    *LaunchState
 	// activity is StateIdle or StateRunning. A session starts running, so
 	// only an owner that manages the activity gate ever marks it idle.
+	// Open records the starting value in the lease holder record.
 	activity HolderState
 
 	relaunched bool
@@ -172,6 +173,19 @@ func (s *Session) SetIdle() error {
 		h.IdleSince = &now
 		h.RunID = ""
 	})
+}
+
+// persistActivity writes the session's current activity to the lease
+// holder record, so the record tells idle from running from the moment
+// the session exists.
+func (s *Session) persistActivity() error {
+	s.mu.Lock()
+	state := s.activity
+	s.mu.Unlock()
+	if state == StateIdle {
+		return s.SetIdle()
+	}
+	return s.SetRunning("")
 }
 
 func (s *Session) setActivity(state HolderState) {
