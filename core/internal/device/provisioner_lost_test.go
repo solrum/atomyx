@@ -5,6 +5,8 @@ import (
 	"errors"
 	"os"
 	"testing"
+
+	"dev.atomyx/internal/logging"
 )
 
 func awaitLoss(t *testing.T, lost <-chan error) *ProcessExitError {
@@ -75,5 +77,49 @@ func TestDriverProvisioner_EnsureIOSAgentWatched_AFailedLaunchReportsNoLoss(t *t
 	})
 	if err == nil {
 		t.Fatal("EnsureIOSAgentWatched() error = nil, want the launch failure")
+	}
+}
+
+// debugSignalLogger reports each Debug message on a channel and drops
+// every other log call.
+type debugSignalLogger struct{ debug chan string }
+
+func (l debugSignalLogger) Debug(msg string, _ logging.LogContext)  { l.debug <- msg }
+func (debugSignalLogger) Info(string, logging.LogContext)           {}
+func (debugSignalLogger) Warn(string, logging.LogContext)           {}
+func (debugSignalLogger) Error(string, error, logging.LogContext)   {}
+func (l debugSignalLogger) Child(logging.LogContext) logging.Logger { return l }
+
+func TestDriverProvisioner_EnsureIOSAgentWatched_RunnerExitAfterAnotherProcessTookOwnershipTouchesNothing(t *testing.T) {
+	fx := newLaunchFixture(t)
+	logger := debugSignalLogger{debug: make(chan string, 1)}
+	p := fx.provisioner(logger)
+	lost := make(chan error, 1)
+	_, _, err := p.EnsureIOSAgentWatched(context.Background(), "DEV-1", IosAgentKindDevice, func(cause error) { lost <- cause })
+	if err != nil {
+		t.Fatalf("EnsureIOSAgentWatched() error = %v", err)
+	}
+	record, err := ReadRunnerState(fx.statePath("DEV-1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	record.OwnerPid = testOwnerPid + 1
+	if err := WriteRunnerState(fx.statePath("DEV-1"), record); err != nil {
+		t.Fatal(err)
+	}
+
+	fx.farm.started("xcodebuild")[0].Exit(1)
+
+	select {
+	case <-logger.debug:
+	case cause := <-lost:
+		t.Fatalf("a runner owned by another process was reported lost: %v", cause)
+	}
+	if fx.farm.started("iproxy")[0].Killed() {
+		t.Error("the tunnel of a runner owned by another process was stopped")
+	}
+	kept, err := ReadRunnerState(fx.statePath("DEV-1"))
+	if err != nil || kept.OwnerPid != testOwnerPid+1 {
+		t.Errorf("record = %+v (%v), want it kept with its new owner", kept, err)
 	}
 }

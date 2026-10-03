@@ -32,6 +32,12 @@ const runnerStateFileMode = 0o600
 // a physical device's runner port, written once the tunnel is up. The
 // tunnel leads its own process group. TunnelPid is zero for a simulator
 // runner and for a tunnel the launcher reused instead of starting.
+//
+// OwnerPid and OwnerStartTime identify the process that answers for the
+// runner, the one that stops it when it exits. The owner is not the
+// runner's parent and not any single session: a session closing leaves
+// the runner running, and only the owning process ending, or an owner
+// that is no longer alive, makes the runner a candidate for reaping.
 type RunnerState struct {
 	UDID             string    `json:"udid"`
 	Kind             string    `json:"kind"`
@@ -44,6 +50,20 @@ type RunnerState struct {
 	StartedAt        time.Time `json:"startedAt"`
 	TunnelPid        int       `json:"tunnelPid,omitempty"`
 	TunnelStartTime  time.Time `json:"tunnelStartTime"`
+	OwnerPid         int       `json:"ownerPid,omitempty"`
+	OwnerStartTime   time.Time `json:"ownerStartTime"`
+}
+
+// RunnerOwner identifies one host process. The start time pairs with the
+// pid so a recycled pid is never mistaken for the process it replaced.
+type RunnerOwner struct {
+	Pid       int
+	StartTime time.Time
+}
+
+// OwnedBy reports whether the record names owner as its owner.
+func (s RunnerState) OwnedBy(owner RunnerOwner) bool {
+	return s.OwnerPid == owner.Pid && s.OwnerStartTime.Equal(owner.StartTime)
 }
 
 // RunnerStatePath returns the path of the runner record for key inside
@@ -100,11 +120,11 @@ func ReadRunnerState(path string) (RunnerState, error) {
 }
 
 // removeRunnerStateOf deletes the record at path when it still names
-// runnerID, so stopping one runner never removes the record of a runner
-// launched after it.
-func removeRunnerStateOf(path, runnerID string) {
+// runnerID and owner, so stopping one runner never removes the record of
+// a runner launched after it or of a runner another process now owns.
+func removeRunnerStateOf(path, runnerID string, owner RunnerOwner) {
 	state, err := ReadRunnerState(path)
-	if err != nil || state.RunnerID != runnerID {
+	if err != nil || state.RunnerID != runnerID || !state.OwnedBy(owner) {
 		return
 	}
 	_ = os.Remove(path)

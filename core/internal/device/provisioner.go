@@ -151,6 +151,9 @@ type DriverProvisioner struct {
 	newRunnerID func() string
 	// now reports the current time for the runner record.
 	now func() time.Time
+	// ownPid reports the pid recorded as the owner of every runner this
+	// provisioner launches.
+	ownPid func() int
 
 	mu       sync.Mutex
 	reserved map[int]struct{}
@@ -176,7 +179,7 @@ func NewDriverProvisioner(deps DriverProvisionerDeps) *DriverProvisioner {
 	}
 	return &DriverProvisioner{
 		runner: deps.Runner, background: background, clock: clock, logger: logger, inspector: inspector, deps: deps,
-		freePort: operatingSystemFreePort, newRunnerID: randomRunnerID, now: time.Now,
+		freePort: operatingSystemFreePort, newRunnerID: randomRunnerID, now: time.Now, ownPid: os.Getpid,
 		reserved: make(map[int]struct{}),
 	}
 }
@@ -318,6 +321,7 @@ func (p *DriverProvisioner) EnsureIOSAgentWatched(ctx context.Context, udid stri
 	// launch that failed leaves ended nil, and its caller already has
 	// the failure, so nothing is reported.
 	var ended func() error
+	var held launchRecord
 	settled := make(chan struct{})
 	defer close(settled)
 	lostHook := func(component LostComponent) func(error) {
@@ -327,6 +331,10 @@ func (p *DriverProvisioner) EnsureIOSAgentWatched(ctx context.Context, udid stri
 		return func(verdict error) {
 			<-settled
 			if ended == nil {
+				return
+			}
+			if held.ownedByAnotherProcess() {
+				p.logger.Debug("runner ended while another process owns it", logging.LogContext{"udid": udid})
 				return
 			}
 			_ = ended()
@@ -340,7 +348,7 @@ func (p *DriverProvisioner) EnsureIOSAgentWatched(ctx context.Context, udid stri
 		cfg.RunnerID = p.newRunnerID()
 		cfg.AllocatePort = p.reservePort
 		cfg.ReleasePort = func(port int) { p.releasePorts(port) }
-		cfg.AfterSpawn = p.afterSpawn(udid, kind, cfg.RunnerID, lostHook(LostTunnel))
+		cfg.AfterSpawn = p.afterSpawn(udid, kind, cfg.RunnerID, lostHook(LostTunnel), &held)
 	}
 
 	launcher := iosdriver.NewXctestLauncher(p.runner, p.background, p.clock, cfg)
@@ -424,15 +432,16 @@ func (p *DriverProvisioner) iosLaunchConfig(udid string, kind IosAgentKind) iosd
 // exists and before it is probed: it records the runner for crash
 // recovery, then for a physical device starts the USB tunnel the probe
 // needs. The stop function it returns removes both.
-func (p *DriverProvisioner) afterSpawn(udid string, kind IosAgentKind, runnerID string, onTunnelExit func(error)) func(context.Context, iosdriver.SpawnedRunner) (func(), error) {
+func (p *DriverProvisioner) afterSpawn(udid string, kind IosAgentKind, runnerID string, onTunnelExit func(error), held *launchRecord) func(context.Context, iosdriver.SpawnedRunner) (func(), error) {
 	return func(ctx context.Context, spawned iosdriver.SpawnedRunner) (func(), error) {
 		statePath, state, err := p.recordRunner(udid, kind, runnerID, spawned)
 		if err != nil {
 			return nil, err
 		}
+		*held = launchRecord{path: statePath, runnerID: runnerID, owner: RunnerOwner{Pid: state.OwnerPid, StartTime: state.OwnerStartTime}}
 		removeRecord := func() {
 			if statePath != "" {
-				removeRunnerStateOf(statePath, runnerID)
+				removeRunnerStateOf(statePath, runnerID, held.owner)
 			}
 		}
 		if kind != IosAgentKindDevice {
@@ -476,6 +485,11 @@ func (p *DriverProvisioner) recordRunner(udid string, kind IosAgentKind, runnerI
 	if err != nil {
 		return "", RunnerState{}, fmt.Errorf("record the runner: %w", err)
 	}
+	ownerPid := p.ownPid()
+	ownerInfo, err := p.inspector.Inspect(ownerPid)
+	if err != nil {
+		return "", RunnerState{}, fmt.Errorf("record the runner: %w", err)
+	}
 	path := RunnerStatePath(p.deps.RunnerStateDir, p.deps.RunnerStateKey(udid))
 	state := RunnerState{
 		UDID:             udid,
@@ -487,6 +501,8 @@ func (p *DriverProvisioner) recordRunner(udid string, kind IosAgentKind, runnerI
 		ProcessStartTime: info.StartTime,
 		HostBootTime:     booted,
 		StartedAt:        p.now().UTC(),
+		OwnerPid:         ownerPid,
+		OwnerStartTime:   ownerInfo.StartTime,
 	}
 	if err := WriteRunnerState(path, state); err != nil {
 		return "", RunnerState{}, err
@@ -751,4 +767,24 @@ func (f *FakeProvisioner) ReinstallAndroidAgent(_ context.Context, serial string
 	defer f.mu.Unlock()
 	f.reinstallCalls = append(f.reinstallCalls, serial)
 	return f.reinstallResult[serial]
+}
+
+// launchRecord names the runner record one launch wrote, so the loss
+// hooks can tell whether the record still belongs to this launch.
+type launchRecord struct {
+	path     string
+	runnerID string
+	owner    RunnerOwner
+}
+
+// ownedByAnotherProcess reports whether the record of this launch now
+// names a different owner for the same runner. Such a runner serves
+// another process, so this launch must neither stop its tunnel nor remove
+// its record, and has no session left to tell.
+func (r launchRecord) ownedByAnotherProcess() bool {
+	if r.path == "" {
+		return false
+	}
+	state, err := ReadRunnerState(r.path)
+	return err == nil && state.RunnerID == r.runnerID && !state.OwnedBy(r.owner)
 }

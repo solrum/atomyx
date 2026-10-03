@@ -21,11 +21,16 @@ import (
 const (
 	testRunnerPidBase = 9100
 	testBootSeconds   = 1759372800
+	testOwnerPid      = 4242
 )
 
 // testProcessStart is the start time the fixture's inspector reports for
 // every launched runner process.
 var testProcessStart = time.Date(2026, time.October, 2, 10, 15, 2, 0, time.UTC)
+
+// testOwnerStart is the start time the fixture reports for the process
+// that owns every runner it launches.
+var testOwnerStart = time.Date(2026, time.October, 2, 10, 0, 0, 0, time.UTC)
 
 // runnerFarm is a process.BackgroundRunner that models the processes a
 // launch starts. A started xcodebuild records the environment the
@@ -222,16 +227,19 @@ func newLaunchFixture(t *testing.T) *launchFixture {
 	inspector := process.NewFakeInspector(time.Unix(testBootSeconds, 0).UTC())
 	farm := newRunnerFarm(t)
 	farm.inspector = inspector
+	inspector.Set(process.ProcessInfo{PID: testOwnerPid, PGID: testOwnerPid, Command: "atomyx", StartTime: testOwnerStart})
 	return &launchFixture{projectDir: projectDir, stateDir: t.TempDir(), runner: runner, farm: farm, inspector: inspector}
 }
 
 func (f *launchFixture) provisioner(logger logging.Logger) *DriverProvisioner {
-	return NewDriverProvisioner(DriverProvisionerDeps{
+	p := NewDriverProvisioner(DriverProvisionerDeps{
 		Runner: f.runner, Background: f.farm, Clock: instantClock{}, Inspector: f.inspector,
 		IosProjectDir: f.projectDir, IosDevTeam: "TEAM123", Logger: logger,
 		RunnerStateDir: f.stateDir,
 		RunnerStateKey: func(udid string) string { return "key-" + udid },
 	})
+	p.ownPid = func() int { return testOwnerPid }
+	return p
 }
 
 func (f *launchFixture) statePath(udid string) string {
@@ -287,6 +295,9 @@ func TestDriverProvisioner_EnsureIOSAgent_Simulator_LaunchesOnAReservedPortAndRe
 	}
 	if state.UDID != want.UDID || state.Kind != want.Kind || state.RunnerID != want.RunnerID || state.HostPort != want.HostPort || state.Pid != want.Pid || state.Pgid != want.Pgid {
 		t.Errorf("record = %+v, want %+v", state, want)
+	}
+	if state.OwnerPid != testOwnerPid || !state.OwnerStartTime.Equal(testOwnerStart) {
+		t.Errorf("owner = %d started %v, want this process (%d started %v)", state.OwnerPid, state.OwnerStartTime, testOwnerPid, testOwnerStart)
 	}
 	if info, err := os.Stat(fx.statePath("SIM-1")); err != nil || info.Mode().Perm() != 0o600 {
 		t.Errorf("record mode = %v (%v), want 0600", info, err)
@@ -686,5 +697,27 @@ func TestDriverProvisioner_EnsureIOSAgent_Simulator_RecordsNoTunnel(t *testing.T
 	state, err := ReadRunnerState(fx.statePath("SIM-1"))
 	if err != nil || state.TunnelPid != 0 {
 		t.Fatalf("record = %+v (%v), want no tunnel pid for a simulator", state, err)
+	}
+}
+
+func TestDriverProvisioner_Kill_KeepsTheRecordOfTheSameRunnerOwnedByAnotherProcess(t *testing.T) {
+	fx := newLaunchFixture(t)
+	p := fx.provisioner(nil)
+	_, kill, err := p.EnsureIOSAgent(context.Background(), "SIM-1", IosAgentKindSimulator)
+	if err != nil {
+		t.Fatalf("EnsureIOSAgent() error = %v", err)
+	}
+	record, err := ReadRunnerState(fx.statePath("SIM-1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	record.OwnerPid = testOwnerPid + 1
+	if err := WriteRunnerState(fx.statePath("SIM-1"), record); err != nil {
+		t.Fatal(err)
+	}
+	_ = kill()
+	got, err := ReadRunnerState(fx.statePath("SIM-1"))
+	if err != nil || got.OwnerPid != testOwnerPid+1 {
+		t.Fatalf("record after kill = %+v (%v), want the record another process owns untouched", got, err)
 	}
 }
