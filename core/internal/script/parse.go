@@ -76,16 +76,20 @@ func ParseScript(yamlContent string, externalEnv map[string]string) (*ScriptDefi
 }
 
 // attachAuthoredSteps pairs each resolved step with the same step
-// normalized from the script's text before interpolation. A step whose
-// unexpanded text fails normalization, for example a placeholder where a
-// number belongs, keeps no authored form and stands for itself.
+// normalized from the script's text before interpolation. When that text
+// fails normalization, for example a placeholder where a number belongs,
+// writtenForm rebuilds it through stand-in values, and a step whose
+// written form still cannot be rebuilt is flagged so it is never shown
+// through its expanded fields.
 func attachAuthoredSteps(steps []ScriptStep, rawSteps []any) {
 	for i, raw := range rawSteps {
 		if i >= len(steps) {
 			return
 		}
-		if authored, err := normalizeStep(raw, i); err == nil {
+		if authored := writtenForm(raw, i); authored != nil {
 			attachAuthored(steps[i], authored)
+		} else {
+			markWrittenFormLost(steps[i])
 		}
 	}
 }

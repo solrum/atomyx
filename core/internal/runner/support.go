@@ -20,6 +20,19 @@ func authored[T script.ScriptStep](step script.ScriptStep) T {
 	return script.AuthoredOf(step).(T)
 }
 
+// withheldResult replaces the detail of a step whose written form is
+// lost with the command name and the outcome, because every field the
+// step holds may be a value a variable supplied, and so may any detail a
+// handler built from them.
+func withheldResult(step script.ScriptStep, result CommandResult) CommandResult {
+	outcome := "failed"
+	if result.Ok {
+		outcome = "completed"
+	}
+	result.Detail = strPtr(step.StepCommand() + " " + outcome)
+	return result
+}
+
 // restoreAuthored puts the author's text back into text that a component
 // outside the runner built from the executed value, so the value a
 // variable supplied does not reach a step detail through that component.

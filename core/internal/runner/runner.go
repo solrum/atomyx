@@ -521,18 +521,27 @@ func (r *ScriptRunner) contextFor(ctx context.Context, rs *runState, stepIndex i
 // appearing in default output.
 func (r *ScriptRunner) execute(cmd CommandDefinition, step script.ScriptStep, ctx *CommandContext) (result CommandResult) {
 	defer func() {
+		if script.WrittenFormLost(step) {
+			result = withheldResult(step, result)
+		}
+	}()
+	defer func() {
 		if rec := recover(); rec != nil {
 			if canceled, err := cancellationPanic(rec, ctx.Context); canceled {
 				result = CommandResult{Ok: false, Detail: strPtr(fmt.Sprintf("Interrupted: %v", err))}
 				return
 			}
+			panicText := fmt.Sprintf("%v", rec)
+			if script.WrittenFormLost(step) {
+				panicText = "withheld"
+			}
 			r.deps.Logger.Error("command handler panicked", nil, logging.LogContext{
 				"command": step.StepCommand(),
-				"panic":   fmt.Sprintf("%v", rec),
+				"panic":   panicText,
 			})
 			r.deps.Logger.Debug("command handler panicked", logging.LogContext{
 				"command": step.StepCommand(),
-				"panic":   fmt.Sprintf("%v", rec),
+				"panic":   panicText,
 				"stack":   string(debug.Stack()),
 			})
 			result = CommandResult{Ok: false, Detail: strPtr(fmt.Sprintf("Exception: %v", rec))}

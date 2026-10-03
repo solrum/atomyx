@@ -12,6 +12,10 @@ type ScriptStep interface {
 	// interpolation changed it, and nil otherwise.
 	authoredStep() ScriptStep
 	setAuthored(ScriptStep)
+	// writtenFormLost reports that the step's written form could not be
+	// rebuilt, so nothing the step holds is safe to show.
+	writtenFormLost() bool
+	markWrittenFormLost()
 }
 
 // Step command names, one per ScriptStep implementation.

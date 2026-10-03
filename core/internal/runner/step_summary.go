@@ -51,10 +51,14 @@ type StepSummary struct {
 // SummarizeStep renders step into a colored token sequence plus
 // plain-text fallback, suitable for a progress timeline. The summary
 // text and the token sequence are a stable rendering contract: they
-// must always agree with each other byte for byte.
+// must always agree with each other byte for byte. A step whose written
+// form is lost renders as its command name alone.
 func SummarizeStep(step script.ScriptStep) StepSummary {
-	step = script.AuthoredOf(step)
 	b := &tokenBuilder{}
+	if script.WrittenFormLost(step) {
+		return b.kw(step.StepCommand()).build()
+	}
+	step = script.AuthoredOf(step)
 	switch s := step.(type) {
 	case *script.TapStep:
 		b.kw("tap").punct(": ").selector(&s.Selector)
