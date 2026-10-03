@@ -141,7 +141,7 @@ func Inspect(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 // inspectOpenAttempts bounds how often the opener retries after a device
 // that looked free was taken by another process before it could be
 // acquired, or one that looked held was released before it could be
-// attached.
+// attached. The attempts share one wait budget, inspectAttachBudgetMs.
 const inspectOpenAttempts = 3
 
 // inspectOpener acquires the device, or attaches to the process that
@@ -158,9 +158,22 @@ func inspectOpener(deps Deps, desc device.Descriptor, socketRefresher session.Re
 	}
 	return func(ctx context.Context) (inspector.Target, error) {
 		var held error
+		budget := newAttachBudget(deps.Session.Clock)
 		for attempt := 0; attempt < inspectOpenAttempts; attempt++ {
 			if canProbe {
-				result, err := session.Attach(ctx, attach, desc)
+				if held != nil && budget.remainingMs() <= 0 {
+					return nil, held
+				}
+				attachCtx, stop := ctx, func() {}
+				if held != nil {
+					attachCtx, stop = budget.bound(ctx)
+				}
+				result, err := session.Attach(attachCtx, attach, desc)
+				cut := cutOff(ctx, attachCtx)
+				stop()
+				if cut {
+					return nil, held
+				}
 				if err != nil {
 					return nil, err
 				}

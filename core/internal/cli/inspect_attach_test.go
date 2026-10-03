@@ -340,3 +340,50 @@ func TestInspect_AViewersFreshCaptureIsCountedAsTheInspectorDrivingTheDevice(t *
 	}
 	run.stop(syscall.SIGINT)
 }
+
+// stoppedClock reports a time only the test moves, and its sleeps last
+// until their context ends, so no timer elapses by itself.
+type stoppedClock struct{ now atomic.Int64 }
+
+func (c *stoppedClock) NowMs() int64 { return c.now.Load() }
+
+func (c *stoppedClock) Sleep(ctx context.Context, _ int64) error {
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+// timeSpendingProber reports a free device after it has used up spendMs
+// of the clock, the way a wait for a holder would, while every acquire
+// goes to the real lease manager.
+type timeSpendingProber struct {
+	*lease.Manager
+	clk     *stoppedClock
+	spendMs int64
+	probes  atomic.Int32
+}
+
+func (p *timeSpendingProber) Probe(context.Context, lease.Key) (lease.Status, error) {
+	p.probes.Add(1)
+	p.clk.now.Add(p.spendMs)
+	return lease.Status{}, nil
+}
+
+func TestInspectOpener_TheAttemptsShareOneWaitBudget(t *testing.T) {
+	clk := &stoppedClock{}
+	manager := newShortLeaseManager(t)
+	holdDevice(t, manager)
+	prober := &timeSpendingProber{Manager: manager, clk: clk, spendMs: inspectAttachBudgetMs * 6 / 10}
+	deps := leaseDeps(t, manager, nil, nil)
+	deps.Session.Leases = prober
+	deps.Session.Clock = clk
+	deps.Factory = singleMockDriverFactory{driver: mockdriver.New()}
+
+	_, err := inspectOpener(deps, device.Descriptor{Platform: device.PlatformAndroid, ID: "emulator-5554"}, nil)(context.Background())
+
+	if code, _, _ := diag.Describe(err); code != diag.CodeDeviceHeld {
+		t.Fatalf("open = %v, want %s", err, diag.CodeDeviceHeld)
+	}
+	if got := prober.probes.Load(); got != 2 {
+		t.Fatalf("probes = %d, want 2 because two attempts spend the whole budget", got)
+	}
+}
