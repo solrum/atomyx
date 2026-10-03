@@ -223,14 +223,15 @@ func (r *RunnerReaper) Reap(ctx context.Context, statePath, udid string) (ReapOu
 // checks Reap applies before it signals anything: the record names this
 // device, the host has not rebooted since it was written, and the
 // recorded pid is a live process that is still the recorded xcodebuild
-// runner. It adds that the runner is a simulator runner with a launch id,
-// because only that runner can be proven the same one later.
-func (r *RunnerReaper) AdoptionBlocker(state RunnerState, udid string) string {
+// runner. It adds that the runner is of the requested kind and carries a
+// launch id and a port, because only such a runner can be proven the same
+// one later.
+func (r *RunnerReaper) AdoptionBlocker(state RunnerState, udid string, kind IosAgentKind) string {
 	if reason := r.unusableRecord(state, udid); reason != "" {
 		return reason
 	}
-	if state.Kind != string(IosAgentKindSimulator) {
-		return "the recorded runner is not a simulator runner"
+	if state.Kind != string(kind) {
+		return "the recorded runner is not a " + string(kind) + " runner"
 	}
 	if state.RunnerID == "" || state.HostPort <= 0 {
 		return "the runner record carries no launch id or port"
@@ -346,6 +347,25 @@ func (r *RunnerReaper) reapTunnel(ctx context.Context, state RunnerState) (signa
 	}
 	killed, err = r.endGroup(ctx, state.TunnelPid, state.TunnelPid)
 	return true, killed, err
+}
+
+// TunnelBlocker reports why the iproxy tunnel a record names cannot be
+// adopted, or an empty string when it can. It applies the checks Reap
+// applies before it signals the tunnel: the recorded pid is a live
+// process that is still the recorded iproxy, owned by the caller and
+// leading its own process group.
+func (r *RunnerReaper) TunnelBlocker(state RunnerState) string {
+	if state.TunnelPid <= 1 {
+		return "the runner record names no tunnel"
+	}
+	info, err := r.deps.Inspector.Inspect(state.TunnelPid)
+	if errors.Is(err, process.ErrProcessNotFound) {
+		return "the recorded tunnel process has gone"
+	}
+	if err != nil {
+		return "the recorded tunnel cannot be inspected"
+	}
+	return r.unusableTunnel(state, info)
 }
 
 // unusableTunnel reports why a live process cannot be the recorded

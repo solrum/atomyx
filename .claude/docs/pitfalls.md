@@ -200,6 +200,11 @@ corresponding area. For the high-level map see
   held, reads the owner from the record again after taking it, and
   releases the lease right after the stop. Stopping a runner without the
   lease can end the runner a live holder is driving.
+- **Use a tunnel only when it can be stopped.** `StartTunnel` refuses a
+  listener on the port unless the caller's `Reuse` accounts for it. The
+  provisioner accounts only for the recorded `iproxy` that passes
+  `RunnerReaper.TunnelBlocker`, and records every tunnel it starts, so the
+  reaper's guarded path can end every tunnel the process used.
 - **An adopted runner has no child process.** Its loss is found by
   polling the recorded pid and start time, so a change to that watcher
   must keep comparing the start time, because a recycled pid is a

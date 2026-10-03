@@ -85,6 +85,14 @@ type TunnelConfig struct {
 	// Warn receives a one-line warning when an existing runner is
 	// adopted without a launch identifier. Nil discards it.
 	Warn func(message string)
+	// Reuse is asked once when a listener on HostPort already answers as
+	// the expected runner. It returns the pid of the tunnel behind that
+	// listener and true when the caller can account for that tunnel, which
+	// means it has the tunnel's identity on record and can stop it. A nil
+	// Reuse, or a false answer, refuses the listener with
+	// IproxyErrBindConflict, because a tunnel nobody can stop would outlive
+	// its user.
+	Reuse func() (pid int, ok bool)
 	// OnExit receives the verdict when the tunnel process exits on its own
 	// after it became reachable. A stop through the returned stop function
 	// is not reported. Nil watches nothing.
@@ -100,10 +108,11 @@ type TunnelConfig struct {
 // which would kill the tunnel mid-session. A successful start keeps the
 // process running, independent of ctx, until the returned stop function
 // (or this function's own cleanup on failure) kills its process group.
-// stop is nil and pid is zero when an existing tunnel to the expected
-// runner was reused, because that tunnel belongs to someone else. Otherwise
-// pid is the iproxy process, which leads its own process group, so a later
-// process can find and end it.
+// stop is nil and pid is what Reuse reported when an existing tunnel to the
+// expected runner was reused, because the caller stops that tunnel
+// through the identity it holds on record. Otherwise pid is the iproxy
+// process, which leads its own process group, so a later process can find
+// and end it.
 //
 // Two guards make it safe to dial immediately after this returns
 // successfully:
@@ -112,10 +121,11 @@ type TunnelConfig struct {
 //     already has a listener, it is probed with the same ping handshake
 //     this driver's own wire protocol speaks. A listener that answers as
 //     the expected runner (see ExpectedRunner) is an existing Atomyx
-//     driver tunnel and is reused without spawning a second iproxy. A
-//     listener that does not answer, or answers as a different runner,
-//     is refused with IproxyErrBindConflict instead of racing whatever
-//     else is bound there.
+//     driver tunnel and is reused without spawning a second iproxy, but
+//     only when cfg.Reuse accounts for it. A listener that does not
+//     answer, answers as a different runner, or is not accounted for is
+//     refused with IproxyErrBindConflict instead of racing whatever else
+//     is bound there.
 //   - Poll for real tunnel connectivity after spawn. iproxy emits no
 //     "ready" signal on stdout or stderr, so this polls the port on
 //     iproxyTunnelPollInterval until a fresh TCP connect succeeds,
@@ -141,7 +151,20 @@ func StartTunnel(ctx context.Context, bg process.BackgroundRunner, clk clock.Clo
 			if unmanaged && cfg.Warn != nil {
 				cfg.Warn(unmanagedRunnerWarning(cfg.HostPort))
 			}
-			return nil, 0, nil
+			reusedPid, accounted := 0, false
+			if cfg.Reuse != nil {
+				reusedPid, accounted = cfg.Reuse()
+			}
+			if accounted {
+				return nil, reusedPid, nil
+			}
+			return nil, 0, &IproxyError{
+				Code: IproxyErrBindConflict,
+				Message: fmt.Sprintf(
+					"port %d on 127.0.0.1 already has a tunnel to device %s that this process cannot account for and so cannot stop",
+					cfg.HostPort, cfg.UDID,
+				),
+			}
 		}
 		return nil, 0, &IproxyError{
 			Code: IproxyErrBindConflict,
@@ -208,6 +231,9 @@ func (d *IosDriver) launchIproxy(ctx context.Context) error {
 	d.stopIproxy()
 	stop, _, err := StartTunnel(ctx, d.background, d.opts.Clock, TunnelConfig{
 		UDID: d.opts.UDID, HostPort: d.opts.Port, RunnerID: d.opts.RunnerID, Warn: d.opts.Warn,
+		// The driver keeps no record of tunnels, so it keeps using one that
+		// already reaches its runner and leaves it running.
+		Reuse: func() (int, bool) { return 0, true },
 	})
 	if err != nil {
 		return err

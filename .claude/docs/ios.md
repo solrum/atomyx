@@ -203,7 +203,8 @@ physical device first launches an `iproxy` USB tunnel as a background child proc
 and waits for it to become reachable before dialing. `Disconnect` stops
 the tunnel. A driver built with `Options.ExternalTunnel` skips that
 launch, because the provisioner that started the runner already owns the
-tunnel. On a simulator the driver dials the host port directly, because
+tunnel. A driver that starts its own tunnel keeps using a listener that
+already answers as its runner and leaves it running. On a simulator the driver dials the host port directly, because
 the simulator shares the host's network namespace.
 
 ### Launch from the CLI and MCP
@@ -306,16 +307,18 @@ the record as owner.
 
 #### Runner adoption
 
-A simulator runner left running by an earlier holder is reused instead of
-relaunched. `device.DriverProvisioner.ProvisionIOSAgent` decides, under
+A runner left running by an earlier holder, on a simulator or on a
+physical device, is reused instead of relaunched. `device.DriverProvisioner.ProvisionIOSAgent` decides, under
 the device lease and before it reaps. It adopts the
 recorded runner only when all of these hold:
 
-- The record names this device and a simulator runner, and carries a
-  launch id and a port.
+- The record names this device and a runner of the requested kind, and
+  carries a launch id and a port.
 - The reaper's checks pass: the host has not rebooted since the record
   was written, and the recorded pid is still the live `xcodebuild`
   process that was recorded.
+- For a physical device, a tunnel reaches the recorded `hostPort`, as
+  described below.
 - The runner answers `ping` on the recorded `hostPort` with the recorded
   launch id (`iosdriver.CheckRunnerIdentity`).
 - The record's build product identity matches the current build. The
@@ -328,10 +331,33 @@ The recorded owner is not a condition. Holding the device lease is what
 entitles a process to drive the runner, so a runner whose owner is
 another live process is adopted too. When any condition fails, the
 provisioner logs the reason, ends the recorded runner through the reaper,
-and launches a new one. A physical device runner is never adopted.
+and launches a new one.
+
+A physical device runner is adopted together with its tunnel.
+`iosdriver.StartTunnel` runs against the recorded port and reuses a
+listener that already answers as the recorded runner only when the
+caller accounts for it (`TunnelConfig.Reuse`), so no tunnel is used that
+nobody can stop.
+
+- The recorded `iproxy` is adopted when `RunnerReaper.TunnelBlocker`
+  passes: the recorded pid is alive, its start time matches
+  `tunnelStartTime`, it belongs to this user, its command is `iproxy`, and
+  it leads its own process group. It forwards the recorded port because
+  the runner then answers on it. The record keeps `tunnelPid` and
+  `tunnelStartTime`.
+- When the recorded tunnel is gone, or its pid fails those checks and
+  nothing listens on the port, a new `iproxy` starts for the recorded
+  port and its pid and start time replace the recorded ones.
+- A listener on the recorded port that fails the checks blocks the
+  adoption, and the recorded runner is reaped and replaced.
+- A tunnel started for an adoption that then fails is stopped before the
+  replacement launches.
 
 An adopting process:
 
+- stops an adopted tunnel together with the runner through the reaper's
+  guarded path when its keeper stops the runner, and stops a tunnel it
+  started itself first
 - writes itself into the record as owner, so the previous owner's keeper
   skips the runner, and registers the runner with its own `RunnerKeeper`,
   so that keeper stops it when the process exits
@@ -341,7 +367,8 @@ An adopting process:
   child process whose exit could be awaited. A process that is gone, or
   whose pid now belongs to a different process, ends the runner through
   the reaper and reports a loss like a launched runner that exited.
-  A record that names another owner is left alone.
+  The same watcher reports a loss of the tunnel when an adopted tunnel's
+  process ends. A record that names another owner is left alone.
 
 `DriverFactory.Build` proves an adopted runner after `Connect` with one
 `Hierarchy` call bounded by `adoptedRunnerProbeTimeout` (10 s). A

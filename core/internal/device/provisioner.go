@@ -370,9 +370,10 @@ func (p *DriverProvisioner) ProvisionIOSAgent(ctx context.Context, udid string, 
 	cfg.OnRunnerExit = lostHook(LostRunner)
 	if !p.deps.FixedIosPort {
 		if !opts.Fresh {
-			if state, ok := p.adopt(ctx, udid, cfg); ok {
+			if adopted, ok := p.adopt(ctx, udid, kind, cfg, lostHook(LostTunnel)); ok {
+				state := adopted.state
 				held = launchRecord{udid: udid, path: p.statePath(udid), runnerID: state.RunnerID, owner: RunnerOwner{Pid: state.OwnerPid, StartTime: state.OwnerStartTime}}
-				return p.adoptedAgent(ctx, state, held, udid, lostHook(LostRunner), func(stop func() error) { ended = stop }), nil
+				return p.adoptedAgent(ctx, adopted, held, udid, lostHook(LostRunner), lostHook(LostTunnel), func(stop func() error) { ended = stop }), nil
 			}
 		}
 		p.reapOrphan(ctx, udid)
@@ -523,7 +524,7 @@ func (p *DriverProvisioner) afterSpawn(udid string, kind IosAgentKind, runnerID 
 			return nil, err
 		}
 		if tunnelPid > 0 && statePath != "" {
-			if err := p.recordTunnel(statePath, state, tunnelPid); err != nil {
+			if _, err := p.recordTunnel(statePath, state, tunnelPid); err != nil {
 				stopTunnel()
 				removeRecord()
 				return nil, err
@@ -584,14 +585,14 @@ func (p *DriverProvisioner) recordRunner(udid string, kind IosAgentKind, runnerI
 // recordTunnel rewrites the runner record at path with the iproxy process
 // that tunnels the runner's port, so a later process can end it when this
 // one dies without stopping it.
-func (p *DriverProvisioner) recordTunnel(path string, state RunnerState, tunnelPid int) error {
+func (p *DriverProvisioner) recordTunnel(path string, state RunnerState, tunnelPid int) (RunnerState, error) {
 	info, err := p.inspector.Inspect(tunnelPid)
 	if err != nil {
-		return fmt.Errorf("record the tunnel: %w", err)
+		return state, fmt.Errorf("record the tunnel: %w", err)
 	}
 	state.TunnelPid = tunnelPid
 	state.TunnelStartTime = info.StartTime
-	return WriteRunnerState(path, state)
+	return state, WriteRunnerState(path, state)
 }
 
 // EnsureAndroidAgent implements AgentProvisioner. The host port is the

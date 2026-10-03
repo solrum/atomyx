@@ -213,6 +213,9 @@ func TestDriverProvisioner_ProvisionIOSAgent_EndsAndReplacesARunnerThatFailsAnAd
 		{"record names another device", "belongs to another device", func(t *testing.T, f *launchFixture, _ RunnerState) {
 			f.rewriteRecord(t, "SIM-1", func(s *RunnerState) { s.UDID = "SIM-2" })
 		}},
+		{"record names a runner of another kind", "not a simulator runner", func(t *testing.T, f *launchFixture, _ RunnerState) {
+			f.rewriteRecord(t, "SIM-1", func(s *RunnerState) { s.Kind = string(IosAgentKindDevice) })
+		}},
 		{"host rebooted since the record", "rebooted", func(t *testing.T, f *launchFixture, _ RunnerState) {
 			f.rewriteRecord(t, "SIM-1", func(s *RunnerState) { s.HostBootTime = s.HostBootTime.Add(-time.Hour) })
 		}},
@@ -283,26 +286,6 @@ func TestDriverProvisioner_ProvisionIOSAgent_FreshEndsTheRecordedRunnerEvenWhenA
 	calls := a.signals.recorded()
 	if len(calls) != 1 || calls[0].pgid != left.Pgid {
 		t.Fatalf("group signals = %+v, want the recorded runner's group ended", calls)
-	}
-	if got := len(fx.farm.started("xcodebuild")); got != 2 {
-		t.Fatalf("launched runners = %d, want a replacement", got)
-	}
-}
-
-func TestDriverProvisioner_ProvisionIOSAgent_PhysicalDeviceRunnerIsNotAdopted(t *testing.T) {
-	fx := newLaunchFixture(t)
-	first := fx.provisioner(nil)
-	if _, _, err := first.EnsureIOSAgent(context.Background(), "DEV-1", IosAgentKindDevice); err != nil {
-		t.Fatal(err)
-	}
-	fx.inspector.Remove(testOwnerPid)
-	a := fx.newAdopter()
-
-	agent := a.provision(t, "DEV-1", IosAgentKindDevice, nil, ProvisionOptions{})
-	defer func() { _ = agent.Kill() }()
-
-	if agent.Adopted {
-		t.Fatal("a physical device runner was adopted")
 	}
 	if got := len(fx.farm.started("xcodebuild")); got != 2 {
 		t.Fatalf("launched runners = %d, want a replacement", got)
