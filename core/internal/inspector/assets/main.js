@@ -7,7 +7,7 @@ import { createEventStream } from './events.js';
 import { createHighlight } from './highlight.js';
 import { createPropertiesPanel } from './properties-panel.js';
 import { refreshScreenshot } from './screenshot.js';
-import { refreshSession } from './session-header.js';
+import { refreshBlocked, refreshSession } from './session-header.js';
 import { createStepsPanel } from './steps-panel.js';
 import { createSuggestionsPanel } from './suggestions-panel.js';
 import { createTesterPanel } from './tester-panel.js';
@@ -17,6 +17,9 @@ import { createTreeView } from './tree-view.js';
 
 const HOLDER_BUSY_CODE = 'HOLDER_BUSY';
 const EMPTY_CODES = new Set(['NO_TREE', 'NO_SCREENSHOT']);
+// How often the page reads the holder state, which changes without a
+// capture event when a run ends or a call finishes.
+const SESSION_POLL_MS = 3000;
 
 const byId = (id) => document.getElementById(id);
 
@@ -119,7 +122,7 @@ async function refreshCapture() {
       handleFailure(err);
     }
   } finally {
-    button.disabled = false;
+    button.disabled = refreshBlocked();
   }
 }
 
@@ -162,6 +165,7 @@ async function start() {
   });
   await loadSession();
   events.start();
+  setInterval(loadSession, SESSION_POLL_MS);
 }
 
 hideReleased();

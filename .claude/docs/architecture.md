@@ -648,8 +648,11 @@ Connections:
 ## Inspector server
 
 `core/internal/inspector` is the HTTP server behind the browser
-inspector. Its only way to the device is a `session.Controller`, passed
-to `inspector.New`. It never takes `*Session`, the built driver or the
+inspector. Its only way to the device is an `inspector.Source`, a
+`session.Viewer` with a `session.Refresher`, passed to `inspector.New`.
+A `Source` has no activity gate, so a view of another process's device
+satisfies it as well as a device this process holds. It never takes
+`*Session`, the built driver or the
 Orchestra, and `core/scripts/check-inspector-boundary.sh` fails the
 build on the `.Built(` and `.Orchestra(` accessors, on
 `orchestra.Orchestra` and on any `driver` import under the package.
@@ -709,9 +712,25 @@ build on the `.Built(` and `.Orchestra(` accessors, on
   is built with `textContent` and element children only, and a Go test
   fails when a script parses text as markup or code.
 - **Idle release and reconnect.** `Host` owns the device lifecycle and
-  is itself the `session.Controller` the server and every route group
-  receive, so a route never captures a controller that a release or a
-  reconnect replaced.
+  is itself the `Source` the server and every route group receive, so a
+  route never captures a view that a release or a reconnect replaced.
+  Its target is either a `*session.Session` that holds the lease, which
+  implements `inspector.Lifecycle`, or a `*session.RemoteHandle` that
+  watches the process holding it. Only a lifecycle target is released
+  on idle, has its holder state recorded and has its lost signal
+  watched.
+  - A remote target is never released on idle. When the process it
+    watches exits, the host closes it, reports state `released`, and
+    every route except the session route answers `410` with code
+    `HOLDER_EXITED`. The reconnect request then acquires the device, or
+    attaches to its next holder, and the inspector never does either by
+    itself.
+  - A process that opens its device before it builds the host passes an
+    `inspector.DeferredRefresher` as `Request.SocketRefresher`, bound to
+    the host afterwards, so a viewer's fresh capture on the inspector's
+    socket counts as the inspector driving the device.
+  - The events feed carries step lines, with their run id and sequence
+    number, when the target follows them.
   - After `session.mcpIdleTimeoutMs` with no operator action, the host
     closes the held session, which releases the lease. Only a route
     that declares `Operator` counts as an action, so polls of the

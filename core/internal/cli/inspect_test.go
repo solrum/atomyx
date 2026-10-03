@@ -89,12 +89,22 @@ type inspectRun struct {
 
 func startInspect(t *testing.T, manager *lease.Manager, flags map[string]FlagValue, stdin io.Reader) *inspectRun {
 	t.Helper()
+	return startInspectWith(t, manager, flags, stdin, nil)
+}
+
+// startInspectWith is startInspect with a hook that may change the
+// command's dependencies before it starts.
+func startInspectWith(t *testing.T, manager *lease.Manager, flags map[string]FlagValue, stdin io.Reader, tweak func(*Deps)) *inspectRun {
+	t.Helper()
 	run := &inspectRun{stdout: newLineSink(), stderr: newLineSink(), browser: &fakeBrowser{}, clk: clock.NewManualClock(1), manager: manager, exit: make(chan int, 1)}
 	run.deps = leaseDeps(t, manager, nil, nil)
 	run.deps.Factory = singleMockDriverFactory{driver: mockdriver.New().StageHierarchy(wire.TreeNodeWire{Attributes: map[string]string{"id": "root"}})}
 	run.deps.Stdout, run.deps.Stderr = run.stdout, run.stderr
 	run.deps.Browser, run.deps.Stdin, run.deps.Clock = run.browser, stdin, run.clk
 	run.deps.Timeouts.McpIdleMs = inspectIdleMs
+	if tweak != nil {
+		tweak(&run.deps)
+	}
 	ctx, cancel := context.WithCancelCause(context.Background())
 	run.cancel = cancel
 	t.Cleanup(func() { cancel(nil) })

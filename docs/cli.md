@@ -418,10 +418,11 @@ Flags:
 
 ### Starting and opening the page
 
-The command takes the device like `run` does, so it fails with
-`DEVICE_HELD` when another Atomyx process already holds it. It then
-prints one line to stdout, the URL, and opens it in your default
-browser unless `--no-open` is set:
+The command takes the device like `run` does when no other Atomyx
+process holds it. When another process holds it, the command watches
+that process instead, as described under "Watching a held device". It
+prints one line to stdout, the URL, and opens it in your default browser
+unless `--no-open` is set:
 
 ```
 http://127.0.0.1:<port>/#<code>
@@ -535,10 +536,45 @@ The page works only on this machine, because the command listens on
 - **Stopping.** Ctrl-C and SIGTERM stop the server and release the
   device.
 
+### Watching a held device
+
+When another Atomyx process holds the device, the inspector watches it
+and does not drive it. The terminal says which process it watches, and
+the page shows:
+
+- **Holder.** The header names the holder's command and its state, for
+  example `atomyx run (running)`.
+- **Captures.** The tree and screenshot that the holder last captured,
+  updated as the holder captures new ones.
+- **Steps.** A Steps panel lists the step lines of the run the holder
+  drives, newest last, with each step's number, command, outcome and
+  duration.
+- **Refresh.** A fresh capture works only while the holder is idle. While
+  the holder is running, the Refresh button is disabled and the page
+  says the holder is busy. A request that reaches a busy holder is
+  refused with `HOLDER_BUSY`.
+- **Holder exits.** When the watched process exits, the page shows the
+  released banner with code `HOLDER_EXITED`. The Reconnect button then
+  takes the device when it is free, or watches the next holder when
+  another process has taken it in the meantime. The command never does
+  either on its own. When that process serves no socket, the button
+  reports `DEVICE_HELD` and the banner stays.
+
+The command fails with exit code `1`, prints no URL, and names the
+holder, when:
+
+- the holder serves no socket, so nothing can watch it.
+- the holder has not published its socket within 130 seconds, so it is
+  still starting. Run the command again in a moment.
+- the holder published a socket that does not answer. Stop that process
+  or wait for it to finish.
+
+All three carry the code `DEVICE_HELD`.
+
 Exit codes: `0` when the inspector stopped without a signal, `1` when
-the device could not be reached or held or the server failed, `2` when
-the command was misused, `130` when Ctrl-C stopped it, and `143` when
-SIGTERM did.
+the device could not be reached or held, when its holder cannot be
+watched, or when the server failed, `2` when the command was misused,
+`130` when Ctrl-C stopped it, and `143` when SIGTERM did.
 
 ## Device ownership
 
@@ -546,10 +582,12 @@ SIGTERM did.
 the length of the command. Only one Atomyx process, whether this CLI or
 an `atomyx-mcp` server, can drive a device at a time.
 
-- A second command against a device that is already owned fails with
-  code `DEVICE_HELD`. The message names the holder's process id,
-  command, and state. Stop that process or wait for it to finish, then
-  run the command again.
+- A second `run`, `suite` or `doctor` command against a device that is
+  already owned fails with code `DEVICE_HELD`. The message names the
+  holder's process id, command, and state. Stop that process or wait
+  for it to finish, then run the command again, or use
+  `atomyx inspect` to watch it. `inspect` does not fail on a held
+  device, because it watches the holder.
 - On iOS, a runner that is missing or stale is built before ownership is
   taken, so a long build never holds the device. The command prints
   `building runner` to stderr while it builds. The build has a timeout

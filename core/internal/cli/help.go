@@ -125,7 +125,10 @@ EXAMPLES
   Open the browser inspector for a device: its live UI tree and
   screenshot, with selector suggestions and a selector tester. The
   server listens on 127.0.0.1 only and the device is released when
-  the command ends or sits idle.
+  the command ends or sits idle. A device another Atomyx process
+  holds is watched instead: the page shows its captures, its state
+  and its step lines, and asks for a fresh capture only while that
+  process is idle.
 
 USAGE
   atomyx driver inspect [flags]
@@ -140,7 +143,10 @@ FLAGS
 The command prints one URL on stdout. Press Enter in the terminal
 for a fresh URL, for example after reloading the page. The device is
 released after session.mcpIdleTimeoutMs without an action in the
-page, and the page can take it again with its reconnect button.
+page, and the page can take it again with its reconnect button. When
+the process being watched exits, the page offers the same button,
+which takes the device or watches its next holder. The command never
+takes a device on its own.
 
 EXAMPLES
   atomyx inspect --platform android
@@ -148,7 +154,9 @@ EXAMPLES
 
 EXIT CODES
   0    the inspector stopped
-  1    the device could not be reached or held, or the server failed
+  1    the device could not be reached or held, its holder serves no
+       socket, is still starting or cannot be reached, or the server
+       failed
   2    the command was misused
   130  stopped by Ctrl-C
   143  stopped by SIGTERM

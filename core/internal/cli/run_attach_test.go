@@ -27,6 +27,13 @@ import (
 // sits under a short path, so the holder socket path fits the unix limit.
 func newShortLeaseManager(t *testing.T) *lease.Manager {
 	t.Helper()
+	return newShortLeaseManagerWithClock(t, clock.SystemClock{})
+}
+
+// newShortLeaseManagerWithClock is newShortLeaseManager over a clock the
+// manager waits on while it retries a contended lease.
+func newShortLeaseManagerWithClock(t *testing.T, clk clock.Clock) *lease.Manager {
+	t.Helper()
 	root, err := os.MkdirTemp("", "a")
 	if err != nil {
 		t.Fatal(err)
@@ -40,7 +47,7 @@ func newShortLeaseManager(t *testing.T) *lease.Manager {
 		IsLocalFS:     func(string) (bool, error) { return true, nil },
 		FallbackRoot:  root,
 		MaxSocketPath: 4096,
-	}, clock.SystemClock{})
+	}, clk)
 	if err != nil {
 		t.Fatal(err)
 	}
