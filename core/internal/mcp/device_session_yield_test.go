@@ -195,14 +195,7 @@ func TestDeviceSessionYield_TheSourceReportsReleasedOnceTheBorrowerEnds(t *testi
 	if err := f.selectDevice(borrower); err != nil {
 		t.Fatal(err)
 	}
-	eventually(t, "the source to watch the borrower", func() bool {
-		for _, entry := range borrower.Interventions() {
-			if entry.Kind == session.InterventionViewerAttached {
-				return true
-			}
-		}
-		return false
-	})
+	f.awaitBorrowerWatched(borrower)
 	if got := f.state(f.devices); got != holderBorrowed {
 		t.Fatalf("state while the borrower runs = %q, want borrowed", got)
 	}
@@ -289,3 +282,56 @@ func (c *closeCounter) Info(msg string, _ logging.LogContext) {
 }
 
 func (c *closeCounter) Child(logging.LogContext) logging.Logger { return c }
+
+func (f *lifecycleFixture) awaitBorrowerWatched(borrower *DeviceSession) {
+	f.t.Helper()
+	eventually(f.t, "the source to watch the borrower", func() bool {
+		for _, entry := range borrower.Interventions() {
+			if entry.Kind == session.InterventionViewerAttached {
+				return true
+			}
+		}
+		return false
+	})
+}
+
+func TestDeviceSessionYield_CheckHealthSaysTheDeviceWasHandedOverNotIdledOnceTheBorrowerEnds(t *testing.T) {
+	f := newLifecycleFixture(t)
+	f.selectedAndIdle()
+	borrower := f.newDevices("atomyx run", f.factory)
+	t.Cleanup(borrower.Close)
+	if err := f.requestYield(); err != nil {
+		t.Fatal(err)
+	}
+	f.awaitLeaseFree()
+	if err := f.selectDevice(borrower); err != nil {
+		t.Fatal(err)
+	}
+	f.awaitBorrowerWatched(borrower)
+	if err := borrower.Disconnect(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "the source to report released", func() bool { return f.state(f.devices) == holderReleased })
+
+	report := f.devices.CheckHealth(context.Background())
+	const want = "the session handed its device to another process that no longer holds it and has not probed it"
+	if report.State != "released" || report.Message != want {
+		t.Fatalf("CheckHealth() = %+v, want released with message %q", report, want)
+	}
+}
+
+func TestDeviceSessionYield_CheckHealthKeepsTheIdleReasonForAnIdleRelease(t *testing.T) {
+	f := newLifecycleFixture(t)
+	if err := f.selectDevice(f.devices); err != nil {
+		t.Fatal(err)
+	}
+	f.clk.AwaitSleepers(1)
+	f.clk.Advance(testIdleMs)
+	f.awaitRelease(f.devices)
+
+	report := f.devices.CheckHealth(context.Background())
+	const want = "the session released its device after an idle timeout and has not probed it"
+	if report.State != "released" || report.Message != want {
+		t.Fatalf("CheckHealth() = %+v, want released with message %q", report, want)
+	}
+}

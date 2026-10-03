@@ -104,6 +104,7 @@ func (s *DeviceSession) endBorrow(gen uint64) {
 	defer s.mu.Unlock()
 	if s.state == holderBorrowed && s.borrowGen == gen {
 		s.state = holderReleased
+		s.releasedBy = releasedHandedOver
 		s.stopBorrowViewLocked()
 	}
 }

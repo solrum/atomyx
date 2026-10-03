@@ -126,8 +126,10 @@ const (
 	// holderRunning: a device is held and a call is in flight or a run is
 	// open.
 	holderRunning holderState = "running"
-	// holderReleased: the idle timer gave the device up. The descriptor
-	// is remembered, so the next device-needing call re-acquires it.
+	// holderReleased: the session no longer holds the device, either
+	// because the idle timer gave it up or because the process it was
+	// handed to has finished. releasedBy tells which. The descriptor is
+	// remembered, so the next device-needing call re-acquires it.
 	holderReleased holderState = "released"
 	// holderBorrowed: the session handed its device to another process
 	// that asked for it, and watches that process until it ends. The
@@ -136,6 +138,14 @@ const (
 	// holderLost: the session had the device and lost it without
 	// choosing to. The descriptor is remembered like in holderReleased.
 	holderLost holderState = "lost"
+)
+
+// releaseCause names why a session is in holderReleased.
+type releaseCause int
+
+const (
+	releasedIdle releaseCause = iota
+	releasedHandedOver
 )
 
 // timerKind names which idle timeout is armed.
@@ -184,6 +194,8 @@ type DeviceSession struct {
 	mu     sync.Mutex
 	closed bool
 	state  holderState
+	// releasedBy is meaningful while state is holderReleased.
+	releasedBy releaseCause
 	// sess is the held session. Writing it requires acquireMu and mu.
 	sess       *session.Session
 	active     *ActiveDevice
@@ -670,6 +682,7 @@ func (s *DeviceSession) detach(forget bool) *session.Session {
 		s.state = holderUnselected
 	} else {
 		s.state = holderReleased
+		s.releasedBy = releasedIdle
 	}
 	return prev
 }
@@ -825,6 +838,7 @@ func (s *DeviceSession) onTimer(gen uint64, kind timerKind) {
 	s.sess = nil
 	s.active = nil
 	s.state = holderReleased
+	s.releasedBy = releasedIdle
 	s.cancelTimerLocked()
 	s.mu.Unlock()
 
@@ -896,7 +910,7 @@ func (s *DeviceSession) watchLost(sess *session.Session) {
 // check outcome, not a failure of the check itself.
 func (s *DeviceSession) CheckHealth(ctx context.Context) orchestra.HealthReport {
 	s.mu.Lock()
-	active, state, remembered := s.active, s.state, s.remembered
+	active, state, remembered, releasedBy := s.active, s.state, s.remembered, s.releasedBy
 	s.mu.Unlock()
 	switch {
 	case active != nil:
@@ -919,9 +933,13 @@ func (s *DeviceSession) CheckHealth(ctx context.Context) orchestra.HealthReport 
 			Remedy:  "Wait for that process to finish, then call a device tool to take the device again.",
 		}
 	}
+	message := "the session released its device after an idle timeout and has not probed it"
+	if releasedBy == releasedHandedOver {
+		message = "the session handed its device to another process that no longer holds it and has not probed it"
+	}
 	return orchestra.HealthReport{
 		Selected: true, State: string(holderReleased),
-		Message: "the session released its device after an idle timeout and has not probed it",
+		Message: message,
 		Remedy:  "Call a device tool to take the device again.",
 	}
 }
