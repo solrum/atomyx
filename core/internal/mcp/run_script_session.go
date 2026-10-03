@@ -13,6 +13,7 @@ import (
 	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/runner"
 	"dev.atomyx/internal/session"
+	"dev.atomyx/internal/stepstream"
 )
 
 const (
@@ -32,6 +33,9 @@ type scriptTarget struct {
 	RunID     string
 	Artifacts runner.ScriptArtifacts
 	Evidence  runner.EvidenceWriter
+	// OnStep receives the step events of the execution and appends them to
+	// the run folder's step stream.
+	OnStep func(runner.StepEvent)
 }
 
 // RunScript executes a script inside a run folder. When a run is open,
@@ -78,7 +82,7 @@ func (s *runSession) runInOpenRun(
 		return runner.ScriptResult{}, err
 	}
 	artifacts := newScriptArtifacts(dir, counter, s.logger)
-	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: open.ID(), Artifacts: artifacts, Evidence: artifacts})
+	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: open.ID(), Artifacts: artifacts, Evidence: artifacts, OnStep: stepstream.NewSink(open, s.logger)})
 	if execErr == nil {
 		s.recordScriptTotals(open, result)
 	}
@@ -102,7 +106,7 @@ func (s *runSession) runAsOwnRun(
 		return runner.ScriptResult{}, err
 	}
 	artifacts := newScriptArtifacts(dir, &artifactCounter{}, s.logger)
-	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: w.ID(), Artifacts: artifacts, Evidence: artifacts})
+	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: w.ID(), Artifacts: artifacts, Evidence: artifacts, OnStep: stepstream.NewSink(w, s.logger)})
 	finalizeErr := w.Finalize(scriptOutcome(ctx, result, execErr), func(m *runfolder.Meta) {
 		m.TotalSteps = result.TotalSteps
 		m.FailedAtStep = result.FailedAtStep

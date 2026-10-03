@@ -17,6 +17,7 @@ import (
 	"dev.atomyx/internal/scenario"
 	"dev.atomyx/internal/script"
 	"dev.atomyx/internal/shutdown"
+	"dev.atomyx/internal/stepstream"
 )
 
 // The run command's top-level flow: parse and validate its flags, connect
@@ -161,6 +162,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 			ExternalEnv:           externalEnv,
 			PreconditionsOverride: preconditionsOverride,
 			ChildArtifacts:        newArtifactSequence(runfolder.ArtifactsDir(record.Dir())).forTarget,
+			OnStep:                stepstream.NewSink(record.writer, deps.logger()),
 		})
 		result, err := scenarioRunner.Run(runCtx, scenarioDef)
 		finishedAt := time.Now()
@@ -225,6 +227,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		PreconditionsOverride: preconditionsOverride,
 		NetworkCapture:        networkCapture,
 		Artifacts:             artifacts,
+		OnStep:                stepstream.NewSink(record.writer, deps.logger()),
 		FailureCapture: runner.NewFailureBundle(runner.FailureBundleDeps{
 			Orchestra: built.Orchestra, Clock: deps.clock(), Logger: deps.logger(), Sink: artifacts,
 		}),

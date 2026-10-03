@@ -16,6 +16,7 @@ import (
 	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/runner"
 	"dev.atomyx/internal/scenario"
+	"dev.atomyx/internal/stepstream"
 	"dev.atomyx/internal/suite"
 )
 
@@ -164,6 +165,7 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 		CreateLoadScript: fsScenarioScriptLoader,
 		ExternalEnv:      externalEnv,
 		ChildArtifacts:   newArtifactSequence(runfolder.ArtifactsDir(record.Dir())).forTarget,
+		OnStep:           stepstream.NewSink(record.writer, deps.logger()),
 	})
 
 	result, err := suiteRunner.Run(runCtx, entries, &scenario.SuiteRunOptions{

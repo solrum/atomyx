@@ -166,6 +166,7 @@ func registerRunScriptTool(server *mcp.Server, tc *ToolContext) {
 					Commands:       runner.DefaultCommands(),
 					NetworkCapture: networkCapture,
 					Artifacts:      target.Artifacts,
+					OnStep:         target.OnStep,
 					FailureCapture: runner.NewFailureBundle(runner.FailureBundleDeps{
 						Orchestra: orch, Clock: tc.Clock, Logger: tc.Logger, Sink: target.Evidence,
 					}),

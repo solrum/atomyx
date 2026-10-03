@@ -2,9 +2,11 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -269,5 +271,58 @@ func TestRunScriptFailuresInOneOpenRunWriteDistinctBundles(t *testing.T) {
 	}
 	if strings.Join(names, ",") != strings.Join(want, ",") {
 		t.Fatalf("artifacts = %v, want %v", names, want)
+	}
+}
+
+func stepFileLines(t *testing.T, r runServer, runID string) []runfolder.StepLine {
+	t.Helper()
+	body, err := os.ReadFile(filepath.Join(runfolder.RunDir(r.root, runID), runfolder.StepsFileName))
+	if err != nil {
+		t.Fatalf("reading steps file: %v", err)
+	}
+	var lines []runfolder.StepLine
+	for _, raw := range strings.Split(strings.TrimSuffix(string(body), "\n"), "\n") {
+		var line runfolder.StepLine
+		if err := json.Unmarshal([]byte(raw), &line); err != nil {
+			t.Fatalf("decoding step line %q: %v", raw, err)
+		}
+		lines = append(lines, line)
+	}
+	return lines
+}
+
+func TestRunScriptInAnOpenRunKeepsOneSeqAcrossCalls(t *testing.T) {
+	r := newRunServer(t)
+	selectMockDevice(t, r.cs, t.Context())
+	id := r.call("start_run", map[string]any{"name": "explore"})["id"].(string)
+
+	for range 2 {
+		if got := r.call("run_script", map[string]any{"script": passingScreenshotScript}); got["ok"] != true {
+			t.Fatalf("run_script = %v", got)
+		}
+	}
+
+	lines := stepFileLines(t, r, id)
+	if len(lines) != 4 {
+		t.Fatalf("got %d step lines, want a started and a completed line for each of two calls", len(lines))
+	}
+	for i, line := range lines {
+		if line.Seq != int64(i+1) || line.Command != "screenshot" {
+			t.Errorf("line %d = seq %d command %q, want seq %d and command screenshot", i, line.Seq, line.Command, i+1)
+		}
+	}
+}
+
+func TestBareRunScriptWritesItsStepLines(t *testing.T) {
+	r := newRunServer(t)
+	selectMockDevice(t, r.cs, t.Context())
+
+	if got := r.call("run_script", map[string]any{"script": passingScreenshotScript}); got["ok"] != true {
+		t.Fatalf("run_script = %v", got)
+	}
+
+	lines := stepFileLines(t, r, r.onlyMeta(t).RunID)
+	if len(lines) != 2 || lines[0].Phase != runfolder.StepPhaseStarted || lines[1].Phase != runfolder.StepPhaseCompleted || !lines[1].Ok {
+		t.Fatalf("step lines = %+v, want a started then an ok completed line", lines)
 	}
 }

@@ -89,6 +89,8 @@ components:
     in: internal/inspector
   redact:
     in: internal/redact
+  stepstream:
+    in: internal/stepstream
   cmd:
     in: cmd/**
   scripttools:
@@ -241,6 +243,7 @@ deps:
       - storage
       - sessiontest
       - redact
+      - stepstream
   skills:
     anyVendorDeps: true
   storage:
@@ -264,6 +267,7 @@ deps:
       - session
       - sessiontest
       - runfolder
+      - stepstream
   config:
     anyVendorDeps: true
   report:
@@ -284,6 +288,10 @@ deps:
   runfolder:
     mayDependOn:
       - flock
+  stepstream:
+    mayDependOn:
+      - runner
+      - runfolder
   attach:
     mayDependOn:
       - wire

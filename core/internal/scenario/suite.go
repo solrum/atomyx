@@ -82,6 +82,9 @@ type SuiteRunnerDeps struct {
 	LaunchNoReset    *bool
 	ClearDataOnFresh bool
 	AppArtifact      *string
+	// OnStep, when non-nil, is forwarded to every script the suite runs,
+	// directly or through a scenario entry.
+	OnStep func(runner.StepEvent)
 	// ChildArtifacts, when non-nil, supplies the artifacts of every
 	// script the suite runs, directly or through a scenario entry, and
 	// enables failure evidence capture for them.
@@ -315,6 +318,7 @@ func (r *SuiteRunner) runScriptEntry(ctx context.Context, index int, entry Suite
 		ClearDataOnFresh:      r.deps.ClearDataOnFresh,
 		AppArtifact:           r.deps.AppArtifact,
 		PreconditionsOverride: override,
+		OnStep:                r.deps.OnStep,
 		Artifacts:             artifacts,
 		FailureCapture:        failureCapture,
 	})
@@ -350,6 +354,7 @@ func (r *SuiteRunner) runScenarioEntry(ctx context.Context, index int, entry Sui
 		ClearDataOnFresh:      r.deps.ClearDataOnFresh,
 		AppArtifact:           r.deps.AppArtifact,
 		PreconditionsOverride: override,
+		OnStep:                r.deps.OnStep,
 		ChildArtifacts:        r.deps.ChildArtifacts.forEntry(index, entry.Path),
 	})
 	return scenarioRunner.Run(ctx, def)

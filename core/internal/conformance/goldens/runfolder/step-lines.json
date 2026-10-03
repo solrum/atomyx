@@ -1,0 +1,37 @@
+[
+  {
+    "artifacts": [],
+    "command": "assertExists",
+    "detail": null,
+    "durationMs": 0,
+    "ok": false,
+    "phase": "started",
+    "schemaVersion": 1,
+    "seq": 1,
+    "stepIndex": 0
+  },
+  {
+    "artifacts": [],
+    "command": "assertExists",
+    "detail": "Element exists",
+    "durationMs": 12,
+    "ok": true,
+    "phase": "completed",
+    "schemaVersion": 1,
+    "seq": 2,
+    "stepIndex": 0
+  },
+  {
+    "artifacts": [
+      "step-002-home.png"
+    ],
+    "command": "screenshot",
+    "detail": null,
+    "durationMs": 40,
+    "ok": true,
+    "phase": "completed",
+    "schemaVersion": 1,
+    "seq": 3,
+    "stepIndex": 1
+  }
+]

@@ -710,6 +710,17 @@ Contract:
   first line past the bound is dropped and one marker line
   `{"truncated":true,"limitBytes":N}` ends the file, after which
   further lines are dropped silently.
+- **Step stream.** `steps.jsonl` holds one line per step phase, written
+  by `Writer.AppendStep` as the run progresses. A line is a JSON object
+  with `schemaVersion` (1), `seq`, `stepIndex`, `command`, `phase`
+  (`started` or `completed`), `ok`, `durationMs`, `detail`, and
+  `artifacts`. `seq` counts the lines of the run from 1 in append
+  order, across every script execution that writes into the run.
+  `ok`, `durationMs`, and `detail` are meaningful only on a completed
+  line, and `detail` never carries typed text. The file is bounded to
+  8 MiB the same way as `log.jsonl`, and the marker line is
+  `{"truncated":true,"limitBytes":N}`. `atomyx run`, `atomyx suite`,
+  and MCP `run_script` write it through `stepstream.NewSink`.
 - **Evidence.** One `artifacts/` directory holds every screenshot and
   piece of failure evidence. An MCP `screenshot` taken with no run open
   goes to `LooseScreenshotsDir` under the root instead. The report
