@@ -2,6 +2,7 @@ package inspector
 
 import (
 	"context"
+	"errors"
 	"sync/atomic"
 
 	"dev.atomyx/internal/diag"
@@ -22,7 +23,8 @@ type Source interface {
 // it builds the host hands this to the session as the refresher of its
 // attach socket, so a viewer's capture request is counted as driving the
 // device and an idle release cannot close the session during it. Until a
-// host is bound, a request is refused as busy.
+// host is bound, or while the host holds no device, a request is refused
+// as busy.
 type DeferredRefresher struct {
 	host atomic.Pointer[Host]
 }
@@ -38,5 +40,9 @@ func (d *DeferredRefresher) FreshTree(ctx context.Context) (session.Snapshot, er
 	if host == nil {
 		return session.Snapshot{}, diag.NewHolderBusy("the inspector is starting")
 	}
-	return host.FreshTree(ctx)
+	snap, err := host.FreshTree(ctx)
+	if errors.Is(err, ErrReleased) || errors.Is(err, ErrLost) || errors.Is(err, ErrHolderExited) {
+		return session.Snapshot{}, diag.NewHolderBusy("the inspector holds no device at the moment")
+	}
+	return snap, err
 }

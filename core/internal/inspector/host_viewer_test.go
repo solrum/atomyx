@@ -208,3 +208,17 @@ func TestDeferredRefresher_ACaptureForAViewerKeepsTheIdleReleaseFromClosingTheSe
 		t.Fatalf("holder after the capture = %q, want idle", got)
 	}
 }
+
+func TestDeferredRefresher_ARequestWhileTheHostHoldsNoDeviceIsRefusedAsBusy(t *testing.T) {
+	h := newHostHarness(t)
+	var refresher DeferredRefresher
+	refresher.Bind(h.host)
+	h.clk.Advance(testIdleMs)
+	<-h.first.closed
+
+	_, err := refresher.FreshTree(context.Background())
+
+	if code, _, _ := diag.Describe(err); code != diag.CodeHolderBusy {
+		t.Fatalf("FreshTree after a release = %v, want %s", err, diag.CodeHolderBusy)
+	}
+}
