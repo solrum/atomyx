@@ -49,7 +49,10 @@ func (s *Session) Subscribe(ctx context.Context) (<-chan Observation, error) {
 	return s.hub.Subscribe(ctx)
 }
 
-var _ Controller = (*Session)(nil)
+var (
+	_ Controller = (*Session)(nil)
+	_ Refresher  = (*Session)(nil)
+)
 
 // ErrClosed reports a request made of a session that has been closed.
 var ErrClosed = errors.New("the session is closed")
@@ -60,6 +63,13 @@ func (s *Session) Gate() *ActivityGate { return s.gate }
 
 // FreshTree implements Controller.
 func (s *Session) FreshTree(ctx context.Context) (Snapshot, error) {
+	return s.FreshTreeIf(ctx, admitAlways)
+}
+
+func admitAlways() error { return nil }
+
+// FreshTreeIf implements Refresher.
+func (s *Session) FreshTreeIf(ctx context.Context, admit func() error) (Snapshot, error) {
 	if err := ctx.Err(); err != nil {
 		return Snapshot{}, err
 	}
@@ -72,6 +82,9 @@ func (s *Session) FreshTree(ctx context.Context) (Snapshot, error) {
 	case <-s.closed:
 		return Snapshot{}, ErrClosed
 	default:
+	}
+	if err := admit(); err != nil {
+		return Snapshot{}, err
 	}
 
 	o := s.built.Orchestra

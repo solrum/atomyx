@@ -208,3 +208,71 @@ func TestFreshTree_OnAClosedSessionReturnsErrClosed(t *testing.T) {
 		t.Fatalf("FreshTree error = %v, want ErrClosed", err)
 	}
 }
+
+func TestFreshTreeIf_ReturnsTheAdmitErrorWithoutTouchingTheDevice(t *testing.T) {
+	s, gate := openWithGate(t)
+	events, err := s.Subscribe(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	refusal := errors.New("not now")
+	var gateTaken bool
+
+	_, err = s.FreshTreeIf(context.Background(), func() error {
+		if release, ok := gate.TryExclusive(); ok {
+			release()
+		} else {
+			gateTaken = true
+		}
+		return refusal
+	})
+
+	if !errors.Is(err, refusal) {
+		t.Fatalf("FreshTreeIf error = %v, want the admit error", err)
+	}
+	if !gateTaken {
+		t.Fatal("admit ran without the exclusive gate held")
+	}
+	if got := collectKinds(t, events); len(got) != 0 {
+		t.Fatalf("a refused capture published %v, want no driver call", got)
+	}
+	if _, err := s.FreshTree(context.Background()); err != nil {
+		t.Fatalf("FreshTree after a refusal: %v", err)
+	}
+}
+
+func TestFreshTreeIf_CapturesWhenAdmitAllows(t *testing.T) {
+	s, _ := openWithGate(t)
+	admitted := 0
+
+	snap, err := s.FreshTreeIf(context.Background(), func() error {
+		admitted++
+		return nil
+	})
+
+	if err != nil || admitted != 1 || !snap.Paired {
+		t.Fatalf("FreshTreeIf = paired %v, admitted %d, err %v, want one admit and a paired capture", snap.Paired, admitted, err)
+	}
+}
+
+func TestFreshTreeIf_HolderBusyWinsOverAdmit(t *testing.T) {
+	s, gate := openWithGate(t)
+	endCall, err := gate.Enter(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer endCall()
+	admitted := false
+
+	_, err = s.FreshTreeIf(context.Background(), func() error {
+		admitted = true
+		return errors.New("not now")
+	})
+
+	if code, _, _ := diag.Describe(err); code != diag.CodeHolderBusy {
+		t.Fatalf("FreshTreeIf error = %v, want HOLDER_BUSY", err)
+	}
+	if admitted {
+		t.Fatal("admit ran while a tool call held the gate")
+	}
+}
