@@ -22,6 +22,9 @@ func TestLeaseErrors_CodesAndRemedies(t *testing.T) {
 		{"unsupported", diag.NewUnsupported("control.borrow"), diag.CodeUnsupported, "control.borrow", "feature list"},
 		{"unsupported version", diag.NewUnsupportedVersion(2, 3, 1, 1), diag.CodeUnsupportedVersion, "2 to 3", "same source"},
 	}
+	if _, _, remedy := diag.Describe(diag.NewDeviceHeld("pid 7 (atomyx run), running")); !strings.Contains(remedy, "atomyx inspect") {
+		t.Fatalf("held remedy %q does not name atomyx inspect as the way to watch", remedy)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			code, msg, remedy := diag.Describe(tt.err)

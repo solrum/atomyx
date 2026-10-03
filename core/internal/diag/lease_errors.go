@@ -11,6 +11,7 @@ func NewDeviceHeld(holder string) error {
 		CodeDeviceHeld,
 		fmt.Sprintf("the device is in use by another Atomyx process: %s", holder),
 		"Stop that process or wait for it to finish, then run the command again. "+
+			"Run atomyx inspect to watch the run without stopping it. "+
 			"Only one Atomyx process can drive a device at a time.",
 		nil,
 	)
