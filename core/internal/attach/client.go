@@ -6,13 +6,21 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 
 	"dev.atomyx/internal/diag"
 )
 
-// DefaultNoticeBuffer is how many notices a client holds for a consumer
-// before it stops reading the socket.
+// DefaultNoticeBuffer is how many step notices a client holds for a
+// consumer before it drops the newest and reports a gap.
 const DefaultNoticeBuffer = 64
+
+// NoticeStepsDropped is a notice the client itself produces, never one a
+// holder sends. It marks the place in the notice stream where step
+// notices were dropped because the consumer fell behind, so the consumer
+// resubscribes with the run id and the sequence number of the last step
+// line it read.
+const NoticeStepsDropped = "observe.client.stepsDropped"
 
 // ErrClientClosed is the cause of a ConnectionError after the caller
 // closed the client itself.
@@ -49,19 +57,25 @@ type ClientConfig struct {
 	Features []string
 	// PeerUID reads the uid of the holder. The platform lookup is the
 	// default.
-	PeerUID      PeerCredFunc
+	PeerUID PeerCredFunc
+	// NoticeBuffer bounds the step notices held for the consumer. Tree
+	// and screenshot notices never queue, because only the newest of each
+	// matters.
 	NoticeBuffer int
 }
 
 // Client is one attached viewer's connection to a holder. Its methods are
 // safe for concurrent use.
 type Client struct {
-	nc      *net.UnixConn
+	nc      net.Conn
 	hello   HelloResult
+	inbox   *noticeInbox
 	notices chan Frame
 	done    chan struct{}
-	// stop is closed by Close so a read loop blocked on a consumer that has
-	// stopped reading can leave.
+	// delivered is closed when the delivery goroutine has ended.
+	delivered chan struct{}
+	// stop is closed by Close so the delivery goroutine blocked on a
+	// consumer that has stopped reading can leave.
 	stop     chan struct{}
 	stopOnce sync.Once
 
@@ -90,18 +104,7 @@ func Dial(ctx context.Context, cfg ClientConfig) (*Client, error) {
 		_ = nc.Close()
 		return nil, err
 	}
-	buffer := cfg.NoticeBuffer
-	if buffer <= 0 {
-		buffer = DefaultNoticeBuffer
-	}
-	c := &Client{
-		nc:      uc,
-		notices: make(chan Frame, buffer),
-		done:    make(chan struct{}),
-		stop:    make(chan struct{}),
-		pending: map[int64]chan Frame{},
-	}
-	go c.readLoop()
+	c := newClient(uc, cfg.NoticeBuffer)
 	features := cfg.Features
 	if features == nil {
 		features = []string{}
@@ -114,15 +117,36 @@ func Dial(ctx context.Context, cfg ClientConfig) (*Client, error) {
 	return c, nil
 }
 
+func newClient(nc net.Conn, noticeBuffer int) *Client {
+	if noticeBuffer <= 0 {
+		noticeBuffer = DefaultNoticeBuffer
+	}
+	c := &Client{
+		nc:        nc,
+		inbox:     newNoticeInbox(noticeBuffer),
+		notices:   make(chan Frame),
+		done:      make(chan struct{}),
+		delivered: make(chan struct{}),
+		stop:      make(chan struct{}),
+		pending:   map[int64]chan Frame{},
+	}
+	go c.readLoop()
+	go c.deliver()
+	return c
+}
+
 // Protocol is the major version the holder chose.
 func (c *Client) Protocol() int { return c.hello.Protocol }
 
 // Features lists what the holder serves.
 func (c *Client) Features() []string { return c.hello.Features }
 
-// Notices delivers the notices a subscription starts. The channel closes
-// when the connection ends, and the consumer must keep reading it, or the
-// holder disconnects the viewer for reading too slowly.
+// Notices delivers the notices a subscription starts, in the order they
+// arrived. A consumer that falls behind sees only the newest tree notice
+// and the newest screenshot notice, and step notices past the buffer are
+// replaced by one NoticeStepsDropped marker. The channel closes after the
+// connection ends and the notices already held are delivered. Reading it
+// is never required for calls to complete.
 func (c *Client) Notices() <-chan Frame { return c.notices }
 
 // Done is closed when the connection ends.
@@ -135,7 +159,7 @@ func (c *Client) Err() error {
 	return c.err
 }
 
-// Close ends the connection and waits for the read loop to stop. It is
+// Close ends the connection and waits for its goroutines to stop. It is
 // safe to call more than once.
 func (c *Client) Close() error {
 	c.mu.Lock()
@@ -144,6 +168,7 @@ func (c *Client) Close() error {
 	c.stopOnce.Do(func() { close(c.stop) })
 	_ = c.nc.Close()
 	<-c.done
+	<-c.delivered
 	return nil
 }
 
@@ -173,6 +198,12 @@ func (c *Client) Call(ctx context.Context, messageType string, data, result any)
 		if errors.Is(err, ErrFrameTooLarge) {
 			return err
 		}
+		if ctx.Err() != nil {
+			// A write that was cut short may have left half a line on the
+			// stream, so the connection cannot carry another request.
+			_ = c.nc.Close()
+			return ctx.Err()
+		}
 		// A holder that turned the viewer away has closed the socket, so
 		// the read loop reports why instead of the failed write.
 		select {
@@ -198,6 +229,8 @@ func (c *Client) Call(ctx context.Context, messageType string, data, result any)
 	}
 }
 
+// write sends one frame. A context without a deadline still ends the
+// write when it is cancelled, by moving the write deadline into the past.
 func (c *Client) write(ctx context.Context, f Frame) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
@@ -205,7 +238,16 @@ func (c *Client) write(ctx context.Context, f Frame) error {
 	if err := c.nc.SetWriteDeadline(deadline); err != nil {
 		return err
 	}
-	return WriteFrame(c.nc, f)
+	expired := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() {
+		defer close(expired)
+		_ = c.nc.SetWriteDeadline(time.Unix(1, 0))
+	})
+	err := WriteFrame(c.nc, f)
+	if !stop() {
+		<-expired
+	}
+	return err
 }
 
 func (c *Client) forget(id int64) {
@@ -218,7 +260,8 @@ func remoteError(f Frame) *RemoteError {
 	return &RemoteError{Type: f.Type, ErrCode: f.Code, Message: f.Message, RemedyText: f.Remedy}
 }
 
-// readLoop is the only reader and the only sender on notices.
+// readLoop is the only reader. It never waits on the consumer, so a
+// response is always read.
 func (c *Client) readLoop() {
 	reader := NewFrameReader(c.nc)
 	var cause error
@@ -231,22 +274,54 @@ func (c *Client) readLoop() {
 		}
 		switch f.Kind() {
 		case KindNotice:
-			select {
-			case c.notices <- f:
-			case <-c.stop:
-				return
-			}
+			c.inbox.push(f)
 		case KindResponse:
 			if f.ID == 0 {
 				cause = remoteError(f)
 				return
 			}
-			c.mu.Lock()
-			reply := c.pending[f.ID]
-			c.mu.Unlock()
-			if reply != nil {
-				reply <- f
+			c.reply(f)
+		}
+	}
+}
+
+// reply hands a response to its call. A response with an unknown id, or a
+// second response to the same id, is dropped.
+func (c *Client) reply(f Frame) {
+	c.mu.Lock()
+	reply := c.pending[f.ID]
+	c.mu.Unlock()
+	if reply == nil {
+		return
+	}
+	select {
+	case reply <- f:
+	default:
+	}
+}
+
+// deliver moves notices from the inbox to the consumer, then closes the
+// notices channel once the connection has ended and the inbox is empty.
+func (c *Client) deliver() {
+	defer close(c.delivered)
+	defer close(c.notices)
+	for {
+		f, ok, ended := c.inbox.next()
+		if ok {
+			select {
+			case c.notices <- f:
+			case <-c.stop:
+				return
 			}
+			continue
+		}
+		if ended {
+			return
+		}
+		select {
+		case <-c.inbox.wake:
+		case <-c.stop:
+			return
 		}
 	}
 }
@@ -259,6 +334,6 @@ func (c *Client) end(cause error) {
 	c.err = &ConnectionError{Cause: cause}
 	c.mu.Unlock()
 	_ = c.nc.Close()
-	close(c.notices)
 	close(c.done)
+	c.inbox.finish()
 }

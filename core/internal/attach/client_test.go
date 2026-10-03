@@ -6,7 +6,6 @@ import (
 	"net"
 	"os"
 	"runtime"
-	"strings"
 	"testing"
 	"time"
 
@@ -165,7 +164,7 @@ func TestCancelledCallLeavesTheConnectionUsable(t *testing.T) {
 	}
 }
 
-func TestCloseIsTypedAndReleasesAReadLoopBlockedOnNotices(t *testing.T) {
+func TestCloseIsTypedAndReleasesAConsumerThatStoppedReading(t *testing.T) {
 	baseGoroutines := runtime.NumGoroutine()
 	baseFDs := openFDs(t)
 
@@ -179,7 +178,9 @@ func TestCloseIsTypedAndReleasesAReadLoopBlockedOnNotices(t *testing.T) {
 	for range 3 {
 		sub.notices <- Notice{Type: NoticeTree, Data: TreeNotice{}}
 	}
-	waitForBlockedNoticeSend(t)
+	if err := c.Call(context.Background(), TypeStatus, nil, nil); err != nil {
+		t.Fatalf("a call while notices wait for the consumer: %v", err)
+	}
 
 	closed := make(chan struct{})
 	go func() {
@@ -201,22 +202,157 @@ func TestCloseIsTypedAndReleasesAReadLoopBlockedOnNotices(t *testing.T) {
 	waitForNoLeak(t, baseGoroutines, baseFDs)
 }
 
-// waitForBlockedNoticeSend returns once a client read loop is parked
-// sending a notice to a consumer that is not reading.
-func waitForBlockedNoticeSend(t *testing.T) {
-	t.Helper()
-	const attempts = 500
-	buf := make([]byte, 1<<20)
-	for range attempts {
-		n := runtime.Stack(buf, true)
-		for _, trace := range strings.Split(string(buf[:n]), "\n\n") {
-			if strings.Contains(trace, "(*Client).readLoop") && strings.Contains(trace, "[select") {
+func TestConsumerThatCallsFromItsNoticeLoopNeverHangs(t *testing.T) {
+	h := newFakeObserve()
+	h.tree = TreeResult{Revision: 9}
+	c := dialClient(t, observeServer(t, h, ServerConfig{}), ClientConfig{NoticeBuffer: 1})
+	if err := c.Call(context.Background(), TypeSubscribe, Subscribe{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	sub := h.nextSubscription(t)
+
+	const burst = 200
+	go func() {
+		for i := range burst {
+			sub.notices <- Notice{Type: NoticeTree, Data: TreeNotice{Revision: uint64(i)}}
+		}
+		sub.notices <- Notice{Type: NoticeStep, Data: StepNotice{}}
+	}()
+
+	failed := make(chan error, 1)
+	go func() {
+		for n := range c.Notices() {
+			if n.Type == NoticeStep {
+				failed <- nil
+				return
+			}
+			var tree TreeResult
+			if err := c.Call(context.Background(), TypeTreeLatest, nil, &tree); err != nil {
+				failed <- err
 				return
 			}
 		}
-		<-time.After(10 * time.Millisecond)
+		failed <- errors.New("the notices ended before the last step notice")
+	}()
+	select {
+	case err := <-failed:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(testGuard):
+		t.Fatal("a consumer calling from its notice loop hung during a notice burst")
 	}
-	t.Fatal("the client read loop never blocked on the notice consumer")
+}
+
+func TestInboxKeepsOnlyTheNewestTreeAndScreenshotNotice(t *testing.T) {
+	in := newNoticeInbox(4)
+	tree := func(rev uint64) Frame {
+		f, err := NewNotice(NoticeTree, TreeNotice{Revision: rev})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return f
+	}
+	shot, err := NewNotice(NoticeScreenshot, ScreenshotNotice{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	in.push(tree(1))
+	in.push(shot)
+	in.push(tree(2))
+	in.push(tree(3))
+
+	first, _, _ := in.next()
+	second, _, _ := in.next()
+	if first.Type != NoticeScreenshot || second.Type != NoticeTree {
+		t.Fatalf("order = %s then %s, want screenshot then tree", first.Type, second.Type)
+	}
+	var newest TreeNotice
+	if err := second.Decode(&newest); err != nil || newest.Revision != 3 {
+		t.Fatalf("kept tree notice = %+v, %v, want revision 3", newest, err)
+	}
+	if _, ok, _ := in.next(); ok {
+		t.Fatal("an older tree notice was kept")
+	}
+}
+
+func TestInboxReplacesStepsPastTheBoundWithOneGapMarker(t *testing.T) {
+	in := newNoticeInbox(2)
+	step := func(seq int64) Frame {
+		f, err := NewNotice(NoticeStep, StepNotice{Line: StepLine{Seq: seq}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return f
+	}
+	for seq := int64(1); seq <= 5; seq++ {
+		in.push(step(seq))
+	}
+	var got []string
+	for {
+		f, ok, _ := in.next()
+		if !ok {
+			break
+		}
+		got = append(got, f.Type)
+	}
+	want := []string{NoticeStep, NoticeStep, NoticeStepsDropped}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] || got[2] != want[2] {
+		t.Fatalf("delivered %v, want %v", got, want)
+	}
+
+	in.push(step(6))
+	in.push(step(7))
+	in.push(step(8))
+	got = got[:0]
+	for {
+		f, ok, _ := in.next()
+		if !ok {
+			break
+		}
+		got = append(got, f.Type)
+	}
+	want = []string{NoticeStep, NoticeStep, NoticeStepsDropped}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] || got[2] != want[2] {
+		t.Fatalf("after the marker was delivered, delivered %v, want %v", got, want)
+	}
+}
+
+func TestDuplicateResponseIsDroppedWithoutBlockingTheReadLoop(t *testing.T) {
+	c := &Client{pending: map[int64]chan Frame{7: make(chan Frame, 1)}}
+	ok := true
+	response := Frame{V: ProtocolMajor, ID: 7, Type: TypeStatus, Ok: &ok}
+	returned := make(chan struct{})
+	go func() {
+		c.reply(response)
+		c.reply(response)
+		close(returned)
+	}()
+	select {
+	case <-returned:
+	case <-time.After(testGuard):
+		t.Fatal("a duplicate response blocked the reader")
+	}
+}
+
+func TestCancellingTheContextEndsABlockedWrite(t *testing.T) {
+	local, remote := net.Pipe()
+	t.Cleanup(func() { _ = remote.Close() })
+	c := newClient(local, 0)
+	t.Cleanup(func() { _ = c.Close() })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	result := make(chan error, 1)
+	go func() { result <- c.Call(ctx, TypeStatus, nil, nil) }()
+	cancel()
+	select {
+	case err := <-result:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("error = %v, want context.Canceled", err)
+		}
+	case <-time.After(testGuard):
+		t.Fatal("cancelling the context did not end a write nobody reads")
+	}
 }
 
 func TestDialReportsTheRefusalWhenTheHolderClosedBeforeTheHelloWasSent(t *testing.T) {
