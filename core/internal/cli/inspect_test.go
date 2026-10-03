@@ -9,6 +9,7 @@ import (
 	"sync"
 	"syscall"
 	"testing"
+	"time"
 
 	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/device"
@@ -57,15 +58,35 @@ func (s *lineSink) awaitLine(t *testing.T, want string) string {
 	return ""
 }
 
+// fakeBrowser records every opened URL and announces each open on
+// signal, so a test waits for the open instead of racing the command
+// that prints the URL first.
 type fakeBrowser struct {
-	mu   sync.Mutex
-	urls []string
+	mu     sync.Mutex
+	urls   []string
+	signal chan string
+}
+
+const browserOpenGuard = 10 * time.Second
+
+func newFakeBrowser() *fakeBrowser { return &fakeBrowser{signal: make(chan string, 16)} }
+
+func (b *fakeBrowser) awaitOpen(t *testing.T) string {
+	t.Helper()
+	select {
+	case url := <-b.signal:
+		return url
+	case <-time.After(browserOpenGuard):
+		t.Fatal("the browser was never opened")
+		return ""
+	}
 }
 
 func (b *fakeBrowser) Open(url string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.urls = append(b.urls, url)
+	b.signal <- url
 	return nil
 }
 
@@ -96,7 +117,7 @@ func startInspect(t *testing.T, manager *lease.Manager, flags map[string]FlagVal
 // command's dependencies before it starts.
 func startInspectWith(t *testing.T, manager *lease.Manager, flags map[string]FlagValue, stdin io.Reader, tweak func(*Deps)) *inspectRun {
 	t.Helper()
-	run := &inspectRun{stdout: newLineSink(), stderr: newLineSink(), browser: &fakeBrowser{}, clk: clock.NewManualClock(1), manager: manager, exit: make(chan int, 1)}
+	run := &inspectRun{stdout: newLineSink(), stderr: newLineSink(), browser: newFakeBrowser(), clk: clock.NewManualClock(1), manager: manager, exit: make(chan int, 1)}
 	run.deps = leaseDeps(t, manager, nil, nil)
 	run.deps.Factory = singleMockDriverFactory{driver: mockdriver.New().StageHierarchy(wire.TreeNodeWire{Attributes: map[string]string{"id": "root"}})}
 	run.deps.Stdout, run.deps.Stderr = run.stdout, run.stderr
@@ -180,6 +201,9 @@ func TestInspect_PrintsALoopbackURLWithTheCodeInTheFragmentAndOpensItOnce(t *tes
 	if !strings.HasPrefix(url, "http://127.0.0.1:") || !strings.Contains(url, "/#") || strings.Contains(url, "localhost") {
 		t.Fatalf("url = %q, want a 127.0.0.1 URL with a fragment", url)
 	}
+	if opened := run.browser.awaitOpen(t); opened != url {
+		t.Fatalf("opened %q, want %q", opened, url)
+	}
 	if got := run.browser.opened(); len(got) != 1 || got[0] != url {
 		t.Fatalf("opened = %v, want exactly %q", got, url)
 	}
@@ -210,6 +234,10 @@ func TestInspect_EnterMintsAFreshURLAndEndOfInputKeepsServing(t *testing.T) {
 	second := run.stdout.awaitLine(t, "http://")
 	if second == first {
 		t.Fatal("Enter printed the same URL again")
+	}
+	run.browser.awaitOpen(t)
+	if run.browser.awaitOpen(t) != second {
+		t.Fatal("the second opened URL differs from the printed one")
 	}
 	if got := run.browser.opened(); len(got) != 2 || got[1] != second {
 		t.Fatalf("opened = %v, want the second URL opened", got)
