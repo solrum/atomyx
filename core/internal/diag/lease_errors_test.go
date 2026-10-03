@@ -19,6 +19,8 @@ func TestLeaseErrors_CodesAndRemedies(t *testing.T) {
 		{"released held", diag.NewDeviceReleasedHeld("atomyx run, running"), diag.CodeDeviceReleasedHeld, "atomyx run", "Retry the call shortly"},
 		{"holder busy", diag.NewHolderBusy("a tool call is running"), diag.CodeHolderBusy, "a tool call is running", "ask again"},
 		{"run expired", diag.NewRunExpired("r-1"), diag.CodeRunExpired, "r-1", "Start a new run"},
+		{"unsupported", diag.NewUnsupported("control.borrow"), diag.CodeUnsupported, "control.borrow", "feature list"},
+		{"unsupported version", diag.NewUnsupportedVersion(2, 3, 1, 1), diag.CodeUnsupportedVersion, "2 to 3", "same source"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

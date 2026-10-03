@@ -117,6 +117,13 @@ const (
 	// a capture. The condition is temporary, so the same request
 	// succeeds once that work ends.
 	CodeHolderBusy = "HOLDER_BUSY"
+	// CodeUnsupported means a peer sent a message type the receiver does
+	// not implement. The connection stays usable, so the sender may
+	// continue with other messages.
+	CodeUnsupported = "UNSUPPORTED"
+	// CodeUnsupportedVersion means two peers share no protocol version,
+	// so they cannot exchange any message.
+	CodeUnsupportedVersion = "UNSUPPORTED_VERSION"
 )
 
 // Coded is implemented by an error that carries a stable code and an
