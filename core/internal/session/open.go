@@ -191,7 +191,7 @@ func Open(ctx context.Context, deps Deps, req Request) (*Session, error) {
 		}
 	}
 	if err := s.persistActivity(); err != nil {
-		_ = s.Close()
+		_ = s.close(context.WithoutCancel(ctx))
 		return nil, fmt.Errorf("record the holder state: %w", err)
 	}
 	return s, nil

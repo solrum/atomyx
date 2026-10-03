@@ -30,7 +30,7 @@ func keptRunner(t *testing.T) (*device.RunnerKeeper, *device.FakeProvisioner) {
 func TestCleanup_NormalExitStopsTheRunnerTheProcessOwns(t *testing.T) {
 	keeper, prov := keptRunner(t)
 
-	finished := shutdown.Bounded(clock.SystemClock{}, shutdown.GracePeriod, runnerprovision.Cleanup(keeper, nil))
+	finished := shutdown.Bounded(context.Background(), clock.SystemClock{}, shutdown.GracePeriod, runnerprovision.Cleanup(keeper, nil))
 
 	if !finished {
 		t.Fatal("the exit cleanup did not finish within the grace period")

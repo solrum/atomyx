@@ -197,7 +197,7 @@ func run(opts options) int {
 	// alike. Either way the active device must be released here, because
 	// its helper processes run in their own process group and a terminal
 	// Ctrl-C does not reach them.
-	if !shutdown.Bounded(clock, shutdown.GracePeriod, cleanup) {
+	if !shutdown.Bounded(ctx, clock, shutdown.GracePeriod, cleanup) {
 		fmt.Fprintln(os.Stderr, "atomyx-mcp: device cleanup did not finish in time")
 	}
 	if serveErr != nil {

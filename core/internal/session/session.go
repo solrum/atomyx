@@ -267,6 +267,13 @@ func (s *Session) updateHolder(mutate func(*lease.Holder)) error {
 //
 // Close is idempotent and returns the first call's result.
 func (s *Session) Close() error {
+	return s.close(context.Background())
+}
+
+// close runs the shutdown described on Close. Cleanup always runs to
+// completion within the shutdown grace period, even when the caller's
+// context is already done, so ctx contributes only its values.
+func (s *Session) close(ctx context.Context) error {
 	s.closeOnce.Do(func() {
 		s.watchCancel()
 		s.watchers.Wait()
@@ -278,7 +285,7 @@ func (s *Session) Close() error {
 
 		disconnected := make(chan error, 1)
 		attachStopped := make(chan struct{})
-		finished := shutdown.Bounded(s.deps.Clock, shutdown.GracePeriod, func() {
+		finished := shutdown.Bounded(ctx, s.deps.Clock, shutdown.GracePeriod, func() {
 			go func() {
 				defer close(attachStopped)
 				s.stopAttach()

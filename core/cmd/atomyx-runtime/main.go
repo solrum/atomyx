@@ -131,7 +131,7 @@ func run() int {
 	case <-done:
 		cancel()
 	}
-	if !shutdown.Bounded(clock, shutdown.GracePeriod, disposeOnce) {
+	if !shutdown.Bounded(runCtx, clock, shutdown.GracePeriod, disposeOnce) {
 		writeSidecarErrorLine("device cleanup did not finish in time")
 	}
 	return 0

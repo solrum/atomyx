@@ -92,7 +92,7 @@ func main() {
 	code := cli.RunContext(ctx, os.Args[1:], deps)
 	// Closing a session leaves its runner running, so the process stops
 	// the runners it owns itself before it exits.
-	if !shutdown.Bounded(clock, shutdown.GracePeriod, cleanup) {
+	if !shutdown.Bounded(ctx, clock, shutdown.GracePeriod, cleanup) {
 		fmt.Fprintln(os.Stderr, "atomyx: runner cleanup did not finish in time")
 	}
 	//nolint:gocritic // see the comment above

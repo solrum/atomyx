@@ -19,7 +19,7 @@ const (
 
 func TestBoundedReportsCompletion(t *testing.T) {
 	ran := false
-	if !Bounded(clock.SystemClock{}, time.Second, func() { ran = true }) {
+	if !Bounded(context.Background(), clock.SystemClock{}, time.Second, func() { ran = true }) {
 		t.Fatal("Bounded returned false for a cleanup that finished")
 	}
 	if !ran {
@@ -32,8 +32,33 @@ func TestBoundedGivesUpOnAHungCleanup(t *testing.T) {
 	release := make(chan struct{})
 	defer close(release)
 	result := make(chan bool, 1)
-	go func() { result <- Bounded(clk, time.Second, func() { <-release }) }()
+	go func() { result <- Bounded(context.Background(), clk, time.Second, func() { <-release }) }()
 	clk.AwaitSleepers(1)
+	clk.Advance(time.Second.Milliseconds())
+	select {
+	case finished := <-result:
+		if finished {
+			t.Fatal("Bounded returned true for a cleanup that never finished")
+		}
+	case <-time.After(testTimeout):
+		t.Fatal("Bounded did not give up after the grace period")
+	}
+}
+
+func TestBoundedKeepsTheGraceTimerWhenTheContextIsCanceled(t *testing.T) {
+	clk := clock.NewManualClock(0)
+	release := make(chan struct{})
+	defer close(release)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	result := make(chan bool, 1)
+	go func() { result <- Bounded(ctx, clk, time.Second, func() { <-release }) }()
+	clk.AwaitSleepers(1)
+	select {
+	case <-result:
+		t.Fatal("Bounded gave up before the grace period elapsed")
+	case <-time.After(time.Duration(testGraceMs) * time.Millisecond):
+	}
 	clk.Advance(time.Second.Milliseconds())
 	select {
 	case finished := <-result:

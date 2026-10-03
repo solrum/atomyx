@@ -74,17 +74,21 @@ func InterruptExitCode(ctx context.Context) (int, bool) {
 // as measured by clk. When it did not, cleanup keeps running on its
 // own goroutine and the caller is expected to exit the process, which
 // reclaims it.
-func Bounded(clk clock.Clock, grace time.Duration, cleanup func()) bool {
+//
+// The grace timer inherits only the values of ctx, never its
+// cancellation, so cleanup gets its full grace period even when the
+// caller's context is already done.
+func Bounded(ctx context.Context, clk clock.Clock, grace time.Duration, cleanup func()) bool {
 	finished := make(chan struct{})
 	go func() {
 		defer close(finished)
 		cleanup()
 	}()
-	ctx, stopTimer := context.WithCancel(context.Background())
+	timerCtx, stopTimer := context.WithCancel(context.WithoutCancel(ctx))
 	defer stopTimer()
 	expired := make(chan struct{})
 	go func() {
-		if clk.Sleep(ctx, grace.Milliseconds()) == nil {
+		if clk.Sleep(timerCtx, grace.Milliseconds()) == nil {
 			close(expired)
 		}
 	}()
@@ -144,7 +148,7 @@ func HandleStop(clk clock.Clock, sig os.Signal, hooks StopHooks) (disarm func())
 	}
 	return ForceExitAfter(clk, GracePeriod-ForcedCleanupBudget, func() {
 		if hooks.Cleanup != nil {
-			Bounded(clk, ForcedCleanupBudget, hooks.Cleanup)
+			Bounded(context.Background(), clk, ForcedCleanupBudget, hooks.Cleanup)
 		}
 		hooks.Exit(ExitCodeFor(sig))
 	})
