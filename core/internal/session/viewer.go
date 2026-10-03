@@ -44,11 +44,16 @@ const (
 	// sequence number of the oldest line the hub still holds, and every
 	// line before it is lost to that subscriber.
 	ObservedStepGap
+	// ObservedState announces a holder state transition. State, Command
+	// and RunID carry the new state, so a subscriber never has to ask for
+	// it. Every subscriber receives it, in order with the other notices.
+	ObservedState
 )
 
-// Observation announces that a new capture is available. It carries no
-// payload: a subscriber reads the value with Latest, so a slow reader
-// only ever sees the newest capture and never a backlog.
+// Observation announces that a new capture is available. A capture
+// notification carries no payload: a subscriber reads the value with
+// Latest, so a slow reader only ever sees the newest capture and never a
+// backlog. Only ObservedState carries one.
 type Observation struct {
 	Kind  ObservationKind
 	Epoch uint64
@@ -59,6 +64,12 @@ type Observation struct {
 	Revision uint64
 	// Stable is false when a mutating call overlapped the capture.
 	Stable bool
+	// State, Command and RunID describe the holder after an ObservedState
+	// transition and are empty for every other kind. RunID is empty while
+	// no run is open.
+	State   HolderState
+	Command string
+	RunID   string
 }
 
 // Snapshot is the newest capture of each kind, as a viewer may show it.

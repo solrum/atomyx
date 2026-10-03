@@ -27,11 +27,17 @@ const (
 	NoticeStep       = "observe.notice.step"
 	NoticeStepGap    = "observe.notice.stepGap"
 	NoticeClosed     = "observe.notice.closed"
+	NoticeState      = "observe.notice.state"
 )
 
 // FeatureObserve is the feature name of the observe group in the
 // feature list of a hello exchange.
 const FeatureObserve = "observe"
+
+// FeatureObserveState is the feature name of the holder state notice.
+// A holder that advertises it sends observe.notice.state on every
+// subscription, and a viewer that does not know the notice ignores it.
+const FeatureObserveState = "observe.state"
 
 // VersionRange is an inclusive range of major protocol versions.
 type VersionRange struct {
@@ -138,6 +144,15 @@ type ScreenshotNotice struct {
 	Revision uint64 `json:"revision"`
 	Epoch    uint64 `json:"epoch"`
 	CaptureState
+}
+
+// StateNotice announces that the holder moved to State, one of the holder
+// state names Status carries. Command is the holder's command line name
+// and RunID is the open run, absent while none is open.
+type StateNotice struct {
+	State   string `json:"state"`
+	Command string `json:"command"`
+	RunID   string `json:"runId,omitempty"`
 }
 
 // StepLine is one line of a run's step stream. Its JSON is identical to

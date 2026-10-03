@@ -243,3 +243,35 @@ func TestHub_PublishingNeverBlocksOnAStuckSubscriber(t *testing.T) {
 		t.Fatalf("hub kept %d lines after seq 990, want 10", len(lines))
 	}
 }
+
+func TestSession_StateChangesReachASubscriberInOrderWithStepNotices(t *testing.T) {
+	s, _ := openMock(t)
+	feed, err := s.SubscribeSince(context.Background(), "", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s.PublishStep(stepLine(1))
+	if err := s.SetIdle(); err != nil {
+		t.Fatal(err)
+	}
+	s.PublishStep(stepLine(2))
+	if err := s.SetRunning(runA); err != nil {
+		t.Fatal(err)
+	}
+
+	step := nextNotice(t, feed)
+	idle := nextNotice(t, feed)
+	step2 := nextNotice(t, feed)
+	running := nextNotice(t, feed)
+	if step.Kind != session.ObservedStep || step.Revision != 1 || step2.Kind != session.ObservedStep || step2.Revision != 2 {
+		t.Fatalf("step notices = %+v and %+v, want lines 1 and 2", step, step2)
+	}
+	if idle.Kind != session.ObservedState || idle.State != session.StateIdle || idle.RunID != "" || idle.Command != s.Info().Holder.Command {
+		t.Fatalf("second notice = %+v, want the idle state of %q", idle, s.Info().Holder.Command)
+	}
+	if running.Kind != session.ObservedState || running.State != session.StateRunning || running.RunID != runA {
+		t.Fatalf("fourth notice = %+v, want the running state of run %s", running, runA)
+	}
+	requireNoNotice(t, feed)
+}

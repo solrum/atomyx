@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -31,7 +32,7 @@ func observeServer(t *testing.T, h *fakeObserve, cfg ServerConfig) *Server {
 func TestDialCompletesHelloAndCallsReturnData(t *testing.T) {
 	srv := observeServer(t, newFakeObserve(), ServerConfig{})
 	c := dialClient(t, srv, ClientConfig{Client: "test viewer"})
-	if c.Protocol() != 1 || len(c.Features()) != 1 || c.Features()[0] != FeatureObserve {
+	if c.Protocol() != 1 || !slices.Equal(c.Features(), []string{FeatureObserve, FeatureObserveState}) {
 		t.Fatalf("protocol %d features %v", c.Protocol(), c.Features())
 	}
 	var status Status
@@ -409,5 +410,36 @@ func TestResubscribingMarksTheEndOfTheReplacedSubscriptionsNotices(t *testing.T)
 		case <-time.After(testGuard):
 			t.Fatalf("notice %s never arrived", want)
 		}
+	}
+}
+
+func TestInboxKeepsOnlyTheNewestStateNotice(t *testing.T) {
+	in := newNoticeInbox(4)
+	state := func(name string) Frame {
+		f, err := NewNotice(NoticeState, StateNotice{State: name})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return f
+	}
+	step, err := NewNotice(NoticeStep, StepNotice{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	in.push(state("running"))
+	in.push(step)
+	in.push(state("idle"))
+
+	first, _, _ := in.next()
+	second, _, _ := in.next()
+	if first.Type != NoticeStep || second.Type != NoticeState {
+		t.Fatalf("order = %s then %s, want the step then the state", first.Type, second.Type)
+	}
+	var kept StateNotice
+	if err := second.Decode(&kept); err != nil || kept.State != "idle" {
+		t.Fatalf("kept state notice = %+v, %v, want idle", kept, err)
+	}
+	if _, ok, _ := in.next(); ok {
+		t.Fatal("an older state notice was kept")
 	}
 }

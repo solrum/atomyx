@@ -610,13 +610,17 @@ Message groups:
 - `session`: `session.hello`, `session.status`, `session.bye`.
 - `observe`: `observe.subscribe` with `sinceSeq`, then the notices
   `observe.notice.tree`, `observe.notice.screenshot`,
-  `observe.notice.step`, `observe.notice.stepGap` and
-  `observe.notice.closed`. Tree and screenshot notices carry a
+  `observe.notice.step`, `observe.notice.stepGap`,
+  `observe.notice.state` and `observe.notice.closed`. Tree and screenshot notices carry a
   revision, an action epoch and the capture state (`stable`, `paired`,
   `highlightable` and `scale`), so a viewer pulls the image with
   `observe.tree.latest` or `observe.screenshot.latest`. A connection
   holds one subscription, and a new `observe.subscribe` on it ends the
-  previous one.
+  previous one. A state notice carries the holder state, its command and
+  the open run id, and the holder sends one on every state transition,
+  in order with the other notices. A holder that sends it lists the
+  feature `observe.state` in its hello answer, and a viewer that does
+  not know the notice ignores it.
   `observe.tree.fresh` returns a matched tree and screenshot pair.
 - There is no group that drives the device.
 

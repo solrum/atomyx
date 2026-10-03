@@ -75,6 +75,29 @@
   {
     "frame": {
       "data": {
+        "command": "atomyx-mcp",
+        "state": "idle"
+      },
+      "type": "observe.notice.state",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "data": {
+        "command": "atomyx run",
+        "runId": "20261003-101500-smoke",
+        "state": "running"
+      },
+      "type": "observe.notice.state",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "data": {
         "epoch": 3,
         "highlightable": false,
         "paired": false,

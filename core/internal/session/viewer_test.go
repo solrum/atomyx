@@ -5,6 +5,7 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"time"
 
 	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/device"
@@ -198,6 +199,9 @@ func TestSession_CloseEndsSubscriptions(t *testing.T) {
 	if err := s.Close(); err != nil {
 		t.Fatal(err)
 	}
+	if got := <-ch; got.Kind != session.ObservedState || got.State != session.StateClosed {
+		t.Fatalf("a subscription got %+v at Close, want the closed state first", got)
+	}
 	if got := <-ch; got.Kind != session.ObservedClosed {
 		t.Fatalf("a subscription got %+v at Close, want ObservedClosed", got)
 	}
@@ -216,5 +220,30 @@ func TestOpen_RefusesDepsWithoutAFactoryAndHoldsNothing(t *testing.T) {
 	status, err := m.Probe(context.Background(), lease.KeyFor("android", "A"))
 	if err != nil || status.Held {
 		t.Fatalf("Probe() = %+v, %v, want the device free", status, err)
+	}
+}
+
+func TestSession_ALostDeviceIsAnnouncedAsAStateTransition(t *testing.T) {
+	lost := make(chan error, 1)
+	s, err := session.Open(context.Background(), session.Deps{Factory: lostMockFactory{lost: lost}}, session.Request{Descriptor: androidDesc("A")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	feed, err := s.Subscribe(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lost <- &device.ProcessExitError{Component: device.LostRunner, Cause: errors.New("signal: killed")}
+	<-s.Lost()
+
+	select {
+	case got := <-feed:
+		if got.Kind != session.ObservedState || got.State != session.StateLost {
+			t.Fatalf("a subscription got %+v after the loss, want the lost state", got)
+		}
+	case <-time.After(remoteGuard):
+		t.Fatalf("no lost state within %s", remoteGuard)
 	}
 }

@@ -155,6 +155,7 @@ func (s *Session) markLost(err error) {
 		s.mu.Unlock()
 		s.deps.Logger.Warn("lost the device", logging.LogContext{"id": s.desc.ID, "error": err.Error()})
 		close(s.lost)
+		s.publishState(StateLost, s.Info().Holder.RunID)
 		go s.stopAttach()
 	})
 }
@@ -192,10 +193,12 @@ func (s *Session) liveLaunchState() LaunchState {
 // runID means no run is open.
 func (s *Session) SetRunning(runID string) error {
 	s.setActivity(StateRunning)
-	return s.updateHolder(func(h *lease.Holder) {
+	err := s.updateHolder(func(h *lease.Holder) {
 		h.IdleSince = nil
 		h.RunID = runID
 	})
+	s.publishState(StateRunning, runID)
+	return err
 }
 
 // SetIdle marks the holder as idle at the current time, in the state
@@ -203,10 +206,18 @@ func (s *Session) SetRunning(runID string) error {
 func (s *Session) SetIdle() error {
 	s.setActivity(StateIdle)
 	now := time.UnixMilli(s.deps.Clock.NowMs()).UTC()
-	return s.updateHolder(func(h *lease.Holder) {
+	err := s.updateHolder(func(h *lease.Holder) {
 		h.IdleSince = &now
 		h.RunID = ""
 	})
+	s.publishState(StateIdle, "")
+	return err
+}
+
+// publishState tells the viewers of the session that the holder moved to
+// state.
+func (s *Session) publishState(state HolderState, runID string) {
+	s.hub.PublishState(state, s.Info().Holder.Command, runID)
 }
 
 // persistActivity writes the session's current activity to the lease
@@ -284,6 +295,7 @@ func (s *Session) Close() error {
 		if !finished && !errors.Is(disconnectErr, ErrDisconnectTimeout) {
 			disconnectErr = errors.Join(disconnectErr, ErrAttachStopTimeout)
 		}
+		s.publishState(StateClosed, "")
 		s.hub.Close()
 		var releaseErr error
 		if s.lease != nil {

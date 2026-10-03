@@ -202,8 +202,8 @@ func (c *Client) Protocol() int { return c.hello.Protocol }
 func (c *Client) Features() []string { return c.hello.Features }
 
 // Notices delivers the notices a subscription starts, in the order they
-// arrived. A consumer that falls behind sees only the newest tree notice
-// and the newest screenshot notice, and step notices past the buffer are
+// arrived. A consumer that falls behind sees only the newest tree notice,
+// the newest screenshot notice and the newest state notice, and step notices past the buffer are
 // replaced by one NoticeStepsDropped marker. The channel closes after the
 // connection ends and the notices already held are delivered. Reading it
 // is never required for calls to complete.

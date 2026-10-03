@@ -53,6 +53,8 @@ func attachDataShape(messageType string) any {
 		return &attach.StepNotice{}
 	case attach.NoticeStepGap:
 		return &attach.StepGapNotice{}
+	case attach.NoticeState:
+		return &attach.StateNotice{}
 	default:
 		return nil
 	}
@@ -163,5 +165,31 @@ func TestAttachCaptureStateFieldsMatchTheFreshResultPairingFields(t *testing.T) 
 		if stateFields[key] != freshFields[key] {
 			t.Fatalf("%s = %v in a capture state and %v in a fresh result", key, stateFields[key], freshFields[key])
 		}
+	}
+}
+
+func TestAttachStateNoticeNamesMatchTheStatusHolderFields(t *testing.T) {
+	notice, err := json.Marshal(attach.StateNotice{State: "running", Command: "atomyx run", RunID: "r"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	holder, err := json.Marshal(attach.HolderInfo{PID: 1, Command: "atomyx run", RunID: "r"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var noticeFields, holderFields map[string]any
+	if err := json.Unmarshal(notice, &noticeFields); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(holder, &holderFields); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"command", "runId"} {
+		if noticeFields[key] != holderFields[key] {
+			t.Fatalf("%s = %v in a state notice and %v in the status holder", key, noticeFields[key], holderFields[key])
+		}
+	}
+	if len(noticeFields) != 3 {
+		t.Fatalf("state notice fields = %v, want state, command and runId", noticeFields)
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"dev.atomyx/internal/attach"
 	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/session"
@@ -534,5 +535,76 @@ func TestRemoteHandle_AWaiterGivesUpWhenItsContextEndsWhileAnotherPullIsInFlight
 		}
 	case <-time.After(remoteGuard):
 		t.Fatal("a canceled caller stayed parked behind the pull in flight")
+	}
+}
+
+func TestRemoteHandle_FollowsTheHoldersStateInOrderWithItsSteps(t *testing.T) {
+	s, _, path := socketHolder(t)
+	h := dialRemote(t, path)
+	feed, err := h.SubscribeSince(context.Background(), "", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	next := func() session.Observation {
+		t.Helper()
+		select {
+		case o, open := <-feed:
+			if !open {
+				t.Fatal("feed closed, want an observation")
+			}
+			return o
+		case <-time.After(remoteGuard):
+			t.Fatalf("no observation within %s", remoteGuard)
+			return session.Observation{}
+		}
+	}
+
+	s.PublishStep(stepLine(1))
+	if o := next(); o.Kind != session.ObservedStep || o.Revision != 1 {
+		t.Fatalf("first observation = %+v, want step 1", o)
+	}
+	if err := s.SetIdle(); err != nil {
+		t.Fatal(err)
+	}
+	if o := next(); o.Kind != session.ObservedState || o.State != session.StateIdle || o.RunID != "" || o.Command != "atomyx run" {
+		t.Fatalf("second observation = %+v, want the idle state of atomyx run", o)
+	}
+	s.PublishStep(stepLine(2))
+	if o := next(); o.Kind != session.ObservedStep || o.Revision != 2 {
+		t.Fatalf("third observation = %+v, want step 2", o)
+	}
+	if err := s.SetRunning(runA); err != nil {
+		t.Fatal(err)
+	}
+	if o := next(); o.Kind != session.ObservedState || o.State != session.StateRunning || o.RunID != runA {
+		t.Fatalf("fourth observation = %+v, want the running state of run %s", o, runA)
+	}
+	if info := h.Info(); info.State != session.StateRunning || info.Holder.RunID != runA {
+		t.Fatalf("Info() = %+v, want the running holder with run %s", info, runA)
+	}
+}
+
+func TestRemoteHandle_TheStateNoticeRefreshesInfoWithoutAskingTheHolder(t *testing.T) {
+	released := make(chan struct{})
+	path, _ := serveScript(t, func(h *scriptedHolder) {
+		h.prime(7, 1000)
+		<-released
+		h.notice(attach.NoticeState, attach.StateNotice{State: "idle", Command: "atomyx-mcp"})
+	})
+	h := dialRemote(t, path)
+	feed, err := h.Subscribe(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	close(released)
+
+	o := awaitObservation(t, feed, session.ObservedState, 0)
+
+	if o.State != session.StateIdle || o.Command != "atomyx-mcp" {
+		t.Fatalf("observation = %+v, want the idle state of atomyx-mcp", o)
+	}
+	_ = h.Close()
+	if info := h.Info(); info.Holder.Command != "atomyx-mcp" {
+		t.Fatalf("Info().Holder.Command = %q after the notice, want atomyx-mcp", info.Holder.Command)
 	}
 }

@@ -49,6 +49,11 @@ func (h *RemoteHandle) consume(ctx context.Context, client *attach.Client, stale
 			h.syncTree(ctx)
 		case attach.NoticeScreenshot:
 			h.syncScreenshot(ctx)
+		case attach.NoticeState:
+			var n attach.StateNotice
+			if f.Decode(&n) == nil {
+				h.storeState(n)
+			}
 		case attach.NoticeStep:
 			var n attach.StepNotice
 			if f.Decode(&n) == nil {
@@ -209,4 +214,15 @@ func (h *RemoteHandle) storeGap(n attach.StepGapNotice) {
 	defer h.mu.Unlock()
 	h.store.forgetSteps()
 	h.fanout.notifyLocked(Observation{Kind: ObservedStepGap, Revision: uint64(n.OldestSeq), Stable: true})
+}
+
+// storeState adopts the holder state of n into the handle's Info and
+// passes it on to the subscribers.
+func (h *RemoteHandle) storeState(n attach.StateNotice) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.info.State = HolderState(n.State)
+	h.info.Holder.Command = n.Command
+	h.info.Holder.RunID = n.RunID
+	h.fanout.notifyLocked(Observation{Kind: ObservedState, Stable: true, State: HolderState(n.State), Command: n.Command, RunID: n.RunID})
 }

@@ -102,6 +102,15 @@ func (h *Hub) ObserveScreenSize(size wire.Size, epoch uint64, stable bool) {
 	h.fanout.notifyLocked(Observation{Kind: ObservedScreenSize, Epoch: epoch, Revision: h.sizeSeq, Stable: stable})
 }
 
+// PublishState tells every subscriber that the holder moved to state. It
+// never blocks on a subscriber, and one that is too far behind is dropped
+// like any other.
+func (h *Hub) PublishState(state HolderState, command, runID string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.fanout.notifyLocked(Observation{Kind: ObservedState, Stable: true, State: state, Command: command, RunID: runID})
+}
+
 // Latest returns the newest captures. The masked copy of a tree is made
 // once, on the first read after the tree was stored, and shared by every
 // later read of that tree.

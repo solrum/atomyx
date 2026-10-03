@@ -2,6 +2,7 @@ package attach
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -113,8 +114,8 @@ func TestObserveRequestsReturnTheHandlerData(t *testing.T) {
 	client := dialRaw(t, srv.Path())
 
 	var hello HelloResult
-	if err := client.hello().Decode(&hello); err != nil || len(hello.Features) != 1 || hello.Features[0] != FeatureObserve {
-		t.Fatalf("features = %v, %v, want [observe]", hello.Features, err)
+	if err := client.hello().Decode(&hello); err != nil || !slices.Equal(hello.Features, []string{FeatureObserve, FeatureObserveState}) {
+		t.Fatalf("features = %v, %v, want [observe observe.state]", hello.Features, err)
 	}
 	var tree TreeResult
 	if err := client.call(TypeTreeLatest, nil).Decode(&tree); err != nil || tree.Revision != 4 {

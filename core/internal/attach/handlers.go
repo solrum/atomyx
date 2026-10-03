@@ -66,7 +66,7 @@ type Handlers struct {
 func (h Handlers) features() []string {
 	features := []string{}
 	if h.Observe != nil {
-		features = append(features, FeatureObserve)
+		features = append(features, FeatureObserve, FeatureObserveState)
 	}
 	return features
 }

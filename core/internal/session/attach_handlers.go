@@ -132,7 +132,8 @@ type stepCursor struct {
 
 // relay turns hub observations into notices until the subscription ends.
 // Capture observations carry no payload, so each becomes a notice with
-// its revision, epoch and capture state. A step observation is read from the hub
+// its revision, epoch and capture state. A state observation becomes a
+// state notice with the holder state it carries. A step observation is read from the hub
 // ring, so a burst of lines costs one read.
 func (h *attachHandlers) relay(ctx context.Context, observations <-chan Observation, notices chan<- attach.Notice, cursor stepCursor) {
 	defer close(notices)
@@ -153,6 +154,10 @@ func (h *attachHandlers) relay(ctx context.Context, observations <-chan Observat
 			}
 		case ObservedScreenshot:
 			if !send(attach.Notice{Type: attach.NoticeScreenshot, Data: attach.ScreenshotNotice{Revision: o.Revision, Epoch: o.Epoch, CaptureState: h.noticeState(o)}}) {
+				return
+			}
+		case ObservedState:
+			if !send(attach.Notice{Type: attach.NoticeState, Data: attach.StateNotice{State: string(o.State), Command: o.Command, RunID: o.RunID}}) {
 				return
 			}
 		case ObservedStepGap:

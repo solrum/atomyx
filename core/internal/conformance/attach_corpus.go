@@ -99,7 +99,7 @@ func attachHandshakeTranscript() (AttachTranscript, error) {
 		Client:   "atomyx inspect",
 		Features: []string{attach.FeatureObserve},
 	})
-	b.response(1, attach.TypeHello, attach.HelloResult{Protocol: 1, Features: []string{attach.FeatureObserve}})
+	b.response(1, attach.TypeHello, attach.HelloResult{Protocol: 1, Features: []string{attach.FeatureObserve, attach.FeatureObserveState}})
 	b.request(2, attach.TypeStatus, nil)
 	b.response(2, attach.TypeStatus, attach.Status{
 		State:      "idle",
@@ -123,6 +123,8 @@ func attachObserveTranscript() (AttachTranscript, error) {
 		SchemaVersion: 1, RunID: "20261003-101500-smoke", Seq: 5, StepIndex: 1, Command: "assertExists", Phase: "completed",
 		Ok: true, DurationMs: 12, Detail: &detail, Artifacts: []string{},
 	}})
+	b.notice(attach.NoticeState, attach.StateNotice{State: "idle", Command: "atomyx-mcp"})
+	b.notice(attach.NoticeState, attach.StateNotice{State: "running", Command: "atomyx run", RunID: "20261003-101500-smoke"})
 	b.notice(attach.NoticeTree, attach.TreeNotice{Revision: 5, Epoch: 3, CaptureState: attach.CaptureState{Stable: false, Scale: 2.5}})
 	b.notice(attach.NoticeStepGap, attach.StepGapNotice{OldestSeq: 40})
 	b.request(2, attach.TypeTreeLatest, nil)
@@ -149,7 +151,7 @@ func attachErrorsTranscript() (AttachTranscript, error) {
 	b.request(1, attach.TypeHello, attach.Hello{Protocol: attach.VersionRange{Min: 2, Max: 3}, Client: "future viewer", Features: []string{}})
 	b.failure(1, attach.TypeHello, diag.NewUnsupportedVersion(2, 3, 1, 1))
 	b.request(2, attach.TypeHello, attach.Hello{Protocol: attach.VersionRange{Min: 1, Max: 1}, Client: "atomyx inspect", Features: []string{}})
-	b.response(2, attach.TypeHello, attach.HelloResult{Protocol: 1, Features: []string{attach.FeatureObserve}})
+	b.response(2, attach.TypeHello, attach.HelloResult{Protocol: 1, Features: []string{attach.FeatureObserve, attach.FeatureObserveState}})
 	b.request(3, "control.borrow", nil)
 	b.failure(3, "control.borrow", diag.NewUnsupported("control.borrow"))
 	b.request(4, attach.TypeTreeFresh, nil)

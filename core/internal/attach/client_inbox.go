@@ -3,8 +3,8 @@ package attach
 import "sync"
 
 // noticeInbox holds the notices a client has read and not yet delivered.
-// It keeps arrival order, keeps only the newest tree notice and the newest
-// screenshot notice, and bounds the step notices.
+// It keeps arrival order, keeps only the newest tree, screenshot and state
+// notice, and bounds the step notices.
 type noticeInbox struct {
 	maxSteps int
 	// wake carries one pending signal that the inbox changed.
@@ -27,7 +27,7 @@ func newNoticeInbox(maxSteps int) *noticeInbox {
 func (b *noticeInbox) push(f Frame) {
 	b.mu.Lock()
 	switch f.Type {
-	case NoticeTree, NoticeScreenshot:
+	case NoticeTree, NoticeScreenshot, NoticeState:
 		b.removeType(f.Type)
 		b.queue = append(b.queue, f)
 	case NoticeStep:

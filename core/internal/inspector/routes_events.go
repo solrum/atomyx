@@ -104,6 +104,9 @@ func eventsHandler(c session.Viewer) http.Handler {
 				if !open {
 					return
 				}
+				if obs.Kind == session.ObservedState {
+					continue
+				}
 				if followsSteps && (obs.Kind == session.ObservedStep || obs.Kind == session.ObservedStepGap) {
 					if cursor.write(enc, steps, obs) != nil || flusher.Flush() != nil {
 						return

@@ -21,7 +21,8 @@
     "frame": {
       "data": {
         "features": [
-          "observe"
+          "observe",
+          "observe.state"
         ],
         "protocol": 1
       },
