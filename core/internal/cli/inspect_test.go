@@ -13,8 +13,10 @@ import (
 	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/diag"
+	mockdriver "dev.atomyx/internal/driver/mock"
 	"dev.atomyx/internal/lease"
 	"dev.atomyx/internal/shutdown"
+	"dev.atomyx/internal/wire"
 )
 
 const inspectIdleMs = 1_000
@@ -89,6 +91,7 @@ func startInspect(t *testing.T, manager *lease.Manager, flags map[string]FlagVal
 	t.Helper()
 	run := &inspectRun{stdout: newLineSink(), stderr: newLineSink(), browser: &fakeBrowser{}, clk: clock.NewManualClock(1), manager: manager, exit: make(chan int, 1)}
 	run.deps = leaseDeps(t, manager, nil, nil)
+	run.deps.Factory = singleMockDriverFactory{driver: mockdriver.New().StageHierarchy(wire.TreeNodeWire{Attributes: map[string]string{"id": "root"}})}
 	run.deps.Stdout, run.deps.Stderr = run.stdout, run.stderr
 	run.deps.Browser, run.deps.Stdin, run.deps.Clock = run.browser, stdin, run.clk
 	run.deps.Timeouts.McpIdleMs = inspectIdleMs
@@ -273,5 +276,23 @@ func TestInspect_AnUnknownPlatformIsAUsageError(t *testing.T) {
 	run := startInspect(t, newLeaseManager(t), map[string]FlagValue{"--platform": "windows"}, nil)
 	if code := <-run.exit; code != 2 {
 		t.Fatalf("exit = %d, want 2", code)
+	}
+}
+
+func TestInspect_TheLeaseHolderReadsIdleAfterOpenAndAfterAnOperatorAction(t *testing.T) {
+	run := startInspect(t, newLeaseManager(t), heldDevice, nil)
+	client := connectClient(t, run.stdout.awaitLine(t, "http://"))
+	run.clk.AwaitSleepers(1)
+
+	err := run.otherProcessOpens(t)
+	if err == nil || !strings.Contains(err.Error(), "idle") {
+		t.Fatalf("after open: error = %v, want a holder reported idle", err)
+	}
+	if status := client.send(t, http.MethodPost, "/api/v1/tree/fresh", "", nil); status != http.StatusOK {
+		t.Fatalf("fresh = %d", status)
+	}
+	err = run.otherProcessOpens(t)
+	if err == nil || !strings.Contains(err.Error(), "idle") {
+		t.Fatalf("after an operator action: error = %v, want a holder reported idle", err)
 	}
 }

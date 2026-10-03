@@ -22,6 +22,10 @@ type stubController struct {
 	freshErr   error
 	freshCalls int
 	latestRead int
+	// holder is the lease state the host last recorded, empty until it
+	// records one. duringFresh runs inside FreshTree.
+	holder      string
+	duringFresh func()
 }
 
 func (c *stubController) Info() session.Info { return c.info }
@@ -40,7 +44,33 @@ func (c *stubController) Subscribe(context.Context) (<-chan session.Observation,
 	return c.feed, nil
 }
 
+func (c *stubController) SetIdle() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.holder = "idle"
+	return nil
+}
+
+func (c *stubController) SetRunning(string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.holder = "running"
+	return nil
+}
+
+func (c *stubController) holderState() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.holder
+}
+
 func (c *stubController) FreshTree(context.Context) (session.Snapshot, error) {
+	c.mu.Lock()
+	during := c.duringFresh
+	c.mu.Unlock()
+	if during != nil {
+		during()
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.freshCalls++

@@ -263,3 +263,37 @@ func TestNewHost_RequiresItsDependencies(t *testing.T) {
 		t.Fatal("an empty config built a host")
 	}
 }
+
+func TestHost_TheHolderIsIdleAfterOpenAndRunningOnlyDuringAFreshCapture(t *testing.T) {
+	h := newHostHarness(t)
+	if got := h.first.holderState(); got != "idle" {
+		t.Fatalf("holder after open = %q, want idle", got)
+	}
+	var during string
+	h.first.duringFresh = func() { during = h.first.holderState() }
+	if rec := h.post(routeTreeFresh, ""); rec.Code != http.StatusOK {
+		t.Fatalf("fresh = %d, body %s", rec.Code, rec.Body)
+	}
+	if during != "running" {
+		t.Errorf("holder during the capture = %q, want running", during)
+	}
+	if got := h.first.holderState(); got != "idle" {
+		t.Errorf("holder after the capture = %q, want idle", got)
+	}
+}
+
+func TestHost_TheHolderIsIdleAfterAReconnect(t *testing.T) {
+	h := newHostHarness(t)
+	h.clk.Advance(testIdleMs)
+	<-h.first.closed
+	if err := h.host.Reconnect(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	current, ok := h.host.held()
+	if !ok {
+		t.Fatal("the device is not held after the reconnect")
+	}
+	if got := current.(*fakeHeld).holderState(); got != "idle" {
+		t.Fatalf("holder after reconnect = %q, want idle", got)
+	}
+}

@@ -21,6 +21,12 @@ var ErrReleased = errors.New("inspector: the device is released")
 // that gives the device back. A *session.Session is one.
 type Held interface {
 	session.Controller
+	// SetIdle marks the holder idle in the lease metadata, so another
+	// process that finds the device held can see it may be borrowed.
+	SetIdle() error
+	// SetRunning marks the holder as driving the device in the lease
+	// metadata. An empty runID means no run is open.
+	SetRunning(runID string) error
 	Close() error
 }
 
@@ -66,6 +72,7 @@ type Host struct {
 
 	mu        sync.Mutex
 	current   Held
+	driving   int
 	last      session.Info
 	touchedMs int64
 	stopIdle  context.CancelFunc
@@ -87,12 +94,14 @@ func NewHost(cfg HostConfig) (*Host, error) {
 	h.mu.Lock()
 	h.adoptLocked(cfg.Held)
 	h.mu.Unlock()
+	h.markIdle(cfg.Held)
 	return h, nil
 }
 
 // adoptLocked makes held the current device and starts its idle timer.
 func (h *Host) adoptLocked(held Held) {
 	h.current = held
+	h.driving = 0
 	h.last = held.Info()
 	h.touchedMs = h.clk.NowMs()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -136,7 +145,44 @@ func (h *Host) idleLoop(ctx context.Context, held Held) {
 	}
 }
 
+// markIdle records the holder as idle. A failure only costs the
+// metadata, never the operator's action, so it is logged and dropped.
+func (h *Host) markIdle(held Held) {
+	if err := held.SetIdle(); err != nil {
+		h.logger.Warn("inspector.holder.mark_idle_failed", logging.LogContext{"error": err.Error()})
+	}
+}
+
+// beginDriving marks the holder running while at least one operator
+// action that drives the device is in flight, and returns the call that
+// ends the action. The holder returns to idle when the last in-flight
+// action ends, unless a release or a reconnect replaced the device.
+func (h *Host) beginDriving(held Held) func() {
+	h.mu.Lock()
+	h.driving++
+	first := h.driving == 1
+	h.mu.Unlock()
+	if first {
+		if err := held.SetRunning(""); err != nil {
+			h.logger.Warn("inspector.holder.mark_running_failed", logging.LogContext{"error": err.Error()})
+		}
+	}
+	return func() {
+		h.mu.Lock()
+		last := false
+		if h.current == held {
+			h.driving--
+			last = h.driving == 0
+		}
+		h.mu.Unlock()
+		if last {
+			h.markIdle(held)
+		}
+	}
+}
+
 func (h *Host) touch() {
+
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.current != nil {
@@ -188,6 +234,7 @@ func (h *Host) FreshTree(ctx context.Context) (session.Snapshot, error) {
 	if !ok {
 		return session.Snapshot{}, ErrReleased
 	}
+	defer h.beginDriving(held)()
 	return held.FreshTree(ctx)
 }
 
@@ -213,6 +260,7 @@ func (h *Host) Reconnect(ctx context.Context) error {
 	h.mu.Lock()
 	h.adoptLocked(held) //nolint:contextcheck // the idle timer outlives the request that reconnected
 	h.mu.Unlock()
+	h.markIdle(held)
 	h.logger.Info("inspector.reconnected", nil)
 	return nil
 }
