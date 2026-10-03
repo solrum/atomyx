@@ -7,7 +7,7 @@ import { createEventStream } from './events.js';
 import { createHighlight } from './highlight.js';
 import { createPropertiesPanel } from './properties-panel.js';
 import { refreshScreenshot } from './screenshot.js';
-import { refreshBlocked, refreshSession } from './session-header.js';
+import { applyState, refreshBlocked, refreshSession } from './session-header.js';
 import { createStepsPanel } from './steps-panel.js';
 import { createSuggestionsPanel } from './suggestions-panel.js';
 import { createTesterPanel } from './tester-panel.js';
@@ -17,9 +17,10 @@ import { createTreeView } from './tree-view.js';
 
 const HOLDER_BUSY_CODE = 'HOLDER_BUSY';
 const EMPTY_CODES = new Set(['NO_TREE', 'NO_SCREENSHOT']);
-// How often the page reads the holder state, which changes without a
-// capture event when a run ends or a call finishes.
-const SESSION_POLL_MS = 3000;
+// How often the page reads the session as a backstop. The server pushes
+// every holder state transition on the events feed, so this only repairs
+// what a missed notice left behind.
+const SESSION_BACKSTOP_MS = 30_000;
 
 const byId = (id) => document.getElementById(id);
 
@@ -172,6 +173,7 @@ async function start() {
     onScreenshot: loadScreenshot,
     onStep: steps.add,
     onStepGap: steps.gap,
+    onState: applyState,
     onReleased: (code) => {
       released(unavailableText(code));
       loadSession();
@@ -180,7 +182,7 @@ async function start() {
   });
   await loadSession();
   events.start();
-  setInterval(loadSession, SESSION_POLL_MS);
+  setInterval(loadSession, SESSION_BACKSTOP_MS);
 }
 
 hideReleased();
