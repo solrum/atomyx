@@ -6,6 +6,7 @@
     "durationMs": 0,
     "ok": false,
     "phase": "started",
+    "runId": "20261002-070309-corpus-run-abcd",
     "schemaVersion": 1,
     "seq": 1,
     "stepIndex": 0
@@ -17,6 +18,7 @@
     "durationMs": 12,
     "ok": true,
     "phase": "completed",
+    "runId": "20261002-070309-corpus-run-abcd",
     "schemaVersion": 1,
     "seq": 2,
     "stepIndex": 0
@@ -30,6 +32,7 @@
     "durationMs": 40,
     "ok": true,
     "phase": "completed",
+    "runId": "20261002-070309-corpus-run-abcd",
     "schemaVersion": 1,
     "seq": 3,
     "stepIndex": 1

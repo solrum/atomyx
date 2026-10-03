@@ -27,7 +27,7 @@ func (c *conn) subscribe(h ObserveHandler, f Frame) bool {
 	if err := f.Decode(&request); err != nil {
 		return c.fail(f, invalidFrame(err.Error()))
 	}
-	notices, err := h.Subscribe(c.ctx, request.SinceSeq)
+	notices, err := h.Subscribe(c.ctx, request.RunID, request.SinceSeq)
 	if err != nil {
 		return c.fail(f, err)
 	}

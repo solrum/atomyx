@@ -33,6 +33,11 @@ const (
 // a caller must not put any in it.
 type StepLine struct {
 	SchemaVersion int `json:"schemaVersion"`
+	// RunID is the id of the run folder the line belongs to. AppendStep
+	// assigns it, and a value the caller sets is overwritten. Sequence
+	// numbers restart with every run, so a reader that follows lines
+	// across runs tells them apart by RunID.
+	RunID string `json:"runId"`
 	// Seq numbers the lines of one run from 1 in the order they were
 	// appended. AppendStep assigns it, and a value the caller sets is
 	// overwritten.
@@ -49,8 +54,8 @@ type StepLine struct {
 	Artifacts []string `json:"artifacts"`
 }
 
-// AppendStep stamps line with the schema version and the next sequence
-// number, appends it to steps.jsonl, and returns the stamped line with
+// AppendStep stamps line with the schema version, the run id and the next
+// sequence number, appends it to steps.jsonl, and returns the stamped line with
 // true. The sequence number advances only for a line that was written.
 // Once the file would pass MaxStepsBytes, the line is dropped, one
 // truncation marker line is written, and every later call drops its line.
@@ -65,6 +70,7 @@ func (w *Writer) AppendStep(line StepLine) (StepLine, bool, error) {
 		return StepLine{}, false, err
 	}
 	line.SchemaVersion = StepLineSchemaVersion
+	line.RunID = w.meta.RunID
 	line.Seq = w.stepSeq + 1
 	if line.Artifacts == nil {
 		line.Artifacts = []string{}

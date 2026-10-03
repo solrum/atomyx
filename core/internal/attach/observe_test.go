@@ -15,6 +15,7 @@ type fakeSession struct{ status Status }
 func (f fakeSession) Status() Status { return f.status }
 
 type subscription struct {
+	runID   string
 	since   int64
 	ctx     context.Context
 	notices chan Notice
@@ -51,8 +52,8 @@ func (f *fakeObserve) TreeFresh(ctx context.Context) (FreshResult, error) {
 	return f.fresh, f.freshErr
 }
 
-func (f *fakeObserve) Subscribe(ctx context.Context, since int64) (<-chan Notice, error) {
-	s := subscription{since: since, ctx: ctx, notices: make(chan Notice)}
+func (f *fakeObserve) Subscribe(ctx context.Context, runID string, since int64) (<-chan Notice, error) {
+	s := subscription{runID: runID, since: since, ctx: ctx, notices: make(chan Notice)}
 	f.subs <- s
 	return s.notices, nil
 }
@@ -68,10 +69,10 @@ func (f *fakeObserve) nextSubscription(t *testing.T) subscription {
 	}
 }
 
-func subscribed(t *testing.T, client *rawClient, h *fakeObserve, since int64) subscription {
+func subscribed(t *testing.T, client *rawClient, h *fakeObserve, runID string, since int64) subscription {
 	t.Helper()
 	client.hello()
-	if ok := client.call(TypeSubscribe, Subscribe{SinceSeq: since}).Ok; ok == nil || !*ok {
+	if ok := client.call(TypeSubscribe, Subscribe{RunID: runID, SinceSeq: since}).Ok; ok == nil || !*ok {
 		t.Fatal("subscribe was refused")
 	}
 	return h.nextSubscription(t)
@@ -144,9 +145,9 @@ func TestSubscribeAcknowledgesThenPushesNoticesInOrder(t *testing.T) {
 	h := newFakeObserve()
 	srv := startServer(t, ServerConfig{Handlers: Handlers{Observe: h}}, nil)
 	client := dialRaw(t, srv.Path())
-	sub := subscribed(t, client, h, 41)
-	if sub.since != 41 {
-		t.Fatalf("handler got sinceSeq %d, want 41", sub.since)
+	sub := subscribed(t, client, h, "run-7", 41)
+	if sub.runID != "run-7" || sub.since != 41 {
+		t.Fatalf("handler got run %q sinceSeq %d, want run-7 and 41", sub.runID, sub.since)
 	}
 
 	sub.notices <- Notice{Type: NoticeTree, Data: TreeNotice{Revision: 1, Epoch: 1}}
@@ -169,7 +170,7 @@ func TestSlowReaderIsDisconnectedAndOthersKeepBeingServed(t *testing.T) {
 		WriteTimeout: time.Hour,
 	}, nil)
 	slow := dialRaw(t, srv.Path())
-	sub := subscribed(t, slow, h, 0)
+	sub := subscribed(t, slow, h, "", 0)
 	other := dialRaw(t, srv.Path())
 	other.hello()
 
@@ -207,7 +208,7 @@ func TestWriteDeadlineDisconnectsAViewerWhoseWriteFails(t *testing.T) {
 	h := newFakeObserve()
 	srv := startServer(t, ServerConfig{Handlers: Handlers{Observe: h}}, now)
 	client := dialRaw(t, srv.Path())
-	sub := subscribed(t, client, h, 0)
+	sub := subscribed(t, client, h, "", 0)
 
 	stale.Store(true)
 	select {
@@ -243,7 +244,7 @@ func TestOversizedResponseFailsAndTheConnectionStaysOpen(t *testing.T) {
 func TestCloseCancelsSubscriptions(t *testing.T) {
 	h := newFakeObserve()
 	srv := startServer(t, ServerConfig{Handlers: Handlers{Observe: h}}, nil)
-	sub := subscribed(t, dialRaw(t, srv.Path()), h, 0)
+	sub := subscribed(t, dialRaw(t, srv.Path()), h, "", 0)
 	if err := srv.Close(); err != nil {
 		t.Fatal(err)
 	}

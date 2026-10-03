@@ -180,20 +180,31 @@ func (h *Hub) Subscribe(ctx context.Context) (<-chan Observation, error) {
 	return h.subscribe(ctx, nil)
 }
 
-// subscribe registers a subscriber. A non-nil sinceSeq makes it a step
+// stepResume names the last step line a step subscriber read.
+type stepResume struct {
+	runID    string
+	sinceSeq int64
+}
+
+// subscribe registers a subscriber. A non-nil resume makes it a step
 // subscriber, and its resume notices are queued before any live one.
-func (h *Hub) subscribe(ctx context.Context, sinceSeq *int64) (<-chan Observation, error) {
+func (h *Hub) subscribe(ctx context.Context, resume *stepResume) (<-chan Observation, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	sub := &subscriber{ch: make(chan Observation, subscriberBuffer+1), done: make(chan struct{}), steps: sinceSeq != nil}
+	sub := &subscriber{ch: make(chan Observation, subscriberBuffer+1), done: make(chan struct{}), steps: resume != nil}
 	h.mu.Lock()
 	if h.closed {
 		h.mu.Unlock()
 		return nil, ErrHubClosed
 	}
-	if sinceSeq != nil {
-		for _, o := range h.steps.resumeLocked(*sinceSeq) {
+	if resume != nil {
+		notices, err := h.steps.resumeLocked(resume.runID, resume.sinceSeq)
+		if err != nil {
+			h.mu.Unlock()
+			return nil, err
+		}
+		for _, o := range notices {
 			sub.ch <- o
 		}
 	}

@@ -37,8 +37,8 @@ func TestRunScriptPublishesItsStepLinesToTheHeldSession(t *testing.T) {
 	server.session.mu.Lock()
 	held := server.session.sess
 	server.session.mu.Unlock()
-	lines, gap := held.StepsSince(0)
-	if gap || len(lines) != 2 || lines[0].Seq != 1 || lines[1].Seq != 2 || lines[1].Command != "screenshot" {
+	lines, gap, err := held.StepsSince("", 0)
+	if err != nil || gap || len(lines) != 2 || lines[0].Seq != 1 || lines[1].Seq != 2 || lines[1].Command != "screenshot" {
 		t.Fatalf("held session lines = %+v gap %v, want the two stamped lines of the script", lines, gap)
 	}
 }
@@ -55,7 +55,7 @@ func TestRunScriptInAnOpenRunPublishesItsStepLinesToTheHeldSession(t *testing.T)
 	server.session.mu.Lock()
 	held := server.session.sess
 	server.session.mu.Unlock()
-	if lines, _ := held.StepsSince(0); len(lines) != 2 {
+	if lines, _, _ := held.StepsSince("", 0); len(lines) != 2 {
 		t.Fatalf("held session has %d lines, want 2", len(lines))
 	}
 }

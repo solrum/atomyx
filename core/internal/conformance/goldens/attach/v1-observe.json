@@ -2,7 +2,8 @@
   {
     "frame": {
       "data": {
-        "sinceSeq": 0
+        "runId": "20261003-101500-smoke",
+        "sinceSeq": 4
       },
       "id": 1,
       "type": "observe.subscribe",
@@ -52,6 +53,7 @@
           "durationMs": 12,
           "ok": true,
           "phase": "completed",
+          "runId": "20261003-101500-smoke",
           "schemaVersion": 1,
           "seq": 5,
           "stepIndex": 1

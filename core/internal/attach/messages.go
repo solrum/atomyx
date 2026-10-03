@@ -94,11 +94,16 @@ type Status struct {
 }
 
 // Subscribe is the data of observe.subscribe. A viewer that resumes sends
-// the sequence number of the last step line it read, and the holder
-// replays the lines it still holds above it. Zero starts from the lines
-// the holder holds now.
+// the run id and the sequence number of the last step line it read, and
+// the holder replays the lines it still holds above it. Sequence numbers
+// restart with every run, so a RunID that is empty or is not the run the
+// holder is on replays every held line of the current run. A SinceSeq
+// beyond the newest line of the same run is refused with
+// diag.CodeInvalidArgument. Zero with no RunID starts from the lines the
+// holder holds now.
 type Subscribe struct {
-	SinceSeq int64 `json:"sinceSeq"`
+	RunID    string `json:"runId,omitempty"`
+	SinceSeq int64  `json:"sinceSeq"`
 }
 
 // TreeNotice announces a new tree. The viewer reads it with
@@ -119,6 +124,7 @@ type ScreenshotNotice struct {
 // one line of steps.jsonl.
 type StepLine struct {
 	SchemaVersion int      `json:"schemaVersion"`
+	RunID         string   `json:"runId"`
 	Seq           int64    `json:"seq"`
 	StepIndex     int      `json:"stepIndex"`
 	Command       string   `json:"command"`

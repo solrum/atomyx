@@ -7,6 +7,7 @@
   "durationMs": 41,
   "ok": true,
   "phase": "completed",
+  "runId": "20261003-101500-smoke",
   "schemaVersion": 1,
   "seq": 9,
   "stepIndex": 3

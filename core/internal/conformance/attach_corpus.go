@@ -111,12 +111,12 @@ func attachHandshakeTranscript() (AttachTranscript, error) {
 func attachObserveTranscript() (AttachTranscript, error) {
 	detail := "Element exists"
 	var b attachTranscriptBuilder
-	b.request(1, attach.TypeSubscribe, attach.Subscribe{SinceSeq: 0})
+	b.request(1, attach.TypeSubscribe, attach.Subscribe{RunID: "20261003-101500-smoke", SinceSeq: 4})
 	b.response(1, attach.TypeSubscribe, nil)
 	b.notice(attach.NoticeTree, attach.TreeNotice{Revision: 4, Epoch: 2})
 	b.notice(attach.NoticeScreenshot, attach.ScreenshotNotice{Revision: 3, Epoch: 2})
 	b.notice(attach.NoticeStep, attach.StepNotice{Epoch: 2, Line: attach.StepLine{
-		SchemaVersion: 1, Seq: 5, StepIndex: 1, Command: "assertExists", Phase: "completed",
+		SchemaVersion: 1, RunID: "20261003-101500-smoke", Seq: 5, StepIndex: 1, Command: "assertExists", Phase: "completed",
 		Ok: true, DurationMs: 12, Detail: &detail, Artifacts: []string{},
 	}})
 	b.notice(attach.NoticeStepGap, attach.StepGapNotice{OldestSeq: 40})

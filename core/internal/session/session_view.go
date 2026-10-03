@@ -108,11 +108,11 @@ func (s *Session) FreshTreeIf(ctx context.Context, admit func() error) (Snapshot
 func (s *Session) PublishStep(line runfolder.StepLine) { s.hub.PublishStep(line) }
 
 // StepsSince implements StepSource.
-func (s *Session) StepsSince(sinceSeq int64) ([]runfolder.StepLine, bool) {
-	return s.hub.StepsSince(sinceSeq)
+func (s *Session) StepsSince(runID string, sinceSeq int64) ([]runfolder.StepLine, bool, error) {
+	return s.hub.StepsSince(runID, sinceSeq)
 }
 
 // SubscribeSince implements StepSource.
-func (s *Session) SubscribeSince(ctx context.Context, sinceSeq int64) (<-chan Observation, error) {
-	return s.hub.SubscribeSince(ctx, sinceSeq)
+func (s *Session) SubscribeSince(ctx context.Context, runID string, sinceSeq int64) (<-chan Observation, error) {
+	return s.hub.SubscribeSince(ctx, runID, sinceSeq)
 }

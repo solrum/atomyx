@@ -177,12 +177,16 @@ type Viewer interface {
 // read with StepsSince and never travels inside an Observation.
 type StepSource interface {
 	Viewer
-	// StepsSince returns the held step lines with a sequence number above
-	// sinceSeq, oldest first, and reports whether lines were lost.
-	StepsSince(sinceSeq int64) ([]runfolder.StepLine, bool)
+	// StepsSince returns the held step lines after line sinceSeq of run
+	// runID, oldest first, and reports whether lines were lost. Sequence
+	// numbers restart with every run, so a caller that last read another
+	// run, or none, passes its own runID and gets every held line of the
+	// current run. A sinceSeq beyond the newest line of the same run is
+	// an error.
+	StepsSince(runID string, sinceSeq int64) ([]runfolder.StepLine, bool, error)
 	// SubscribeSince is Subscribe plus ObservedStep and ObservedStepGap
-	// notices, resuming after sinceSeq.
-	SubscribeSince(ctx context.Context, sinceSeq int64) (<-chan Observation, error)
+	// notices, resuming after line sinceSeq of run runID.
+	SubscribeSince(ctx context.Context, runID string, sinceSeq int64) (<-chan Observation, error)
 }
 
 // Refresher captures a fresh tree only when the caller's own check

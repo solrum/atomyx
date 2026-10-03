@@ -112,12 +112,12 @@ func TestAttachGoldensReplayThroughTheFrameReader(t *testing.T) {
 func TestAttachStepLineMatchesRunfolderStepLine(t *testing.T) {
 	detail := "Element exists"
 	runLine := runfolder.StepLine{
-		SchemaVersion: runfolder.StepLineSchemaVersion, Seq: 9, StepIndex: 3, Command: "tap",
+		SchemaVersion: runfolder.StepLineSchemaVersion, RunID: "20261003-101500-smoke", Seq: 9, StepIndex: 3, Command: "tap",
 		Phase: runfolder.StepPhaseCompleted, Ok: true, DurationMs: 41, Detail: &detail,
 		Artifacts: []string{"step-004-home.png"},
 	}
 	attachLine := attach.StepLine{
-		SchemaVersion: runLine.SchemaVersion, Seq: runLine.Seq, StepIndex: runLine.StepIndex,
+		SchemaVersion: runLine.SchemaVersion, RunID: runLine.RunID, Seq: runLine.Seq, StepIndex: runLine.StepIndex,
 		Command: runLine.Command, Phase: string(runLine.Phase), Ok: runLine.Ok,
 		DurationMs: runLine.DurationMs, Detail: runLine.Detail, Artifacts: runLine.Artifacts,
 	}

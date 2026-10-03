@@ -142,9 +142,9 @@ func publishedLines(t *testing.T, deps *Deps) func() []runfolder.StepLine {
 		if held == nil {
 			t.Fatal("the command never opened a session")
 		}
-		lines, gap := held.StepsSince(0)
-		if gap {
-			t.Fatal("the hub reported lost lines")
+		lines, gap, err := held.StepsSince("", 0)
+		if err != nil || gap {
+			t.Fatalf("the hub reported lost lines or an error: %v", err)
 		}
 		return lines
 	}

@@ -131,3 +131,14 @@ func TestAppendStepDoesNotAdvanceTheSequenceWhenTheFileCannotOpen(t *testing.T) 
 		t.Fatalf("append after recovery = seq %d, appended %v, err %v, want seq 1", got.Seq, appended, err)
 	}
 }
+
+func TestAppendStepStampsTheRunIDOfTheFolder(t *testing.T) {
+	w := startOne(t, t.TempDir())
+	got, _, err := w.AppendStep(StepLine{RunID: "caller-set", Command: "tap"})
+	if err != nil || got.RunID != w.ID() || got.RunID == "" {
+		t.Fatalf("stamped run id = %q, err %v, want %q", got.RunID, err, w.ID())
+	}
+	if lines := readStepFile(t, w); !strings.Contains(lines[0], `"runId":"`+w.ID()+`"`) {
+		t.Errorf("steps file line lacks the run id: %s", lines[0])
+	}
+}

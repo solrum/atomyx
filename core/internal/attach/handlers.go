@@ -27,9 +27,10 @@ type ObserveHandler interface {
 	// the error that says why the holder refuses, for example
 	// diag.CodeHolderBusy. It must return once ctx ends.
 	TreeFresh(ctx context.Context) (FreshResult, error)
-	// Subscribe starts a notice stream that resumes after sinceSeq. The
-	// stream ends when the handler closes the channel or ctx ends.
-	Subscribe(ctx context.Context, sinceSeq int64) (<-chan Notice, error)
+	// Subscribe starts a notice stream that resumes after line sinceSeq
+	// of run runID. The stream ends when the handler closes the channel
+	// or ctx ends.
+	Subscribe(ctx context.Context, runID string, sinceSeq int64) (<-chan Notice, error)
 }
 
 // Handlers groups what a server's owner supplies. A nil group is not
