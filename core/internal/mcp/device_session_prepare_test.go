@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"testing"
+	"time"
 
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/diag"
@@ -38,6 +39,11 @@ func TestSelectReportsRunnerBuildTimeoutNotToolTimeout(t *testing.T) {
 		t.Fatal("a build that timed out still built a driver or took the device lease")
 	}
 }
+
+// progressDeliveryTimeout bounds how long a test waits for a progress
+// notification, which the client handler receives asynchronously from the
+// call result.
+const progressDeliveryTimeout = 5 * time.Second
 
 type recordedPhase struct {
 	progress float64
@@ -97,8 +103,8 @@ func TestSelectDeviceSendsProgressInOrderWhenTheCallHasAToken(t *testing.T) {
 			if phase != w {
 				t.Fatalf("notification %d = %+v, want %+v", i, phase, w)
 			}
-		default:
-			t.Fatalf("notification %d missing, want %+v", i, w)
+		case <-time.After(progressDeliveryTimeout):
+			t.Fatalf("notification %d missing after %s, want %+v", i, progressDeliveryTimeout, w)
 		}
 	}
 	if extra := len(got); extra != 0 {
