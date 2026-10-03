@@ -2,6 +2,8 @@ package stepstream
 
 import (
 	"errors"
+	"runtime"
+	"sync"
 	"testing"
 
 	"dev.atomyx/internal/logging"
@@ -14,9 +16,9 @@ type recordingAppender struct {
 	err   error
 }
 
-func (r *recordingAppender) AppendStep(line runfolder.StepLine) (runfolder.StepLine, error) {
+func (r *recordingAppender) AppendStep(line runfolder.StepLine) (runfolder.StepLine, bool, error) {
 	r.lines = append(r.lines, line)
-	return line, r.err
+	return line, r.err == nil, r.err
 }
 
 type countingLogger struct {
@@ -60,12 +62,18 @@ func TestSinkLogsAFailedAppendOnceAndKeepsGoing(t *testing.T) {
 	}
 }
 
-type stampingAppender struct{ next int64 }
+type stampingAppender struct {
+	mu   sync.Mutex
+	next int64
+}
 
-func (a *stampingAppender) AppendStep(line runfolder.StepLine) (runfolder.StepLine, error) {
+func (a *stampingAppender) AppendStep(line runfolder.StepLine) (runfolder.StepLine, bool, error) {
+	a.mu.Lock()
 	a.next++
 	line.Seq = a.next
-	return line, nil
+	a.mu.Unlock()
+	runtime.Gosched()
+	return line, true, nil
 }
 
 func TestSinkPublishesEveryStampedLineInOrder(t *testing.T) {
@@ -92,5 +100,53 @@ func TestSinkDoesNotPublishALineThatFailedToAppend(t *testing.T) {
 
 	if published != 0 {
 		t.Fatalf("published %d lines, want none for a failed append", published)
+	}
+}
+
+type droppingAppender struct{}
+
+func (droppingAppender) AppendStep(line runfolder.StepLine) (runfolder.StepLine, bool, error) {
+	return line, false, nil
+}
+
+func TestSinkDoesNotPublishALineTheWriterDropped(t *testing.T) {
+	published := 0
+	sink := NewSink(droppingAppender{}, &countingLogger{}, WithPublisher(func(runfolder.StepLine) {
+		published++
+	}))
+
+	sink(runner.StepEvent{Type: runner.StepStarted, Command: "tap"})
+
+	if published != 0 {
+		t.Fatalf("published %d lines, want none for a dropped line", published)
+	}
+}
+
+func TestSinkPublishesInSequenceOrderUnderConcurrentEvents(t *testing.T) {
+	var published []runfolder.StepLine
+	sink := NewSink(&stampingAppender{}, &countingLogger{}, WithPublisher(func(l runfolder.StepLine) {
+		published = append(published, l)
+	}))
+
+	const goroutines, perGoroutine = 8, 50
+	var wg sync.WaitGroup
+	for g := 0; g < goroutines; g++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < perGoroutine; i++ {
+				sink(runner.StepEvent{Type: runner.StepStarted, Command: "tap"})
+			}
+		}()
+	}
+	wg.Wait()
+
+	if len(published) != goroutines*perGoroutine {
+		t.Fatalf("published %d lines, want %d", len(published), goroutines*perGoroutine)
+	}
+	for i, line := range published {
+		if line.Seq != int64(i+1) {
+			t.Fatalf("published line %d has seq %d, want %d", i, line.Seq, i+1)
+		}
 	}
 }

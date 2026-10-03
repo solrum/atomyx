@@ -22,9 +22,9 @@ func readStepFile(t *testing.T, w *Writer) []string {
 func TestAppendStepAssignsMonotonicSeqAndStampsTheSchemaVersion(t *testing.T) {
 	w := startOne(t, t.TempDir())
 	for i := 0; i < 3; i++ {
-		got, err := w.AppendStep(StepLine{Seq: 99, SchemaVersion: 7, Command: "tap", Phase: StepPhaseStarted})
-		if err != nil {
-			t.Fatal(err)
+		got, appended, err := w.AppendStep(StepLine{Seq: 99, SchemaVersion: 7, Command: "tap", Phase: StepPhaseStarted})
+		if err != nil || !appended {
+			t.Fatalf("append = %v, %v", appended, err)
 		}
 		if got.Seq != int64(i+1) || got.SchemaVersion != StepLineSchemaVersion {
 			t.Fatalf("line %d stamped seq %d schemaVersion %d", i, got.Seq, got.SchemaVersion)
@@ -52,7 +52,7 @@ func TestAppendStepNumbersConcurrentLinesWithoutGaps(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < perWriter; j++ {
-				if _, err := w.AppendStep(StepLine{Command: "tap", Phase: StepPhaseCompleted}); err != nil {
+				if _, _, err := w.AppendStep(StepLine{Command: "tap", Phase: StepPhaseCompleted}); err != nil {
 					t.Error(err)
 				}
 			}
@@ -71,7 +71,7 @@ func TestAppendStepStopsAtTheBoundAndRecordsOneMarker(t *testing.T) {
 	w := startOne(t, t.TempDir())
 	w.maxStepsBytes = 300
 	for i := 0; i < 6; i++ {
-		if _, err := w.AppendStep(StepLine{Command: "tap", Phase: StepPhaseStarted}); err != nil {
+		if _, _, err := w.AppendStep(StepLine{Command: "tap", Phase: StepPhaseStarted}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -86,9 +86,9 @@ func TestAppendStepStopsAtTheBoundAndRecordsOneMarker(t *testing.T) {
 	if err := json.Unmarshal([]byte(lines[len(lines)-1]), &marker); err != nil || !marker.Truncated || marker.LimitBytes != 300 {
 		t.Fatalf("last line = %q, %v", lines[len(lines)-1], err)
 	}
-	got, err := w.AppendStep(StepLine{Command: "tap"})
-	if err != nil || got.Seq != 7 {
-		t.Fatalf("append after the bound = seq %d, err %v, want seq 7 and no error", got.Seq, err)
+	got, appended, err := w.AppendStep(StepLine{Command: "tap"})
+	if err != nil || appended || got.Seq != 0 {
+		t.Fatalf("append after the bound = seq %d, appended %v, err %v, want a dropped line and no error", got.Seq, appended, err)
 	}
 	if after := readStepFile(t, w); len(after) != len(lines) {
 		t.Fatalf("file grew past the marker: %d lines, was %d", len(after), len(lines))
@@ -100,7 +100,34 @@ func TestAppendStepAfterFinalizeReportsErrFinalized(t *testing.T) {
 	if err := w.Finalize(OutcomePassed, nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := w.AppendStep(StepLine{}); !errors.Is(err, ErrFinalized) {
+	if _, _, err := w.AppendStep(StepLine{}); !errors.Is(err, ErrFinalized) {
 		t.Fatalf("err = %v, want ErrFinalized", err)
+	}
+}
+
+func TestAppendStepReportsTheLineThatCrossesTheBoundAsNotAppended(t *testing.T) {
+	w := startOne(t, t.TempDir())
+	w.maxStepsBytes = 1
+	got, appended, err := w.AppendStep(StepLine{Command: "tap"})
+	if err != nil || appended || got.Seq != 0 {
+		t.Fatalf("append = seq %d, appended %v, err %v, want a dropped line", got.Seq, appended, err)
+	}
+}
+
+func TestAppendStepDoesNotAdvanceTheSequenceWhenTheFileCannotOpen(t *testing.T) {
+	w := startOne(t, t.TempDir())
+	blocker := filepath.Join(w.Dir(), StepsFileName)
+	if err := os.Mkdir(blocker, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, appended, err := w.AppendStep(StepLine{Command: "tap"}); err == nil || appended {
+		t.Fatalf("append = %v, %v, want an open failure", appended, err)
+	}
+	if err := os.Remove(blocker); err != nil {
+		t.Fatal(err)
+	}
+	got, appended, err := w.AppendStep(StepLine{Command: "tap"})
+	if err != nil || !appended || got.Seq != 1 {
+		t.Fatalf("append after recovery = seq %d, appended %v, err %v, want seq 1", got.Seq, appended, err)
 	}
 }

@@ -19,7 +19,7 @@ func TestRunfolderStepLineFormat(t *testing.T) {
 		{StepIndex: 1, Command: "screenshot", Phase: runfolder.StepPhaseCompleted, Ok: true, DurationMs: 40, Artifacts: []string{"step-002-home.png"}},
 	}
 	for _, line := range lines {
-		if _, err := w.AppendStep(line); err != nil {
+		if _, _, err := w.AppendStep(line); err != nil {
 			t.Fatal(err)
 		}
 	}

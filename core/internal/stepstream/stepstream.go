@@ -12,7 +12,7 @@ import (
 
 // Appender is the part of a run folder writer a Sink needs.
 type Appender interface {
-	AppendStep(runfolder.StepLine) (runfolder.StepLine, error)
+	AppendStep(runfolder.StepLine) (runfolder.StepLine, bool, error)
 }
 
 // Option tunes NewSink.
@@ -24,8 +24,10 @@ type sinkConfig struct {
 
 // WithPublisher makes the sink hand every line that was appended to
 // publish, stamped with its schema version and sequence number. publish
-// must not block, and a nil publish changes nothing. A line whose append
-// failed is not published, because it has no sequence number.
+// must not block, and a nil publish changes nothing. Lines are published
+// in sequence order even when events arrive from several goroutines. A
+// line that was not appended, because the append failed or the file is
+// full, is not published, because it has no sequence number.
 func WithPublisher(publish func(runfolder.StepLine)) Option {
 	return func(c *sinkConfig) { c.publish = publish }
 }
@@ -45,15 +47,18 @@ func NewSink(appender Appender, logger logging.Logger, opts ...Option) func(runn
 		opt(&cfg)
 	}
 	var warn sync.Once
+	var mu sync.Mutex
 	return func(event runner.StepEvent) {
-		stamped, err := appender.AppendStep(lineFor(event))
+		mu.Lock()
+		defer mu.Unlock()
+		stamped, appended, err := appender.AppendStep(lineFor(event))
 		if err != nil {
 			warn.Do(func() {
 				logger.Warn("run.step_line_failed", logging.LogContext{"error": err.Error()})
 			})
 			return
 		}
-		if cfg.publish != nil {
+		if appended && cfg.publish != nil {
 			cfg.publish(stamped)
 		}
 	}

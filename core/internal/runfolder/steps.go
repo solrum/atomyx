@@ -50,34 +50,36 @@ type StepLine struct {
 }
 
 // AppendStep stamps line with the schema version and the next sequence
-// number, appends it to steps.jsonl, and returns the stamped line. Once
-// the file would pass MaxStepsBytes, the line is dropped, one truncation
-// marker line is written, and every later call drops its line and
-// returns it unwritten with a nil error. StepsTruncated reports whether
-// that happened. Sequence numbers keep counting across dropped lines.
-func (w *Writer) AppendStep(line StepLine) (StepLine, error) {
+// number, appends it to steps.jsonl, and returns the stamped line with
+// true. The sequence number advances only for a line that was written.
+// Once the file would pass MaxStepsBytes, the line is dropped, one
+// truncation marker line is written, and every later call drops its line.
+// A dropped line is returned unwritten and unstamped with false and a nil
+// error, so the caller must not publish it. StepsTruncated reports
+// whether that happened. A write or encoding failure returns false and
+// the error.
+func (w *Writer) AppendStep(line StepLine) (StepLine, bool, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if err := w.checkOpen(); err != nil {
-		return StepLine{}, err
+		return StepLine{}, false, err
 	}
-	w.stepSeq++
 	line.SchemaVersion = StepLineSchemaVersion
-	line.Seq = w.stepSeq
+	line.Seq = w.stepSeq + 1
 	if line.Artifacts == nil {
 		line.Artifacts = []string{}
 	}
 	if w.stepsTruncated {
-		return line, nil
+		return dropped(line), false, nil
 	}
 	body, err := json.Marshal(line)
 	if err != nil {
-		return line, fmt.Errorf("encoding step line: %w", err)
+		return dropped(line), false, fmt.Errorf("encoding step line: %w", err)
 	}
 	if w.steps == nil {
 		f, err := os.OpenFile(filepath.Join(w.dir, StepsFileName), os.O_WRONLY|os.O_CREATE|os.O_APPEND, fileMode)
 		if err != nil {
-			return line, fmt.Errorf("opening steps file: %w", err)
+			return dropped(line), false, fmt.Errorf("opening steps file: %w", err)
 		}
 		w.steps = f
 	}
@@ -85,11 +87,20 @@ func (w *Writer) AppendStep(line StepLine) (StepLine, error) {
 		w.stepsTruncated = true
 		marker, _ := json.Marshal(map[string]any{"truncated": true, "limitBytes": w.maxStepsBytes})
 		_, err := w.steps.Write(append(marker, '\n'))
-		return line, err
+		return dropped(line), false, err
 	}
 	n, err := w.steps.Write(append(body, '\n'))
 	w.stepsBytes += n
-	return line, err
+	if err != nil {
+		return dropped(line), false, err
+	}
+	w.stepSeq = line.Seq
+	return line, true, nil
+}
+
+func dropped(line StepLine) StepLine {
+	line.Seq = 0
+	return line
 }
 
 // StepsTruncated reports whether AppendStep hit the size bound.
