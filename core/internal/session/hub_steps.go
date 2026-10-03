@@ -110,7 +110,7 @@ func (h *Hub) PublishStep(line runfolder.StepLine) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.steps.push(line)
-	h.notifyLocked(Observation{Kind: ObservedStep, Revision: uint64(line.Seq), Stable: true})
+	h.fanout.notifyLocked(Observation{Kind: ObservedStep, Revision: uint64(line.Seq), Stable: true})
 }
 
 // StepsSince returns the held step lines the caller has not read, oldest

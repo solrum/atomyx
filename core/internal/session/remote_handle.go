@@ -73,7 +73,7 @@ type RemoteHandle struct {
 	info   Info
 	snap   Snapshot
 	steps  stepRing
-	subs   map[*subscriber]struct{}
+	fanout fanout
 	closed bool
 }
 
@@ -100,8 +100,8 @@ func DialRemote(ctx context.Context, cfg RemoteConfig, desc device.Descriptor) (
 		cancel:     cancel,
 		done:       make(chan struct{}),
 		client:     client,
-		subs:       make(map[*subscriber]struct{}),
 	}
+	h.fanout = newFanout(&h.mu)
 	h.snap.Generation = h.generation
 	if err := h.prime(ctx, client); err != nil {
 		cancel()
@@ -217,37 +217,7 @@ func (h *RemoteHandle) SubscribeSince(ctx context.Context, runID string, sinceSe
 }
 
 func (h *RemoteHandle) subscribe(ctx context.Context, resume *stepResume) (<-chan Observation, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	sub := &subscriber{ch: make(chan Observation, subscriberBuffer+1), done: make(chan struct{}), steps: resume != nil}
-	h.mu.Lock()
-	if h.closed {
-		h.mu.Unlock()
-		return nil, ErrRemoteClosed
-	}
-	if resume != nil {
-		notices, err := h.steps.resumeLocked(resume.runID, resume.sinceSeq)
-		if err != nil {
-			h.mu.Unlock()
-			return nil, err
-		}
-		for _, o := range notices {
-			sub.ch <- o
-		}
-	}
-	h.subs[sub] = struct{}{}
-	h.mu.Unlock()
-	go func() {
-		select {
-		case <-ctx.Done():
-			h.mu.Lock()
-			h.dropLocked(sub)
-			h.mu.Unlock()
-		case <-sub.done:
-		}
-	}()
-	return sub.ch, nil
+	return h.fanout.subscribe(ctx, &h.steps, func() bool { return h.closed }, ErrRemoteClosed, resume)
 }
 
 // Close ends the connection and every subscription, and waits for the
@@ -381,9 +351,7 @@ func (h *RemoteHandle) finish() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.closed = true
-	for sub := range h.subs {
-		h.endLocked(sub, ObservedClosed)
-	}
+	h.fanout.endAllLocked(ObservedClosed)
 }
 
 func (h *RemoteHandle) syncTree(parent context.Context) {
@@ -406,7 +374,7 @@ func (h *RemoteHandle) pullTree(ctx context.Context) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.storeTreeLocked(r) {
-		h.notifyLocked(Observation{Kind: ObservedTree, Epoch: r.Epoch, Revision: r.Revision, Stable: r.Stable})
+		h.fanout.notifyLocked(Observation{Kind: ObservedTree, Epoch: r.Epoch, Revision: r.Revision, Stable: r.Stable})
 	}
 	return nil
 }
@@ -419,7 +387,7 @@ func (h *RemoteHandle) pullScreenshot(ctx context.Context) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.storeScreenshotLocked(r) {
-		h.notifyLocked(Observation{Kind: ObservedScreenshot, Epoch: r.Epoch, Revision: r.Revision, Stable: r.Stable})
+		h.fanout.notifyLocked(Observation{Kind: ObservedScreenshot, Epoch: r.Epoch, Revision: r.Revision, Stable: r.Stable})
 	}
 	return nil
 }
@@ -489,7 +457,7 @@ func (h *RemoteHandle) storeStep(n attach.StepNotice) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.steps.push(line)
-	h.notifyLocked(Observation{Kind: ObservedStep, Epoch: n.Epoch, Revision: uint64(line.Seq), Stable: true})
+	h.fanout.notifyLocked(Observation{Kind: ObservedStep, Epoch: n.Epoch, Revision: uint64(line.Seq), Stable: true})
 }
 
 // storeGap forgets the held lines, because the lines that follow a gap
@@ -498,34 +466,5 @@ func (h *RemoteHandle) storeGap(n attach.StepGapNotice) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.steps = stepRing{}
-	h.notifyLocked(Observation{Kind: ObservedStepGap, Revision: uint64(n.OldestSeq), Stable: true})
-}
-
-func (h *RemoteHandle) notifyLocked(o Observation) {
-	for sub := range h.subs {
-		if isStepNotice(o.Kind) && !sub.steps {
-			continue
-		}
-		if len(sub.ch) >= subscriberBuffer {
-			h.endLocked(sub, ObservedDropped)
-			continue
-		}
-		sub.ch <- o
-	}
-}
-
-// endLocked sends the terminal notification and then drops sub. Ordinary
-// notifications stop at subscriberBuffer, so the slot is always free.
-func (h *RemoteHandle) endLocked(sub *subscriber, kind ObservationKind) {
-	sub.ch <- Observation{Kind: kind}
-	h.dropLocked(sub)
-}
-
-func (h *RemoteHandle) dropLocked(sub *subscriber) {
-	if _, live := h.subs[sub]; !live {
-		return
-	}
-	delete(h.subs, sub)
-	close(sub.ch)
-	close(sub.done)
+	h.fanout.notifyLocked(Observation{Kind: ObservedStepGap, Revision: uint64(n.OldestSeq), Stable: true})
 }

@@ -35,7 +35,7 @@ var ErrHubClosed = errors.New("the capture hub is closed")
 type Hub struct {
 	mu     sync.Mutex
 	closed bool
-	subs   map[*subscriber]struct{}
+	fanout fanout
 
 	tree       wire.TreeNodeWire
 	treeEpoch  uint64
@@ -66,17 +66,11 @@ type Hub struct {
 
 var _ Observer = (*Hub)(nil)
 
-type subscriber struct {
-	ch   chan Observation
-	done chan struct{}
-	// steps is true for a subscriber that asked for step notices through
-	// SubscribeSince.
-	steps bool
-}
-
 // NewHub returns an empty hub.
 func NewHub() *Hub {
-	return &Hub{subs: make(map[*subscriber]struct{})}
+	h := &Hub{}
+	h.fanout = newFanout(&h.mu)
+	return h
 }
 
 // ObserveTree implements Observer.
@@ -85,7 +79,7 @@ func (h *Hub) ObserveTree(tree wire.TreeNodeWire, epoch uint64, stable bool) {
 	defer h.mu.Unlock()
 	h.tree, h.treeEpoch, h.treeStable, h.hasTree = tree, epoch, stable, true
 	h.treeSeq++
-	h.notifyLocked(Observation{Kind: ObservedTree, Epoch: epoch, Revision: h.treeSeq, Stable: stable})
+	h.fanout.notifyLocked(Observation{Kind: ObservedTree, Epoch: epoch, Revision: h.treeSeq, Stable: stable})
 }
 
 // ObserveScreenshot implements Observer.
@@ -96,7 +90,7 @@ func (h *Hub) ObserveScreenshot(img []byte, epoch uint64, stable bool) {
 	h.shot, h.shotEpoch, h.shotStable, h.hasShot = img, epoch, stable, true
 	h.shotFormat, h.shotWidth, h.shotHeight = format, width, height
 	h.shotSeq++
-	h.notifyLocked(Observation{Kind: ObservedScreenshot, Epoch: epoch, Revision: h.shotSeq, Stable: stable})
+	h.fanout.notifyLocked(Observation{Kind: ObservedScreenshot, Epoch: epoch, Revision: h.shotSeq, Stable: stable})
 }
 
 // ObserveScreenSize implements Observer.
@@ -105,7 +99,7 @@ func (h *Hub) ObserveScreenSize(size wire.Size, epoch uint64, stable bool) {
 	defer h.mu.Unlock()
 	h.size, h.sizeEpoch, h.sizeStable, h.hasSize = size, epoch, stable, true
 	h.sizeSeq++
-	h.notifyLocked(Observation{Kind: ObservedScreenSize, Epoch: epoch, Revision: h.sizeSeq, Stable: stable})
+	h.fanout.notifyLocked(Observation{Kind: ObservedScreenSize, Epoch: epoch, Revision: h.sizeSeq, Stable: stable})
 }
 
 // Latest returns the newest captures. The masked copy of a tree is made
@@ -204,37 +198,7 @@ type stepResume struct {
 // subscribe registers a subscriber. A non-nil resume makes it a step
 // subscriber, and its resume notices are queued before any live one.
 func (h *Hub) subscribe(ctx context.Context, resume *stepResume) (<-chan Observation, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	sub := &subscriber{ch: make(chan Observation, subscriberBuffer+1), done: make(chan struct{}), steps: resume != nil}
-	h.mu.Lock()
-	if h.closed {
-		h.mu.Unlock()
-		return nil, ErrHubClosed
-	}
-	if resume != nil {
-		notices, err := h.steps.resumeLocked(resume.runID, resume.sinceSeq)
-		if err != nil {
-			h.mu.Unlock()
-			return nil, err
-		}
-		for _, o := range notices {
-			sub.ch <- o
-		}
-	}
-	h.subs[sub] = struct{}{}
-	h.mu.Unlock()
-	go func() {
-		select {
-		case <-ctx.Done():
-			h.mu.Lock()
-			h.dropLocked(sub)
-			h.mu.Unlock()
-		case <-sub.done:
-		}
-	}()
-	return sub.ch, nil
+	return h.fanout.subscribe(ctx, &h.steps, func() bool { return h.closed }, ErrHubClosed, resume)
 }
 
 // Close ends every subscription. Later captures are still stored.
@@ -242,38 +206,7 @@ func (h *Hub) Close() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.closed = true
-	for sub := range h.subs {
-		h.endLocked(sub, ObservedClosed)
-	}
-}
-
-func (h *Hub) notifyLocked(o Observation) {
-	for sub := range h.subs {
-		if isStepNotice(o.Kind) && !sub.steps {
-			continue
-		}
-		if len(sub.ch) >= subscriberBuffer {
-			h.endLocked(sub, ObservedDropped)
-			continue
-		}
-		sub.ch <- o
-	}
-}
-
-// endLocked sends the terminal notification and then drops sub. Capture
-// notifications stop at subscriberBuffer, so the slot is always free.
-func (h *Hub) endLocked(sub *subscriber, kind ObservationKind) {
-	sub.ch <- Observation{Kind: kind}
-	h.dropLocked(sub)
-}
-
-func (h *Hub) dropLocked(sub *subscriber) {
-	if _, live := h.subs[sub]; !live {
-		return
-	}
-	delete(h.subs, sub)
-	close(sub.ch)
-	close(sub.done)
+	h.fanout.endAllLocked(ObservedClosed)
 }
 
 // sniffImage reads the format and pixel size from the image header
