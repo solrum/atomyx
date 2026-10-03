@@ -191,7 +191,10 @@ func (h *RemoteHandle) pull(ctx context.Context, messageType string, result any)
 func (h *RemoteHandle) storeStep(n attach.StepNotice) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	line := h.store.storeStep(n)
+	line, kept := h.store.storeStep(n)
+	if !kept {
+		return
+	}
 	h.fanout.notifyLocked(Observation{Kind: ObservedStep, Epoch: n.Epoch, Revision: uint64(line.Seq), Stable: true})
 }
 

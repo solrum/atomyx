@@ -59,8 +59,10 @@ func (c *captureStore) applyState(s attach.CaptureState) {
 	c.snap.Paired, c.snap.Highlightable, c.snap.Scale = s.Paired, s.Highlightable, s.Scale
 }
 
-// storeStep keeps the line of n and returns it.
-func (c *captureStore) storeStep(n attach.StepNotice) runfolder.StepLine {
+// storeStep keeps the line of n and returns it. A line of the held run
+// whose sequence number is not above the newest held one is a repeat of a
+// line already stored, so it is refused and storeStep reports false.
+func (c *captureStore) storeStep(n attach.StepNotice) (runfolder.StepLine, bool) {
 	line := runfolder.StepLine{
 		SchemaVersion: n.Line.SchemaVersion,
 		RunID:         n.Line.RunID,
@@ -73,8 +75,11 @@ func (c *captureStore) storeStep(n attach.StepNotice) runfolder.StepLine {
 		Detail:        n.Line.Detail,
 		Artifacts:     n.Line.Artifacts,
 	}
+	if line.RunID == c.steps.runID && c.steps.count > 0 && line.Seq <= c.steps.lastSeq {
+		return line, false
+	}
 	c.steps.push(line)
-	return line
+	return line, true
 }
 
 // forgetSteps drops the held lines, because the lines that follow a gap
