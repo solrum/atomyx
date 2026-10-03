@@ -9,7 +9,6 @@ import (
 
 	"dev.atomyx/internal/attach"
 	"dev.atomyx/internal/device"
-	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/lease"
 	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/wire"
@@ -19,10 +18,6 @@ const (
 	// remoteCallTimeout bounds one request a handle makes to the holder
 	// on its own, such as a status read or a capture pull.
 	remoteCallTimeout = 5 * time.Second
-	// pullBusyRetries is how many times a capture pull is repeated when
-	// the holder answers that the previous pull response is still being
-	// written. That answer is a transient overlap, never a refusal.
-	pullBusyRetries = 3
 )
 
 // ErrRemoteClosed reports a subscription to a handle whose connection to
@@ -70,8 +65,8 @@ type RemoteHandle struct {
 	cancel     context.CancelFunc
 	done       chan struct{}
 
-	// pullMu keeps one capture pull in flight, because the holder answers
-	// a second pull on the same connection with HOLDER_BUSY.
+	// pullMu keeps one capture pull in flight, so the responses a handle
+	// holds in memory stay at one large frame.
 	pullMu sync.Mutex
 
 	mu     sync.Mutex
@@ -414,22 +409,7 @@ func (h *RemoteHandle) pullScreenshot(ctx context.Context) error {
 func (h *RemoteHandle) pull(ctx context.Context, messageType string, result any) error {
 	h.pullMu.Lock()
 	defer h.pullMu.Unlock()
-	client := h.currentClient()
-	var err error
-	for range pullBusyRetries + 1 {
-		if err = client.Call(ctx, messageType, nil, result); diagCode(err) != diag.CodeHolderBusy {
-			return err
-		}
-	}
-	return err
-}
-
-func diagCode(err error) string {
-	if err == nil {
-		return ""
-	}
-	code, _, _ := diag.Describe(err)
-	return code
+	return h.currentClient().Call(ctx, messageType, nil, result)
 }
 
 // storeTreeLocked keeps r when it is newer than the held tree and reports

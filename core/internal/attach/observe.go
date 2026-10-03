@@ -1,7 +1,5 @@
 package attach
 
-import "dev.atomyx/internal/diag"
-
 // observe answers a request of the observe group. Only the connection's
 // read goroutine calls it, so the subscribed flag needs no lock.
 func (c *conn) observe(h ObserveHandler, f Frame) bool {
@@ -13,13 +11,12 @@ func (c *conn) observe(h ObserveHandler, f Frame) bool {
 	}
 }
 
-// pull answers a request whose response can be large. At most one pull
-// response is queued or being written at a time, so a viewer that
-// pipelines them without reading cannot stack screenshots in memory.
+// pull answers a request whose response can be large. The response goes
+// to the writer queue without waiting for the write, so a viewer that
+// has read one response can always send the next request. A viewer that
+// pipelines pulls without reading cannot stack screenshots in memory,
+// because the queue's byte budget disconnects it.
 func (c *conn) pull(h ObserveHandler, f Frame) bool {
-	if !c.pullBusy.CompareAndSwap(false, true) {
-		return c.fail(f, diag.NewHolderBusy("the previous response has not been read yet"))
-	}
 	var data any
 	switch f.Type {
 	case TypeTreeLatest:
@@ -29,17 +26,11 @@ func (c *conn) pull(h ObserveHandler, f Frame) bool {
 	default:
 		result, err := h.TreeFresh(c.ctx)
 		if err != nil {
-			c.pullBusy.Store(false)
 			return c.fail(f, err)
 		}
 		data = result
 	}
-	response, err := NewResponse(f.ID, f.Type, data)
-	if err != nil {
-		c.pullBusy.Store(false)
-		return c.fail(f, diag.New(diag.CodeUnknown, "the response could not be encoded", "", err))
-	}
-	return c.sendFrame(response, true)
+	return c.respond(f, data)
 }
 
 func (c *conn) subscribe(h ObserveHandler, f Frame) bool {

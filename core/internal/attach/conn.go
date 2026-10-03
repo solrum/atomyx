@@ -16,11 +16,9 @@ import (
 var zeroTime time.Time
 
 // outbound is one encoded frame waiting for the writer. A nil line means
-// close after the frames before it have been written. A pull frame
-// releases the connection's pull slot once it is written.
+// close after the frames before it have been written.
 type outbound struct {
 	line []byte
-	pull bool
 }
 
 // conn is one attached viewer. run reads and dispatches requests, and
@@ -39,9 +37,6 @@ type conn struct {
 	// written, so a viewer that never reads cannot hold more than
 	// ServerConfig.QueueBytes of the holder's memory.
 	queuedBytes atomic.Int64
-	// pullBusy is set while a pull response (a tree or screenshot read) is
-	// queued or being written, so a viewer cannot stack large responses.
-	pullBusy atomic.Bool
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -115,9 +110,6 @@ func (c *conn) writeLoop() {
 				return
 			}
 			c.queuedBytes.Add(-int64(len(item.line)))
-			if item.pull {
-				c.pullBusy.Store(false)
-			}
 		}
 	}
 }
@@ -125,7 +117,7 @@ func (c *conn) writeLoop() {
 // enqueue hands a line to the writer without waiting. A full queue or an
 // exhausted byte budget means the viewer stopped reading, so the
 // connection closes.
-func (c *conn) enqueue(line []byte, pull bool) bool {
+func (c *conn) enqueue(line []byte) bool {
 	size := int64(len(line))
 	if c.queuedBytes.Add(size) > c.srv.cfg.QueueBytes {
 		c.queuedBytes.Add(-size)
@@ -133,7 +125,7 @@ func (c *conn) enqueue(line []byte, pull bool) bool {
 		return false
 	}
 	select {
-	case c.out <- outbound{line: line, pull: pull}:
+	case c.out <- outbound{line: line}:
 		return true
 	default:
 		c.queuedBytes.Add(-size)
@@ -143,10 +135,6 @@ func (c *conn) enqueue(line []byte, pull bool) bool {
 }
 
 func (c *conn) send(f Frame) bool {
-	return c.sendFrame(f, false)
-}
-
-func (c *conn) sendFrame(f Frame, pull bool) bool {
 	line, err := EncodeFrame(f)
 	if errors.Is(err, ErrFrameTooLarge) && f.Kind() == KindResponse {
 		line, err = EncodeFrame(NewErrorResponse(f.ID, f.Type, errResponseTooLarge))
@@ -155,7 +143,7 @@ func (c *conn) sendFrame(f Frame, pull bool) bool {
 		c.close()
 		return false
 	}
-	return c.enqueue(line, pull)
+	return c.enqueue(line)
 }
 
 func (c *conn) respond(req Frame, data any) bool {
@@ -174,7 +162,7 @@ func (c *conn) fail(req Frame, cause error) bool {
 // connection.
 func (c *conn) drain() {
 	c.draining.Store(true)
-	c.enqueue(nil, false)
+	c.enqueue(nil)
 }
 
 // finish sends a last error that belongs to the connection, not to a

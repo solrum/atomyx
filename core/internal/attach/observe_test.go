@@ -268,7 +268,23 @@ func TestViewerOverTheByteBudgetIsDisconnected(t *testing.T) {
 	}
 }
 
-func TestSecondPullResponseIsRefusedWhileTheFirstIsUnwritten(t *testing.T) {
+func TestAViewerThatReadsAPullResponseCanSendTheNextPullAtOnce(t *testing.T) {
+	h := newFakeObserve()
+	h.shot = ScreenshotResult{Format: "png", Image: make([]byte, 64<<10)}
+	srv := startServer(t, ServerConfig{Handlers: Handlers{Observe: h}}, nil)
+	client := dialRaw(t, srv.Path())
+	client.hello()
+
+	const rounds = 1000
+	for i := range rounds {
+		response := client.call(TypeScreenshotLatest, nil)
+		if response.Ok == nil || !*response.Ok {
+			t.Fatalf("pull %d = %+v, want success", i, response)
+		}
+	}
+}
+
+func TestPipelinedPullsAreAnsweredWhileTheFirstIsUnwritten(t *testing.T) {
 	h := newFakeObserve()
 	h.shot = ScreenshotResult{Format: "png", Image: []byte{1}}
 	cfg := ServerConfig{Handlers: Handlers{Observe: h}}
@@ -286,15 +302,10 @@ func TestSecondPullResponseIsRefusedWhileTheFirstIsUnwritten(t *testing.T) {
 	g.waitFor(t, g.dispatched, "the second request answered")
 	g.open()
 
-	if got := client.read(); got.ID != first || got.Ok == nil || !*got.Ok {
-		t.Fatalf("first response = %+v, want success for id %d", got, first)
-	}
-	refusal := client.read()
-	if refusal.ID != second || failureCode(t, refusal) != diag.CodeHolderBusy {
-		t.Fatalf("second response = %+v, want HOLDER_BUSY for id %d", refusal, second)
-	}
-	if ok := client.call(TypeScreenshotLatest, nil).Ok; ok == nil || !*ok {
-		t.Fatal("a pull request after the first response was written was refused")
+	for _, id := range []int64{first, second} {
+		if got := client.read(); got.ID != id || got.Ok == nil || !*got.Ok {
+			t.Fatalf("response = %+v, want success for id %d", got, id)
+		}
 	}
 }
 
