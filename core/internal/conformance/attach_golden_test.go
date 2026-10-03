@@ -39,6 +39,8 @@ func attachDataShape(messageType string) any {
 		return &attach.Status{}
 	case attach.TypeSubscribe:
 		return &attach.Subscribe{}
+	case attach.TypeControlYield:
+		return &attach.ControlYield{}
 	case attach.TypeTreeLatest:
 		return &attach.TreeResult{}
 	case attach.TypeScreenshotLatest:

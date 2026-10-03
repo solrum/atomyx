@@ -19,6 +19,9 @@ var zeroTime time.Time
 // close after the frames before it have been written.
 type outbound struct {
 	line []byte
+	// fireAfter asks the writer to release the connection's pending
+	// after-reply callback once this frame has been written.
+	fireAfter bool
 }
 
 // conn is one attached viewer. run reads and dispatches requests, and
@@ -45,6 +48,10 @@ type conn struct {
 	// sub is the connection's live notice subscription. Only the read
 	// goroutine touches it.
 	sub *liveSubscription
+	// afterMu guards after, which the read goroutine sets and the writer
+	// or the read goroutine's exit consumes.
+	afterMu sync.Mutex
+	after   []func()
 	// draining is set once the last frame is queued, so the writer closes
 	// the socket after writing everything before it.
 	draining atomic.Bool
@@ -89,6 +96,7 @@ func (c *conn) run() {
 			c.close()
 		}
 	}()
+	defer c.fireAfter()
 	defer c.endSubscription()
 	if !c.handshake() {
 		return
@@ -107,6 +115,7 @@ func (c *conn) writeLoop() {
 	defer c.srv.wg.Done()
 	defer c.srv.forget(c)
 	defer c.close()
+	defer c.fireAfter()
 	for {
 		select {
 		case <-c.ctx.Done():
@@ -125,6 +134,9 @@ func (c *conn) writeLoop() {
 				return
 			}
 			c.queuedBytes.Add(-int64(len(item.line)))
+			if item.fireAfter {
+				c.fireAfter()
+			}
 		}
 	}
 }
@@ -133,14 +145,18 @@ func (c *conn) writeLoop() {
 // exhausted byte budget means the viewer stopped reading, so the
 // connection closes.
 func (c *conn) enqueue(line []byte) bool {
-	size := int64(len(line))
+	return c.enqueueItem(outbound{line: line})
+}
+
+func (c *conn) enqueueItem(item outbound) bool {
+	size := int64(len(item.line))
 	if c.queuedBytes.Add(size) > c.srv.cfg.QueueBytes {
 		c.queuedBytes.Add(-size)
 		c.close()
 		return false
 	}
 	select {
-	case c.out <- outbound{line: line}:
+	case c.out <- item:
 		return true
 	default:
 		c.queuedBytes.Add(-size)
@@ -150,6 +166,10 @@ func (c *conn) enqueue(line []byte) bool {
 }
 
 func (c *conn) send(f Frame) bool {
+	return c.sendItem(f, false)
+}
+
+func (c *conn) sendItem(f Frame, fireAfter bool) bool {
 	line, err := EncodeFrame(f)
 	if errors.Is(err, ErrFrameTooLarge) && f.Kind() == KindResponse {
 		line, err = EncodeFrame(NewErrorResponse(f.ID, f.Type, errResponseTooLarge))
@@ -158,7 +178,7 @@ func (c *conn) send(f Frame) bool {
 		c.close()
 		return false
 	}
-	return c.enqueue(line)
+	return c.enqueueItem(outbound{line: line, fireAfter: fireAfter})
 }
 
 func (c *conn) respond(req Frame, data any) bool {
@@ -167,6 +187,19 @@ func (c *conn) respond(req Frame, data any) bool {
 		return c.fail(req, diag.New(diag.CodeUnknown, "the response could not be encoded", "", err))
 	}
 	return c.send(f)
+}
+
+// fireAfter runs the pending after-reply callback once on its own
+// goroutine, so the callback may close the server that waits for this
+// connection's goroutines.
+func (c *conn) fireAfter() {
+	c.afterMu.Lock()
+	pending := c.after
+	c.after = nil
+	c.afterMu.Unlock()
+	for _, fn := range pending {
+		go fn()
+	}
 }
 
 func (c *conn) fail(req Frame, cause error) bool {
@@ -280,6 +313,10 @@ func (c *conn) dispatch(ctx context.Context, f Frame) bool {
 	case TypeSubscribe, TypeTreeLatest, TypeScreenshotLatest, TypeTreeFresh:
 		if h := c.srv.cfg.Handlers.Observe; h != nil {
 			return c.observe(ctx, h, f)
+		}
+	case TypeControlYield:
+		if h := c.srv.cfg.Handlers.Control; h != nil {
+			return c.yield(ctx, h, f)
 		}
 	}
 	return c.fail(f, diag.NewUnsupported(f.Type))

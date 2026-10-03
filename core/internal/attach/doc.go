@@ -13,9 +13,10 @@
 // The holder answers with the version it chose, or UNSUPPORTED_VERSION
 // when the ranges do not overlap.
 //
-// Message groups: session (hello, status, bye) and observe (subscribe,
+// Message groups: session (hello, status, bye), observe (subscribe,
 // tree.latest, screenshot.latest, tree.fresh, plus the notices that
-// subscribe starts). An unknown type is answered with UNSUPPORTED and the
+// subscribe starts) and control (yield, served only by a holder that
+// advertises the control feature). An unknown type is answered with UNSUPPORTED and the
 // connection stays open.
 //
 // The package depends only on wire and diag, so the holder's own session

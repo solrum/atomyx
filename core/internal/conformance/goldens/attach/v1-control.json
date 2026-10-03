@@ -1,0 +1,80 @@
+[
+  {
+    "frame": {
+      "data": {
+        "client": "atomyx run",
+        "features": [
+          "control"
+        ],
+        "protocol": {
+          "max": 1,
+          "min": 1
+        }
+      },
+      "id": 1,
+      "type": "session.hello",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "data": {
+        "features": [
+          "observe",
+          "observe.state",
+          "control"
+        ],
+        "protocol": 1
+      },
+      "id": 1,
+      "ok": true,
+      "type": "session.hello",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "data": {
+        "command": "atomyx run login.yml"
+      },
+      "id": 2,
+      "type": "control.yield",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "code": "HOLDER_BUSY",
+      "id": 2,
+      "message": "the device holder is busy: a tool call is running",
+      "ok": false,
+      "remedy": "Wait for that work to finish, then ask again.",
+      "type": "control.yield",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "data": {
+        "command": "atomyx run login.yml"
+      },
+      "id": 3,
+      "type": "control.yield",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "id": 3,
+      "ok": true,
+      "type": "control.yield",
+      "v": 1
+    },
+    "from": "holder"
+  }
+]

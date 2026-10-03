@@ -161,6 +161,21 @@ func attachErrorsTranscript() (AttachTranscript, error) {
 	return b.build("errors")
 }
 
+func attachControlTranscript() (AttachTranscript, error) {
+	var b attachTranscriptBuilder
+	b.request(1, attach.TypeHello, attach.Hello{
+		Protocol: attach.VersionRange{Min: 1, Max: 1},
+		Client:   "atomyx run",
+		Features: []string{attach.FeatureControl},
+	})
+	b.response(1, attach.TypeHello, attach.HelloResult{Protocol: 1, Features: []string{attach.FeatureObserve, attach.FeatureObserveState, attach.FeatureControl}})
+	b.request(2, attach.TypeControlYield, attach.ControlYield{Command: "atomyx run login.yml"})
+	b.failure(2, attach.TypeControlYield, diag.NewHolderBusy("a tool call is running"))
+	b.request(3, attach.TypeControlYield, attach.ControlYield{Command: "atomyx run login.yml"})
+	b.response(3, attach.TypeControlYield, nil)
+	return b.build("control")
+}
+
 // AttachCorpus returns the attach transcripts of protocol major version
 // 1. Each one is frozen as goldens/attach/v1-<name>.json.
 func AttachCorpus() ([]AttachTranscript, error) {
@@ -168,6 +183,7 @@ func AttachCorpus() ([]AttachTranscript, error) {
 		attachHandshakeTranscript,
 		attachObserveTranscript,
 		attachErrorsTranscript,
+		attachControlTranscript,
 	}
 	transcripts := make([]AttachTranscript, 0, len(builders))
 	for _, build := range builders {

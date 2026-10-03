@@ -33,6 +33,27 @@ type ObserveHandler interface {
 	Subscribe(ctx context.Context, runID string, sinceSeq int64) (<-chan Notice, error)
 }
 
+// ControlHandler answers the control group requests. A holder that wants
+// to give the device to a borrower supplies one.
+type ControlHandler interface {
+	// Yield decides whether the holder gives the device to the process
+	// described by borrower. It is called on the connection's read
+	// goroutine, so it must return promptly and decide under the host's
+	// own lock.
+	//
+	// A non-nil error refuses, and the server sends it as the response,
+	// for example diag.CodeHolderBusy while the holder is working. The
+	// connection stays usable.
+	//
+	// A nil error accepts: the host has committed to release the device.
+	// The server then writes the ok response and runs afterReply exactly
+	// once on a new goroutine, after that response has been written to
+	// the connection, or when the connection ended first. afterReply may
+	// be nil. It may close the whole session, including the server that
+	// calls it, because it never runs on the connection's goroutines.
+	Yield(ctx context.Context, borrower string) (afterReply func(), err error)
+}
+
 // ViewerInfo identifies one attached viewer. ID is unique among the
 // connections a server has accepted, and Client is the name the viewer
 // sent in its hello request.
@@ -59,6 +80,9 @@ type ViewerHandler interface {
 type Handlers struct {
 	Session SessionHandler
 	Observe ObserveHandler
+	// Control is optional. A nil value leaves the control feature out of
+	// the hello answer.
+	Control ControlHandler
 	// Viewers is optional. A nil value skips the attach and detach calls.
 	Viewers ViewerHandler
 }
@@ -67,6 +91,9 @@ func (h Handlers) features() []string {
 	features := []string{}
 	if h.Observe != nil {
 		features = append(features, FeatureObserve, FeatureObserveState)
+	}
+	if h.Control != nil {
+		features = append(features, FeatureControl)
 	}
 	return features
 }

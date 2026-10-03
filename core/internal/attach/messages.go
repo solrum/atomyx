@@ -20,6 +20,11 @@ const (
 	TypeTreeFresh        = "observe.tree.fresh"
 )
 
+// Request types of the control group.
+const (
+	TypeControlYield = "control.yield"
+)
+
 // Notice types that a subscription starts.
 const (
 	NoticeTree       = "observe.notice.tree"
@@ -38,6 +43,11 @@ const FeatureObserve = "observe"
 // A holder that advertises it sends observe.notice.state on every
 // subscription, and a viewer that does not know the notice ignores it.
 const FeatureObserveState = "observe.state"
+
+// FeatureControl is the feature name of the control group. A holder
+// advertises it only while it can yield the device, so a client that
+// finds it absent must not send control.yield.
+const FeatureControl = "control"
 
 // VersionRange is an inclusive range of major protocol versions.
 type VersionRange struct {
@@ -212,4 +222,19 @@ type FreshResult struct {
 	Paired        bool             `json:"paired"`
 	Highlightable bool             `json:"highlightable"`
 	Scale         float64          `json:"scale"`
+}
+
+// MaxBorrowerCommandBytes bounds ControlYield.Command. A longer one is
+// refused with diag.CodeInvalidArgument.
+const MaxBorrowerCommandBytes = 256
+
+// ControlYield is the data of control.yield. Command is a short human
+// readable name of the process that wants the device, for example
+// "atomyx run login.yml", which the holder may show to its own user. The
+// holder answers ok after it has committed to release the device, and
+// closes the connection once that reply is written. It answers
+// diag.CodeHolderBusy when it cannot release now, and the connection
+// stays usable.
+type ControlYield struct {
+	Command string `json:"command"`
 }
