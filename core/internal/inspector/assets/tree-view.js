@@ -134,7 +134,14 @@ export function createTreeView({ viewport, rowsEl, spacer, emptyEl, countEl }) {
     if (query.trim() === '') {
       return '';
     }
-    return found.matches.length === 0 ? 'No matches' : `${matchIndex + 1} of ${found.matches.length}`;
+    const count = found.matches.length;
+    if (count === 0) {
+      return 'No matches';
+    }
+    if (matchIndex < 0) {
+      return count === 1 ? '1 match' : `${count} matches`;
+    }
+    return `${matchIndex + 1} of ${count}`;
   }
 
   viewport.addEventListener('scroll', draw);
@@ -184,8 +191,9 @@ export function createTreeView({ viewport, rowsEl, spacer, emptyEl, countEl }) {
       capture = incoming;
       top = buildEntries(response.tree);
       if (query.trim() !== '') {
+        const keptKey = matchIndex >= 0 ? found.matches[matchIndex]?.key : undefined;
         found = search(top, query);
-        matchIndex = -1;
+        matchIndex = keptKey === undefined ? -1 : found.matches.findIndex((entry) => entry.key === keptKey);
       }
       countEl.textContent = countText();
       relayout();
