@@ -48,6 +48,9 @@ type conn struct {
 	// writerDone is closed when the writer has ended, so Server.Close can
 	// tell that every frame queued before it was written.
 	writerDone chan struct{}
+	// announced is set once the viewer handler was told this connection
+	// observes. Only the read goroutine touches it.
+	announced bool
 	// sub is the connection's live notice subscription. Only the read
 	// goroutine touches it.
 	sub *liveSubscription
@@ -105,11 +108,7 @@ func (c *conn) run() {
 	if !c.handshake() {
 		return
 	}
-	if h := c.srv.cfg.Handlers.Viewers; h != nil {
-		info := ViewerInfo{ID: c.id, Client: c.client}
-		h.ViewerAttached(info)
-		defer h.ViewerDetached(info)
-	}
+	defer c.announceDetached()
 	c.serve()
 }
 
@@ -324,6 +323,7 @@ func (c *conn) dispatch(ctx context.Context, f Frame) bool {
 		}
 	case TypeSubscribe, TypeTreeLatest, TypeScreenshotLatest, TypeTreeFresh:
 		if h := c.srv.cfg.Handlers.Observe; h != nil {
+			c.announceAttached()
 			return c.observe(ctx, h, f)
 		}
 	case TypeControlYield:
@@ -332,4 +332,27 @@ func (c *conn) dispatch(ctx context.Context, f Frame) bool {
 		}
 	}
 	return c.fail(f, diag.NewUnsupported(f.Type))
+}
+
+// announceAttached tells the viewer handler that this connection observes,
+// once. A connection that only yields control or asks for status never
+// watches the device, so it is not announced.
+func (c *conn) announceAttached() {
+	h := c.srv.cfg.Handlers.Viewers
+	if h == nil || c.announced {
+		return
+	}
+	c.announced = true
+	h.ViewerAttached(c.viewerInfo())
+}
+
+// announceDetached pairs the attach call, when one was made.
+func (c *conn) announceDetached() {
+	if c.announced {
+		c.srv.cfg.Handlers.Viewers.ViewerDetached(c.viewerInfo())
+	}
+}
+
+func (c *conn) viewerInfo() ViewerInfo {
+	return ViewerInfo{ID: c.id, Client: c.client}
 }

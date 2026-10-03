@@ -31,8 +31,8 @@ func (r *fakeRecorder) recorded() []runfolder.InterventionLine {
 }
 
 // attachNamed connects a viewer under name and returns once the holder
-// has seen it attach, because a served request is answered only after the
-// attach callback ran.
+// has seen it attach, because the first observe request is answered only
+// after the attach callback ran.
 func attachNamed(t *testing.T, path, name string) *attach.Client {
 	t.Helper()
 	c, err := attach.Dial(context.Background(), attach.ClientConfig{Path: path, Client: name})
@@ -40,7 +40,7 @@ func attachNamed(t *testing.T, path, name string) *attach.Client {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = c.Close() })
-	if err := c.Call(context.Background(), attach.TypeStatus, nil, nil); err != nil {
+	if err := c.Call(context.Background(), attach.TypeTreeLatest, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	return c

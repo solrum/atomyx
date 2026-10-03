@@ -66,8 +66,9 @@ type ViewerInfo struct {
 // show who is watching. Both methods run on the connection's own
 // goroutine, so they must return promptly.
 type ViewerHandler interface {
-	// ViewerAttached is called once per connection, after its hello
-	// request succeeded.
+	// ViewerAttached is called once per connection, when its first
+	// observe request arrives. A connection that never observes is not
+	// a viewer and is never announced.
 	ViewerAttached(info ViewerInfo)
 	// ViewerDetached is called once for each ViewerAttached, when the
 	// connection ends for any reason.

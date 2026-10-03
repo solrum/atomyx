@@ -25,8 +25,8 @@ type Viewer struct {
 }
 
 // DialViewer connects to the holder socket at path under the client name
-// and returns once the holder has seen it attach, because a served request
-// is answered only after the attach callback ran. The connection closes
+// and returns once the holder has seen it attach, because the first
+// observe request is answered only after the attach callback ran. The connection closes
 // when the test ends.
 func DialViewer(t testing.TB, path, name string) *Viewer {
 	t.Helper()
@@ -37,8 +37,8 @@ func DialViewer(t testing.TB, path, name string) *Viewer {
 	t.Cleanup(func() { _ = client.Close() })
 	v := &Viewer{client: client}
 	v.cond = sync.NewCond(&v.mu)
-	if err := v.Status(); err != nil {
-		t.Fatalf("holder status: %v", err)
+	if err := v.TreeLatest(); err != nil {
+		t.Fatalf("holder tree: %v", err)
 	}
 	return v
 }

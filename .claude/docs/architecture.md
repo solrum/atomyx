@@ -503,7 +503,9 @@ reaches the driver:
 
 Each viewer that attaches or detaches becomes a `session.Intervention`
 with the kind `viewerAttached` or `viewerDetached`, the time in epoch
-milliseconds and the viewer's client name. A holder that gives the device
+milliseconds and the viewer's client name. A connection counts as a viewer
+from its first `observe.*` request until it ends, so one that only sends
+`session.hello`, `session.status` or `control.yield` records neither kind. A holder that gives the device
 to another process records `controlBorrowed` through
 `Session.RecordIntervention`, with the borrower's command as the client. `session.InterventionSource`
 drains the pending entries, and a session that nobody drains keeps only

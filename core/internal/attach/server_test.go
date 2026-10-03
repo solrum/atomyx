@@ -321,13 +321,16 @@ func helloAs(c *rawClient, name string) Frame {
 	return c.call(TypeHello, Hello{Protocol: SupportedVersions, Client: name, Features: []string{}})
 }
 
-func TestViewerHandlerSeesEachConnectionAttachAndDetachOnce(t *testing.T) {
+func TestViewerHandlerSeesEachObservingConnectionAttachAndDetachOnce(t *testing.T) {
 	rec := newViewerRecorder()
-	srv := startServer(t, ServerConfig{Handlers: Handlers{Viewers: rec}}, nil)
+	srv := startServer(t, ServerConfig{Handlers: Handlers{Viewers: rec, Observe: newFakeObserve()}}, nil)
 	first := dialRaw(t, srv.Path())
 	helloAs(first, "viewer one")
+	first.call(TypeTreeLatest, nil)
 	second := dialRaw(t, srv.Path())
 	helloAs(second, "viewer two")
+	second.call(TypeTreeLatest, nil)
+	first.call(TypeScreenshotLatest, nil)
 
 	a, b := rec.next(t), rec.next(t)
 	if !a.attached || !b.attached || a.info.Client != "viewer one" || b.info.Client != "viewer two" {
@@ -353,6 +356,23 @@ func TestViewerHandlerSeesEachConnectionAttachAndDetachOnce(t *testing.T) {
 	rec.expectNone(t)
 }
 
+func TestConnectionThatOnlyYieldsOrSaysHelloIsNotAnnounced(t *testing.T) {
+	rec := newViewerRecorder()
+	srv := startServer(t, ServerConfig{Handlers: Handlers{Viewers: rec, Observe: newFakeObserve(), Control: &fakeControl{}}}, nil)
+	client := dialRaw(t, srv.Path())
+	helloAs(client, "atomyx run")
+	if ok := client.call(TypeControlYield, ControlYield{Command: "atomyx run"}).Ok; ok == nil || !*ok {
+		t.Fatal("yield was refused")
+	}
+	if ok := client.call(TypeBye, nil).Ok; ok == nil || !*ok {
+		t.Fatal("bye was not acknowledged")
+	}
+	if err := srv.Close(); err != nil {
+		t.Fatal(err)
+	}
+	rec.expectNone(t)
+}
+
 func TestConnectionThatNeverSaidHelloIsNotAnnounced(t *testing.T) {
 	rec := newViewerRecorder()
 	srv := startServer(t, ServerConfig{Handlers: Handlers{Viewers: rec}}, func() time.Time { return time.Unix(0, 0) })
@@ -365,7 +385,7 @@ func TestConnectionThatNeverSaidHelloIsNotAnnounced(t *testing.T) {
 
 func TestClientNameOverTheBoundIsRefusedAndNotAnnounced(t *testing.T) {
 	rec := newViewerRecorder()
-	srv := startServer(t, ServerConfig{Handlers: Handlers{Viewers: rec}}, nil)
+	srv := startServer(t, ServerConfig{Handlers: Handlers{Viewers: rec, Observe: newFakeObserve()}}, nil)
 	client := dialRaw(t, srv.Path())
 
 	tooLong := strings.Repeat("n", MaxClientNameBytes+1)
@@ -378,6 +398,7 @@ func TestClientNameOverTheBoundIsRefusedAndNotAnnounced(t *testing.T) {
 	if ok := helloAs(client, atBound).Ok; ok == nil || !*ok {
 		t.Fatal("a name of exactly the bound was refused")
 	}
+	client.call(TypeTreeLatest, nil)
 	if e := rec.next(t); !e.attached || e.info.Client != atBound {
 		t.Fatalf("attach event = %+v", e)
 	}
