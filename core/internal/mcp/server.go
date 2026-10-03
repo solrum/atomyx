@@ -96,7 +96,8 @@ func NewServer(info Info, deps ServerDeps) (*Server, error) {
 	var devices *DeviceSession
 	runSession := newRunSession(runSessionDeps{
 		Store: runStore, Catalog: runs, Starter: deps.RunStarter, Clock: clk, Logger: logger,
-		PublishStep: func(line runfolder.StepLine) { devices.PublishStep(line) },
+		PublishStep:             func(line runfolder.StepLine) { devices.PublishStep(line) },
+		SetInterventionRecorder: func(r session.InterventionRecorder) { devices.SetInterventionRecorder(r) },
 	})
 	devices = NewDeviceSession(DeviceSessionDeps{
 		Factory: deps.Factory, Probe: deps.Probe, Runners: deps.Runners, Clock: clk, TimerClock: timers, Logger: logger,

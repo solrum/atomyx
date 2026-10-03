@@ -115,7 +115,7 @@ type lifecycleFixture struct {
 
 func newLifecycleFixture(t *testing.T) *lifecycleFixture {
 	t.Helper()
-	leases, err := sessiontest.NewLeases(t.TempDir())
+	leases, err := sessiontest.NewLeases(shortTempDir(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,11 +125,12 @@ func newLifecycleFixture(t *testing.T) *lifecycleFixture {
 	}
 	runStore := storage.NewRunStore()
 	f.runs = newRunSession(runSessionDeps{
-		Store:   runStore,
-		Catalog: testRunCatalog(storage.NewInMemoryStorage(), f.root),
-		Starter: testRunStarter(f.root),
-		Clock:   f.clk,
-		Logger:  logging.NoopLogger{},
+		Store:                   runStore,
+		Catalog:                 testRunCatalog(storage.NewInMemoryStorage(), f.root),
+		Starter:                 testRunStarter(f.root),
+		Clock:                   f.clk,
+		Logger:                  logging.NoopLogger{},
+		SetInterventionRecorder: func(r session.InterventionRecorder) { f.devices.SetInterventionRecorder(r) },
 	})
 	f.devices = f.newDevices("atomyx-mcp", f.factory)
 	t.Cleanup(f.devices.Close)

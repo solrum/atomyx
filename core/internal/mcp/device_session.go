@@ -203,6 +203,15 @@ type DeviceSession struct {
 	// gate keeps a fresh capture of any session this host holds from
 	// interleaving with a tool call. It outlives each held session.
 	gate *session.ActivityGate
+
+	// recMu guards the three fields below. It is a leaf lock, so a run
+	// session may call SetInterventionRecorder while it holds its own lock.
+	recMu sync.Mutex
+	// recorder is where the open run keeps interventions, nil when no run
+	// is routed.
+	recorder session.InterventionRecorder
+	// recSess is the newest installed session, which receives recorder.
+	recSess *session.Session
 }
 
 // errSessionClosed is returned by Select once the session has been
@@ -522,6 +531,7 @@ func (s *DeviceSession) install(ctx context.Context, sess *session.Session, plat
 	s.sess = sess
 	s.active = active
 	s.remembered = &rememberedDevice{desc: desc}
+	s.bindRecorder(sess)
 	s.state = holderRunning
 	s.settleLocked() //nolint:contextcheck // idle timers outlive any call, so they take no call context
 	s.mu.Unlock()
@@ -873,4 +883,25 @@ func (s *DeviceSession) PublishStep(line runfolder.StepLine) {
 	if held != nil {
 		held.PublishStep(line)
 	}
+}
+
+// SetInterventionRecorder routes the interventions of the held device to
+// recorder, which a run sets when it opens and clears with nil when it
+// ends. A session installed later receives the same recorder, so a run
+// opened before a device was selected still keeps what happens to it.
+func (s *DeviceSession) SetInterventionRecorder(recorder session.InterventionRecorder) {
+	s.recMu.Lock()
+	defer s.recMu.Unlock()
+	s.recorder = recorder
+	if s.recSess != nil {
+		s.recSess.SetInterventionRecorder(recorder)
+	}
+}
+
+// bindRecorder hands the current recorder to a newly installed session.
+func (s *DeviceSession) bindRecorder(sess *session.Session) {
+	s.recMu.Lock()
+	defer s.recMu.Unlock()
+	s.recSess = sess
+	sess.SetInterventionRecorder(s.recorder)
 }

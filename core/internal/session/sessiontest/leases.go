@@ -53,3 +53,9 @@ func (f *Leases) FireRecheck() { f.clk.Fire() }
 func (f *Leases) LockPathFor(platform, hardwareID string) string {
 	return f.LockPath(lease.KeyFor(platform, hardwareID))
 }
+
+// SocketPathFor reports the holder socket of the device with the given
+// platform and hardware id.
+func (f *Leases) SocketPathFor(platform, hardwareID string) string {
+	return f.SocketPath(lease.KeyFor(platform, hardwareID))
+}

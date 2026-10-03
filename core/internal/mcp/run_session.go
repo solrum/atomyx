@@ -13,6 +13,7 @@ import (
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/runner"
+	"dev.atomyx/internal/session"
 	"dev.atomyx/internal/storage"
 )
 
@@ -72,14 +73,18 @@ type RunStarter interface {
 // that ended last, so a later script replaces the counts of an earlier
 // one.
 type runSession struct {
-	store        *storage.RunStore
-	catalog      *storage.RunCatalog
-	starter      RunStarter
-	clock        orchestra.Clock
-	logger       logging.Logger
-	drainTimeout time.Duration
-	bare         *scriptFlight
-	publishStep  func(runfolder.StepLine)
+	store                   *storage.RunStore
+	catalog                 *storage.RunCatalog
+	starter                 RunStarter
+	clock                   orchestra.Clock
+	logger                  logging.Logger
+	drainTimeout            time.Duration
+	bare                    *scriptFlight
+	publishStep             func(runfolder.StepLine)
+	setInterventionRecorder func(session.InterventionRecorder)
+
+	routeMu sync.Mutex
+	routed  *runfolder.Writer
 
 	mu        sync.Mutex
 	writer    *runfolder.Writer
@@ -96,13 +101,17 @@ type runSessionDeps struct {
 	// PublishStep receives every step line a script run appends, so the
 	// viewers of the held device follow the run. Nil publishes nothing.
 	PublishStep func(runfolder.StepLine)
+	// SetInterventionRecorder receives the writer of the run whose folder
+	// should keep interventions, and nil when that run ends. Nil routes
+	// nothing.
+	SetInterventionRecorder func(session.InterventionRecorder)
 }
 
 func newRunSession(deps runSessionDeps) *runSession {
 	return &runSession{
 		store: deps.Store, catalog: deps.Catalog, starter: deps.Starter,
 		clock: deps.Clock, logger: deps.Logger, artifacts: &artifactCounter{},
-		drainTimeout: runDrainTimeout, bare: newScriptFlight(), flight: newScriptFlight(), publishStep: deps.PublishStep,
+		drainTimeout: runDrainTimeout, bare: newScriptFlight(), flight: newScriptFlight(), publishStep: deps.PublishStep, setInterventionRecorder: deps.SetInterventionRecorder,
 	}
 }
 
@@ -150,6 +159,7 @@ func (s *runSession) Start(ctx context.Context, name string, source *string, dev
 		})
 	}
 	s.writer, s.artifacts, s.flight = writer, &artifactCounter{}, newScriptFlight()
+	s.route(writer, true)
 	return startedRun{Run: started.Run, Superseded: started.ErroredPredecessor}, nil
 }
 
@@ -295,6 +305,7 @@ func (s *runSession) finalizeLocked(w *runfolder.Writer, run *storage.RunRecord,
 	if w == nil {
 		return nil
 	}
+	s.unroute(w)
 	err := w.Finalize(outcome, func(m *runfolder.Meta) {
 		info := mcpInfoOf(run)
 		if m.MCP != nil {
@@ -388,4 +399,38 @@ func outcomeOfFinishStatus(status string) runfolder.Outcome {
 // carries and the tool payloads keep reporting.
 func legacyStatusOf(outcome runfolder.Outcome) storage.RunStatus {
 	return storage.RunStatus(runfolder.LegacyStatusOf(runfolder.Meta{Outcome: outcome}))
+}
+
+// route sends the interventions of the held device to w until unroute.
+// An unconditional route replaces the current one. A conditional route
+// leaves a run that is already routed alone and reports whether it took
+// over, so a script that is its own run never steals interventions from
+// an open run.
+func (s *runSession) route(w *runfolder.Writer, replace bool) bool {
+	if s.setInterventionRecorder == nil {
+		return false
+	}
+	s.routeMu.Lock()
+	defer s.routeMu.Unlock()
+	if !replace && s.routed != nil {
+		return false
+	}
+	s.routed = w
+	s.setInterventionRecorder(w)
+	return true
+}
+
+// unroute stops sending interventions to w. It does nothing when another
+// run was routed in the meantime.
+func (s *runSession) unroute(w *runfolder.Writer) {
+	if s.setInterventionRecorder == nil {
+		return
+	}
+	s.routeMu.Lock()
+	defer s.routeMu.Unlock()
+	if s.routed != w {
+		return
+	}
+	s.routed = nil
+	s.setInterventionRecorder(nil)
 }

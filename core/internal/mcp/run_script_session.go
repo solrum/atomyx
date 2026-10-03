@@ -106,7 +106,9 @@ func (s *runSession) runAsOwnRun(
 		return runner.ScriptResult{}, err
 	}
 	artifacts := newScriptArtifacts(dir, &artifactCounter{}, s.logger)
+	s.route(w, false)
 	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: w.ID(), Artifacts: artifacts, Evidence: artifacts, OnStep: stepstream.NewSink(w, s.logger, stepstream.WithPublisher(s.publishStep))})
+	s.unroute(w)
 	finalizeErr := w.Finalize(scriptOutcome(ctx, result, execErr), func(m *runfolder.Meta) {
 		m.TotalSteps = result.TotalSteps
 		m.FailedAtStep = result.FailedAtStep
