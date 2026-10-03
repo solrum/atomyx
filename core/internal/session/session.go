@@ -19,6 +19,11 @@ import (
 // finish inside the shared shutdown grace period.
 var ErrDisconnectTimeout = errors.New("device disconnect did not finish in time")
 
+// ErrAttachStopTimeout reports that the attach server did not stop inside
+// the shared shutdown grace period, for example because a viewer's request
+// is stuck in a driver call that never returns.
+var ErrAttachStopTimeout = errors.New("attach server did not stop in time")
+
 // ErrDeviceLost is wrapped by every cause LostErr reports, so a caller
 // that holds only a cancellation cause can tell a lost device from a
 // user stop. The wrapped cause names what ended the session: the lease
@@ -113,8 +118,9 @@ func (s *Session) Orchestra() *orchestra.Orchestra { return s.built.Orchestra }
 
 // Lost is closed when the session lost the device without choosing to:
 // the lease file was replaced under it and re-acquiring failed, or a
-// process the control plane depends on exited on its own. The owner decides what to do, normally by ending the run in flight and
-// closing the session.
+// process the control plane depends on exited on its own. The owner
+// decides what to do. Normally it ends the run in flight and closes the
+// session.
 func (s *Session) Lost() <-chan struct{} { return s.lost }
 
 // Closed is closed once Close has finished, so a goroutine that waits on
@@ -224,11 +230,18 @@ func (s *Session) updateHolder(mutate func(*lease.Holder)) error {
 	return err
 }
 
-// Close ends the session: it stops the lease watcher, stops the attach
-// server and closes every viewer connection, removes the socket file,
-// disconnects the driver, which stops a runner the factory launched, and
-// releases the lease. The server stop and the disconnect together are
-// bounded by the shared shutdown grace period. Close is idempotent and returns the first call's result.
+// Close ends the session. It stops the lease watcher, then stops the
+// attach server and disconnects the driver at the same time, then
+// releases the lease.
+//
+// Stopping the server closes every viewer connection and removes the
+// socket file. Disconnecting the driver stops a runner the factory
+// launched. The two run side by side because a viewer's fresh capture can
+// be stuck in a driver call that only Disconnect ends, so the disconnect
+// must never wait behind the server. Both are bounded by the shared
+// shutdown grace period.
+//
+// Close is idempotent and returns the first call's result.
 func (s *Session) Close() error {
 	s.closeOnce.Do(func() {
 		s.watchCancel()
@@ -240,14 +253,23 @@ func (s *Session) Close() error {
 		s.mu.Unlock()
 
 		disconnected := make(chan error, 1)
-		var disconnectErr error
-		if shutdown.Bounded(s.deps.Clock, shutdown.GracePeriod, func() {
-			s.stopAttach()
+		attachStopped := make(chan struct{})
+		finished := shutdown.Bounded(s.deps.Clock, shutdown.GracePeriod, func() {
+			go func() {
+				defer close(attachStopped)
+				s.stopAttach()
+			}()
 			disconnected <- s.built.Driver.Disconnect()
-		}) {
-			disconnectErr = <-disconnected
-		} else {
+			<-attachStopped
+		})
+		var disconnectErr error
+		select {
+		case disconnectErr = <-disconnected:
+		default:
 			disconnectErr = ErrDisconnectTimeout
+		}
+		if !finished && !errors.Is(disconnectErr, ErrDisconnectTimeout) {
+			disconnectErr = errors.Join(disconnectErr, ErrAttachStopTimeout)
 		}
 		s.hub.Close()
 		var releaseErr error
