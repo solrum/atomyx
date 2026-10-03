@@ -186,14 +186,20 @@ corresponding area. For the high-level map see
   because a runner outlives the session that used it. Reaping before the
   lease, or without it, can signal the runner of a live holder.
 - **Adopt a recorded runner only when every condition holds.** The
-  record must name this device, its owner must be this process or gone,
-  the recorded `xcodebuild` process must still be the recorded one, the
+  record must name this device, the recorded `xcodebuild` process must still be the recorded one, the
   runner must answer with the recorded launch id, and the record's build
   product must match the product on disk. Dropping the build check
   adopts a runner that runs old Swift code. Dropping the identity check
   adopts whatever now answers on a recycled port. Only one runner fits
   per simulator, so an adopted runner that fails the post-connect probe
-  is ended before a fresh one is launched.
+  is ended before a fresh one is launched. The recorded owner is not a
+  condition, because holding the lease is what entitles a process to
+  drive the runner. The adopter rewrites the owner to itself.
+- **The keeper stops a runner only under the device lease.** It takes the
+  lease with one non-blocking attempt, skips the runner when the lease is
+  held, reads the owner from the record again after taking it, and
+  releases the lease right after the stop. Stopping a runner without the
+  lease can end the runner a live holder is driving.
 - **An adopted runner has no child process.** Its loss is found by
   polling the recorded pid and start time, so a change to that watcher
   must keep comparing the start time, because a recycled pid is a

@@ -42,8 +42,9 @@ const runnerStateFileMode = 0o600
 // OwnerPid and OwnerStartTime identify the process that answers for the
 // runner, the one that stops it when it exits. The owner is not the
 // runner's parent and not any single session: a session closing leaves
-// the runner running, and only the owning process ending, or an owner
-// that is no longer alive, makes the runner a candidate for reaping.
+// the runner running. A process that holds the device lease may adopt the
+// runner and becomes its owner, and the previous owner then leaves it
+// running.
 type RunnerState struct {
 	UDID             string    `json:"udid"`
 	Kind             string    `json:"kind"`

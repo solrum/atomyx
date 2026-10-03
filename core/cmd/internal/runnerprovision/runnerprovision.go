@@ -5,6 +5,9 @@
 package runnerprovision
 
 import (
+	"os"
+
+	clk "dev.atomyx/internal/clock"
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/lease"
 	"dev.atomyx/internal/logging"
@@ -16,8 +19,9 @@ import (
 // on its own port, ends the runner an earlier holder left recorded
 // before each launch, and records each launched runner next to the
 // device lease files. It also returns the RunnerKeeper that holds every runner
-// the provisioner launches, which the caller stops through Cleanup when
-// its process exits. When the runtime directory cannot be resolved, the
+// the provisioner launches or adopts, which the caller stops through Cleanup
+// when its process exits. The keeper stops a device's runner only after it
+// takes that device's lease with one non-blocking attempt. When the runtime directory cannot be resolved, the
 // provisioner still launches runners but writes no record, and a warning
 // says so.
 func New(runner process.Runner, background process.BackgroundRunner, clock orchestra.Clock, logger logging.Logger) (*device.DriverProvisioner, *device.RunnerKeeper) {
@@ -30,11 +34,12 @@ func New(runner process.Runner, background process.BackgroundRunner, clock orche
 		Clock:      clock,
 		Logger:     logger,
 	}
-	dir, err := lease.ResolveRuntimeDir(lease.DefaultEnvironment())
+	leases, err := lease.NewManager(lease.DefaultEnvironment(), clk.SystemClock{})
 	if err != nil {
 		logger.Warn("runner records are disabled because the runtime directory is unusable", logging.LogContext{"error": err.Error()})
 	} else {
-		deps.RunnerStateDir = dir
+		deps.RunnerStateDir = leases.Dir()
+		keeper.TakeLeaseWith(leaseAttempt(leases, os.Getpid(), cleanupHolderCommand))
 		deps.RunnerStateKey = func(udid string) string {
 			return string(lease.KeyFor(string(device.PlatformIOS), udid))
 		}

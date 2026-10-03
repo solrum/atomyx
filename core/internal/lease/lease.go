@@ -113,8 +113,19 @@ type Lease struct {
 // since it was opened forces a bounded restart, and persistent
 // replacement returns ErrLockFileReplaced.
 func (m *Manager) Acquire(ctx context.Context, key Key, holder Holder) (*Lease, error) {
+	return m.acquire(ctx, key, holder, AcquireRetryWindow)
+}
+
+// TryAcquire takes the exclusive lease for key with one non-blocking
+// flock attempt and no retry window. A lease that is held, even for an
+// instant, is reported at once as a *HeldError.
+func (m *Manager) TryAcquire(ctx context.Context, key Key, holder Holder) (*Lease, error) {
+	return m.acquire(ctx, key, holder, 0)
+}
+
+func (m *Manager) acquire(ctx context.Context, key Key, holder Holder, retryWindow time.Duration) (*Lease, error) {
 	path := m.LockPath(key)
-	f, err := m.lockFile(ctx, path)
+	f, err := m.lockFile(ctx, path, retryWindow)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +137,7 @@ func (m *Manager) Acquire(ctx context.Context, key Key, holder Holder) (*Lease, 
 	return l, nil
 }
 
-func (m *Manager) lockFile(ctx context.Context, path string) (*os.File, error) {
+func (m *Manager) lockFile(ctx context.Context, path string, retryWindow time.Duration) (*os.File, error) {
 	for attempt := 0; attempt < maxAcquireAttempts; attempt++ {
 		f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, fileMode)
 		if err != nil {
@@ -135,7 +146,7 @@ func (m *Manager) lockFile(ctx context.Context, path string) (*os.File, error) {
 		if m.afterOpen != nil {
 			m.afterOpen(attempt)
 		}
-		if err := m.flockWithRetry(ctx, f); err != nil {
+		if err := m.flockWithRetry(ctx, f, retryWindow); err != nil {
 			_ = f.Close()
 			if flock.IsContended(err) {
 				h, known := readHolder(path)
@@ -151,8 +162,8 @@ func (m *Manager) lockFile(ctx context.Context, path string) (*os.File, error) {
 	return nil, ErrLockFileReplaced
 }
 
-func (m *Manager) flockWithRetry(ctx context.Context, f *os.File) error {
-	deadline := m.clock.NowMs() + AcquireRetryWindow.Milliseconds()
+func (m *Manager) flockWithRetry(ctx context.Context, f *os.File, retryWindow time.Duration) error {
+	deadline := m.clock.NowMs() + retryWindow.Milliseconds()
 	for {
 		err := flock.TryExclusive(f)
 		if err == nil {
@@ -233,7 +244,7 @@ func (l *Lease) Recheck(ctx context.Context) error {
 	}
 	_ = l.file.Close()
 	l.file = nil
-	f, err := l.m.lockFile(ctx, l.path)
+	f, err := l.m.lockFile(ctx, l.path, AcquireRetryWindow)
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrLost, err)
 	}
@@ -305,7 +316,7 @@ func (m *Manager) Probe(ctx context.Context, key Key) (Status, error) {
 		return Status{}, fmt.Errorf("open lease file %s: %w", path, err)
 	}
 	defer func() { _ = f.Close() }()
-	if err := m.flockWithRetry(ctx, f); err != nil {
+	if err := m.flockWithRetry(ctx, f, AcquireRetryWindow); err != nil {
 		if flock.IsContended(err) {
 			h, known := readHolder(path)
 			return Status{Held: true, Holder: h, HolderKnown: known}, nil

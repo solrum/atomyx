@@ -371,7 +371,7 @@ func (p *DriverProvisioner) ProvisionIOSAgent(ctx context.Context, udid string, 
 	if !p.deps.FixedIosPort {
 		if !opts.Fresh {
 			if state, ok := p.adopt(ctx, udid, cfg); ok {
-				held = launchRecord{path: p.statePath(udid), runnerID: state.RunnerID, owner: RunnerOwner{Pid: state.OwnerPid, StartTime: state.OwnerStartTime}}
+				held = launchRecord{udid: udid, path: p.statePath(udid), runnerID: state.RunnerID, owner: RunnerOwner{Pid: state.OwnerPid, StartTime: state.OwnerStartTime}}
 				return p.adoptedAgent(ctx, state, held, udid, lostHook(LostRunner), func(stop func() error) { ended = stop }), nil
 			}
 		}
@@ -506,7 +506,7 @@ func (p *DriverProvisioner) afterSpawn(udid string, kind IosAgentKind, runnerID 
 		if err != nil {
 			return nil, err
 		}
-		*held = launchRecord{path: statePath, runnerID: runnerID, owner: RunnerOwner{Pid: state.OwnerPid, StartTime: state.OwnerStartTime}}
+		*held = launchRecord{udid: udid, path: statePath, runnerID: runnerID, owner: RunnerOwner{Pid: state.OwnerPid, StartTime: state.OwnerStartTime}}
 		removeRecord := func() {
 			if statePath != "" {
 				removeRunnerStateOf(statePath, runnerID, held.owner)
@@ -829,7 +829,7 @@ func (f *FakeProvisioner) ProvisionIOSAgent(ctx context.Context, udid string, ki
 	keeper := f.keeper
 	f.mu.Unlock()
 	if keeper != nil && err == nil {
-		keeper.keep(launchRecord{runnerID: udid}, kill)
+		keeper.keep(launchRecord{udid: udid, runnerID: udid}, kill)
 	}
 	return IOSAgent{Port: port, RunnerID: "fake-runner-" + udid, Adopted: adopted && err == nil, Kill: kill}, err
 }
@@ -887,6 +887,7 @@ func (f *FakeProvisioner) ReinstallAndroidAgent(_ context.Context, serial string
 // launchRecord names the runner record one launch wrote, so the loss
 // hooks can tell whether the record still belongs to this launch.
 type launchRecord struct {
+	udid     string
 	path     string
 	runnerID string
 	owner    RunnerOwner

@@ -483,3 +483,40 @@ func TestAcquire_LockDescriptorIsCloseOnExec(t *testing.T) {
 		t.Fatal("lock descriptor is not close-on-exec")
 	}
 }
+
+func TestTryAcquire_ReportsAHeldLeaseAtOnceWithoutRetrying(t *testing.T) {
+	clk := clock.NewFakeClock(0)
+	m := newManagerAt(t.TempDir(), clk)
+	key := KeyFor("android", "A")
+	first, err := m.Acquire(context.Background(), key, testHolder(1, "a"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = first.Release() }()
+
+	_, err = m.TryAcquire(context.Background(), key, testHolder(2, "b"))
+
+	var held *HeldError
+	if !errors.As(err, &held) {
+		t.Fatalf("err = %v, want HeldError", err)
+	}
+	if got := clk.NowMs(); got != 0 {
+		t.Fatalf("clock advanced %dms, want the attempt to return without waiting", got)
+	}
+}
+
+func TestTryAcquire_TakesAFreeLease(t *testing.T) {
+	m := newTestManager(t)
+	key := KeyFor("android", "A")
+
+	l, err := m.TryAcquire(context.Background(), key, testHolder(2, "b"))
+	if err != nil {
+		t.Fatalf("TryAcquire() error = %v", err)
+	}
+	if err := l.Release(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.TryAcquire(context.Background(), key, testHolder(3, "c")); err != nil {
+		t.Fatalf("TryAcquire() after release error = %v", err)
+	}
+}

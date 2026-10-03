@@ -154,6 +154,10 @@ func TestDriverProvisioner_ProvisionIOSAgent_AdoptsARunnerWhoseEveryConditionHol
 		name  string
 		setup func(f *launchFixture)
 	}{
+		{"owner is another live process", func(f *launchFixture) {
+			f.inspector.Set(process.ProcessInfo{PID: foreignOwnerPid, PGID: foreignOwnerPid, Command: "atomyx", StartTime: testOwnerStart})
+			f.rewriteRecord(t, "SIM-1", func(s *RunnerState) { s.OwnerPid, s.OwnerStartTime = foreignOwnerPid, testOwnerStart })
+		}},
 		{"owner is this process", func(f *launchFixture) {
 			f.rewriteRecord(t, "SIM-1", func(s *RunnerState) { s.OwnerPid, s.OwnerStartTime = adoptingOwnerPid, adoptingOwnerStart })
 		}},
@@ -208,10 +212,6 @@ func TestDriverProvisioner_ProvisionIOSAgent_EndsAndReplacesARunnerThatFailsAnAd
 	}{
 		{"record names another device", "belongs to another device", func(t *testing.T, f *launchFixture, _ RunnerState) {
 			f.rewriteRecord(t, "SIM-1", func(s *RunnerState) { s.UDID = "SIM-2" })
-		}},
-		{"owner is another live process", "another live process", func(t *testing.T, f *launchFixture, _ RunnerState) {
-			f.inspector.Set(process.ProcessInfo{PID: foreignOwnerPid, PGID: foreignOwnerPid, Command: "atomyx", StartTime: testOwnerStart})
-			f.rewriteRecord(t, "SIM-1", func(s *RunnerState) { s.OwnerPid = foreignOwnerPid })
 		}},
 		{"host rebooted since the record", "rebooted", func(t *testing.T, f *launchFixture, _ RunnerState) {
 			f.rewriteRecord(t, "SIM-1", func(s *RunnerState) { s.HostBootTime = s.HostBootTime.Add(-time.Hour) })

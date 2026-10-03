@@ -274,22 +274,28 @@ Build and run layout, both under `platforms/ios-agent/build`:
 
 #### Runner ownership
 
-A runner lives as long as the process that launched it, not as long as
-the session that first used it. The process that launches a runner writes
-itself into the record as owner.
+A runner lives as long as the process that launched or adopted it, not as
+long as the session that first used it. That process writes itself into
+the record as owner.
 
 - Closing a session, whether a normal close or an idle release, ends the
   driver's connection and leaves the runner running.
 - `device.RunnerKeeper` (`core/internal/device/runner_keeper.go`) holds
-  every runner its process launched. `atomyx` and `atomyx-mcp` build one
+  every runner its process launched or adopted. `atomyx` and `atomyx-mcp` build one
   in `core/cmd/internal/runnerprovision` and run its `Cleanup` on both
   exit paths: after the command or the server returns, and in the stop
   watchdog that SIGINT and SIGTERM arm. Both are bounded by
   `shutdown.GracePeriod`.
 - `RunnerKeeper.StopAll` stops each kept runner, its tunnel and its record
-  through the provisioner's single kill path, and skips a runner whose
-  record names another process as owner. It runs once, and a later call
-  waits for the first.
+  through the provisioner's single kill path. For each runner it first
+  takes that device's lease with one non-blocking attempt
+  (`lease.Manager.TryAcquire`, supplied through `LeaseAttempt` by
+  `core/cmd/internal/runnerprovision`) and releases the lease right after.
+  It skips a runner whose lease is held, because another process is using
+  the device. It reads the owner from the record again after it takes the
+  lease and skips a runner whose record names another process, because
+  that process adopted it. It runs once, and a later call waits for the
+  first.
 - A Connect failure stops the runner at once, because no session ever
   used it. `device.Built.Release` stops it for a caller that owns the
   driver outright, and the Studio sidecar calls it after it disposes a
@@ -307,8 +313,6 @@ recorded runner only when all of these hold:
 
 - The record names this device and a simulator runner, and carries a
   launch id and a port.
-- The recorded owner is this process, or is no longer alive. An owner
-  whose pid now belongs to a process that started later counts as gone.
 - The reaper's checks pass: the host has not rebooted since the record
   was written, and the recorded pid is still the live `xcodebuild`
   process that was recorded.
@@ -320,14 +324,17 @@ recorded runner only when all of these hold:
   runner app. A product that is missing or older than a Swift source or
   the project file matches nothing.
 
-When any condition fails, the provisioner logs the reason, ends the
-recorded runner through the reaper, and launches a new one. A physical
-device runner is never adopted.
+The recorded owner is not a condition. Holding the device lease is what
+entitles a process to drive the runner, so a runner whose owner is
+another live process is adopted too. When any condition fails, the
+provisioner logs the reason, ends the recorded runner through the reaper,
+and launches a new one. A physical device runner is never adopted.
 
 An adopting process:
 
-- writes itself into the record as owner, and registers the runner with
-  its `RunnerKeeper`, so the keeper stops it when the process exits
+- writes itself into the record as owner, so the previous owner's keeper
+  skips the runner, and registers the runner with its own `RunnerKeeper`,
+  so that keeper stops it when the process exits
 - passes the recorded port and launch id to the driver
 - watches the runner's `xcodebuild` pid and start time every
   `adoptedRunnerWatchPeriod` (2 s), because an adopted runner has no

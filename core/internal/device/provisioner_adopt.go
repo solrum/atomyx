@@ -24,11 +24,15 @@ var _ AdoptingProvisioner = (*DriverProvisioner)(nil)
 // rewritten record. A runner is adopted only when all of these hold:
 //
 //   - the record names udid and a simulator runner
-//   - its owner is this process or no longer alive
 //   - the host has not rebooted and the recorded process is still the
 //     recorded runner
 //   - the runner answers on the recorded port with the recorded launch id
 //   - the record names the compiled product that is on disk now
+//
+// The recorded owner is no obstacle, even when it is another live
+// process, because holding the device lease is what entitles a process
+// to drive the runner. The adopter rewrites the record's owner to
+// itself, so the previous owner's keeper leaves the runner running.
 //
 // The caller must hold the device lease, because only then does no
 // other process drive the runner.
@@ -61,9 +65,6 @@ func (p *DriverProvisioner) adopt(ctx context.Context, udid string, cfg iosdrive
 
 // adoptionBlocker returns why state cannot be adopted, or an empty string.
 func (p *DriverProvisioner) adoptionBlocker(ctx context.Context, state RunnerState, udid string, cfg iosdriver.LaunchConfig) string {
-	if reason := p.ownerBlocksAdoption(state); reason != "" {
-		return reason
-	}
 	if reason := p.deps.Reaper.AdoptionBlocker(state, udid); reason != "" {
 		return reason
 	}
@@ -77,27 +78,6 @@ func (p *DriverProvisioner) adoptionBlocker(ctx context.Context, state RunnerSta
 		return "the runner was started from a different build of the runner product"
 	}
 	return ""
-}
-
-// ownerBlocksAdoption reports why the recorded owner keeps another
-// process from adopting its runner. The owner is no obstacle when it is
-// this process, when the record names none, when its process is gone, or
-// when its pid now belongs to a process that started later.
-func (p *DriverProvisioner) ownerBlocksAdoption(state RunnerState) string {
-	if state.OwnerPid <= 0 || state.OwnerPid == p.ownPid() {
-		return ""
-	}
-	info, err := p.inspector.Inspect(state.OwnerPid)
-	if errors.Is(err, process.ErrProcessNotFound) {
-		return ""
-	}
-	if err != nil {
-		return "the recorded owner cannot be inspected"
-	}
-	if absDuration(info.StartTime.Sub(state.OwnerStartTime)) > startTimeTolerance {
-		return ""
-	}
-	return "the recorded owner is another live process"
 }
 
 // ownOwner identifies this process as the owner of a runner.
