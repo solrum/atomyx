@@ -132,6 +132,12 @@ type DriverProvisionerDeps struct {
 	// Keeper, when set, receives every runner this provisioner launches
 	// so the process that owns the keeper can stop them when it exits.
 	Keeper *RunnerKeeper
+	// Reaper ends the runner an earlier holder of the device left
+	// recorded, before a launch. The provisioner runs only under the
+	// device lease, so a recorded runner belongs to a holder that is
+	// gone or idle. Nil leaves a recorded runner alone, and so does
+	// FixedIosPort, which writes no record.
+	Reaper *RunnerReaper
 }
 
 // DriverProvisioner is the production AgentProvisioner: each call
@@ -348,6 +354,7 @@ func (p *DriverProvisioner) EnsureIOSAgentWatched(ctx context.Context, udid stri
 	cfg := p.iosLaunchConfig(udid, kind)
 	cfg.OnRunnerExit = lostHook(LostRunner)
 	if !p.deps.FixedIosPort {
+		p.reapOrphan(ctx, udid)
 		cfg.RunnerID = p.newRunnerID()
 		cfg.AllocatePort = p.reservePort
 		cfg.ReleasePort = func(port int) { p.releasePorts(port) }
@@ -377,6 +384,37 @@ func (p *DriverProvisioner) EnsureIOSAgentWatched(ctx context.Context, udid stri
 		p.deps.Keeper.keep(held, stop)
 	}
 	return port, stop, nil
+}
+
+// statePath returns the runner record path for udid, or an empty string
+// when records are disabled.
+func (p *DriverProvisioner) statePath(udid string) string {
+	if p.deps.RunnerStateDir == "" || p.deps.RunnerStateKey == nil {
+		return ""
+	}
+	return RunnerStatePath(p.deps.RunnerStateDir, p.deps.RunnerStateKey(udid))
+}
+
+// reapOrphan ends the runner an earlier holder of udid left recorded. A
+// failure to end it is logged and does not stop the launch, because the
+// launcher still refuses a runner that is not its own.
+func (p *DriverProvisioner) reapOrphan(ctx context.Context, udid string) {
+	path := p.statePath(udid)
+	if p.deps.Reaper == nil || path == "" {
+		return
+	}
+	outcome, err := p.deps.Reaper.Reap(ctx, path, udid)
+	fields := logging.LogContext{"udid": udid, "pgid": outcome.PGID}
+	switch {
+	case err != nil:
+		fields["error"] = err.Error()
+		p.logger.Warn("could not end an orphaned runner", fields)
+	case outcome.Signaled || outcome.TerminatedViaSimctl:
+		p.logger.Info("ended an orphaned runner", fields)
+	}
+	if outcome.TunnelSignaled {
+		p.logger.Info("ended an orphaned iproxy tunnel", logging.LogContext{"udid": udid})
+	}
 }
 
 // Prepare implements RunnerPreparer. It builds the iOS runner when it is
@@ -483,7 +521,8 @@ func (p *DriverProvisioner) afterSpawn(udid string, kind IosAgentKind, runnerID 
 // returns its path and content, or an empty path when records are
 // disabled.
 func (p *DriverProvisioner) recordRunner(udid string, kind IosAgentKind, runnerID string, spawned iosdriver.SpawnedRunner) (string, RunnerState, error) {
-	if p.deps.RunnerStateDir == "" || p.deps.RunnerStateKey == nil {
+	path := p.statePath(udid)
+	if path == "" {
 		return "", RunnerState{}, nil
 	}
 	info, err := p.inspector.Inspect(spawned.Pid)
@@ -499,7 +538,6 @@ func (p *DriverProvisioner) recordRunner(udid string, kind IosAgentKind, runnerI
 	if err != nil {
 		return "", RunnerState{}, fmt.Errorf("record the runner: %w", err)
 	}
-	path := RunnerStatePath(p.deps.RunnerStateDir, p.deps.RunnerStateKey(udid))
 	state := RunnerState{
 		UDID:             udid,
 		Kind:             string(kind),

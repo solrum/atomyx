@@ -179,8 +179,9 @@ corresponding area. For the high-level map see
 
 ## Session ownership
 
-- **Reap a recorded runner only after the lease is held.** A held lease
-  proves no other session drives the device. A free lease does not prove
+- **Reap a recorded runner only after the lease is held.** The
+  provisioner reaps while it launches, which runs after `session.Open`
+  took the lease. A held lease proves no other session drives the device. A free lease does not prove
   the record's owner is gone, because a runner outlives the session that
   used it. Reaping before the lease, or without it, can signal the runner
   of a live holder.

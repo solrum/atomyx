@@ -1,7 +1,6 @@
 // Package sessionwire builds the session dependencies and timeouts the
 // CLI and the MCP server share, so both composition roots arbitrate
-// devices through the same lease directory, identity rules and orphan
-// reaping.
+// devices through the same lease directory and identity rules.
 package sessionwire
 
 import (
@@ -39,7 +38,6 @@ func Deps(runner process.Runner, clk clock.Clock, logger logging.Logger, command
 		Identity: device.NewIdentityResolver(runner),
 		Leases:   leases,
 		Sockets:  leases,
-		Reaper:   device.NewRunnerReaper(device.RunnerReaperDeps{Runner: runner, Clock: clk, Logger: logger}),
 		Clock:    clk,
 		Logger:   logger,
 		Command:  command,

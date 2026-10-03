@@ -328,11 +328,12 @@ name an unrelated process, so a reader trusts it only when
 
 #### Orphan reaping
 
-`session.Open` reads the record after it has acquired the device lease,
-because a held lease proves no other session drives the device. The
-reaper reads no owner field, so it ends a recorded runner even when its
-owner is alive and idle.
-`device.RunnerReaper` then ends the orphan. It reads the process through
+`device.DriverProvisioner` reads the record before it launches a runner,
+and it runs only under the device lease that `session.Open` holds,
+because a held lease proves no other session drives the device. A
+provisioner built with `FixedIosPort` writes no record and reaps nothing.
+The reaper reads no owner field, so it ends a recorded runner even when
+its owner is alive and idle. `device.RunnerReaper` ends the orphan. It reads the process through
 `process.Inspector`, which asks the kernel for the pid's start time,
 user, command name and process group, and it signals the recorded group
 only when all of these hold:

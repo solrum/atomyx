@@ -13,8 +13,9 @@ import (
 )
 
 // New returns a DriverProvisioner that launches a runner per iOS target
-// on its own port and records each launched runner next to the device
-// lease files. It also returns the RunnerKeeper that holds every runner
+// on its own port, ends the runner an earlier holder left recorded
+// before each launch, and records each launched runner next to the
+// device lease files. It also returns the RunnerKeeper that holds every runner
 // the provisioner launches, which the caller stops through Cleanup when
 // its process exits. When the runtime directory cannot be resolved, the
 // provisioner still launches runners but writes no record, and a warning
@@ -23,6 +24,7 @@ func New(runner process.Runner, background process.BackgroundRunner, clock orche
 	keeper := device.NewRunnerKeeper()
 	deps := device.DriverProvisionerDeps{
 		Keeper:     keeper,
+		Reaper:     device.NewRunnerReaper(device.RunnerReaperDeps{Runner: runner, Clock: clock, Logger: logger}),
 		Runner:     runner,
 		Background: background,
 		Clock:      clock,

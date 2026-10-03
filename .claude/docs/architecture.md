@@ -331,13 +331,7 @@ for a host that does not need to split them.
 2. Acquires the lease for that identity. A conflict is `DEVICE_HELD`,
    or `DEVICE_RELEASED_HELD` when the request is a `Reacquire`, and in
    both cases no driver is built.
-3. For an iOS target, ends an orphaned runner, and the `iproxy` tunnel of
-   a physical device, that a crashed earlier holder left behind, through
-   `device.RunnerReaper`. This runs only after the
-   lease is held, because that is what proves the previous holder is
-   gone. A failure to end the orphan is logged and does not block the
-   open.
-4. Builds the driver through `device.Factory`, with the device tagged on
+3. Builds the driver through `device.Factory`, with the device tagged on
    the context through `logging.WithDevice` so every log line from the
    driver carries `deviceId` and `hardwareId`. The factory must implement
    `device.WrappingFactory`, which the type of `session.Deps.Factory`
@@ -362,12 +356,12 @@ for a host that does not need to split them.
    combination of those optional interfaces, using mock-backed test
    doubles, because the protocol fakes of the real adapters are private
    to their packages and `session` may not depend on a concrete driver.
-5. Offers the previous driver's launched-app state to the new driver.
+4. Offers the previous driver's launched-app state to the new driver.
    The iOS drivers apply it only when the runner they reached reports the
    same launch id as the one that launched the app. When the new driver
    could not take it, the session reports `Relaunched`, and the MCP
    server tells the agent that the app was relaunched on a new runner.
-6. Binds the holder socket, `<key>.sock` in the runtime directory beside
+5. Binds the holder socket, `<key>.sock` in the runtime directory beside
    the lock file, through `attach.ListenUnix`, and records its path in the
    lease metadata. The process holds the flock, so any file already at
    that path belongs to a holder that is gone and is removed first. The
@@ -385,8 +379,8 @@ re-acquired closes `Session.Lost()` and also stops the attach server.
 2. Stops the attach server, which closes every viewer connection, then
    removes the socket file only while the path still names the file this
    session bound. After a lost lease another holder may own that path.
-3. Disconnects the driver, which also stops a runner the factory
-   launched. Steps 2 and 3 together stay within the shared shutdown
+3. Disconnects the driver. A runner the factory launched keeps running.
+   Steps 2 and 3 together stay within the shared shutdown
    grace period.
 4. Releases the lease.
 

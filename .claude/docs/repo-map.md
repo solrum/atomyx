@@ -64,7 +64,7 @@ atomyx/
 | `core/cmd/gen-script-schema` | `gen-script-schema` | Regenerates the checked-in JSON Schema for the script definition type from `core/internal/script`'s Go types. |
 | `core/cmd/internal/browseropen` | none | Opens a URL in the platform's default browser through the platform's own opener command, the real browser opener `atomyx inspect` is given. |
 | `core/cmd/internal/runnerprovision` | none | Builds the iOS runner provisioner that `atomyx` and `atomyx-mcp` wire into their driver factory, including where runner records live, and the runner keeper whose cleanup stops the runners the process owns when it exits. |
-| `core/cmd/internal/sessionwire` | none | Builds the lease manager, identity resolver, orphaned runner reaper and session timeouts that `atomyx` and `atomyx-mcp` hand to `session.Open`, so both arbitrate devices the same way. |
+| `core/cmd/internal/sessionwire` | none | Builds the lease manager, identity resolver and session timeouts that `atomyx` and `atomyx-mcp` hand to `session.Open`, so both arbitrate devices the same way. |
 
 ## `core/internal/`: one package per concern
 
@@ -98,7 +98,7 @@ atomyx/
 | `stepstream` | Turns the step events of a script run into the lines of a run folder's `steps.jsonl`. Depends on `runner` and `runfolder`. |
 | `script` | Owns the test-script schema, parser, and expression engine. |
 | `core/internal/script/expression` | Implements the test-script expression language: tokenizing, parsing, and evaluating. |
-| `session` | Opens a device for one process: a lease-free prepare phase that builds the runner, then identity, lease, orphaned runner and tunnel reaping, then the driver inside an observing decorator that counts mutating calls and reports captures, and the owner's lifecycle of the result. It also binds the holder socket, answers viewers from the hub, and records viewer attach and detach as interventions. Its `RemoteHandle` follows another process's holder over that socket as a viewer, and `Attach` finds the holder of a busy device and connects to it. |
+| `session` | Opens a device for one process: a lease-free prepare phase that builds the runner, then identity, lease, then the driver inside an observing decorator that counts mutating calls and reports captures, and the owner's lifecycle of the result. It also binds the holder socket, answers viewers from the hub, and records viewer attach and detach as interventions. Its `RemoteHandle` follows another process's holder over that socket as a viewer, and `Attach` finds the holder of a busy device and connects to it. |
 | `core/internal/session/sessiontest` | Test-only helpers for a session host, such as a lease manager over a throwaway directory and a socket viewer of a holder. Only `_test.go` files import it. |
 | `sidecar` | Implements the host-side control process: a JSON-RPC bridge, method dispatcher, session, and event bus. |
 | `skills` | Embeds and copies the Atomyx skill and agent markdown files a consumer project installs. |

@@ -132,32 +132,6 @@ func (r fixedResolver) Resolve(_ context.Context, d device.Descriptor) (device.I
 	return r.byID[d.ID], nil
 }
 
-type fakeReaper struct {
-	mu       sync.Mutex
-	calls    []reapCall
-	err      error
-	onReap   func()
-	outcomes device.ReapOutcome
-}
-
-type reapCall struct{ path, udid string }
-
-func (r *fakeReaper) Reap(_ context.Context, path, udid string) (device.ReapOutcome, error) {
-	r.mu.Lock()
-	r.calls = append(r.calls, reapCall{path: path, udid: udid})
-	r.mu.Unlock()
-	if r.onReap != nil {
-		r.onReap()
-	}
-	return r.outcomes, r.err
-}
-
-func (r *fakeReaper) recorded() []reapCall {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return append([]reapCall(nil), r.calls...)
-}
-
 func newManager(t *testing.T, clk clock.Clock) *lease.Manager {
 	t.Helper()
 	root := t.TempDir()
@@ -402,78 +376,6 @@ func TestOpen_TheBuildContextCarriesTheDeviceTag(t *testing.T) {
 	if !ok || tag.DeviceID != "A" || tag.HardwareID != "HW-A" {
 		t.Fatalf("device tag = %+v (%v), want deviceId A and hardwareId HW-A", tag, ok)
 	}
-}
-
-func TestOpen_ReapsAnOrphanedIosRunnerOnlyAfterTheLeaseIsHeld(t *testing.T) {
-	factory := &recordingFactory{events: &eventLog{}}
-	m := newManager(t, clock.SystemClock{})
-	var heldDuringReap bool
-	reaper := &fakeReaper{outcomes: device.ReapOutcome{Found: true, Signaled: true, PGID: 4242}}
-	reaper.onReap = func() {
-		status, _ := m.Probe(context.Background(), lease.KeyFor("ios", "SIM-1"))
-		heldDuringReap = status.Held
-	}
-	deps := baseDeps(t, factory, m)
-	deps.Reaper = reaper
-
-	s, err := session.Open(context.Background(), deps, session.Request{Descriptor: iosDesc("SIM-1")})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = s.Close() }()
-
-	calls := reaper.recorded()
-	wantPath := device.RunnerStatePath(m.Dir(), string(lease.KeyFor("ios", "SIM-1")))
-	if len(calls) != 1 || calls[0].path != wantPath || calls[0].udid != "SIM-1" {
-		t.Fatalf("reap calls = %+v, want one call for %s and SIM-1", calls, wantPath)
-	}
-	if !heldDuringReap {
-		t.Fatal("the reaper ran before the lease was held")
-	}
-}
-
-func TestOpen_DoesNotReapWhenTheLeaseIsHeldElsewhere(t *testing.T) {
-	factory := &recordingFactory{events: &eventLog{}}
-	m := newManager(t, clock.SystemClock{})
-	reaper := &fakeReaper{}
-	deps := baseDeps(t, factory, m)
-	deps.Reaper = reaper
-	holder, err := session.Open(context.Background(), deps, session.Request{Descriptor: iosDesc("SIM-1")})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = holder.Close() }()
-	before := len(reaper.recorded())
-
-	if _, err := session.Open(context.Background(), deps, session.Request{Descriptor: iosDesc("SIM-1")}); codeOf(err) != diag.CodeDeviceHeld {
-		t.Fatalf("code = %s, want DEVICE_HELD", codeOf(err))
-	}
-
-	if got := len(reaper.recorded()); got != before {
-		t.Fatalf("reap calls = %d, want none from an open that never got the lease", got-before)
-	}
-}
-
-func TestOpen_AndroidNeverReapsAndAReapFailureDoesNotBlockTheOpen(t *testing.T) {
-	m := newManager(t, clock.SystemClock{})
-	reaper := &fakeReaper{err: errors.New("still answering")}
-	deps := baseDeps(t, &recordingFactory{events: &eventLog{}}, m)
-	deps.Reaper = reaper
-
-	a, err := session.Open(context.Background(), deps, session.Request{Descriptor: androidDesc("A")})
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = a.Close()
-	if got := len(reaper.recorded()); got != 0 {
-		t.Fatalf("reap calls for Android = %d, want 0", got)
-	}
-
-	ios, err := session.Open(context.Background(), deps, session.Request{Descriptor: iosDesc("SIM-1")})
-	if err != nil {
-		t.Fatalf("Open() error = %v, want a reap failure logged but not fatal", err)
-	}
-	_ = ios.Close()
 }
 
 func TestOpen_RestoresTheLaunchedAppIntoTheRebuiltDriver(t *testing.T) {

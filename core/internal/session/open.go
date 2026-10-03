@@ -21,12 +21,6 @@ type IdentityResolver interface {
 	Resolve(ctx context.Context, d device.Descriptor) (device.Identity, error)
 }
 
-// RunnerReaper ends an iOS runner a crashed holder left behind. The
-// caller of Reap must hold the device lease.
-type RunnerReaper interface {
-	Reap(ctx context.Context, statePath, udid string) (device.ReapOutcome, error)
-}
-
 // Deps configures Open.
 type Deps struct {
 	// Factory builds the driver once the lease is held. Required. It must
@@ -51,9 +45,6 @@ type Deps struct {
 	// Preparer does the lease-free work Prepare runs before Open, such as
 	// building the iOS runner. Nil makes Prepare a no-op.
 	Preparer device.RunnerPreparer
-	// Reaper ends orphaned iOS runners after the lease is acquired. Nil
-	// skips reaping.
-	Reaper RunnerReaper
 	// Clock times the lease watcher. Defaults to clock.SystemClock.
 	Clock clock.Clock
 	// Logger receives acquisition and reaping lines. Defaults to a
@@ -123,9 +114,9 @@ func observingFactory(factory device.WrappingFactory, hub *Hub) device.Factory {
 
 // Open takes ownership of the device named by req.
 //
-// It resolves the canonical identity, acquires the device lease, ends
-// an orphaned iOS runner left by a crashed earlier holder, and builds
-// the driver. A lease held by another process fails with DEVICE_HELD,
+// It resolves the canonical identity, acquires the device lease, and
+// builds the driver, which is where an iOS runner left by an earlier
+// holder is adopted or ended. A lease held by another process fails with DEVICE_HELD,
 // or DEVICE_RELEASED_HELD for a Reacquire, before any driver is built.
 // An identity failure, such as an unauthorized Android device, fails
 // with a coded error before the lease is taken. On any failure nothing
@@ -165,7 +156,6 @@ func Open(ctx context.Context, deps Deps, req Request) (*Session, error) {
 		if err != nil {
 			return nil, mapLeaseError(err, req.Reacquire)
 		}
-		deps.reapOrphan(ctx, desc, key)
 	}
 
 	ctx = logging.WithDevice(ctx, logging.DeviceTag{DeviceID: desc.ID, HardwareID: identity.HardwareID})
@@ -245,30 +235,6 @@ func (d Deps) ResolveIdentity(ctx context.Context, desc device.Descriptor) (devi
 		return device.Identity{}, mapIdentityError(err)
 	}
 	return identity, nil
-}
-
-// reapOrphan ends a runner a crashed earlier holder of an iOS device
-// left behind. It runs only after the lease was acquired, because a
-// free lease is what proves the previous holder is gone. A failure to
-// end the orphan is logged and does not block the open: the launcher
-// still refuses to adopt a runner that is not its own.
-func (d Deps) reapOrphan(ctx context.Context, desc device.Descriptor, key lease.Key) {
-	if d.Reaper == nil || desc.Platform != device.PlatformIOS {
-		return
-	}
-	path := device.RunnerStatePath(d.Leases.Dir(), string(key))
-	outcome, err := d.Reaper.Reap(ctx, path, desc.ID)
-	fields := logging.LogContext{"udid": desc.ID, "pgid": outcome.PGID}
-	switch {
-	case err != nil:
-		fields["error"] = err.Error()
-		d.Logger.Warn("could not end an orphaned runner", fields)
-	case outcome.Signaled || outcome.TerminatedViaSimctl:
-		d.Logger.Info("ended an orphaned runner", fields)
-	}
-	if outcome.TunnelSignaled {
-		d.Logger.Info("ended an orphaned iproxy tunnel", logging.LogContext{"udid": desc.ID})
-	}
 }
 
 // mapIdentityError turns the typed identity errors of the device
