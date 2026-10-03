@@ -9,12 +9,13 @@ import (
 	"time"
 
 	"dev.atomyx/internal/driver"
+	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/wire"
 )
 
 func TestScript_RunScript_MissingYaml_ReturnsInvalidParams(t *testing.T) {
 	ctx := newTestContext()
-	RegisterScriptFeature(ctx)
+	RegisterScriptFeature(ctx, logging.NoopLogger{})
 
 	_, err := ctx.Dispatcher.Dispatch(context.Background(), "runScript", json.RawMessage(`{}`))
 	var dispatchErr *DispatcherError
@@ -25,7 +26,7 @@ func TestScript_RunScript_MissingYaml_ReturnsInvalidParams(t *testing.T) {
 
 func TestScript_RunScript_NoDeviceSelected_ReturnsNoDeviceSelectedMessage(t *testing.T) {
 	ctx := newTestContext()
-	RegisterScriptFeature(ctx)
+	RegisterScriptFeature(ctx, logging.NoopLogger{})
 
 	params, _ := json.Marshal(map[string]string{"yaml": "appId: com.test\n---\n- back\n"})
 	_, err := ctx.Dispatcher.Dispatch(context.Background(), "runScript", params)
@@ -36,7 +37,7 @@ func TestScript_RunScript_NoDeviceSelected_ReturnsNoDeviceSelectedMessage(t *tes
 
 func TestScript_IsRunning_FalseWhenIdle(t *testing.T) {
 	ctx := newTestContext()
-	RegisterScriptFeature(ctx)
+	RegisterScriptFeature(ctx, logging.NoopLogger{})
 
 	result, err := ctx.Dispatcher.Dispatch(context.Background(), "isRunning", nil)
 	if err != nil {
@@ -49,7 +50,7 @@ func TestScript_IsRunning_FalseWhenIdle(t *testing.T) {
 
 func TestScript_StopScript_WhenIdle_IsNoOp(t *testing.T) {
 	ctx := newTestContext()
-	RegisterScriptFeature(ctx)
+	RegisterScriptFeature(ctx, logging.NoopLogger{})
 
 	if _, err := ctx.Dispatcher.Dispatch(context.Background(), "stopScript", nil); err != nil {
 		t.Fatalf("Dispatch() error = %v", err)
@@ -61,7 +62,7 @@ func TestScript_RunScript_EmitsEventSequenceAndReturnsResult(t *testing.T) {
 	drv := selectMockDevice(t, ctx)
 	drv.Apps = []driver.InstalledApp{{BundleID: "com.test"}}
 	drv.StageHierarchy(wire.TreeNodeWire{Attributes: map[string]string{"id": "root"}})
-	RegisterScriptFeature(ctx)
+	RegisterScriptFeature(ctx, logging.NoopLogger{})
 
 	var mu sync.Mutex
 	var eventNames []string
@@ -114,7 +115,7 @@ func TestScript_RunScript_EmitsEventSequenceAndReturnsResult(t *testing.T) {
 func TestScript_RunScript_InvalidYaml_DoesNotLeakRunState(t *testing.T) {
 	ctx := newTestContext()
 	selectMockDevice(t, ctx)
-	RegisterScriptFeature(ctx)
+	RegisterScriptFeature(ctx, logging.NoopLogger{})
 
 	invalidParams, _ := json.Marshal(map[string]string{"yaml": "- bogusCommand\n"})
 	if _, err := ctx.Dispatcher.Dispatch(context.Background(), "runScript", invalidParams); err == nil {
@@ -138,7 +139,7 @@ func TestScript_RunScript_InvalidYaml_DoesNotLeakRunState(t *testing.T) {
 func TestScript_RunScript_ConcurrentRun_Rejected(t *testing.T) {
 	ctx := newTestContext()
 	selectMockDevice(t, ctx)
-	RegisterScriptFeature(ctx)
+	RegisterScriptFeature(ctx, logging.NoopLogger{})
 
 	yaml := "appId: com.test\n---\n- sleep: 150\n"
 	params, _ := json.Marshal(map[string]string{"yaml": yaml})
@@ -193,7 +194,7 @@ func TestScript_RunScript_ConcurrentRun_Rejected(t *testing.T) {
 func TestScript_StopScript_CancelsInFlightRun(t *testing.T) {
 	ctx := newTestContext()
 	selectMockDevice(t, ctx)
-	RegisterScriptFeature(ctx)
+	RegisterScriptFeature(ctx, logging.NoopLogger{})
 
 	yaml := "appId: com.test\n---\n- sleep: 5000\n"
 	params, _ := json.Marshal(map[string]string{"yaml": yaml})

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/script"
 )
 
@@ -12,8 +13,8 @@ import (
 // scenario-shaped YAML to the scenario path, which additionally
 // requires params.cwd: the directory each child script's relative
 // path is resolved against.
-func RegisterScriptFeature(ctx *Context) Handle {
-	service := newScriptService(ctx.Session, ctx.Events)
+func RegisterScriptFeature(ctx *Context, logger logging.Logger) Handle {
+	service := newScriptService(ctx.Session, ctx.Events, logger)
 
 	mustRegister(ctx.Dispatcher, "runScript", func(c context.Context, params json.RawMessage) (any, error) {
 		decoded := decodeParams(params)

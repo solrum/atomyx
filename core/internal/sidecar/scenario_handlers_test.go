@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"dev.atomyx/internal/driver"
+	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/wire"
 )
 
@@ -37,7 +38,7 @@ func writeScenarioFixture(t *testing.T) (yaml string, cwd string) {
 func TestScript_RunScript_ScenarioMissingCwd_ReturnsInvalidParams(t *testing.T) {
 	ctx := newTestContext()
 	selectMockDevice(t, ctx)
-	RegisterScriptFeature(ctx)
+	RegisterScriptFeature(ctx, logging.NoopLogger{})
 
 	yaml, _ := writeScenarioFixture(t)
 	params, _ := json.Marshal(map[string]string{"yaml": yaml})
@@ -63,7 +64,7 @@ func TestScript_RunScript_Scenario_EmitsEventsAndWireShape(t *testing.T) {
 			{Attributes: map[string]string{"text": "ok"}, Children: []wire.TreeNodeWire{}},
 		},
 	})
-	RegisterScriptFeature(ctx)
+	RegisterScriptFeature(ctx, logging.NoopLogger{})
 
 	yaml, cwd := writeScenarioFixture(t)
 

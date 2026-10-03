@@ -38,6 +38,7 @@ type activeRun struct {
 type scriptService struct {
 	session *Session
 	events  *EventBus
+	logger  logging.Logger
 
 	mu      sync.Mutex
 	current *activeRun
@@ -46,10 +47,11 @@ type scriptService struct {
 	parseScenario func(yamlContent string) (*script.ScenarioDefinition, error)
 }
 
-func newScriptService(session *Session, events *EventBus) *scriptService {
+func newScriptService(session *Session, events *EventBus, logger logging.Logger) *scriptService {
 	return &scriptService{
 		session:       session,
 		events:        events,
+		logger:        logger,
 		parseScript:   script.ParseScript,
 		parseScenario: script.ParseScenario,
 	}
@@ -108,7 +110,7 @@ func (s *scriptService) Run(ctx context.Context, yaml string) (runScriptResultWi
 	sr := runner.NewScriptRunner(runner.ScriptRunnerDeps{
 		Orchestra: selection.Orchestra,
 		Clock:     orchestra.SystemClock{},
-		Logger:    logging.NoopLogger{},
+		Logger:    s.logger,
 		Commands:  runner.DefaultCommands(),
 		OnStep: func(event runner.StepEvent) {
 			s.events.Emit(Event{Event: string(event.Type), Payload: toStepEventWire(runID, event)})
@@ -183,7 +185,7 @@ func (s *scriptService) RunScenario(ctx context.Context, yaml string, cwd string
 	sr := scenario.NewScenarioRunner(scenario.ScenarioRunnerDeps{
 		Orchestra: selection.Orchestra,
 		Clock:     orchestra.SystemClock{},
-		Logger:    logging.NoopLogger{},
+		Logger:    s.logger,
 		Commands:  runner.DefaultCommands(),
 		LoadScript: func(relPath string) (string, error) {
 			data, err := os.ReadFile(resolveScriptPath(cwd, relPath))

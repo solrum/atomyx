@@ -3,11 +3,14 @@ package sidecar
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/runner"
 	"dev.atomyx/internal/script"
 	"dev.atomyx/internal/wire"
@@ -39,7 +42,7 @@ func TestScriptService_Run_ConcurrentCalls_SecondIsRejectedBeforeItParses(t *tes
 	drv := selectMockDevice(t, ctx)
 	drv.StageHierarchy(wire.TreeNodeWire{Attributes: map[string]string{"id": "root"}})
 
-	svc := newScriptService(ctx.Session, ctx.Events)
+	svc := newScriptService(ctx.Session, ctx.Events, logging.NoopLogger{})
 
 	firstEnteredParse := make(chan struct{})
 	var enteredOnce sync.Once
@@ -103,7 +106,7 @@ func TestScriptService_Run_ConcurrentCalls_SecondIsRejectedBeforeItParses(t *tes
 func TestScriptService_RunScenario_WhenRunSlotReserved_ReturnsAlreadyInProgress(t *testing.T) {
 	ctx := newTestContext()
 	selectMockDevice(t, ctx)
-	svc := newScriptService(ctx.Session, ctx.Events)
+	svc := newScriptService(ctx.Session, ctx.Events, logging.NoopLogger{})
 
 	if err := svc.reserve(); err != nil {
 		t.Fatalf("reserve() error = %v", err)
@@ -123,7 +126,7 @@ func TestScriptService_Run_ParseFailure_ReleasesTheReservedSlot(t *testing.T) {
 	ctx := newTestContext()
 	drv := selectMockDevice(t, ctx)
 	drv.StageHierarchy(wire.TreeNodeWire{Attributes: map[string]string{"id": "root"}})
-	svc := newScriptService(ctx.Session, ctx.Events)
+	svc := newScriptService(ctx.Session, ctx.Events, logging.NoopLogger{})
 
 	if _, err := svc.Run(context.Background(), "not valid yaml: [\n"); err == nil {
 		t.Fatal("Run() error = nil, want a parse error for invalid yaml")
@@ -155,7 +158,7 @@ func TestScriptService_Run_DeviceLostAbort_CarriedIntoWireResult(t *testing.T) {
 		remedy: "Confirm the agent is running on the device, then try again.",
 	})
 
-	svc := newScriptService(ctx.Session, ctx.Events)
+	svc := newScriptService(ctx.Session, ctx.Events, logging.NoopLogger{})
 
 	yaml := "appId: com.test\n---\n- assertVisible: \"Does not exist\"\n"
 	result, err := svc.Run(context.Background(), yaml)
@@ -177,5 +180,99 @@ func TestScriptService_Run_DeviceLostAbort_CarriedIntoWireResult(t *testing.T) {
 	}
 	if result.Result.Abort.Remedy == "" {
 		t.Fatal("Result.Abort.Remedy is empty, want an actionable hint")
+	}
+}
+
+type recordedLog struct {
+	msg string
+	ctx logging.LogContext
+}
+
+// recordingLogger collects every entry it receives, including those
+// from children, so a test can assert on what a component logged
+// without parsing structured output.
+type recordingLogger struct {
+	mu      *sync.Mutex
+	entries *[]recordedLog
+}
+
+func newRecordingLogger() recordingLogger {
+	return recordingLogger{mu: &sync.Mutex{}, entries: &[]recordedLog{}}
+}
+
+func (l recordingLogger) record(msg string, ctx logging.LogContext) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	*l.entries = append(*l.entries, recordedLog{msg: msg, ctx: ctx})
+}
+
+func (l recordingLogger) messages() []string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	out := make([]string, len(*l.entries))
+	for i, e := range *l.entries {
+		out[i] = e.msg
+	}
+	return out
+}
+
+func (l recordingLogger) Debug(msg string, ctx logging.LogContext) { l.record(msg, ctx) }
+func (l recordingLogger) Info(msg string, ctx logging.LogContext)  { l.record(msg, ctx) }
+func (l recordingLogger) Warn(msg string, ctx logging.LogContext)  { l.record(msg, ctx) }
+func (l recordingLogger) Error(msg string, _ error, ctx logging.LogContext) {
+	l.record(msg, ctx)
+}
+func (l recordingLogger) Child(logging.LogContext) logging.Logger { return l }
+
+func countMessage(messages []string, want string) int {
+	n := 0
+	for _, m := range messages {
+		if m == want {
+			n++
+		}
+	}
+	return n
+}
+
+// TestScriptService_Run_LogsStepsToTheInjectedLogger guards that the
+// logger handed to the service is the one the script runner writes its
+// per-step trace to, rather than a discarding logger.
+func TestScriptService_Run_LogsStepsToTheInjectedLogger(t *testing.T) {
+	ctx := newTestContext()
+	drv := selectMockDevice(t, ctx)
+	drv.StageHierarchy(wire.TreeNodeWire{Attributes: map[string]string{"id": "root"}})
+	rec := newRecordingLogger()
+	svc := newScriptService(ctx.Session, ctx.Events, rec)
+
+	if _, err := svc.Run(context.Background(), "appId: com.test\n---\n- launchApp\n"); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if got := countMessage(rec.messages(), "script.step"); got == 0 {
+		t.Fatalf("injected logger messages = %v, want at least one script.step entry", rec.messages())
+	}
+}
+
+// TestScriptService_RunScenario_LogsStepsToTheInjectedLogger is the
+// scenario-path counterpart: each child script's step trace reaches
+// the injected logger.
+func TestScriptService_RunScenario_LogsStepsToTheInjectedLogger(t *testing.T) {
+	ctx := newTestContext()
+	drv := selectMockDevice(t, ctx)
+	drv.StageHierarchy(wire.TreeNodeWire{Attributes: map[string]string{"id": "root"}})
+	rec := newRecordingLogger()
+	svc := newScriptService(ctx.Session, ctx.Events, rec)
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "child.yaml"), []byte("appId: com.test\n---\n- launchApp\n"), 0o600); err != nil {
+		t.Fatalf("write child script: %v", err)
+	}
+
+	if _, err := svc.RunScenario(context.Background(), "name: scenario\nscripts:\n  - child.yaml\n", dir); err != nil {
+		t.Fatalf("RunScenario() error = %v", err)
+	}
+
+	if got := countMessage(rec.messages(), "script.step"); got == 0 {
+		t.Fatalf("injected logger messages = %v, want at least one script.step entry", rec.messages())
 	}
 }

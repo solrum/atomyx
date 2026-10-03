@@ -9,6 +9,7 @@ import (
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/driver"
 	"dev.atomyx/internal/driver/mock"
+	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/sidecar"
 )
@@ -64,7 +65,7 @@ func newGoSidecarCaller(snapshots [][]device.Descriptor) (*goSidecarCaller, func
 		sidecar.RegisterMetaFeature(ctx),
 		sidecar.RegisterDeviceFeature(ctx, probe, factory),
 		sidecar.RegisterAppFeature(ctx),
-		sidecar.RegisterScriptFeature(ctx),
+		sidecar.RegisterScriptFeature(ctx, logging.NoopLogger{}),
 		sidecar.RegisterInspectionFeature(ctx),
 		sidecar.RegisterInputFeature(ctx),
 		sidecar.RegisterMirrorInputFeature(ctx, sidecar.MirrorInputFeatureDeps{

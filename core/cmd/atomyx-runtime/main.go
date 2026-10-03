@@ -82,7 +82,7 @@ func run() int {
 		sidecar.RegisterMetaFeature(ctx),
 		sidecar.RegisterDeviceFeature(ctx, probe, factory),
 		sidecar.RegisterAppFeature(ctx),
-		sidecar.RegisterScriptFeature(ctx),
+		sidecar.RegisterScriptFeature(ctx, logger),
 		sidecar.RegisterInspectionFeature(ctx),
 		sidecar.RegisterInputFeature(ctx),
 		sidecar.RegisterIosAgentFeature(ctx, iosAgentService, simHid),
