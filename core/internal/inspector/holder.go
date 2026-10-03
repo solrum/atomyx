@@ -148,22 +148,25 @@ func NewHost(cfg HostConfig) (*Host, error) {
 		idle = session.DefaultMcpIdleTimeoutMs
 	}
 	h := &Host{open: cfg.Open, clk: cfg.Clock, idleMs: idle, logger: cfg.Logger}
+	info := cfg.Target.Info()
 	h.mu.Lock()
-	h.adoptLocked(cfg.Target)
+	h.adoptLocked(cfg.Target, info)
 	h.mu.Unlock()
 	h.markIdle(cfg.Target)
 	return h, nil
 }
 
-// adoptLocked makes t the current target. For a target that holds the
-// lease it starts the idle timer and the lost watcher, and for one that
-// follows another process it starts the watcher of that process.
-func (h *Host) adoptLocked(t Target) {
+// adoptLocked makes t the current target, with info as its Info read by
+// the caller before it took the lock, because a target's Info may be a
+// call over a socket. For a target that holds the lease it starts the
+// idle timer and the lost watcher, and for one that follows another
+// process it starts the watcher of that process.
+func (h *Host) adoptLocked(t Target, info session.Info) {
 	h.current = t
 	h.driving = 0
 	h.gone = nil
 	h.generation++
-	h.last = t.Info()
+	h.last = info
 	h.touchedMs = h.clk.NowMs()
 	ctx, cancel := context.WithCancel(context.Background())
 	h.stopWatch = cancel
@@ -177,9 +180,10 @@ func (h *Host) adoptLocked(t Target) {
 }
 
 // dropLocked forgets the current target for the reason gone, and stops
-// the loops that watch it. The caller closes the target.
-func (h *Host) dropLocked(gone error) {
-	h.last = h.current.Info()
+// the loops that watch it. The caller closes the target, and passes its
+// Info read before it took the lock.
+func (h *Host) dropLocked(gone error, info session.Info) {
+	h.last = info
 	h.current = nil
 	h.driving = 0
 	h.gone = gone
@@ -196,12 +200,13 @@ func (h *Host) endLoop(ctx context.Context, t Target, ended <-chan struct{}, gon
 	}
 	h.opMu.Lock()
 	defer h.opMu.Unlock()
+	info := t.Info()
 	h.mu.Lock()
 	if h.current != t {
 		h.mu.Unlock()
 		return
 	}
-	h.dropLocked(gone)
+	h.dropLocked(gone, info)
 	h.mu.Unlock()
 	fields := logging.LogContext{}
 	if lc, ok := t.(Lifecycle); ok {
@@ -227,6 +232,7 @@ func (h *Host) idleLoop(ctx context.Context, held Target) {
 			return
 		}
 		h.opMu.Lock()
+		info := held.Info()
 		h.mu.Lock()
 		if h.current != held {
 			h.mu.Unlock()
@@ -245,7 +251,7 @@ func (h *Host) idleLoop(ctx context.Context, held Target) {
 			wait = remaining
 			continue
 		}
-		h.dropLocked(ErrReleased)
+		h.dropLocked(ErrReleased, info)
 		h.mu.Unlock()
 		err := held.Close()
 		h.opMu.Unlock()
@@ -449,8 +455,9 @@ func (h *Host) Reconnect(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	info := held.Info()
 	h.mu.Lock()
-	h.adoptLocked(held) //nolint:contextcheck // the idle timer outlives the request that reconnected
+	h.adoptLocked(held, info) //nolint:contextcheck // the idle timer outlives the request that reconnected
 	h.mu.Unlock()
 	h.markIdle(held)
 	h.logger.Info("inspector.reconnected", nil)
@@ -462,15 +469,14 @@ func (h *Host) Reconnect(ctx context.Context) error {
 func (h *Host) Close() error {
 	h.opMu.Lock()
 	defer h.opMu.Unlock()
-	h.mu.Lock()
-	held := h.current
-	if held != nil {
-		h.dropLocked(ErrReleased)
-	}
-	h.mu.Unlock()
-	if held == nil {
+	held, ok := h.held()
+	if !ok {
 		return nil
 	}
+	info := held.Info()
+	h.mu.Lock()
+	h.dropLocked(ErrReleased, info)
+	h.mu.Unlock()
 	return held.Close()
 }
 

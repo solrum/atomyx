@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"dev.atomyx/internal/clock"
@@ -309,5 +310,55 @@ func TestHost_TheHolderIsIdleAfterAReconnect(t *testing.T) {
 	}
 	if got := current.(*fakeHeld).holderState(); got != "idle" {
 		t.Fatalf("holder after reconnect = %q, want idle", got)
+	}
+}
+
+// lockProbeViewer is a viewer that reports whether the host's lock was
+// held while the host read its Info.
+type lockProbeViewer struct {
+	*fakeViewer
+	probe func()
+}
+
+func (v *lockProbeViewer) Info() session.Info {
+	if v.probe != nil {
+		v.probe()
+	}
+	return v.fakeViewer.Info()
+}
+
+func TestHost_NeverReadsATargetsInfoUnderItsLock(t *testing.T) {
+	first := &lockProbeViewer{fakeViewer: newFakeViewer()}
+	next := &lockProbeViewer{fakeViewer: newFakeViewer()}
+	var host *Host
+	var underLock atomic.Int32
+	probe := func() {
+		if host.mu.TryLock() {
+			host.mu.Unlock()
+			return
+		}
+		underLock.Add(1)
+	}
+	var err error
+	host, err = NewHost(HostConfig{
+		Target: first, Open: func(context.Context) (Target, error) { return next, nil },
+		Clock: clock.NewManualClock(1_000), IdleMs: testIdleMs, Logger: newRecordingLogger(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first.probe, next.probe = probe, probe
+
+	close(first.done)
+	<-first.closed
+	if err := host.Reconnect(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := host.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if n := underLock.Load(); n != 0 {
+		t.Fatalf("Info was read %d times while the host lock was held", n)
 	}
 }
