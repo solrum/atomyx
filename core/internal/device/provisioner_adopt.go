@@ -17,8 +17,6 @@ import (
 // the provisioner could wait on.
 const adoptedRunnerWatchPeriod = 2 * time.Second
 
-var _ AdoptingProvisioner = (*DriverProvisioner)(nil)
-
 // adoption is a runner this process took over, with what it must stop
 // and watch beyond the runner itself.
 type adoption struct {

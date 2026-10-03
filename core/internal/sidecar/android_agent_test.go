@@ -189,6 +189,10 @@ func (panickingProvisioner) EnsureIOSAgentWatched(context.Context, string, devic
 	panic("ios agent panic")
 }
 
+func (panickingProvisioner) ProvisionIOSAgent(context.Context, string, device.IosAgentKind, func(error), device.ProvisionOptions) (device.IOSAgent, error) {
+	panic("ios agent panic")
+}
+
 func (panickingProvisioner) EnsureAndroidAgent(context.Context, string) error {
 	panic("android agent panic")
 }

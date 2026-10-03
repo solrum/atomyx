@@ -305,7 +305,7 @@ func (f *DriverFactory) createDriverWatched(ctx context.Context, desc Descriptor
 	stopRunner := func() {}
 	adopted := false
 	if f.provisioner != nil && desc.Port == 0 && desc.ID != "" {
-		agent, err := f.provision(ctx, desc.ID, agentKind, onLost, opts)
+		agent, err := f.provisioner.ProvisionIOSAgent(ctx, desc.ID, agentKind, onLost, opts)
 		if err != nil {
 			if agent.Kill != nil {
 				_ = agent.Kill()
@@ -345,17 +345,6 @@ func (f *DriverFactory) createDriverWatched(ctx context.Context, desc Descriptor
 		return createdDriver{driver: drv, release: stopRunner, adopted: adopted}, nil
 	}
 	return createdDriver{driver: iosdriver.New(conn, f.runner, iosOpts), release: stopRunner, adopted: adopted}, nil
-}
-
-// provision brings the iOS runner up through the provisioner. A
-// provisioner that cannot adopt runners launches one, and reports its
-// launch identifier as unknown.
-func (f *DriverFactory) provision(ctx context.Context, udid string, kind IosAgentKind, onLost func(error), opts ProvisionOptions) (IOSAgent, error) {
-	if adopting, ok := f.provisioner.(AdoptingProvisioner); ok {
-		return adopting.ProvisionIOSAgent(ctx, udid, kind, onLost, opts)
-	}
-	port, kill, err := f.provisioner.EnsureIOSAgentWatched(ctx, udid, kind, onLost)
-	return IOSAgent{Port: port, Kill: kill}, err
 }
 
 // MockDriverFactory replaces DriverFactory in tests: it returns a

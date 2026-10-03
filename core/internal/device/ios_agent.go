@@ -1,7 +1,5 @@
 package device
 
-import "context"
-
 // IOSAgent is a running iOS runner a provisioner hands to a caller.
 type IOSAgent struct {
 	// Port is the host port the runner answers on.
@@ -23,15 +21,4 @@ type ProvisionOptions struct {
 	// even when the recorded runner could be adopted. A caller sets it
 	// after an adopted runner proved unusable.
 	Fresh bool
-}
-
-// AdoptingProvisioner is an AgentProvisioner that reuses a runner an
-// earlier holder left running.
-type AdoptingProvisioner interface {
-	AgentProvisioner
-	// ProvisionIOSAgent behaves like EnsureIOSAgentWatched and also
-	// reports the launch identifier and whether the runner was adopted.
-	// The error contract of EnsureIOSAgentWatched applies, including that
-	// Kill is never nil.
-	ProvisionIOSAgent(ctx context.Context, udid string, kind IosAgentKind, onLost func(error), opts ProvisionOptions) (IOSAgent, error)
 }

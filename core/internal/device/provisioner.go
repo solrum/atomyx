@@ -68,6 +68,13 @@ type AgentProvisioner interface {
 	// through kill, then calls onLost once with a *ProcessExitError. A
 	// call to kill is never reported. A nil onLost watches nothing.
 	EnsureIOSAgentWatched(ctx context.Context, udid string, kind IosAgentKind, onLost func(error)) (port int, kill func() error, err error)
+	// ProvisionIOSAgent behaves like EnsureIOSAgentWatched and also
+	// reports the launch identifier and whether the runner was adopted
+	// from an earlier holder of the device instead of launched. The error
+	// contract of EnsureIOSAgentWatched applies, including that Kill is
+	// never nil. A provisioner that wraps another must forward this call,
+	// because the driver factory provisions through it.
+	ProvisionIOSAgent(ctx context.Context, udid string, kind IosAgentKind, onLost func(error), opts ProvisionOptions) (IOSAgent, error)
 	EnsureAndroidAgent(ctx context.Context, serial string) error
 	// ReinstallAndroidAgent replaces the agent on the Android device
 	// serial and brings it up again, even when the installed agent
@@ -335,7 +342,7 @@ func (p *DriverProvisioner) EnsureIOSAgentWatched(ctx context.Context, udid stri
 	return agent.Port, agent.Kill, err
 }
 
-// ProvisionIOSAgent implements AdoptingProvisioner. Unless the
+// ProvisionIOSAgent implements AgentProvisioner. Unless the
 // provisioner was built with FixedIosPort or opts.Fresh is set, it first
 // adopts the simulator runner an earlier holder left running when every
 // condition of adopt holds. Otherwise it ends the recorded runner and
@@ -700,10 +707,7 @@ func NewFakeProvisioner() *FakeProvisioner {
 	}
 }
 
-var (
-	_ AgentProvisioner    = (*FakeProvisioner)(nil)
-	_ AdoptingProvisioner = (*FakeProvisioner)(nil)
-)
+var _ AgentProvisioner = (*FakeProvisioner)(nil)
 
 // SetIOSAdopted makes every later ProvisionIOSAgent call for udid report
 // an adopted runner, unless the call asks for a fresh one.
@@ -807,7 +811,7 @@ func (f *FakeProvisioner) EnsureIOSAgentWatched(ctx context.Context, udid string
 	return agent.Port, agent.Kill, err
 }
 
-// ProvisionIOSAgent implements AdoptingProvisioner. The runner is
+// ProvisionIOSAgent implements AgentProvisioner. The runner is
 // reported adopted when SetIOSAdopted asked for it and opts.Fresh is
 // not set.
 func (f *FakeProvisioner) ProvisionIOSAgent(ctx context.Context, udid string, kind IosAgentKind, onLost func(error), opts ProvisionOptions) (IOSAgent, error) {
