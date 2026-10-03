@@ -100,16 +100,20 @@ export function displayRole(node) {
   return (node.attributes || {}).role || 'node';
 }
 
-// The deepest entry whose bounds contain the point, in the device's own
-// units. Among entries at equal depth the later one wins, because a
-// later sibling is drawn over an earlier one.
+// The entry that is on top at the point, in the device's own units.
+// Among every entry whose bounds contain the point, the one that comes
+// last in document order wins. A child follows its parent, so it beats
+// the parent. A later sibling and all of its descendants follow an
+// earlier sibling and all of its descendants, so an overlay drawn over
+// an earlier sibling beats that sibling's descendants even when those
+// sit deeper in the tree.
 export function deepestAt(top, x, y) {
   let best = null;
   const stack = [top];
   while (stack.length > 0) {
     const entry = stack.pop();
     const bounds = parseBounds((entry.node.attributes || {}).bounds);
-    if (bounds && containsPoint(bounds, x, y) && (best === null || entry.depth >= best.depth)) {
+    if (bounds && containsPoint(bounds, x, y)) {
       best = entry;
     }
     for (let i = entry.children.length - 1; i >= 0; i -= 1) {

@@ -239,7 +239,7 @@ func (s *Server) handleAuth(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case err != nil:
 		s.logger.Error("inspector.auth.failed", err, fields)
-		writeCoded(w, http.StatusInternalServerError, codeInternal, "the token could not be issued",
+		writeCoded(w, http.StatusInternalServerError, diag.CodeUnknown, "the token could not be issued",
 			"Press Enter in the atomyx inspect terminal for a fresh URL, then try again.")
 	case outcome == exchangeExpired:
 		s.logger.Warn("inspector.auth.expired", fields)

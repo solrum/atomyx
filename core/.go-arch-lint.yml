@@ -315,7 +315,6 @@ deps:
       - diag
       - orchestra
       - script
-      - runner
       - session
   cmd:
     anyProjectDeps: true

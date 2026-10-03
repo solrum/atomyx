@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -212,9 +213,11 @@ func TestFresh_OtherFailuresAreMappedWithoutLeakingText(t *testing.T) {
 		code   string
 	}{
 		{"closed", session.ErrClosed, http.StatusGone, codeSessionClosed},
-		{"unclassified", errors.New("dial /Users/me/secret.sock failed"), http.StatusInternalServerError, codeInternal},
+		{"unclassified", errors.New("dial /Users/me/secret.sock failed"), http.StatusInternalServerError, diag.CodeUnknown},
 		{"device", diag.New(diag.CodeAgentUnreachable, "agent gone", "restart it", nil), http.StatusBadGateway, diag.CodeAgentUnreachable},
-		{"cancelled", context.Canceled, http.StatusServiceUnavailable, codeInternal},
+		{"cancelled", context.Canceled, statusClientClosedRequest, diag.CodeUnknown},
+		{"wrapped cancel", fmt.Errorf("capture: %w", context.Canceled), statusClientClosedRequest, diag.CodeUnknown},
+		{"out of time", context.DeadlineExceeded, http.StatusGatewayTimeout, diag.CodeToolTimeout},
 	}
 	for _, tc := range cases {
 		rec := newAPIHarness(t, &stubController{freshErr: tc.err}, ReadRoutes).post(routeTreeFresh, "")

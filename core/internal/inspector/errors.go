@@ -12,7 +12,8 @@ import (
 // Codes the inspector reports for conditions that are specific to it.
 // Every code in an error body is upper snake case, the same convention
 // as the diag codes, and a failure that already carries a diag code
-// keeps that code.
+// keeps that code. A failure with no code is reported as the diag
+// code UNKNOWN.
 const (
 	codeNoTree           = "NO_TREE"
 	codeNoScreenshot     = "NO_SCREENSHOT"
@@ -25,8 +26,11 @@ const (
 	codeOriginNotAllowed = "ORIGIN_NOT_ALLOWED"
 	codeTokenRequired    = "TOKEN_REQUIRED"
 	codeCodeRefused      = "CODE_REFUSED"
-	codeInternal         = "INTERNAL"
 )
+
+// statusClientClosedRequest is the status for a request whose caller
+// went away before the answer was ready. net/http has no name for it.
+const statusClientClosedRequest = 499
 
 // writeCoded writes the error payload every failing /api/ response
 // carries: a stable code, a message, and a remedy when one is known.
@@ -40,8 +44,13 @@ func writeCoded(w http.ResponseWriter, status int, code, message, remedy string)
 
 // writeFailure reports err with the HTTP status its code calls for.
 // A diag-coded failure keeps its code, message and remedy, and any
-// other failure is reported as an internal error without its text,
-// because the text of an unclassified error may name host details.
+// other failure is reported as UNKNOWN with status 500 and without its
+// text, because the text of an unclassified error may name host
+// details. A request whose caller canceled it is reported as UNKNOWN
+// with status 499, the way a canceled MCP tool call carries no code of
+// its own, and a request that ran out of time is reported as
+// TOOL_TIMEOUT with status 504, the code an MCP tool call gets when
+// its budget elapses.
 func writeFailure(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, session.ErrClosed):
@@ -55,8 +64,12 @@ func writeFailure(w http.ResponseWriter, err error) {
 		writeCoded(w, http.StatusGone, codeDeviceLost, "the device was lost",
 			"Check that the device is connected and awake, then press reconnect on the page.")
 		return
-	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
-		writeCoded(w, http.StatusServiceUnavailable, codeInternal, "the request was cancelled before it finished", "")
+	case errors.Is(err, context.DeadlineExceeded):
+		writeCoded(w, http.StatusGatewayTimeout, diag.CodeToolTimeout, "the request ran out of time before it finished",
+			"Try again. If it keeps timing out, check that the device responds, or press reconnect.")
+		return
+	case errors.Is(err, context.Canceled):
+		writeCoded(w, statusClientClosedRequest, diag.CodeUnknown, "the request was cancelled before it finished", "")
 		return
 	}
 	code, message, remedy := diag.Describe(err)
@@ -66,7 +79,7 @@ func writeFailure(w http.ResponseWriter, err error) {
 	case diag.CodeInvalidArgument:
 		writeCoded(w, http.StatusBadRequest, code, message, remedy)
 	case diag.CodeUnknown:
-		writeCoded(w, http.StatusInternalServerError, codeInternal, "the request failed", "")
+		writeCoded(w, http.StatusInternalServerError, diag.CodeUnknown, "the request failed", "")
 	default:
 		writeCoded(w, http.StatusBadGateway, code, message, remedy)
 	}
