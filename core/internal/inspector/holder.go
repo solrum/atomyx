@@ -82,6 +82,10 @@ type HostConfig struct {
 	IdleMs int64
 	// Logger receives the release and reconnect entries.
 	Logger logging.Logger
+	// Follow attaches to the process that took the device after the host
+	// yielded it, and returns the device's own coded error when none did.
+	// Nil makes a yield end in the released state.
+	Follow Opener
 }
 
 // Host owns the device lifecycle of one inspector. It is itself a Source
@@ -107,9 +111,13 @@ type HostConfig struct {
 // rule of the MCP server.
 type Host struct {
 	open   Opener
-	clk    clock.Clock
-	idleMs int64
-	logger logging.Logger
+	follow Opener
+	// life ends when Close runs, so a follow in flight stops.
+	life       context.Context
+	cancelLife context.CancelFunc
+	clk        clock.Clock
+	idleMs     int64
+	logger     logging.Logger
 
 	// opMu serializes a release and a reconnect, so a reconnect never
 	// opens the device while the release is still giving it up. It is
@@ -147,7 +155,8 @@ func NewHost(cfg HostConfig) (*Host, error) {
 	if idle <= 0 {
 		idle = session.DefaultMcpIdleTimeoutMs
 	}
-	h := &Host{open: cfg.Open, clk: cfg.Clock, idleMs: idle, logger: cfg.Logger}
+	life, cancelLife := context.WithCancel(context.Background())
+	h := &Host{open: cfg.Open, follow: cfg.Follow, life: life, cancelLife: cancelLife, clk: cfg.Clock, idleMs: idle, logger: cfg.Logger}
 	info := cfg.Target.Info()
 	h.mu.Lock()
 	h.adoptLocked(cfg.Target, info)
@@ -364,8 +373,11 @@ func (h *Host) Info() session.Info {
 	info := h.last
 	info.Generation = h.generation
 	info.State = session.StateReleased
-	if errors.Is(h.gone, ErrLost) {
+	switch {
+	case errors.Is(h.gone, ErrLost):
 		info.State = session.StateLost
+	case errors.Is(h.gone, ErrBorrowed):
+		info.State = session.StateBorrowed
 	}
 	return info
 }
@@ -467,6 +479,7 @@ func (h *Host) Reconnect(ctx context.Context) error {
 // Close stops the idle timer and gives the device back. It is safe to
 // call after a release and more than once.
 func (h *Host) Close() error {
+	h.cancelLife()
 	h.opMu.Lock()
 	defer h.opMu.Unlock()
 	held, ok := h.held()

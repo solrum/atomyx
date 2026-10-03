@@ -52,7 +52,7 @@ func (d *deviceSession) cancelOnLost(cancel context.CancelCauseFunc) {
 // the acquisition runs within deps.Timeouts.DeviceAcquireMs. The command is the name other
 // processes see when they find the device held, for example "atomyx run".
 func openDevice(ctx context.Context, deps Deps, command string, desc device.Descriptor) (*deviceSession, error) {
-	opened, err := acquireSession(ctx, deps, command, desc, nil)
+	opened, err := acquireSession(ctx, deps, command, desc, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,9 @@ func openDevice(ctx context.Context, deps Deps, command string, desc device.Desc
 // bare session for a command that manages its release itself.
 // socketRefresher, when set, answers a viewer's fresh capture request on the
 // holder socket in place of the session's own capture.
-func acquireSession(ctx context.Context, deps Deps, command string, desc device.Descriptor, socketRefresher session.Refresher) (*session.Session, error) {
+// yielder, when set, lets another process ask this command to give the device
+// up, and makes the session advertise that it can.
+func acquireSession(ctx context.Context, deps Deps, command string, desc device.Descriptor, socketRefresher session.Refresher, yielder session.Yielder) (*session.Session, error) {
 	sessionDeps := deps.Session
 	sessionDeps.Factory = deps.Factory
 	if sessionDeps.Command == "" {
@@ -75,7 +77,7 @@ func acquireSession(ctx context.Context, deps Deps, command string, desc device.
 	if sessionDeps.Logger == nil {
 		sessionDeps.Logger = deps.logger()
 	}
-	opened, err := session.Acquire(ctx, sessionDeps, session.Request{Descriptor: desc, SocketRefresher: socketRefresher}, session.Acquisition{BudgetMs: deps.Timeouts.DeviceAcquireMs, BuildBudgetMs: deps.Timeouts.RunnerBuildMs})
+	opened, err := session.Acquire(ctx, sessionDeps, session.Request{Descriptor: desc, SocketRefresher: socketRefresher, Yielder: yielder}, session.Acquisition{BudgetMs: deps.Timeouts.DeviceAcquireMs, BuildBudgetMs: deps.Timeouts.RunnerBuildMs})
 	return opened, err
 }
 

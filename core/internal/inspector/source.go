@@ -46,3 +46,24 @@ func (d *DeferredRefresher) FreshTree(ctx context.Context) (session.Snapshot, er
 	}
 	return snap, err
 }
+
+// DeferredYielder answers a yield request through a host that is bound
+// after the session that advertises it is opened, for the same reason as
+// DeferredRefresher. Until a host is bound, a request is refused as busy.
+type DeferredYielder struct {
+	host atomic.Pointer[Host]
+}
+
+var _ session.Yielder = (*DeferredYielder)(nil)
+
+// Bind makes host answer every later request.
+func (d *DeferredYielder) Bind(host *Host) { d.host.Store(host) }
+
+// Yield asks the bound host to give the device away.
+func (d *DeferredYielder) Yield(ctx context.Context, borrower string) (func(), error) {
+	host := d.host.Load()
+	if host == nil {
+		return nil, diag.NewHolderBusy("the inspector is starting")
+	}
+	return host.Yield(ctx, borrower)
+}

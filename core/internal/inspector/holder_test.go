@@ -23,6 +23,9 @@ type fakeHeld struct {
 	closed chan struct{}
 	lost   chan struct{}
 	once   sync.Once
+	// closes counts every Close call, including repeated ones.
+	closes    atomic.Int32
+	borrowers chan string
 }
 
 var errFakeLost = errors.New("the control plane went away")
@@ -38,7 +41,12 @@ func (h *fakeHeld) LostErr() error {
 	}
 }
 
+func (h *fakeHeld) RecordIntervention(kind, client string) {
+	h.borrowers <- kind + ":" + client
+}
+
 func (h *fakeHeld) Close() error {
+	h.closes.Add(1)
 	h.once.Do(func() {
 		h.device.release()
 		close(h.closed)
@@ -64,7 +72,7 @@ func (d *fakeDevice) open(context.Context) (Target, error) {
 	d.opens++
 	ctrl := &stubController{snap: sampleSnapshot(), freshSnap: sampleSnapshot()}
 	ctrl.info.State = session.StateIdle
-	return &fakeHeld{stubController: ctrl, device: d, closed: make(chan struct{}), lost: make(chan struct{})}, nil
+	return &fakeHeld{stubController: ctrl, device: d, closed: make(chan struct{}), lost: make(chan struct{}), borrowers: make(chan string, 4)}, nil
 }
 
 func (d *fakeDevice) release() {
@@ -83,6 +91,11 @@ type hostHarness struct {
 
 func newHostHarness(t *testing.T) *hostHarness {
 	t.Helper()
+	return newHostHarnessFollowing(t, nil)
+}
+
+func newHostHarnessFollowing(t *testing.T, follow Opener) *hostHarness {
+	t.Helper()
 	dev := &fakeDevice{}
 	opened, err := dev.open(context.Background())
 	if err != nil {
@@ -90,7 +103,7 @@ func newHostHarness(t *testing.T) *hostHarness {
 	}
 	first := opened.(*fakeHeld)
 	clk := clock.NewManualClock(1_000)
-	host, err := NewHost(HostConfig{Target: first, Open: dev.open, Clock: clk, IdleMs: testIdleMs, Logger: newRecordingLogger()})
+	host, err := NewHost(HostConfig{Target: first, Open: dev.open, Follow: follow, Clock: clk, IdleMs: testIdleMs, Logger: newRecordingLogger()})
 	if err != nil {
 		t.Fatal(err)
 	}

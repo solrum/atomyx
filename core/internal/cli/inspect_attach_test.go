@@ -381,7 +381,7 @@ func TestInspectOpener_TheAttemptsShareOneWaitBudget(t *testing.T) {
 	deps.Session.Clock = clk
 	deps.Factory = singleMockDriverFactory{driver: mockdriver.New()}
 
-	_, err := inspectOpener(deps, device.Descriptor{Platform: device.PlatformAndroid, ID: "emulator-5554"}, nil)(context.Background())
+	_, err := inspectOpener(deps, device.Descriptor{Platform: device.PlatformAndroid, ID: "emulator-5554"}, nil, nil)(context.Background())
 
 	if code, _, _ := diag.Describe(err); code != diag.CodeDeviceHeld {
 		t.Fatalf("open = %v, want %s", err, diag.CodeDeviceHeld)

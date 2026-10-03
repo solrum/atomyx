@@ -41,6 +41,10 @@ type BrowserOpener interface {
 // their work when the device is lost and end, the inspector keeps
 // serving until it is stopped.
 //
+// A device the inspector acquired is also given to another Atomyx
+// process that asks for it while no capture or action is running. The
+// page then watches that process and offers the reconnect once it ends.
+//
 // Exit codes:
 //
 //   - 0 when the context ended with no stop signal.
@@ -62,7 +66,8 @@ func Inspect(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
 	var refresher inspector.DeferredRefresher
-	opener := inspectOpener(deps, desc, &refresher)
+	var yielder inspector.DeferredYielder
+	opener := inspectOpener(deps, desc, &refresher, &yielder)
 	held, err := opener(ctx)
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
@@ -74,13 +79,14 @@ func Inspect(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 
 	logger := logging.NewStructuredLogger(stderr, logging.LevelInfo)
 	host, err := inspector.NewHost(inspector.HostConfig{ //nolint:contextcheck // the idle timer outlives the command's call context
-		Target: held, Open: opener, Clock: deps.clock(), IdleMs: deps.Timeouts.WithDefaults().McpIdleMs, Logger: logger,
+		Target: held, Open: opener, Follow: inspectFollower(deps, desc), Clock: deps.clock(), IdleMs: deps.Timeouts.WithDefaults().McpIdleMs, Logger: logger,
 	})
 	if err != nil {
 		_ = held.Close()
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
 	refresher.Bind(host)
+	yielder.Bind(host)
 	defer func() { _ = host.Close() }()
 	srv, err := inspector.New(inspector.Config{ //nolint:contextcheck // the listener is not bound to a call context
 		Source: host,
@@ -160,11 +166,8 @@ const inspectOpenAttempts = 3
 // between the probe and the acquisition, it tries again, and it returns
 // the device's own coded error when the attempts run out. Without a lease
 // manager that can be probed, it only acquires.
-func inspectOpener(deps Deps, desc device.Descriptor, socketRefresher session.Refresher) inspector.Opener {
-	prober, canProbe := deps.Session.Leases.(session.LeaseProber)
-	attach := session.AttachDeps{
-		Leases: prober, Identity: deps.Session.Identity, Clock: deps.Session.Clock, Client: inspectCommandName,
-	}
+func inspectOpener(deps Deps, desc device.Descriptor, socketRefresher session.Refresher, yielder session.Yielder) inspector.Opener {
+	attach, canProbe := inspectAttachDeps(deps)
 	return func(ctx context.Context) (inspector.Target, error) {
 		var held error
 		budget := newAttachBudget(deps.Session.Clock)
@@ -190,7 +193,7 @@ func inspectOpener(deps Deps, desc device.Descriptor, socketRefresher session.Re
 					return result.Handle, nil
 				}
 			}
-			opened, err := acquireSession(ctx, deps, inspectCommandName, desc, socketRefresher)
+			opened, err := acquireSession(ctx, deps, inspectCommandName, desc, socketRefresher, yielder)
 			if err == nil {
 				return opened, nil
 			}
@@ -200,6 +203,31 @@ func inspectOpener(deps Deps, desc device.Descriptor, socketRefresher session.Re
 			held = err
 		}
 		return nil, held
+	}
+}
+
+// inspectAttachDeps names the viewer the inspector attaches as, and reports
+// whether the lease manager can be probed at all.
+func inspectAttachDeps(deps Deps) (session.AttachDeps, bool) {
+	prober, canProbe := deps.Session.Leases.(session.LeaseProber)
+	return session.AttachDeps{
+		Leases: prober, Identity: deps.Session.Identity, Clock: deps.Session.Clock, Client: inspectCommandName,
+	}, canProbe
+}
+
+// inspectFollower attaches to the process that takes the device right after
+// the inspector yielded it, waiting a bounded time for it to appear.
+func inspectFollower(deps Deps, desc device.Descriptor) inspector.Opener {
+	attach, canProbe := inspectAttachDeps(deps)
+	return func(ctx context.Context) (inspector.Target, error) {
+		if !canProbe {
+			return nil, session.ErrNoBorrower
+		}
+		handle, err := session.Follow(ctx, attach, desc)
+		if err != nil {
+			return nil, err
+		}
+		return handle, nil
 	}
 }
 

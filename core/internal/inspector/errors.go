@@ -57,6 +57,10 @@ func writeFailure(w http.ResponseWriter, err error) {
 	case errors.Is(err, session.ErrClosed):
 		writeCoded(w, http.StatusGone, codeSessionClosed, "the session is closed", "Reconnect to the device to inspect it again.")
 		return
+	case errors.Is(err, ErrBorrowed):
+		writeCoded(w, http.StatusGone, codeDeviceReleased, "the inspector handed the device to another process",
+			"Press reconnect on the page to watch that process or to take the device again.")
+		return
 	case errors.Is(err, ErrReleased):
 		writeCoded(w, http.StatusGone, codeDeviceReleased, "the inspector released the device after it sat idle",
 			"Press reconnect on the page to take the device again.")

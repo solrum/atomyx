@@ -23,7 +23,7 @@ var _ session.Yielder = (*DeviceSession)(nil)
 // then sees a device it must take again. Yield never takes acquireMu,
 // because the idle release holds it while it closes the session, and that
 // close waits for this connection's goroutine.
-func (s *DeviceSession) Yield(_ context.Context, borrower string) (func(), error) {
+func (s *DeviceSession) Yield(_ context.Context, borrower string) (func(), error) { //nolint:contextcheck // the close and the watch belong to the session, not to the request
 	endExclusive, ok := s.gate.TryExclusive()
 	if !ok {
 		return nil, diag.NewHolderBusy("a tool call or a capture is running")
@@ -48,7 +48,7 @@ func (s *DeviceSession) Yield(_ context.Context, borrower string) (func(), error
 	sess.RecordIntervention(session.InterventionControlBorrowed, borrower)
 	return func() {
 		defer s.yields.Done()
-		s.closeAndRemember(sess, remembered, "session.borrowed")
+		s.closeAndRemember(sess, remembered, "session.borrowed") //nolint:contextcheck // teardown is bounded by its own grace timer, not by a call context
 		endExclusive()
 		s.followBorrower(viewCtx, gen, sess.Descriptor())
 	}, nil
