@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net"
 	"os"
-	"runtime"
 	"testing"
 	"time"
 
@@ -165,7 +164,6 @@ func TestCancelledCallLeavesTheConnectionUsable(t *testing.T) {
 }
 
 func TestCloseIsTypedAndReleasesAConsumerThatStoppedReading(t *testing.T) {
-	baseGoroutines := runtime.NumGoroutine()
 	baseFDs := openFDs(t)
 
 	h := newFakeObserve()
@@ -199,7 +197,8 @@ func TestCloseIsTypedAndReleasesAConsumerThatStoppedReading(t *testing.T) {
 	if err := srv.Close(); err != nil {
 		t.Fatal(err)
 	}
-	waitForNoLeak(t, baseGoroutines, baseFDs)
+	assertClientStopped(t, c)
+	assertNoLeakedFDs(t, baseFDs)
 }
 
 func TestConsumerThatCallsFromItsNoticeLoopNeverHangs(t *testing.T) {

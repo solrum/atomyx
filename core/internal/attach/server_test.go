@@ -7,8 +7,8 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"testing"
@@ -111,14 +111,31 @@ func failureCode(t *testing.T, f Frame) string {
 	return f.Code
 }
 
-func TestListenRestrictsTheSocketToItsOwner(t *testing.T) {
-	srv := startServer(t, ServerConfig{}, nil)
-	info, err := os.Stat(srv.Path())
-	if err != nil {
-		t.Fatal(err)
+func TestListenRestrictsTheSocketToItsOwnerBeforeAcceptingAnyone(t *testing.T) {
+	path := shortSocketPath(t)
+	modes := make(chan os.FileMode, 1)
+	cfg := ServerConfig{Path: path}
+	var first sync.Once
+	cfg.hooks.accept = func(ln *net.UnixListener) (*net.UnixConn, error) {
+		first.Do(func() {
+			info, err := os.Stat(path)
+			if err != nil {
+				modes <- 0
+				return
+			}
+			modes <- info.Mode().Perm()
+		})
+		return ln.AcceptUnix()
 	}
-	if got := info.Mode().Perm(); got != 0o600 {
-		t.Fatalf("socket mode = %o, want 600", got)
+	startServer(t, cfg, nil)
+
+	select {
+	case got := <-modes:
+		if got != 0o600 {
+			t.Fatalf("socket mode when accepting began = %o, want 600", got)
+		}
+	case <-time.After(testGuard):
+		t.Fatal("the server never started accepting")
 	}
 }
 
@@ -239,7 +256,6 @@ func TestMalformedFrameEndsTheConnectionWithAnError(t *testing.T) {
 }
 
 func TestCloseLeavesNoGoroutineOrDescriptor(t *testing.T) {
-	baseGoroutines := runtime.NumGoroutine()
 	baseFDs := openFDs(t)
 
 	srv := startServer(t, ServerConfig{}, nil)
@@ -259,7 +275,7 @@ func TestCloseLeavesNoGoroutineOrDescriptor(t *testing.T) {
 		t.Fatalf("second Close = %v", err)
 	}
 
-	waitForNoLeak(t, baseGoroutines, baseFDs)
+	assertNoLeakedFDs(t, baseFDs)
 }
 
 type viewerEvent struct {
