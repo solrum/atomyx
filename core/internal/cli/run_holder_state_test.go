@@ -11,14 +11,15 @@ import (
 	mockdriver "dev.atomyx/internal/driver/mock"
 	"dev.atomyx/internal/lease"
 	"dev.atomyx/internal/orchestra"
+	"dev.atomyx/internal/session"
 	"dev.atomyx/internal/session/sessiontest"
 )
 
 // holderObservation is what a probe saw while a command drove the device.
 type holderObservation struct {
-	known bool
-	idle  bool
-	runID string
+	state   session.HolderState
+	hasInfo bool
+	runID   string
 }
 
 // holderProbe records the holder's state and lease run id every time the
@@ -26,15 +27,28 @@ type holderObservation struct {
 type holderProbe struct {
 	mu       sync.Mutex
 	manager  *lease.Manager
+	session  *session.Session
 	observed []holderObservation
+}
+
+func (p *holderProbe) sessionOpened(s *session.Session) {
+	p.mu.Lock()
+	p.session = s
+	p.observed = append(p.observed, holderObservation{hasInfo: true, state: s.Info().State})
+	p.mu.Unlock()
 }
 
 func (p *holderProbe) observe(ctx context.Context) {
 	var obs holderObservation
+	p.mu.Lock()
+	opened := p.session
+	p.mu.Unlock()
+	if opened != nil {
+		obs.hasInfo = true
+		obs.state = opened.Info().State
+	}
 	status, err := p.manager.Probe(ctx, lease.KeyFor("android", "emulator-5554"))
 	if err == nil && status.HolderKnown {
-		obs.known = true
-		obs.idle = status.Holder.IdleSince != nil
 		obs.runID = status.Holder.RunID
 	}
 	p.mu.Lock()
@@ -79,6 +93,7 @@ func probedDeps(t *testing.T, stdout, stderr *bytes.Buffer) (Deps, *holderProbe)
 	probe := &holderProbe{manager: newLeaseManager(t)}
 	deps := leaseDeps(t, probe.manager, stdout, stderr)
 	deps.Factory = probingFactory{probe: probe}
+	deps.SessionOpened = probe.sessionOpened
 	return deps, probe
 }
 
@@ -89,12 +104,18 @@ func requireAllRunning(t *testing.T, probe *holderProbe) holderObservation {
 	if len(probe.observed) == 0 {
 		t.Fatal("the command never called the device")
 	}
+	seen := false
 	for i, obs := range probe.observed {
-		if !obs.known {
-			t.Errorf("observation %d: the lease holder record was unreadable", i)
-		} else if obs.idle {
-			t.Errorf("observation %d: lease holder is idle, want running for the whole command", i)
+		if !obs.hasInfo {
+			continue
 		}
+		seen = true
+		if obs.state != session.StateRunning {
+			t.Errorf("observation %d: session state = %q, want running for the whole command", i, obs.state)
+		}
+	}
+	if !seen {
+		t.Fatal("no device call happened after the session opened")
 	}
 	return probe.observed[len(probe.observed)-1]
 }

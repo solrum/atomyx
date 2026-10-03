@@ -70,7 +70,11 @@ func acquireSession(ctx context.Context, deps Deps, command string, desc device.
 	if sessionDeps.Logger == nil {
 		sessionDeps.Logger = deps.logger()
 	}
-	return session.Acquire(ctx, sessionDeps, session.Request{Descriptor: desc}, session.Acquisition{BudgetMs: deps.Timeouts.DeviceAcquireMs, BuildBudgetMs: deps.Timeouts.RunnerBuildMs})
+	opened, err := session.Acquire(ctx, sessionDeps, session.Request{Descriptor: desc}, session.Acquisition{BudgetMs: deps.Timeouts.DeviceAcquireMs, BuildBudgetMs: deps.Timeouts.RunnerBuildMs})
+	if err == nil && deps.SessionOpened != nil {
+		deps.SessionOpened(opened)
+	}
+	return opened, err
 }
 
 // reportLost tells the operator that a run stopped because the device

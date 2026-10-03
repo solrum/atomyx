@@ -55,19 +55,57 @@ func requireOnePhasePairPerStep(t *testing.T, lines []map[string]any, wantSteps 
 	}
 }
 
+func stepsDeps(stdout, stderr *bytes.Buffer) Deps {
+	deps := mockDeps(stdout, stderr)
+	deps.Factory = stagedMockFactory{tree: focusedInputTree()}
+	return deps
+}
+
 func TestRunWritesOneStepLinePerPhaseAndNeverTheTypedText(t *testing.T) {
 	root := t.TempDir()
 	var stdout, stderr bytes.Buffer
-	// The mock device has no focused field, so the type step fails. Its
-	// lines are still written, which is the case worth checking.
-	RunScript(context.Background(), mockDeps(&stdout, &stderr), map[string]FlagValue{
+	code := RunScript(context.Background(), stepsDeps(&stdout, &stderr), map[string]FlagValue{
 		"--file": writeScript(t, "flow.yml", secretFlow), "--report-dir": root,
 	})
+	if code != 0 {
+		t.Fatalf("exit code = %d, stderr: %s", code, stderr.String())
+	}
 
 	lines, body := readStepLines(t, singleRunDir(t, root))
 	requireOnePhasePairPerStep(t, lines, 2)
 	if lines[0]["command"] != "screenshot" || lines[2]["command"] != "type" {
 		t.Errorf("commands = %v, %v, want screenshot then type", lines[0]["command"], lines[2]["command"])
+	}
+	if strings.Contains(body, typedSecret) {
+		t.Errorf("steps file carries the typed text:\n%s", body)
+	}
+}
+
+func TestScenarioRunWritesStepLinesForItsChildren(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "first.yml", "- screenshot: one\n")
+	writeFile(t, dir, "second.yml", secretFlow)
+	writeFile(t, dir, "scenario.yml", "name: Nested\nscripts:\n  - first.yml\n  - second.yml\n")
+	root := filepath.Join(dir, "reports")
+	var stdout, stderr bytes.Buffer
+	code := RunScript(context.Background(), stepsDeps(&stdout, &stderr), map[string]FlagValue{
+		"--file": filepath.Join(dir, "scenario.yml"), "--report-dir": root,
+	})
+	if code != 0 {
+		t.Fatalf("exit code = %d, stderr: %s", code, stderr.String())
+	}
+
+	lines, body := readStepLines(t, singleRunDir(t, root))
+	requireOnePhasePairPerStep(t, lines, 3)
+	var commands []any
+	for i := 0; i < len(lines); i += 2 {
+		commands = append(commands, lines[i]["command"])
+	}
+	want := []any{"screenshot", "screenshot", "type"}
+	for i := range want {
+		if commands[i] != want[i] {
+			t.Fatalf("commands = %v, want %v", commands, want)
+		}
 	}
 	if strings.Contains(body, typedSecret) {
 		t.Errorf("steps file carries the typed text:\n%s", body)
@@ -81,9 +119,12 @@ func TestSuiteWritesStepLinesForEveryEntryInOrder(t *testing.T) {
 	writeFile(t, dir, "b.yml", "- screenshot: second\n")
 	root := filepath.Join(dir, "reports")
 	var stdout, stderr bytes.Buffer
-	RunSuite(context.Background(), mockDeps(&stdout, &stderr), map[string]FlagValue{
+	code := RunSuite(context.Background(), stepsDeps(&stdout, &stderr), map[string]FlagValue{
 		"--glob": []string{"*.yml"}, "--report-dir": root,
 	}, nil)
+	if code != 0 {
+		t.Fatalf("exit code = %d, stderr: %s", code, stderr.String())
+	}
 
 	lines, body := readStepLines(t, singleRunDir(t, root))
 	requireOnePhasePairPerStep(t, lines, 3)
