@@ -288,14 +288,19 @@ func (s *Session) close(ctx context.Context) error {
 
 		disconnected := make(chan error, 1)
 		attachStopped := make(chan struct{})
+		cleanupCtx, endCleanup := context.WithCancel(context.WithoutCancel(ctx))
 		finished := shutdown.Bounded(ctx, s.deps.Clock, shutdown.GracePeriod, func() {
 			go func() {
 				defer close(attachStopped)
 				s.stopAttach()
 			}()
-			disconnected <- s.built.Driver.Disconnect()
+			disconnected <- driver.DisconnectWithin(cleanupCtx, s.built.Driver)
 			<-attachStopped
 		})
+		// A disconnect that outlived the grace period must not keep running
+		// once the lease is released, because another process may own the
+		// device by then.
+		endCleanup()
 		var disconnectErr error
 		select {
 		case disconnectErr = <-disconnected:

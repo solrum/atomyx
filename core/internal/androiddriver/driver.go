@@ -325,22 +325,30 @@ func (d *AndroidDriver) unreachable(cause error) error {
 		cause)
 }
 
-// Disconnect removes the adb forward only when this Connect call
+// Disconnect is DisconnectContext with no bound on the forward removal.
+func (d *AndroidDriver) Disconnect() error { return d.DisconnectContext(context.Background()) }
+
+// DisconnectContext removes the adb forward only when this Connect call
 // created it. A forward Connect found already in place stays,
 // because it was not this driver's to take in the first place, and
 // some other caller, run, or driver instance may still be relying on
 // it. Removal is best-effort: a failure to remove it (for example the
 // forward was already gone) does not surface as an error, matching
-// Driver.Disconnect's idempotent-and-never-throws contract.
-func (d *AndroidDriver) Disconnect() error {
+// Driver.Disconnect's idempotent-and-never-throws contract. The removal
+// runs under ctx and is skipped once ctx is done, because the device may
+// already belong to another process whose forward on the same port a late
+// removal would take away.
+func (d *AndroidDriver) DisconnectContext(ctx context.Context) error {
 	if !d.connected {
 		return nil
 	}
 	if d.forwardOwnedByThis {
-		_, _ = d.proc.Run(context.Background(), "adb",
-			"-s", d.opts.Serial, "forward", "--remove",
-			fmt.Sprintf("tcp:%d", d.hostPort),
-		)
+		if ctx.Err() == nil {
+			_, _ = d.proc.Run(ctx, "adb",
+				"-s", d.opts.Serial, "forward", "--remove",
+				fmt.Sprintf("tcp:%d", d.hostPort),
+			)
+		}
 	}
 	d.connected = false
 	d.forwardOwnedByThis = false
