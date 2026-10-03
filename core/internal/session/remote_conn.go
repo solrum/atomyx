@@ -182,9 +182,15 @@ func (h *RemoteHandle) pullScreenshot(ctx context.Context) error {
 	return nil
 }
 
+// pull sends one request that returns a capture, once the handle's
+// single pull slot is free. It gives up when ctx ends first.
 func (h *RemoteHandle) pull(ctx context.Context, messageType string, result any) error {
-	h.pullMu.Lock()
-	defer h.pullMu.Unlock()
+	select {
+	case h.pullSlot <- struct{}{}:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	defer func() { <-h.pullSlot }()
 	return h.currentClient().Call(ctx, messageType, nil, result)
 }
 

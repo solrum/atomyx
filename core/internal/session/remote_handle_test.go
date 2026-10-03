@@ -497,3 +497,42 @@ func TestRemoteHandle_EndsWhenADifferentHolderAnswersAfterTheRedial(t *testing.T
 		t.Fatalf("Info() = %+v, want the first holder's closed state", got)
 	}
 }
+
+func TestRemoteHandle_AWaiterGivesUpWhenItsContextEndsWhileAnotherPullIsInFlight(t *testing.T) {
+	m := newSocketManager(t, clock.SystemClock{})
+	refresher := &blockingRefresher{entered: make(chan struct{}), release: make(chan struct{})}
+	s, err := session.Open(context.Background(), socketDeps(t, &recordingFactory{events: &eventLog{}}, m), session.Request{Descriptor: androidDesc("A"), SocketRefresher: refresher})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	h := dialRemote(t, socketPathFor(m))
+	first := make(chan struct{})
+	go func() {
+		defer close(first)
+		_, _ = h.FreshTree(context.Background())
+	}()
+	select {
+	case <-refresher.entered:
+	case <-time.After(remoteGuard):
+		t.Fatal("the holder never started the fresh capture")
+	}
+	t.Cleanup(func() { close(refresher.release); <-first })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	waited := make(chan error, 1)
+	go func() {
+		_, err := h.FreshTree(ctx)
+		waited <- err
+	}()
+
+	select {
+	case err := <-waited:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("FreshTree() with a canceled context = %v, want context.Canceled", err)
+		}
+	case <-time.After(remoteGuard):
+		t.Fatal("a canceled caller stayed parked behind the pull in flight")
+	}
+}

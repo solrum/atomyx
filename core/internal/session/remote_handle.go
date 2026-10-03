@@ -74,9 +74,11 @@ type RemoteHandle struct {
 	cancel     context.CancelFunc
 	done       chan struct{}
 
-	// pullMu keeps one capture pull in flight, so the responses a handle
-	// holds in memory stay at one large frame.
-	pullMu sync.Mutex
+	// pullSlot keeps one capture pull in flight, so the responses a handle
+	// holds in memory stay at one large frame. A caller waits for it with
+	// its own context, so a slow pull never outlasts the deadline of the
+	// caller behind it.
+	pullSlot chan struct{}
 
 	mu     sync.Mutex
 	client *attach.Client
@@ -111,6 +113,7 @@ func DialRemote(ctx context.Context, cfg RemoteConfig, desc device.Descriptor) (
 		client:     client,
 	}
 	h.fanout = newFanout(&h.mu)
+	h.pullSlot = make(chan struct{}, 1)
 	h.store.generation = h.generation
 	h.store.snap.Generation = h.generation
 	primeTimeout := cfg.PrimeTimeout
@@ -202,12 +205,8 @@ func (h *RemoteHandle) Latest() Snapshot {
 // running or has a call in flight refuses with HOLDER_BUSY, which the
 // returned error carries.
 func (h *RemoteHandle) FreshTree(ctx context.Context) (Snapshot, error) {
-	h.pullMu.Lock()
-	client := h.currentClient()
 	var result attach.FreshResult
-	err := client.Call(ctx, attach.TypeTreeFresh, nil, &result)
-	h.pullMu.Unlock()
-	if err != nil {
+	if err := h.pull(ctx, attach.TypeTreeFresh, &result); err != nil {
 		return Snapshot{}, err
 	}
 	h.mu.Lock()
