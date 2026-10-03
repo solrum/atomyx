@@ -87,6 +87,8 @@ components:
     in: internal/session/sessiontest
   inspector:
     in: internal/inspector
+  redact:
+    in: internal/redact
   cmd:
     in: cmd/**
   scripttools:
@@ -238,6 +240,7 @@ deps:
       - storageroot
       - storage
       - sessiontest
+      - redact
   skills:
     anyVendorDeps: true
   storage:
@@ -309,6 +312,9 @@ deps:
       - device
       - driver
       - orchestra
+  redact:
+    mayDependOn:
+      - redact
   inspector:
     mayDependOn:
       - wire
