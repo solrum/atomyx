@@ -23,6 +23,10 @@ const (
 	// DefaultQueueSize is how many encoded frames wait for a viewer's
 	// writer before the server disconnects it for reading too slowly.
 	DefaultQueueSize = 64
+	// DefaultQueueBytes is how many bytes of encoded frames may wait for a
+	// viewer's writer before the server disconnects it. It holds two
+	// maximum-size frames, so one response in flight always fits.
+	DefaultQueueBytes = 2 * MaxFrameBytes
 
 	socketMode = 0o600
 )
@@ -39,6 +43,18 @@ type ServerConfig struct {
 	HelloTimeout   time.Duration
 	WriteTimeout   time.Duration
 	QueueSize      int
+	QueueBytes     int64
+
+	hooks testHooks
+}
+
+// testHooks let a test hold the writer or observe the read loop. They
+// are nil outside tests.
+type testHooks struct {
+	// beforeWrite runs in the writer before each queued frame is written.
+	beforeWrite func()
+	// afterDispatch runs in the read loop after each request is answered.
+	afterDispatch func()
 }
 
 func (c ServerConfig) withDefaults() ServerConfig {
@@ -53,6 +69,9 @@ func (c ServerConfig) withDefaults() ServerConfig {
 	}
 	if c.QueueSize <= 0 {
 		c.QueueSize = DefaultQueueSize
+	}
+	if c.QueueBytes <= 0 {
+		c.QueueBytes = DefaultQueueBytes
 	}
 	return c
 }

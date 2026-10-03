@@ -145,3 +145,44 @@ func TestMalformedLineIsReportedAndSkipped(t *testing.T) {
 		t.Fatalf("next = %+v, %v, want session.bye", next, err)
 	}
 }
+
+const framePrefix = `{"v":1,"id":1,"type":"x","data":"`
+
+// frameLine returns a request line that is exactly n bytes long with its
+// newline.
+func frameLine(n int) string {
+	pad := n - len(framePrefix) - len(`"}`+"\n")
+	return framePrefix + strings.Repeat("a", pad) + `"}` + "\n"
+}
+
+func TestFrameReaderEnforcesTheLimitIncludingTheNewline(t *testing.T) {
+	const limit = 200
+	const chunk = 32
+	fits := newFrameReader(strings.NewReader(frameLine(limit)), limit, chunk)
+	if _, err := fits.ReadFrame(); err != nil {
+		t.Fatalf("a line of exactly the limit: %v", err)
+	}
+	over := newFrameReader(strings.NewReader(frameLine(limit+1)), limit, chunk)
+	if _, err := over.ReadFrame(); !errors.Is(err, ErrFrameTooLarge) {
+		t.Fatalf("a line one byte over the limit: %v, want ErrFrameTooLarge", err)
+	}
+	if _, err := over.ReadFrame(); !errors.Is(err, ErrFrameTooLarge) {
+		t.Fatalf("a read after the oversized line: %v, want the same error", err)
+	}
+}
+
+func TestFrameReaderReleasesItsLineBufferAfterALargeFrame(t *testing.T) {
+	const limit = 4096
+	const chunk = 32
+	input := frameLine(1000) + `{"v":1,"id":2,"type":"y"}` + "\n"
+	reader := newFrameReader(strings.NewReader(input), limit, chunk)
+	if _, err := reader.ReadFrame(); err != nil {
+		t.Fatal(err)
+	}
+	if reader.spill != nil {
+		t.Fatalf("the reader kept %d bytes of a frame it already returned", cap(reader.spill))
+	}
+	if next, err := reader.ReadFrame(); err != nil || next.Type != "y" {
+		t.Fatalf("next = %+v, %v, want type y", next, err)
+	}
+}

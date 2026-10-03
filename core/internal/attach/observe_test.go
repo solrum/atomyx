@@ -3,6 +3,7 @@ package attach
 import (
 	"context"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -166,7 +167,8 @@ func TestSlowReaderIsDisconnectedAndOthersKeepBeingServed(t *testing.T) {
 	h := newFakeObserve()
 	srv := startServer(t, ServerConfig{
 		Handlers:     Handlers{Observe: h, Session: fakeSession{Status{State: "idle"}}},
-		QueueSize:    4,
+		QueueSize:    1000,
+		QueueBytes:   64 << 10,
 		WriteTimeout: time.Hour,
 	}, nil)
 	slow := dialRaw(t, srv.Path())
@@ -174,7 +176,7 @@ func TestSlowReaderIsDisconnectedAndOthersKeepBeingServed(t *testing.T) {
 	other := dialRaw(t, srv.Path())
 	other.hello()
 
-	detail := strings.Repeat("x", 256<<10)
+	detail := strings.Repeat("x", 16<<10)
 	notice := Notice{Type: NoticeStep, Data: StepNotice{Line: StepLine{Detail: &detail}}}
 	const floodLimit = 2000
 	disconnected := false
@@ -194,6 +196,105 @@ func TestSlowReaderIsDisconnectedAndOthersKeepBeingServed(t *testing.T) {
 	var status Status
 	if err := other.call(TypeStatus, nil).Decode(&status); err != nil || status.State != "idle" {
 		t.Fatalf("another viewer after the disconnect: %+v, %v", status, err)
+	}
+}
+
+// writerGate holds the server's writer while armed, and reports each
+// answered request, so a test can queue frames behind a frame that is
+// not yet written.
+type writerGate struct {
+	armed      atomic.Bool
+	entered    chan struct{}
+	dispatched chan struct{}
+	release    chan struct{}
+	openOnce   sync.Once
+}
+
+// installGate wires a gate into cfg. The test must register g.open as a
+// cleanup after starting the server, so the writer is released before
+// the server waits for it.
+func installGate(t *testing.T, cfg *ServerConfig) *writerGate {
+	t.Helper()
+	g := &writerGate{
+		entered:    make(chan struct{}, 16),
+		dispatched: make(chan struct{}, 16),
+		release:    make(chan struct{}),
+	}
+	cfg.hooks.beforeWrite = func() {
+		if g.armed.Load() {
+			g.entered <- struct{}{}
+			<-g.release
+		}
+	}
+	cfg.hooks.afterDispatch = func() { g.dispatched <- struct{}{} }
+	return g
+}
+
+func (g *writerGate) open() { g.openOnce.Do(func() { close(g.release) }) }
+
+func (g *writerGate) waitFor(t *testing.T, signal chan struct{}, what string) {
+	t.Helper()
+	select {
+	case <-signal:
+	case <-time.After(testGuard):
+		t.Fatalf("%s never happened", what)
+	}
+}
+
+func TestViewerOverTheByteBudgetIsDisconnected(t *testing.T) {
+	h := newFakeObserve()
+	cfg := ServerConfig{Handlers: Handlers{Observe: h}, QueueSize: 1000, QueueBytes: 1000}
+	g := installGate(t, &cfg)
+	srv := startServer(t, cfg, nil)
+	t.Cleanup(g.open)
+	sub := subscribed(t, dialRaw(t, srv.Path()), h, "", 0)
+	g.armed.Store(true)
+
+	detail := strings.Repeat("x", 300)
+	notice := Notice{Type: NoticeStep, Data: StepNotice{Line: StepLine{Detail: &detail}}}
+	const noticesPastBudget = 4
+	for range noticesPastBudget {
+		select {
+		case sub.notices <- notice:
+		case <-sub.ctx.Done():
+		case <-time.After(testGuard):
+			t.Fatal("the server stopped consuming notices")
+		}
+	}
+	select {
+	case <-sub.ctx.Done():
+	case <-time.After(testGuard):
+		t.Fatal("a viewer past the byte budget was not disconnected")
+	}
+}
+
+func TestSecondPullResponseIsRefusedWhileTheFirstIsUnwritten(t *testing.T) {
+	h := newFakeObserve()
+	h.shot = ScreenshotResult{Format: "png", Image: []byte{1}}
+	cfg := ServerConfig{Handlers: Handlers{Observe: h}}
+	g := installGate(t, &cfg)
+	srv := startServer(t, cfg, nil)
+	t.Cleanup(g.open)
+	client := dialRaw(t, srv.Path())
+	client.hello()
+	g.armed.Store(true)
+
+	first := client.send(TypeScreenshotLatest, nil)
+	g.waitFor(t, g.entered, "the writer holding the first response")
+	second := client.send(TypeScreenshotLatest, nil)
+	g.waitFor(t, g.dispatched, "the first request answered")
+	g.waitFor(t, g.dispatched, "the second request answered")
+	g.open()
+
+	if got := client.read(); got.ID != first || got.Ok == nil || !*got.Ok {
+		t.Fatalf("first response = %+v, want success for id %d", got, first)
+	}
+	refusal := client.read()
+	if refusal.ID != second || failureCode(t, refusal) != diag.CodeHolderBusy {
+		t.Fatalf("second response = %+v, want HOLDER_BUSY for id %d", refusal, second)
+	}
+	if ok := client.call(TypeScreenshotLatest, nil).Ok; ok == nil || !*ok {
+		t.Fatal("a pull request after the first response was written was refused")
 	}
 }
 

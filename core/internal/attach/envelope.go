@@ -29,8 +29,9 @@ const (
 // connection stays usable.
 var ErrFrameTooLarge = errors.New("attach: frame exceeds the maximum frame size")
 
-// ErrMalformedFrame reports a line that is not a JSON object. The next
-// line can still be read.
+// ErrMalformedFrame reports a line that is not a JSON object. A
+// FrameReader can still read the line after it, but a server answers it
+// and closes the connection.
 var ErrMalformedFrame = errors.New("attach: malformed frame")
 
 // FrameKind tells what a Frame is.
@@ -153,38 +154,79 @@ func WriteFrame(w io.Writer, f Frame) error {
 // FrameReader reads frames from a stream. It is not safe for concurrent
 // use.
 type FrameReader struct {
-	scanner *bufio.Scanner
+	reader   *bufio.Reader
+	maxBytes int
+	// spill collects the part of a line that did not fit the reader's
+	// buffer. It is dropped after each frame so a viewer that sent one
+	// large frame does not keep its memory.
+	spill []byte
+	err   error
 }
 
-// NewFrameReader reads frames from r. The line buffer grows from a small
-// start up to MaxFrameBytes, so an idle connection costs little.
+// NewFrameReader reads frames from r. The line buffer starts small and
+// grows only while a line needs it, up to MaxFrameBytes, and it is
+// released after each frame.
 func NewFrameReader(r io.Reader) *FrameReader {
-	scanner := bufio.NewScanner(r)
-	scanner.Buffer(make([]byte, 0, initialReadBytes), MaxFrameBytes)
-	return &FrameReader{scanner: scanner}
+	return newFrameReader(r, MaxFrameBytes, initialReadBytes)
+}
+
+func newFrameReader(r io.Reader, maxBytes, chunkBytes int) *FrameReader {
+	return &FrameReader{reader: bufio.NewReaderSize(r, max(chunkBytes, 16)), maxBytes: maxBytes}
+}
+
+// nextLine returns the next line with its newline. The result is valid
+// until the next call.
+func (r *FrameReader) nextLine() ([]byte, error) {
+	r.spill = nil
+	for {
+		chunk, err := r.reader.ReadSlice('\n')
+		if r.spill == nil && err == nil && len(chunk) <= r.maxBytes {
+			return chunk, nil
+		}
+		if len(r.spill)+len(chunk) > r.maxBytes {
+			return nil, ErrFrameTooLarge
+		}
+		r.spill = append(r.spill, chunk...)
+		switch {
+		case err == nil:
+			return r.spill, nil
+		case errors.Is(err, bufio.ErrBufferFull):
+			continue
+		case errors.Is(err, io.EOF) && len(r.spill) > 0:
+			return r.spill, nil
+		default:
+			return nil, err
+		}
+	}
 }
 
 // ReadFrame returns the next frame. It returns io.EOF at the end of the
 // stream, ErrFrameTooLarge for a line past MaxFrameBytes, and an error
 // wrapping ErrMalformedFrame for a line that is not a JSON object.
-// Blank lines are skipped.
+// Blank lines are skipped. After ErrFrameTooLarge or a read error the
+// stream cannot be resynchronized, so every later call returns the same
+// error.
 func (r *FrameReader) ReadFrame() (Frame, error) {
-	for r.scanner.Scan() {
-		line := bytes.TrimSpace(r.scanner.Bytes())
+	if r.err != nil {
+		return Frame{}, r.err
+	}
+	for {
+		raw, err := r.nextLine()
+		if err != nil {
+			r.err = err
+			r.spill = nil
+			return Frame{}, err
+		}
+		line := bytes.TrimSpace(raw)
 		if len(line) == 0 {
 			continue
 		}
 		var f Frame
-		if err := json.Unmarshal(line, &f); err != nil {
+		err = json.Unmarshal(line, &f)
+		r.spill = nil
+		if err != nil {
 			return Frame{}, fmt.Errorf("%w: %w", ErrMalformedFrame, err)
 		}
 		return f, nil
 	}
-	if err := r.scanner.Err(); err != nil {
-		if errors.Is(err, bufio.ErrTooLong) {
-			return Frame{}, ErrFrameTooLarge
-		}
-		return Frame{}, err
-	}
-	return Frame{}, io.EOF
 }

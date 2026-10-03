@@ -14,6 +14,14 @@ import (
 // zeroTime clears a connection deadline.
 var zeroTime time.Time
 
+// outbound is one encoded frame waiting for the writer. A nil line means
+// close after the frames before it have been written. A pull frame
+// releases the connection's pull slot once it is written.
+type outbound struct {
+	line []byte
+	pull bool
+}
+
 // conn is one attached viewer. run reads and dispatches requests, and
 // writeLoop is the only writer, fed by a bounded queue so answering a
 // request never waits on a slow viewer.
@@ -21,7 +29,15 @@ type conn struct {
 	srv    *Server
 	nc     *net.UnixConn
 	reader *FrameReader
-	out    chan []byte
+	out    chan outbound
+
+	// queuedBytes counts the bytes of frames that are queued or being
+	// written, so a viewer that never reads cannot hold more than
+	// ServerConfig.QueueBytes of the holder's memory.
+	queuedBytes atomic.Int64
+	// pullBusy is set while a pull response (a tree or screenshot read) is
+	// queued or being written, so a viewer cannot stack large responses.
+	pullBusy atomic.Bool
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -39,7 +55,7 @@ func newConn(s *Server, nc *net.UnixConn) *conn {
 		srv:    s,
 		nc:     nc,
 		reader: NewFrameReader(nc),
-		out:    make(chan []byte, s.cfg.QueueSize),
+		out:    make(chan outbound, s.cfg.QueueSize),
 		ctx:    ctx,
 		cancel: cancel,
 	}
@@ -75,33 +91,52 @@ func (c *conn) writeLoop() {
 		select {
 		case <-c.ctx.Done():
 			return
-		case line := <-c.out:
-			if line == nil {
+		case item := <-c.out:
+			if item.line == nil {
 				return
+			}
+			if hook := c.srv.cfg.hooks.beforeWrite; hook != nil {
+				hook()
 			}
 			if err := c.nc.SetWriteDeadline(c.srv.now().Add(c.srv.cfg.WriteTimeout)); err != nil {
 				return
 			}
-			if _, err := c.nc.Write(line); err != nil {
+			if _, err := c.nc.Write(item.line); err != nil {
 				return
+			}
+			c.queuedBytes.Add(-int64(len(item.line)))
+			if item.pull {
+				c.pullBusy.Store(false)
 			}
 		}
 	}
 }
 
-// enqueue hands a line to the writer without waiting. A full queue means
-// the viewer stopped reading, so the connection closes.
-func (c *conn) enqueue(line []byte) bool {
+// enqueue hands a line to the writer without waiting. A full queue or an
+// exhausted byte budget means the viewer stopped reading, so the
+// connection closes.
+func (c *conn) enqueue(line []byte, pull bool) bool {
+	size := int64(len(line))
+	if c.queuedBytes.Add(size) > c.srv.cfg.QueueBytes {
+		c.queuedBytes.Add(-size)
+		c.close()
+		return false
+	}
 	select {
-	case c.out <- line:
+	case c.out <- outbound{line: line, pull: pull}:
 		return true
 	default:
+		c.queuedBytes.Add(-size)
 		c.close()
 		return false
 	}
 }
 
 func (c *conn) send(f Frame) bool {
+	return c.sendFrame(f, false)
+}
+
+func (c *conn) sendFrame(f Frame, pull bool) bool {
 	line, err := EncodeFrame(f)
 	if errors.Is(err, ErrFrameTooLarge) && f.Kind() == KindResponse {
 		line, err = EncodeFrame(NewErrorResponse(f.ID, f.Type, errResponseTooLarge))
@@ -110,7 +145,7 @@ func (c *conn) send(f Frame) bool {
 		c.close()
 		return false
 	}
-	return c.enqueue(line)
+	return c.enqueue(line, pull)
 }
 
 func (c *conn) respond(req Frame, data any) bool {
@@ -129,7 +164,7 @@ func (c *conn) fail(req Frame, cause error) bool {
 // connection.
 func (c *conn) drain() {
 	c.draining.Store(true)
-	c.enqueue(nil)
+	c.enqueue(nil, false)
 }
 
 // finish sends a last error that belongs to the connection, not to a
@@ -199,7 +234,11 @@ func (c *conn) serve() {
 			c.finish(invalidFrame("a viewer sends only requests"))
 			return
 		}
-		if !c.dispatch(f) {
+		ok = c.dispatch(f)
+		if hook := c.srv.cfg.hooks.afterDispatch; hook != nil {
+			hook()
+		}
+		if !ok {
 			return
 		}
 	}
