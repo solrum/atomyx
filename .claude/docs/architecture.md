@@ -519,6 +519,42 @@ viewer that attached between the session opening and the host's decision
 still appears in the run folder. Clearing the recorder returns only after
 an append in flight has finished.
 
+A process that finds a device held watches it through a
+`session.RemoteHandle`, which implements `Viewer`, `StepSource` and
+`Refresher` over the holder's socket and never `Controller`, because it
+has no activity gate. `session.Attach(ctx, deps, desc)` returns a
+`session.AttachResult` after probing the lease:
+
+- A free device returns `AttachResult.Free`, so the caller may acquire it
+  instead.
+- A held device whose record names a socket is connected to, and the
+  result carries the handle.
+- A held device whose record carries `socketError` fails with
+  `*session.HolderServesNoSocketError`, which names the holder's command.
+- A held device whose record names neither is a holder that is still
+  starting. `Attach` retries with a doubling wait from
+  `AttachBackoffInitialMs` to `AttachBackoffMaxMs`, spending at most
+  `AttachStartingBudgetMs`, then fails with `*session.HolderStartingError`.
+- A connect that fails probes again with the same backoff, spending at
+  most `AttachReconnectBudgetMs`, because the holder may be exiting. A
+  lease that became free returns `AttachResult.Free`. A holder that still
+  holds it fails with `*session.HolderUnreachableError`.
+
+All three errors carry `DEVICE_HELD`. The waits go through
+`AttachDeps.Clock`, so a test steps them without sleeping.
+
+The handle serves the holder's newest masked tree and screenshot with the
+holder's own revisions, pulling each when a notice announces it. A
+notice does not say whether a mutating call overlapped a capture, so
+`Paired`, `Highlightable` and `Scale` are set only for the pair that the
+last `FreshTree` returned. `FreshTree` forwards `observe.tree.fresh`, and
+a holder that is running or has a call in flight refuses it with
+`HOLDER_BUSY`. Each handle has its own `Generation`. When the holder ends
+a subscription, or the connection drops step notices, the handle
+reconnects and resumes after the last step line it stored, and it ends
+only when the holder is gone. `Subscribe` observers that fall behind end
+with a dropped observation, as on a local session.
+
 `session` may depend on `device`, `lease`, `attach`, `runfolder`, `diag`,
 `orchestra`, `driver`, `shutdown` and the common leaves. It never imports
 `mcp`, `cli` or `inspector`.
