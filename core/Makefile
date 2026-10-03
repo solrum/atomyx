@@ -100,7 +100,8 @@ check:
 	@echo "Layer-import gate ..."
 	go-arch-lint check --project-path .
 	@echo "Lint gate ..."
-	golangci-lint run ./...
+# A fresh cache dir because a partial-package run caches a clean result that hides cross-package contextcheck findings.
+	@cache=$$(mktemp -d) && trap 'rm -rf "$$cache"' EXIT && GOLANGCI_LINT_CACHE="$$cache" golangci-lint run ./...
 	@echo "Comment gate ..."
 	bash scripts/check-comments.sh
 	@echo "Raw syscall.Open gate ..."
