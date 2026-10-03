@@ -386,6 +386,11 @@ one, is logged as refused.
 - **A fresh URL.** A reload loses the page's token. Press Enter in the
   terminal to print a fresh URL, which the command also opens unless
   `--no-open` is set. The end of stdin does not stop the server.
+- **Code lifetime.** A URL works for 60 seconds after the command prints
+  it, and for one visit. After that the page says the code was refused
+  because it expired, and the server answers `CODE_REFUSED`. Press
+  Enter in the terminal for a fresh URL. The terminal log records the
+  refusal as `inspector.auth.expired`.
 - **Idle release.** The command keeps the device until
   `session.mcpIdleTimeoutMs` passes without an action taken in the page,
   such as asking for a fresh capture, suggesting a selector, testing a

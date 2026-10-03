@@ -21,7 +21,7 @@ export async function bootstrap() {
     if (err instanceof ApiError && err.status === 401) {
       throw new ApiError(401, {
         code: err.code,
-        message: 'The bootstrap code was refused. It may already have been used.',
+        message: 'The bootstrap code was refused. It may have expired or already been used.',
         remedy: FRESH_URL_REMEDY,
       });
     }

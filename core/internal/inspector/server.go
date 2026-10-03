@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/session"
@@ -65,6 +66,9 @@ type Config struct {
 	// Entropy supplies the randomness of codes and tokens. It defaults
 	// to crypto/rand and exists so a test can be deterministic.
 	Entropy io.Reader
+	// Clock times the lifetime of a bootstrap code. It defaults to the
+	// system clock.
+	Clock clock.Clock
 	// Groups contribute the routes of the server.
 	Groups []RouteGroup
 }
@@ -95,7 +99,11 @@ func New(cfg Config) (*Server, error) {
 	if entropy == nil {
 		entropy = rand.Reader
 	}
-	s := &Server{auth: newAuthority(entropy), logger: cfg.Logger}
+	clk := cfg.Clock
+	if clk == nil {
+		clk = clock.SystemClock{}
+	}
+	s := &Server{auth: newAuthority(entropy, clk), logger: cfg.Logger}
 
 	mux := http.NewServeMux()
 	registered := map[string]bool{}
@@ -226,14 +234,18 @@ func (s *Server) handleAuth(w http.ResponseWriter, r *http.Request) {
 			"Open the URL the atomyx inspect command printed, which carries the code.")
 		return
 	}
-	token, ok, err := s.auth.exchange(body.Code)
+	token, outcome, err := s.auth.exchange(body.Code)
 	fields := logging.LogContext{"remote": r.RemoteAddr}
 	switch {
 	case err != nil:
 		s.logger.Error("inspector.auth.failed", err, fields)
 		writeCoded(w, http.StatusInternalServerError, codeInternal, "the token could not be issued",
 			"Press Enter in the atomyx inspect terminal for a fresh URL, then try again.")
-	case !ok:
+	case outcome == exchangeExpired:
+		s.logger.Warn("inspector.auth.expired", fields)
+		writeCoded(w, http.StatusUnauthorized, codeCodeRefused, "the bootstrap code has expired",
+			"Press Enter in the atomyx inspect terminal for a fresh URL.")
+	case outcome == exchangeRefused:
 		s.logger.Warn("inspector.auth.refused", fields)
 		writeCoded(w, http.StatusUnauthorized, codeCodeRefused, "the bootstrap code is wrong or already used",
 			"Press Enter in the atomyx inspect terminal for a fresh URL.")
