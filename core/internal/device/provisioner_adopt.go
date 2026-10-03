@@ -49,6 +49,9 @@ type adoption struct {
 // recorded. A listener on the port that cannot be accounted for blocks
 // the adoption.
 //
+// The record's lender is set to lender, so an adoption with no lender
+// clears a lender a previous adopter recorded.
+//
 // The recorded owner is no obstacle, even when it is another live
 // process, because holding the device lease is what entitles a process
 // to drive the runner. The adopter rewrites the record's owner to
@@ -56,7 +59,7 @@ type adoption struct {
 //
 // The caller must hold the device lease, because only then does no
 // other process drive the runner.
-func (p *DriverProvisioner) adopt(ctx context.Context, udid string, kind IosAgentKind, cfg iosdriver.LaunchConfig, onTunnelExit func(error)) (adoption, bool) {
+func (p *DriverProvisioner) adopt(ctx context.Context, udid string, kind IosAgentKind, cfg iosdriver.LaunchConfig, lender RunnerOwner, onTunnelExit func(error)) (adoption, bool) {
 	path := p.statePath(udid)
 	if p.deps.Reaper == nil || path == "" {
 		return adoption{}, false
@@ -86,6 +89,7 @@ func (p *DriverProvisioner) adopt(ctx context.Context, udid string, kind IosAgen
 		return adoption{}, false
 	}
 	adopted.state.OwnerPid, adopted.state.OwnerStartTime = owner.Pid, owner.StartTime
+	adopted.state.LenderPid, adopted.state.LenderStartTime = lender.Pid, lender.StartTime
 	if err := WriteRunnerState(path, adopted.state); err != nil {
 		abandon()
 		p.logger.Warn("not adopting the recorded runner", logging.LogContext{"udid": udid, "error": err.Error()})
@@ -190,6 +194,29 @@ func (p *DriverProvisioner) endAdopted(ctx context.Context, a adoption, held lau
 	return nil
 }
 
+// handBackToLender makes the lender recorded for the runner held names
+// its owner again and clears the lender, and reports whether it did. It
+// does nothing, and reports false, when the record no longer names this
+// runner and this owner, when no lender is recorded, or when the lender
+// process is gone, because a runner with no live lender is stopped by its
+// owner. The caller must hold the device lease.
+func (p *DriverProvisioner) handBackToLender(held launchRecord) bool {
+	state, err := ReadRunnerState(held.path)
+	if err != nil || state.RunnerID != held.runnerID || !state.OwnedBy(held.owner) || state.LenderPid == 0 {
+		return false
+	}
+	if p.processEnded(state.LenderPid, state.LenderStartTime) {
+		return false
+	}
+	state.OwnerPid, state.OwnerStartTime = state.LenderPid, state.LenderStartTime
+	state.LenderPid, state.LenderStartTime = 0, time.Time{}
+	if err := WriteRunnerState(held.path, state); err != nil {
+		p.logger.Warn("could not hand the runner back to its lender", logging.LogContext{"udid": held.udid, "error": err.Error()})
+		return false
+	}
+	return true
+}
+
 // watchAdopted reports through lostRunner once when the process of the
 // adopted runner a names is gone or has been replaced by another process,
 // and through lostTunnel once when an adopted tunnel's process is. It
@@ -243,7 +270,11 @@ func (p *DriverProvisioner) adoptedAgent(ctx context.Context, a adoption, held l
 	})
 	setEnded(stop)
 	if p.deps.Keeper != nil {
-		kept = p.deps.Keeper.keep(held, stop)
+		var handBack func() bool
+		if state.LenderPid != 0 {
+			handBack = func() bool { return p.handBackToLender(held) }
+		}
+		kept = p.deps.Keeper.keepWithHandBack(held, stop, handBack)
 	}
 	if onLost != nil {
 		go p.watchAdopted(watchCtx, a, onLost, onTunnelLost)

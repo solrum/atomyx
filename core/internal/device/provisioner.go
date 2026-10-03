@@ -378,7 +378,7 @@ func (p *DriverProvisioner) ProvisionIOSAgent(ctx context.Context, udid string, 
 	cfg.OnRunnerExit = lostHook(LostRunner)
 	if !p.deps.FixedIosPort {
 		if !opts.Fresh {
-			if adopted, ok := p.adopt(ctx, udid, kind, cfg, lostHook(LostTunnel)); ok {
+			if adopted, ok := p.adopt(ctx, udid, kind, cfg, opts.Lender, lostHook(LostTunnel)); ok {
 				state := adopted.state
 				held = launchRecord{udid: udid, path: p.statePath(udid), runnerID: state.RunnerID, owner: RunnerOwner{Pid: state.OwnerPid, StartTime: state.OwnerStartTime}, state: state}
 				return p.adoptedAgent(ctx, adopted, held, udid, lostHook(LostRunner), lostHook(LostTunnel), func(stop func() error) { ended = stop }), nil

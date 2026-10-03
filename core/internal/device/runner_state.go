@@ -45,6 +45,12 @@ const runnerStateFileMode = 0o600
 // the runner running. A process that holds the device lease may adopt the
 // runner and becomes its owner, and the previous owner then leaves it
 // running.
+//
+// LenderPid and LenderStartTime identify the process that held the device
+// just before the owner took over by adopting the runner, when that
+// process lent the device on purpose. They are zero for a runner nobody
+// lent. When the owner exits it hands the runner back to a live lender
+// instead of stopping it.
 type RunnerState struct {
 	UDID             string    `json:"udid"`
 	Kind             string    `json:"kind"`
@@ -59,6 +65,8 @@ type RunnerState struct {
 	TunnelStartTime  time.Time `json:"tunnelStartTime"`
 	OwnerPid         int       `json:"ownerPid,omitempty"`
 	OwnerStartTime   time.Time `json:"ownerStartTime"`
+	LenderPid        int       `json:"lenderPid,omitempty"`
+	LenderStartTime  time.Time `json:"lenderStartTime"`
 
 	BuildProductPath    string    `json:"buildProductPath,omitempty"`
 	BuildProductModTime time.Time `json:"buildProductModTime"`

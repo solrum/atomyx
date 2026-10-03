@@ -21,4 +21,10 @@ type ProvisionOptions struct {
 	// even when the recorded runner could be adopted. A caller sets it
 	// after an adopted runner proved unusable.
 	Fresh bool
+	// Lender identifies the process that lent the device to the caller.
+	// An adopted runner then records it, and the caller's exit hands the
+	// runner back to the lender while the lender is alive. The zero value
+	// means nobody lent the device, and a launched runner never records a
+	// lender.
+	Lender RunnerOwner
 }

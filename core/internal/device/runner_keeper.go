@@ -17,6 +17,10 @@ type LeaseAttempt func(udid string) (release func(), err error)
 // runner is left running. After taking the lease the keeper reads the
 // owner from the record again and leaves a runner whose record names
 // another process, because that process adopted it.
+//
+// A runner adopted from a process that lent the device is handed back to
+// that process while it is alive: the record's owner becomes the lender
+// and the runner keeps running. It is stopped when the lender is gone.
 type RunnerKeeper struct {
 	mu      sync.Mutex
 	attempt LeaseAttempt
@@ -27,6 +31,10 @@ type RunnerKeeper struct {
 type keptRunner struct {
 	launch launchRecord
 	stop   func() error
+	// handBack, when non-nil, gives the runner to the process that lent
+	// the device and reports whether it did. A runner it hands back is not
+	// stopped.
+	handBack func() bool
 }
 
 // NewRunnerKeeper returns a keeper that holds no runner.
@@ -48,9 +56,16 @@ func (k *RunnerKeeper) TakeLeaseWith(attempt LeaseAttempt) *RunnerKeeper {
 // the same launch id, as when this process adopts a runner it launched
 // itself, replaces the earlier entry.
 func (k *RunnerKeeper) keep(launch launchRecord, stop func() error) *keptRunner {
+	return k.keepWithHandBack(launch, stop, nil)
+}
+
+// keepWithHandBack is keep for a runner another process lent the device
+// for. At exit, once the lease is taken and the record still names this
+// process as owner, the keeper calls handBack before it stops the runner.
+func (k *RunnerKeeper) keepWithHandBack(launch launchRecord, stop func() error, handBack func() bool) *keptRunner {
 	k.mu.Lock()
 	defer k.mu.Unlock()
-	entry := &keptRunner{launch: launch, stop: stop}
+	entry := &keptRunner{launch: launch, stop: stop, handBack: handBack}
 	k.runners[launch.runnerID] = entry
 	return entry
 }
@@ -97,7 +112,7 @@ func (k *RunnerKeeper) StopAll() {
 }
 
 // stopIfOwned stops r once the lease of its device is taken, unless the
-// record names another owner by then.
+// record names another owner by then or r is handed back to a live lender.
 func stopIfOwned(r *keptRunner, attempt LeaseAttempt) {
 	if attempt != nil {
 		release, err := attempt(r.launch.udid)
@@ -107,6 +122,9 @@ func stopIfOwned(r *keptRunner, attempt LeaseAttempt) {
 		defer release()
 	}
 	if r.launch.ownedByAnotherProcess() {
+		return
+	}
+	if r.handBack != nil && r.handBack() {
 		return
 	}
 	_ = r.stop()
