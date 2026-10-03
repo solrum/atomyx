@@ -41,11 +41,25 @@ type conn struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	closeOnce  sync.Once
-	subscribed bool
+	closeOnce sync.Once
+	// sub is the connection's live notice subscription. Only the read
+	// goroutine touches it.
+	sub *liveSubscription
 	// draining is set once the last frame is queued, so the writer closes
 	// the socket after writing everything before it.
 	draining atomic.Bool
+}
+
+// liveSubscription is the notice flow one observe.subscribe started.
+type liveSubscription struct {
+	cancel context.CancelFunc
+	// done is closed when the pump of the subscription has ended.
+	done chan struct{}
+}
+
+func newLiveSubscription(parent context.Context) (context.Context, *liveSubscription) {
+	ctx, cancel := context.WithCancel(parent)
+	return ctx, &liveSubscription{cancel: cancel, done: make(chan struct{})}
 }
 
 func newConn(s *Server, nc *net.UnixConn) *conn {
@@ -75,6 +89,7 @@ func (c *conn) run() {
 			c.close()
 		}
 	}()
+	defer c.endSubscription()
 	if !c.handshake() {
 		return
 	}
@@ -237,7 +252,7 @@ func (c *conn) serve() {
 			c.finish(invalidFrame("a viewer sends only requests"))
 			return
 		}
-		ok = c.dispatch(f)
+		ok = c.dispatch(c.ctx, f)
 		if hook := c.srv.cfg.hooks.afterDispatch; hook != nil {
 			hook()
 		}
@@ -249,7 +264,7 @@ func (c *conn) serve() {
 
 // dispatch answers one request and reports whether the connection stays
 // open.
-func (c *conn) dispatch(f Frame) bool {
+func (c *conn) dispatch(ctx context.Context, f Frame) bool {
 	switch f.Type {
 	case TypeHello:
 		return c.fail(f, invalidFrame("session.hello was already accepted"))
@@ -264,7 +279,7 @@ func (c *conn) dispatch(f Frame) bool {
 		}
 	case TypeSubscribe, TypeTreeLatest, TypeScreenshotLatest, TypeTreeFresh:
 		if h := c.srv.cfg.Handlers.Observe; h != nil {
-			return c.observe(h, f)
+			return c.observe(ctx, h, f)
 		}
 	}
 	return c.fail(f, diag.NewUnsupported(f.Type))

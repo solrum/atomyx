@@ -22,6 +22,14 @@ const DefaultNoticeBuffer = 64
 // line it read.
 const NoticeStepsDropped = "observe.client.stepsDropped"
 
+// NoticeSubscribed is a notice the client itself produces, never one a
+// holder sends. It is queued in order each time the holder accepts an
+// observe.subscribe request, so every notice before it belongs to the
+// subscription the request replaced and every notice after it to the new
+// one. A consumer that resubscribes on a live connection ignores the
+// notices that precede the marker.
+const NoticeSubscribed = "observe.client.subscribed"
+
 // ErrClientClosed is the cause of a ConnectionError after the caller
 // closed the client itself.
 var ErrClientClosed = errors.New("attach: client closed")
@@ -279,6 +287,9 @@ func (c *Client) readLoop() {
 			if f.ID == 0 {
 				cause = remoteError(f)
 				return
+			}
+			if f.Type == TypeSubscribe && f.Ok != nil && *f.Ok {
+				c.inbox.push(Frame{V: ProtocolMajor, Type: NoticeSubscribed})
 			}
 			c.reply(f)
 		}

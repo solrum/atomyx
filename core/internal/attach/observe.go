@@ -1,13 +1,15 @@
 package attach
 
+import "context"
+
 // observe answers a request of the observe group. Only the connection's
-// read goroutine calls it, so the subscribed flag needs no lock.
-func (c *conn) observe(h ObserveHandler, f Frame) bool {
+// read goroutine calls it, so the subscription field needs no lock.
+func (c *conn) observe(ctx context.Context, h ObserveHandler, f Frame) bool {
 	switch f.Type {
 	case TypeTreeLatest, TypeScreenshotLatest, TypeTreeFresh:
 		return c.pull(h, f)
 	default:
-		return c.subscribe(h, f)
+		return c.subscribe(ctx, h, f)
 	}
 }
 
@@ -33,35 +35,53 @@ func (c *conn) pull(h ObserveHandler, f Frame) bool {
 	return c.respond(f, data)
 }
 
-func (c *conn) subscribe(h ObserveHandler, f Frame) bool {
-	if c.subscribed {
-		return c.fail(f, invalidFrame("this connection is already subscribed"))
-	}
+// subscribe starts a notice stream. A connection holds one subscription
+// at a time, so a new request ends the previous stream first. The old
+// pump has stopped before the response is queued, so no notice of the old
+// stream follows the response, and the viewer's resume point is the only
+// thing that decides what the new stream replays.
+func (c *conn) subscribe(parent context.Context, h ObserveHandler, f Frame) bool {
 	var request Subscribe
 	if err := f.Decode(&request); err != nil {
 		return c.fail(f, invalidFrame(err.Error()))
 	}
-	notices, err := h.Subscribe(c.ctx, request.RunID, request.SinceSeq)
+	c.endSubscription()
+	ctx, sub := newLiveSubscription(parent)
+	notices, err := h.Subscribe(ctx, request.RunID, request.SinceSeq)
 	if err != nil {
+		sub.cancel()
 		return c.fail(f, err)
 	}
-	c.subscribed = true
 	if !c.respond(f, nil) {
+		sub.cancel()
 		return false
 	}
+	c.sub = sub
 	c.srv.wg.Add(1)
-	go c.pump(notices)
+	go c.pump(ctx, notices, sub.done)
 	return true
+}
+
+// endSubscription stops the live subscription, if any, and waits for its
+// pump to end.
+func (c *conn) endSubscription() {
+	if c.sub == nil {
+		return
+	}
+	c.sub.cancel()
+	<-c.sub.done
+	c.sub = nil
 }
 
 // pump moves notices from a subscription to the writer queue. It never
 // waits on the viewer, because enqueue closes a connection whose queue is
 // full.
-func (c *conn) pump(notices <-chan Notice) {
+func (c *conn) pump(ctx context.Context, notices <-chan Notice, done chan<- struct{}) {
 	defer c.srv.wg.Done()
+	defer close(done)
 	for {
 		select {
-		case <-c.ctx.Done():
+		case <-ctx.Done():
 			return
 		case n, open := <-notices:
 			if !open {

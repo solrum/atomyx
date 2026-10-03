@@ -269,14 +269,27 @@ func (h *RemoteHandle) currentClient() *attach.Client {
 }
 
 // pump follows the holder's notices until the holder is gone. When a
-// subscription ends while the holder lives, the pump reconnects and
-// resumes after the last step line it stored.
+// subscription ends while the connection lives, the pump subscribes again
+// on that connection after the last step line it stored. It dials a new
+// connection only when the connection itself is gone.
 func (h *RemoteHandle) pump(ctx context.Context) {
 	defer h.finish()
-	for h.consume(ctx, h.currentClient()) {
-		if !h.resubscribe(ctx) {
+	client := h.currentClient()
+	stale := false
+	for {
+		restart := h.consume(ctx, client, stale)
+		if ctx.Err() != nil {
 			return
 		}
+		if restart && h.resubscribe(ctx, client) {
+			stale = true
+			continue
+		}
+		next, ok := h.redial(ctx)
+		if !ok {
+			return
+		}
+		client, stale = next, true
 	}
 }
 
@@ -284,9 +297,15 @@ func (h *RemoteHandle) pump(ctx context.Context) {
 // the subscription must be started again. That is the case when the
 // client dropped step notices, and when the holder ended the subscription,
 // which it does for a viewer that fell behind as well as for a holder that
-// is closing. Starting again fails when the holder is gone.
-func (h *RemoteHandle) consume(ctx context.Context, client *attach.Client) (resubscribe bool) {
+// is closing. Starting again fails when the holder is gone. While stale is
+// set, notices of the replaced subscription are skipped up to the marker
+// that announces the new one.
+func (h *RemoteHandle) consume(ctx context.Context, client *attach.Client, stale bool) (restart bool) {
 	for f := range client.Notices() {
+		if stale {
+			stale = f.Type != attach.NoticeSubscribed
+			continue
+		}
 		switch f.Type {
 		case attach.NoticeTree:
 			h.syncTree(ctx)
@@ -309,25 +328,44 @@ func (h *RemoteHandle) consume(ctx context.Context, client *attach.Client) (resu
 	return false
 }
 
-func (h *RemoteHandle) resubscribe(parent context.Context) bool {
+// resubscribe replaces the subscription on client, resuming after the
+// last step line the handle stored, and then refreshes the captures.
+func (h *RemoteHandle) resubscribe(parent context.Context, client *attach.Client) bool {
+	if !h.subscribeOn(parent, client) {
+		return false
+	}
+	h.syncTree(parent)
+	h.syncScreenshot(parent)
+	return true
+}
+
+func (h *RemoteHandle) subscribeOn(parent context.Context, client *attach.Client) bool {
+	ctx, cancel := context.WithTimeout(parent, remoteCallTimeout)
+	defer cancel()
+	h.mu.Lock()
+	runID, seq := h.steps.runID, h.steps.lastSeq
+	h.mu.Unlock()
+	return client.Call(ctx, attach.TypeSubscribe, attach.Subscribe{RunID: runID, SinceSeq: seq}, nil) == nil
+}
+
+// redial connects again after the connection ended, subscribes on the new
+// connection and makes it the handle's connection.
+func (h *RemoteHandle) redial(parent context.Context) (*attach.Client, bool) {
 	ctx, cancel := context.WithTimeout(parent, remoteCallTimeout)
 	defer cancel()
 	client, err := h.cfg.dial(ctx)
 	if err != nil {
-		return false
+		return nil, false
 	}
-	h.mu.Lock()
-	runID, seq := h.steps.runID, h.steps.lastSeq
-	h.mu.Unlock()
-	if err := client.Call(ctx, attach.TypeSubscribe, attach.Subscribe{RunID: runID, SinceSeq: seq}, nil); err != nil {
+	if !h.subscribeOn(parent, client) {
 		_ = client.Close()
-		return false
+		return nil, false
 	}
 	h.mu.Lock()
 	if h.ctx.Err() != nil {
 		h.mu.Unlock()
 		_ = client.Close()
-		return false
+		return nil, false
 	}
 	old := h.client
 	h.client = client
@@ -335,7 +373,7 @@ func (h *RemoteHandle) resubscribe(parent context.Context) bool {
 	_ = old.Close()
 	h.syncTree(parent)
 	h.syncScreenshot(parent)
-	return true
+	return client, true
 }
 
 func (h *RemoteHandle) finish() {

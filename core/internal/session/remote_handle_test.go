@@ -3,7 +3,12 @@ package session_test
 import (
 	"context"
 	"errors"
+	"io"
+	"net"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -280,14 +285,100 @@ func TestRemoteHandle_ResumesAfterTheLastStoredLineWhenNoticesWereDropped(t *tes
 			t.Fatalf("line %d has seq %d, want %d", i, line.Seq, i+1)
 		}
 	}
-	attached := 0
+	attached, detached := 0, 0
 	for _, entry := range s.Interventions() {
-		if entry.Kind == "viewerAttached" && strings.HasPrefix(entry.Client, "viewer") {
+		if !strings.HasPrefix(entry.Client, "viewer") {
+			continue
+		}
+		switch entry.Kind {
+		case "viewerAttached":
 			attached++
+		case "viewerDetached":
+			detached++
 		}
 	}
-	if attached < 2 {
-		t.Fatalf("viewerAttached entries = %d, want the handle to have reconnected once", attached)
+	if attached != 1 || detached != 0 {
+		t.Fatalf("viewer interventions = %d attached and %d detached, want the one original connection and no reconnect", attached, detached)
+	}
+}
+
+// severableProxy forwards unix connections to a holder socket and can cut
+// every live one, so a test can end a handle's connection while the holder
+// keeps running.
+type severableProxy struct {
+	path string
+	ln   net.Listener
+
+	mu    sync.Mutex
+	conns []net.Conn
+}
+
+func newSeverableProxy(t *testing.T, target string) *severableProxy {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "p")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	p := &severableProxy{path: filepath.Join(dir, "s")}
+	p.ln, err = (&net.ListenConfig{}).Listen(context.Background(), "unix", p.path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = p.ln.Close(); p.sever() })
+	go func() {
+		for {
+			front, err := p.ln.Accept()
+			if err != nil {
+				return
+			}
+			back, err := (&net.Dialer{}).DialContext(context.Background(), "unix", target)
+			if err != nil {
+				_ = front.Close()
+				continue
+			}
+			p.mu.Lock()
+			p.conns = append(p.conns, front, back)
+			p.mu.Unlock()
+			go func() { _, _ = io.Copy(back, front); _ = back.Close() }()
+			go func() { _, _ = io.Copy(front, back); _ = front.Close() }()
+		}
+	}()
+	return p
+}
+
+func (p *severableProxy) sever() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, c := range p.conns {
+		_ = c.Close()
+	}
+	p.conns = nil
+}
+
+func TestRemoteHandle_RecoversWhenItsConnectionIsCut(t *testing.T) {
+	s, _, path := socketHolder(t)
+	proxy := newSeverableProxy(t, path)
+	h := dialRemote(t, proxy.path)
+	feed, err := h.SubscribeSince(context.Background(), "", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.PublishStep(stepLine(1))
+	awaitObservation(t, feed, session.ObservedStep, 1)
+
+	proxy.sever()
+	s.PublishStep(stepLine(2))
+
+	awaitObservation(t, feed, session.ObservedStep, 2)
+	lines, gap, err := h.StepsSince("", 0)
+	if err != nil || gap || len(lines) != 2 {
+		t.Fatalf("StepsSince() = %d lines, gap %t, %v, want both lines and no gap", len(lines), gap, err)
+	}
+	select {
+	case <-h.Done():
+		t.Fatal("the handle ended after its connection was cut")
+	default:
 	}
 }
 

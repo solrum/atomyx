@@ -157,10 +157,6 @@ func TestSubscribeAcknowledgesThenPushesNoticesInOrder(t *testing.T) {
 	if first.Kind() != KindNotice || first.Type != NoticeTree || second.Type != NoticeScreenshot {
 		t.Fatalf("notices = %+v then %+v", first, second)
 	}
-
-	if got := failureCode(t, client.call(TypeSubscribe, Subscribe{})); got != diag.CodeInvalidArgument {
-		t.Fatalf("second subscribe code = %q, want %s", got, diag.CodeInvalidArgument)
-	}
 }
 
 func TestSlowReaderIsDisconnectedAndOthersKeepBeingServed(t *testing.T) {
@@ -364,5 +360,36 @@ func TestCloseCancelsSubscriptions(t *testing.T) {
 	case <-sub.ctx.Done():
 	default:
 		t.Fatal("Close returned while a subscription context was still live")
+	}
+}
+
+func TestASecondSubscribeReplacesTheFirstOnTheSameConnection(t *testing.T) {
+	h := newFakeObserve()
+	srv := startServer(t, ServerConfig{Handlers: Handlers{Observe: h}}, nil)
+	client := dialRaw(t, srv.Path())
+	first := subscribed(t, client, h, "", 0)
+
+	if ok := client.call(TypeSubscribe, Subscribe{RunID: "run-7", SinceSeq: 9}).Ok; ok == nil || !*ok {
+		t.Fatal("a second subscribe on the same connection was refused")
+	}
+	second := h.nextSubscription(t)
+
+	select {
+	case <-first.ctx.Done():
+	default:
+		t.Fatal("the first subscription was still live after the second was accepted")
+	}
+	if second.runID != "run-7" || second.since != 9 {
+		t.Fatalf("second subscription = %+v, want run-7 resumed after 9", second)
+	}
+	select {
+	case first.notices <- Notice{Type: NoticeTree, Data: TreeNotice{Revision: 1}}:
+		t.Fatal("the first subscription's pump was still reading after it ended")
+	default:
+	}
+	second.notices <- Notice{Type: NoticeTree, Data: TreeNotice{Revision: 2}}
+	var notice TreeNotice
+	if f := client.read(); f.Kind() != KindNotice || f.Decode(&notice) != nil || notice.Revision != 2 {
+		t.Fatalf("frame = %+v, %+v, want the second subscription's tree notice", f, notice)
 	}
 }

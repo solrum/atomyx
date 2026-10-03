@@ -56,6 +56,9 @@ func subscribe(t *testing.T, c *attach.Client, runID string, sinceSeq int64) {
 	if err := c.Call(context.Background(), attach.TypeSubscribe, attach.Subscribe{RunID: runID, SinceSeq: sinceSeq}, nil); err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
+	if f := nextFrame(t, c); f.Type != attach.NoticeSubscribed {
+		t.Fatalf("first notice = %+v, want the subscribed marker", f)
+	}
 }
 
 func codeOfRemote(err error) string {

@@ -91,10 +91,10 @@ func TestNoticesArriveInOrderAndEndWithTheConnection(t *testing.T) {
 	sub := h.nextSubscription(t)
 	sub.notices <- Notice{Type: NoticeTree, Data: TreeNotice{Revision: 1}}
 	sub.notices <- Notice{Type: NoticeScreenshot, Data: ScreenshotNotice{Revision: 2}}
-	for _, want := range []string{NoticeTree, NoticeScreenshot} {
+	for _, want := range []string{NoticeSubscribed, NoticeTree, NoticeScreenshot} {
 		select {
 		case n := <-c.Notices():
-			if n.Type != want || n.Kind() != KindNotice {
+			if n.Type != want {
 				t.Fatalf("notice = %+v, want %s", n, want)
 			}
 		case <-time.After(testGuard):
@@ -381,5 +381,33 @@ func TestDialReportsTheRefusalWhenTheHolderClosedBeforeTheHelloWasSent(t *testin
 	})
 	if code, _, _ := diag.Describe(err); code != diag.CodeHolderBusy {
 		t.Fatalf("error = %v (code %q), want the HOLDER_BUSY refusal", err, code)
+	}
+}
+
+func TestResubscribingMarksTheEndOfTheReplacedSubscriptionsNotices(t *testing.T) {
+	h := newFakeObserve()
+	srv := observeServer(t, h, ServerConfig{})
+	c := dialClient(t, srv, ClientConfig{})
+	ctx := context.Background()
+	if err := c.Call(ctx, TypeSubscribe, Subscribe{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	first := h.nextSubscription(t)
+	first.notices <- Notice{Type: NoticeTree, Data: TreeNotice{Revision: 1}}
+	if err := c.Call(ctx, TypeSubscribe, Subscribe{RunID: "run-7", SinceSeq: 3}, nil); err != nil {
+		t.Fatal(err)
+	}
+	second := h.nextSubscription(t)
+	second.notices <- Notice{Type: NoticeScreenshot, Data: ScreenshotNotice{Revision: 2}}
+
+	for _, want := range []string{NoticeSubscribed, NoticeTree, NoticeSubscribed, NoticeScreenshot} {
+		select {
+		case n := <-c.Notices():
+			if n.Type != want {
+				t.Fatalf("notice = %+v, want %s", n, want)
+			}
+		case <-time.After(testGuard):
+			t.Fatalf("notice %s never arrived", want)
+		}
 	}
 }

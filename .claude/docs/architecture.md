@@ -544,15 +544,16 @@ All three errors carry `DEVICE_HELD`. The waits go through
 `AttachDeps.Clock`, so a test steps them without sleeping.
 
 The handle serves the holder's newest masked tree and screenshot with the
-holder's own revisions, pulling each when a notice announces it. A
-notice does not say whether a mutating call overlapped a capture, so
-`Paired`, `Highlightable` and `Scale` are set only for the pair that the
-last `FreshTree` returned. `FreshTree` forwards `observe.tree.fresh`, and
+holder's own revisions, pulling each when a notice announces it. Every
+pull result carries `stable`, `paired`, `highlightable` and `scale`, and
+the handle keeps the values of the newest pull in `Latest()` and in its
+observations. `FreshTree` forwards `observe.tree.fresh`, and
 a holder that is running or has a call in flight refuses it with
 `HOLDER_BUSY`. Each handle has its own `Generation`. When the holder ends
 a subscription, or the connection drops step notices, the handle
-reconnects and resumes after the last step line it stored, and it ends
-only when the holder is gone. `Subscribe` observers that fall behind end
+subscribes again on the same connection and resumes after the last step
+line it stored. It dials a new connection only when the connection is
+gone, and it ends only when the holder is gone. `Subscribe` observers that fall behind end
 with a dropped observation, as on a local session.
 
 `session` may depend on `device`, `lease`, `attach`, `runfolder`, `diag`,
@@ -610,9 +611,12 @@ Message groups:
 - `observe`: `observe.subscribe` with `sinceSeq`, then the notices
   `observe.notice.tree`, `observe.notice.screenshot`,
   `observe.notice.step`, `observe.notice.stepGap` and
-  `observe.notice.closed`. Tree and screenshot notices carry only a
-  revision and an action epoch, so a viewer pulls the image with
-  `observe.tree.latest` or `observe.screenshot.latest`.
+  `observe.notice.closed`. Tree and screenshot notices carry a
+  revision, an action epoch and the capture state (`stable`, `paired`,
+  `highlightable` and `scale`), so a viewer pulls the image with
+  `observe.tree.latest` or `observe.screenshot.latest`. A connection
+  holds one subscription, and a new `observe.subscribe` on it ends the
+  previous one.
   `observe.tree.fresh` returns a matched tree and screenshot pair.
 - There is no group that drives the device.
 
