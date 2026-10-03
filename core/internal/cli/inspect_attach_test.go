@@ -122,6 +122,9 @@ func TestInspect_AHeldDeviceIsWatchedAndAFreshCaptureWaitsForAnIdleHolder(t *tes
 	if code := run.stop(syscall.SIGINT); code == 0 {
 		t.Fatalf("exit = %d, want the signal code", code)
 	}
+	if !run.stderr.wrote("Ctrl-C stops watching the device") || run.stderr.wrote("Ctrl-C releases the device") {
+		t.Fatal("a viewer was not told that Ctrl-C stops watching, or was told it releases the device")
+	}
 	if err := run.otherProcessOpens(t); err == nil || !strings.Contains(err.Error(), "atomyx run") {
 		t.Fatalf("after the inspector stopped, another open = %v, want the original holder to still hold the device", err)
 	}

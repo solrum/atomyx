@@ -28,6 +28,7 @@ type lineSink struct {
 	mu      sync.Mutex
 	partial string
 	lines   chan string
+	written []string
 }
 
 func newLineSink() *lineSink { return &lineSink{lines: make(chan string, 256)} }
@@ -41,9 +42,22 @@ func (s *lineSink) Write(p []byte) (int, error) {
 		if i < 0 {
 			return len(p), nil
 		}
+		s.written = append(s.written, s.partial[:i])
 		s.lines <- s.partial[:i]
 		s.partial = s.partial[i+1:]
 	}
+}
+
+// wrote reports whether any complete line written so far contains want.
+func (s *lineSink) wrote(want string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, line := range s.written {
+		if strings.Contains(line, want) {
+			return true
+		}
+	}
+	return false
 }
 
 // awaitLine returns the first line that contains want.
@@ -209,6 +223,9 @@ func TestInspect_PrintsALoopbackURLWithTheCodeInTheFragmentAndOpensItOnce(t *tes
 	}
 	if code := run.stop(syscall.SIGINT); code != shutdown.ExitCodeSigint {
 		t.Fatalf("exit = %d", code)
+	}
+	if !run.stderr.wrote("Ctrl-C releases the device") {
+		t.Fatal("a holder was not told that Ctrl-C releases the device")
 	}
 }
 

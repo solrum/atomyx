@@ -67,7 +67,8 @@ func Inspect(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
-	if watched, ok := held.(*session.RemoteHandle); ok {
+	watched, watching := held.(*session.RemoteHandle)
+	if watching {
 		_, _ = fmt.Fprintf(stderr, "The device is held by %s. The inspector watches it and does not drive it.\n", watched.Info().Holder.Describe()) //nolint:contextcheck // the handle reads its status on its own connection context
 	}
 
@@ -113,7 +114,7 @@ func Inspect(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	if err := announce(); err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
-	_, _ = fmt.Fprintln(stderr, "Press Enter for a fresh URL. Ctrl-C releases the device and stops the inspector.")
+	_, _ = fmt.Fprintln(stderr, "Press Enter for a fresh URL. "+stopHint(watching))
 
 	enter, stopReading := readEnterKeys(deps.Stdin)
 	defer stopReading()
@@ -136,6 +137,14 @@ func Inspect(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 			}
 		}
 	}
+}
+
+// stopHint tells what Ctrl-C does: a viewer has no device to release.
+func stopHint(watching bool) string {
+	if watching {
+		return "Ctrl-C stops watching the device and stops the inspector."
+	}
+	return "Ctrl-C releases the device and stops the inspector."
 }
 
 // inspectOpenAttempts bounds how often the opener retries after a device
