@@ -88,6 +88,13 @@ type ScriptRunnerDeps struct {
 	// called when the run aborts because the device was lost, or when
 	// the run's context is already done. Nil captures nothing.
 	FailureCapture FailureCapture
+	// SourcePath is the script's source file, absolute when set and
+	// empty for an inline script. It only shapes the location a
+	// StepGate sees for a top-level step.
+	SourcePath string
+	// StepGate, when non-nil, is consulted before every step at every
+	// depth. Nil gates nothing.
+	StepGate StepGate
 }
 
 // StepResult is the outcome of one executed top-level step.
@@ -232,6 +239,10 @@ type runState struct {
 	// backs StepEvent.Depth for events emitted from inside a nested
 	// step list; the main step loop always emits depth 0 directly.
 	depth int
+	// gateErr is the first error a StepGate returned. A nested gate
+	// failure surfaces as a failed step, and Run then returns gateErr
+	// instead of a script result.
+	gateErr error
 }
 
 // Run executes def step by step. It returns a non-nil error when ctx
@@ -283,6 +294,12 @@ func (r *ScriptRunner) Run(ctx context.Context, def *script.ScriptDefinition) (S
 	}
 
 	failure, err := r.runRequiredFlows(ctx, rs, def.Requires, startedAt, artifacts)
+	if rs.gateErr != nil {
+		return ScriptResult{}, rs.gateErr
+	}
+	if rs.gateErr != nil {
+		return ScriptResult{}, rs.gateErr
+	}
 	if err != nil {
 		return ScriptResult{}, err
 	}
@@ -291,6 +308,9 @@ func (r *ScriptRunner) Run(ctx context.Context, def *script.ScriptDefinition) (S
 	}
 
 	preconditionResult := r.runPreconditions(ctx, rs, def.Preconditions)
+	if rs.gateErr != nil {
+		return ScriptResult{}, rs.gateErr
+	}
 	if !preconditionResult.Ok {
 		return ScriptResult{
 			ScriptName: def.Name,
@@ -355,11 +375,15 @@ func (r *ScriptRunner) Run(ctx context.Context, def *script.ScriptDefinition) (S
 			}
 		}
 
+		line := lineForStep(def, i)
+		if err := r.gateStep(ctx, rs, r.stepLocation(line), step.StepCommand()); err != nil {
+			return ScriptResult{}, err
+		}
+
 		myIndex := rs.globalStepIndex
 		rs.globalStepIndex++
 
 		summary := SummarizeStep(step)
-		line := lineForStep(def, i)
 		r.resetTrail()
 		r.emitStep(StepEvent{
 			Type: StepStarted, StepIndex: myIndex, Command: step.StepCommand(),
@@ -368,6 +392,9 @@ func (r *ScriptRunner) Run(ctx context.Context, def *script.ScriptDefinition) (S
 
 		stepStart := r.deps.Clock.NowMs()
 		result := r.execute(cmd, step, cmdCtx)
+		if rs.gateErr != nil {
+			return ScriptResult{}, rs.gateErr
+		}
 		durationMs := r.deps.Clock.NowMs() - stepStart
 
 		stepResults = append(stepResults, StepResult{
@@ -594,6 +621,11 @@ func (r *ScriptRunner) runNestedSteps(ctx context.Context, rs *runState, steps [
 		cmdCtx := r.contextFor(ctx, rs, i)
 		if skip, skippable := cmd.(conditionalCommand); skippable && skip.shouldSkip(cmdCtx) {
 			continue
+		}
+
+		if err := r.gateStep(ctx, rs, "", step.StepCommand()); err != nil {
+			rs.gateErr = err
+			return CommandResult{Ok: false, Detail: strPtr(err.Error())}
 		}
 
 		myIndex := rs.globalStepIndex
