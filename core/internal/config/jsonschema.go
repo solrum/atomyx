@@ -100,6 +100,7 @@ func sessionSchema() map[string]any {
 			"mcpIdleTimeoutMs":       integerMin(1, "Milliseconds an MCP session with no tool call keeps its device before releasing it."),
 			"openRunIdleTimeoutMs":   integerMin(1, "Milliseconds a session with an open run and no tool call keeps its device before closing the run and releasing it."),
 			"deviceAcquireTimeoutMs": integerMin(1, "Milliseconds a device acquisition may take, excluding the runner build."),
+			"debugPauseTimeoutMs":    integerMin(1, "Milliseconds a run stays paused for a person to debug before it resumes on its own."),
 		},
 		nil,
 		"Device session timeouts.",

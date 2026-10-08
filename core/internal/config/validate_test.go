@@ -259,10 +259,11 @@ session:
   mcpIdleTimeoutMs: 20000
   openRunIdleTimeoutMs: 30000
   deviceAcquireTimeoutMs: 90000
+  debugPauseTimeoutMs: 120000
 `)
 	s := cfg.Session
-	if s == nil || *s.McpIdleTimeoutMs != 20000 || *s.OpenRunIdleTimeoutMs != 30000 || *s.DeviceAcquireTimeoutMs != 90000 {
-		t.Fatalf("Session = %+v, want all three timeouts read", s)
+	if s == nil || *s.McpIdleTimeoutMs != 20000 || *s.OpenRunIdleTimeoutMs != 30000 || *s.DeviceAcquireTimeoutMs != 90000 || *s.DebugPauseTimeoutMs != 120000 {
+		t.Fatalf("Session = %+v, want all four timeouts read", s)
 	}
 }
 
@@ -278,6 +279,7 @@ func TestParseAndValidate_RejectsInvalidSessionTimeouts(t *testing.T) {
 		"negative": "session:\n  openRunIdleTimeoutMs: -1\n",
 		"fraction": "session:\n  deviceAcquireTimeoutMs: 1.5\n",
 		"string":   "session:\n  mcpIdleTimeoutMs: soon\n",
+		"pause":    "session:\n  debugPauseTimeoutMs: 0\n",
 		"unknown":  "session:\n  idleMs: 5\n",
 	}
 	for name, block := range cases {

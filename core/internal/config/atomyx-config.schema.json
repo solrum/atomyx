@@ -191,6 +191,11 @@
       "additionalProperties": false,
       "description": "Device session timeouts.",
       "properties": {
+        "debugPauseTimeoutMs": {
+          "description": "Milliseconds a run stays paused for a person to debug before it resumes on its own.",
+          "minimum": 1,
+          "type": "integer"
+        },
         "deviceAcquireTimeoutMs": {
           "description": "Milliseconds a device acquisition may take, excluding the runner build.",
           "minimum": 1,

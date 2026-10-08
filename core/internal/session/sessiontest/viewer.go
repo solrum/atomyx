@@ -53,6 +53,15 @@ func (v *Viewer) TreeLatest() error {
 	return v.client.Call(context.Background(), attach.TypeTreeLatest, nil, nil)
 }
 
+// SetBreakpoints replaces the holder's breakpoints, which makes this
+// connection a debugging viewer.
+func (v *Viewer) SetBreakpoints(locations []string) error {
+	return v.client.Call(context.Background(), attach.TypeDebugBreakpointsSet, attach.DebugBreakpoints{Locations: locations}, nil)
+}
+
+// Close ends the connection.
+func (v *Viewer) Close() error { return v.client.Close() }
+
 // ScreenshotLatest reads the holder's latest screenshot.
 func (v *Viewer) ScreenshotLatest() error {
 	return v.client.Call(context.Background(), attach.TypeScreenshotLatest, nil, nil)

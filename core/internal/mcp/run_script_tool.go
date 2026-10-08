@@ -164,7 +164,7 @@ func registerRunScriptTool(server *mcp.Server, tc *ToolContext) {
 				if dbg != nil {
 					gate = dbg
 				}
-				return runner.NewScriptRunner(runner.ScriptRunnerDeps{
+				result, err := runner.NewScriptRunner(runner.ScriptRunnerDeps{
 					StepGate:       gate,
 					Orchestra:      orch,
 					Clock:          tc.Clock,
@@ -178,6 +178,10 @@ func registerRunScriptTool(server *mcp.Server, tc *ToolContext) {
 						Orchestra: orch, Clock: tc.Clock, Logger: tc.Logger, Sink: target.Evidence,
 					}),
 				}).Run(target.Ctx, def)
+				if err != nil && dbg != nil && dbg.endedByDeviceLoss() {
+					return deviceLostResult(def.Name), nil
+				}
+				return result, err
 			})
 		if err != nil {
 			return errorResult(err), nil

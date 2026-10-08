@@ -9,6 +9,9 @@ const (
 	// run and no tool call keeps its device before releasing it and
 	// closing the run.
 	DefaultOpenRunIdleTimeoutMs int64 = 600_000
+	// DefaultDebugPauseTimeoutMs is how long a run stays paused for a
+	// person to debug before it resumes on its own.
+	DefaultDebugPauseTimeoutMs int64 = 1_800_000
 	// DefaultDeviceAcquireTimeoutMs bounds one device acquisition,
 	// including the launch of an iOS runner, but not a runner build.
 	DefaultDeviceAcquireTimeoutMs int64 = 120_000
@@ -24,6 +27,9 @@ type Timeouts struct {
 	McpIdleMs int64
 	// OpenRunIdleMs is the idle release timeout with a run open.
 	OpenRunIdleMs int64
+	// DebugPauseMs bounds how long a paused run waits for a person before
+	// it resumes on its own.
+	DebugPauseMs int64
 	// DeviceAcquireMs bounds one device acquisition.
 	DeviceAcquireMs int64
 	// RunnerBuildMs bounds the runner build that Prepare runs before the
@@ -36,6 +42,7 @@ func DefaultTimeouts() Timeouts {
 	return Timeouts{
 		McpIdleMs:       DefaultMcpIdleTimeoutMs,
 		OpenRunIdleMs:   DefaultOpenRunIdleTimeoutMs,
+		DebugPauseMs:    DefaultDebugPauseTimeoutMs,
 		DeviceAcquireMs: DefaultDeviceAcquireTimeoutMs,
 		RunnerBuildMs:   DefaultRunnerBuildTimeoutMs,
 	}
@@ -50,6 +57,9 @@ func (t Timeouts) WithDefaults() Timeouts {
 	}
 	if t.OpenRunIdleMs <= 0 {
 		t.OpenRunIdleMs = d.OpenRunIdleMs
+	}
+	if t.DebugPauseMs <= 0 {
+		t.DebugPauseMs = d.DebugPauseMs
 	}
 	if t.DeviceAcquireMs <= 0 {
 		t.DeviceAcquireMs = d.DeviceAcquireMs

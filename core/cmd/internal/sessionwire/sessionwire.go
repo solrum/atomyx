@@ -57,6 +57,7 @@ func ResolveTimeouts(cfg *config.AtomyxConfig, getenv func(string) string, logge
 		fromConfig(&t.McpIdleMs, cfg.Session.McpIdleTimeoutMs)
 		fromConfig(&t.OpenRunIdleMs, cfg.Session.OpenRunIdleTimeoutMs)
 		fromConfig(&t.DeviceAcquireMs, cfg.Session.DeviceAcquireTimeoutMs)
+		fromConfig(&t.DebugPauseMs, cfg.Session.DebugPauseTimeoutMs)
 	}
 	fromEnv(&t.McpIdleMs, McpIdleEnvVar, getenv, logger)
 	fromEnv(&t.DeviceAcquireMs, DeviceAcquireEnvVar, getenv, logger)

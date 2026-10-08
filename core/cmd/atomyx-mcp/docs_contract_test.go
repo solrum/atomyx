@@ -30,6 +30,7 @@ func TestDocumentedDefaultTimeoutsMatchTheCode(t *testing.T) {
 		{"runner build timeout", `(?i)\bbuild[^.\n]*?(\d+) seconds`, msPerSecond, session.DefaultRunnerBuildTimeoutMs},
 		{"MCP idle timeout", `(?i)MCP idle timeout, (\d+) minutes`, msPerMinute, session.DefaultMcpIdleTimeoutMs},
 		{"open-run idle timeout", `(?i)open-run idle timeout, (\d+) minutes`, msPerMinute, session.DefaultOpenRunIdleTimeoutMs},
+		{"debug pause timeout", `(?i)debug pause timeout, (\d+) minutes`, msPerMinute, session.DefaultDebugPauseTimeoutMs},
 	}
 	for _, c := range claims {
 		match := regexp.MustCompile(c.re).FindStringSubmatch(doc)

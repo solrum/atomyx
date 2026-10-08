@@ -66,10 +66,23 @@ type debugHarness struct {
 	drv      *blockingDriver
 	progress chan recordedPhase
 	result   chan map[string]any
+	viewer   *sessiontest.Viewer
 }
 
+const defaultDebugPauseMs = 3_600_000
+
 func newDebugHarness(t *testing.T) *debugHarness {
+	return newDebugHarnessWithPause(t, defaultDebugPauseMs)
+}
+
+// newDebugHarnessWithPause serves the holder's attach socket, so a test
+// can connect a real viewer, and bounds a pause at pauseMs.
+func newDebugHarnessWithPause(t *testing.T, pauseMs int64) *debugHarness {
 	t.Helper()
+	leases, err := sessiontest.NewLeases(shortTempDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
 	h := &debugHarness{
 		t: t, ctx: context.Background(), clk: clock.NewManualClock(0),
 		drv:      &blockingDriver{Driver: mockdriver.New(), entered: make(chan struct{}), release: make(chan struct{})},
@@ -79,6 +92,8 @@ func newDebugHarness(t *testing.T) *debugHarness {
 	h.srv = mustNewServer(t, ServerDeps{
 		Probe: device.NewStaticProbe(), Factory: blockingFactory{drv: h.drv}, Storage: storage.NewInMemoryStorage(),
 		TimerClock: h.clk,
+		Session:    session.Deps{Leases: leases, Sockets: leases, Clock: clock.SystemClock{}},
+		Timeouts:   session.Timeouts{DebugPauseMs: pauseMs},
 	})
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 	serverSession, err := h.srv.Connect(h.ctx, serverTransport, nil)
@@ -97,6 +112,7 @@ func newDebugHarness(t *testing.T) *debugHarness {
 	}
 	t.Cleanup(func() { _ = h.cs.Close() })
 	selectMockDevice(t, h.cs, h.ctx)
+	h.viewer = sessiontest.DialViewer(t, leases.SocketPathFor("android", "emulator-5554"), "inspector")
 	t.Cleanup(func() {
 		if sess := h.held(); sess != nil {
 			_, _ = sess.Resume(h.ctx, session.ResumeOptions{Force: true})
@@ -139,7 +155,7 @@ func (h *debugHarness) pauseBeforeLine(script string, line string) session.Pause
 	h.t.Helper()
 	h.startScript(script)
 	h.awaitEntered()
-	if err := h.held().SetBreakpoints([]string{"inline:" + line}); err != nil {
+	if err := h.viewer.SetBreakpoints([]string{"inline:" + line}); err != nil {
 		h.t.Fatalf("SetBreakpoints: %v", err)
 	}
 	close(h.drv.release)
@@ -249,4 +265,44 @@ func TestScriptDebug_APausedSessionNeverYieldsToAnotherProcess(t *testing.T) {
 		t.Fatal(err)
 	}
 	h.awaitResult()
+}
+
+func TestScriptDebug_TheRunResumesWhenTheLastDebuggingViewerLeaves(t *testing.T) {
+	h := newDebugHarness(t)
+	h.pauseBeforeLine(debugScript, "5")
+
+	if err := h.viewer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if got := h.awaitResult(); got["ok"] != true {
+		t.Fatalf("result = %v, want the run to finish once its only debugging viewer left", got)
+	}
+}
+
+func TestScriptDebug_ThePauseTimeoutResumesTheRun(t *testing.T) {
+	const pauseMs = 3 * pauseProgressIntervalMs
+	h := newDebugHarnessWithPause(t, pauseMs)
+	h.pauseBeforeLine(debugScript, "5")
+
+	for range 3 {
+		h.clk.AwaitSleepers(1)
+		h.clk.Advance(pauseProgressIntervalMs)
+	}
+	if got := h.awaitResult(); got["ok"] != true {
+		t.Fatalf("result = %v, want the run to resume after the pause timeout", got)
+	}
+}
+
+func TestScriptDebug_DisconnectingTheDeviceWhilePausedEndsTheRunAsDeviceLost(t *testing.T) {
+	h := newDebugHarness(t)
+	h.pauseBeforeLine(debugScript, "5")
+
+	if _, decoded := callTool(t, h.cs, h.ctx, "disconnect_device", map[string]any{}); decoded["ok"] == false {
+		t.Fatalf("disconnect_device = %v", decoded)
+	}
+	got := h.awaitResult()
+	abort, _ := got["abort"].(map[string]any)
+	if got["ok"] != false || got["deviceLost"] != true || abort["reason"] != "deviceLost" {
+		t.Fatalf("result = %v, want a run that ended as device lost", got)
+	}
 }

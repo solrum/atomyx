@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"dev.atomyx/internal/clock"
@@ -19,6 +20,13 @@ const (
 	// request does not abandon a run a person is debugging.
 	pauseProgressIntervalMs int64 = 10_000
 	pausedProgressMessage         = "Paused while a person debugs the run"
+)
+
+// deviceLostWhilePausedMessage is what the agent reads when the device
+// went away under a paused run.
+const (
+	deviceLostWhilePausedMessage = "The device was lost or disconnected while the run was paused."
+	deviceLostWhilePausedRemedy  = "Select the device again and rerun the script."
 )
 
 // scriptDebugHost is the session.Debugger of an MCP session. A session
@@ -54,6 +62,15 @@ func (h *scriptDebugHost) end(run *scriptDebugRun) {
 	}
 	h.mu.Unlock()
 	run.endPause()
+}
+
+// lastViewerLeft resumes the paused run, because nobody is left to
+// resume it. It runs on a viewer's connection goroutine, so it does not
+// wait for the resume.
+func (h *scriptDebugHost) lastViewerLeft() {
+	if run := h.current(); run != nil {
+		go run.autoResume(run.ctx)
+	}
 }
 
 func (h *scriptDebugHost) current() *scriptDebugRun {
@@ -111,12 +128,16 @@ type scriptDebugRun struct {
 	adapter *debugrun.Adapter
 	sess    *session.Session
 	timers  clock.Clock
+	// pauseTimeoutMs is how long the run stays paused before it resumes
+	// on its own.
+	pauseTimeoutMs int64
 	// ctx is the call's context, which carries its tool budget and the
 	// client's progress token.
 	ctx context.Context
 
 	mu           sync.Mutex
 	stopWatch    context.CancelFunc
+	gateEnded    bool
 	resumeBudget func()
 }
 
@@ -136,7 +157,7 @@ func (s *DeviceSession) beginScriptDebug(ctx context.Context, orch *orchestra.Or
 	if held == nil {
 		return nil, func() {}
 	}
-	run := &scriptDebugRun{sess: held, timers: s.timers, ctx: ctx}
+	run := &scriptDebugRun{sess: held, timers: s.timers, pauseTimeoutMs: s.timeouts.DebugPauseMs, ctx: ctx}
 	run.adapter = debugrun.New(debugrun.Options{
 		Scripts: func() []runner.BreakScript { return []runner.BreakScript{{Definition: def}} },
 		Finder:  orch,
@@ -153,6 +174,11 @@ func (s *DeviceSession) beginScriptDebug(ctx context.Context, orch *orchestra.Or
 func (r *scriptDebugRun) BeforeStep(ctx context.Context, step runner.GateStep, run runner.PausedRun) error {
 	err := r.adapter.BeforeStep(ctx, step, run)
 	r.endPause()
+	if err != nil {
+		r.mu.Lock()
+		r.gateEnded = true
+		r.mu.Unlock()
+	}
 	return err
 }
 
@@ -200,10 +226,45 @@ func (r *scriptDebugRun) endPause() {
 	}
 }
 
-// watchPause reports progress every pauseProgressIntervalMs until ctx
-// ends.
+// watchPause reports progress every pauseProgressIntervalMs and resumes
+// the run once it has been paused for pauseTimeoutMs, until ctx ends.
 func (r *scriptDebugRun) watchPause(ctx context.Context) {
+	var pausedMs int64
 	for beat := float64(1); r.timers.Sleep(ctx, pauseProgressIntervalMs) == nil; beat++ {
+		pausedMs += pauseProgressIntervalMs
+		if pausedMs >= r.pauseTimeoutMs {
+			r.autoResume(ctx)
+			return
+		}
 		reportPhase(ctx, acquirePhase{step: beat, message: pausedProgressMessage})
 	}
+}
+
+// autoResume resumes the run without the advisory check, because no
+// person is there to answer it.
+func (r *scriptDebugRun) autoResume(ctx context.Context) {
+	if _, paused := r.sess.Paused(); !paused {
+		return
+	}
+	_, _ = r.sess.Resume(context.WithoutCancel(ctx), session.ResumeOptions{Force: true})
+}
+
+// endedByDeviceLoss reports that the run's gate ended because the device
+// was lost or disconnected, not because a person stopped the call.
+func (r *scriptDebugRun) endedByDeviceLoss() bool {
+	r.mu.Lock()
+	ended := r.gateEnded
+	r.mu.Unlock()
+	return ended && errors.Is(context.Cause(r.ctx), session.ErrDeviceLost) || r.sess.LostErr() != nil
+}
+
+// deviceLostResult is the result of a run whose device went away while it
+// was paused.
+func deviceLostResult(name string) runner.ScriptResult {
+	return runner.ScriptResult{ScriptName: name, Abort: &runner.RunAbort{
+		Reason:  runner.RunAbortDeviceLost,
+		Code:    diag.CodeAgentUnreachable,
+		Message: deviceLostWhilePausedMessage,
+		Remedy:  deviceLostWhilePausedRemedy,
+	}}
 }

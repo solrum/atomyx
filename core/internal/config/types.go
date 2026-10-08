@@ -62,6 +62,7 @@ type Session struct {
 	McpIdleTimeoutMs       *int64 `json:"mcpIdleTimeoutMs,omitempty"`
 	OpenRunIdleTimeoutMs   *int64 `json:"openRunIdleTimeoutMs,omitempty"`
 	DeviceAcquireTimeoutMs *int64 `json:"deviceAcquireTimeoutMs,omitempty"`
+	DebugPauseTimeoutMs    *int64 `json:"debugPauseTimeoutMs,omitempty"`
 }
 
 // SuiteEntry is one named test selector, matching SuiteEntrySchema.

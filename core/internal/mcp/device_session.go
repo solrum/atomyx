@@ -594,6 +594,7 @@ func (s *DeviceSession) open(ctx context.Context, req session.Request, borrow bo
 	req.Gate = s.gate
 	req.Yielder = s
 	req.Debugger = s.debug
+	req.OnLastDebugViewerLeft = s.debug.lastViewerLeft
 	acq := session.Acquisition{
 		BudgetMs: s.timeouts.DeviceAcquireMs,
 		Clock:    s.timers,
@@ -1007,6 +1008,9 @@ func (s *DeviceSession) Disconnect(ctx context.Context) error {
 		return nil
 	}
 	desc := previous.Descriptor()
+	if _, paused := previous.Paused(); paused && s.runs != nil {
+		s.runs.CancelScriptsForLostDevice(fmt.Errorf("%w: disconnected while the run was paused", session.ErrDeviceLost))
+	}
 	err := previous.Close() //nolint:contextcheck // teardown is bounded by its own grace timer, not by a call context
 	s.carryInterventions(previous)
 	if err != nil {

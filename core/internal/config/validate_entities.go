@@ -216,6 +216,7 @@ func validateReportFormats(obj map[string]any, path []any, c *issueCollector) []
 
 var sessionKeys = map[string]bool{
 	"mcpIdleTimeoutMs": true, "openRunIdleTimeoutMs": true, "deviceAcquireTimeoutMs": true,
+	"debugPauseTimeoutMs": true,
 }
 
 func validateSession(root map[string]any, path []any, c *issueCollector) *Session {
@@ -232,7 +233,8 @@ func validateSession(root map[string]any, path []any, c *issueCollector) *Sessio
 	mcpIdle, _ := optionalPositiveInt(obj, "mcpIdleTimeoutMs", fieldPath, c)
 	openRun, _ := optionalPositiveInt(obj, "openRunIdleTimeoutMs", fieldPath, c)
 	acquire, _ := optionalPositiveInt(obj, "deviceAcquireTimeoutMs", fieldPath, c)
-	return &Session{McpIdleTimeoutMs: mcpIdle, OpenRunIdleTimeoutMs: openRun, DeviceAcquireTimeoutMs: acquire}
+	debugPause, _ := optionalPositiveInt(obj, "debugPauseTimeoutMs", fieldPath, c)
+	return &Session{McpIdleTimeoutMs: mcpIdle, OpenRunIdleTimeoutMs: openRun, DeviceAcquireTimeoutMs: acquire, DebugPauseTimeoutMs: debugPause}
 }
 
 func validateSuites(root map[string]any, path []any, c *issueCollector) *map[string]SuiteEntry {

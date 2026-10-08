@@ -26,16 +26,16 @@ func TestResolveTimeouts_DefaultsApplyWithNoConfigAndNoEnvironment(t *testing.T)
 
 func TestResolveTimeouts_ConfigOverridesDefaultsAndEnvironmentOverridesConfig(t *testing.T) {
 	cfg := &config.AtomyxConfig{Session: &config.Session{
-		McpIdleTimeoutMs: ptr(1000), OpenRunIdleTimeoutMs: ptr(2000), DeviceAcquireTimeoutMs: ptr(3000),
+		McpIdleTimeoutMs: ptr(1000), OpenRunIdleTimeoutMs: ptr(2000), DeviceAcquireTimeoutMs: ptr(3000), DebugPauseTimeoutMs: ptr(4000),
 	}}
 
 	fromConfigOnly := ResolveTimeouts(cfg, env(nil), logging.NoopLogger{})
-	if fromConfigOnly != (session.Timeouts{McpIdleMs: 1000, OpenRunIdleMs: 2000, DeviceAcquireMs: 3000, RunnerBuildMs: session.DefaultRunnerBuildTimeoutMs}) {
+	if fromConfigOnly != (session.Timeouts{McpIdleMs: 1000, OpenRunIdleMs: 2000, DeviceAcquireMs: 3000, DebugPauseMs: 4000, RunnerBuildMs: session.DefaultRunnerBuildTimeoutMs}) {
 		t.Fatalf("config only = %+v", fromConfigOnly)
 	}
 
 	withEnv := ResolveTimeouts(cfg, env(map[string]string{McpIdleEnvVar: "20000", DeviceAcquireEnvVar: "90000"}), logging.NoopLogger{})
-	if withEnv != (session.Timeouts{McpIdleMs: 20000, OpenRunIdleMs: 2000, DeviceAcquireMs: 90000, RunnerBuildMs: session.DefaultRunnerBuildTimeoutMs}) {
+	if withEnv != (session.Timeouts{McpIdleMs: 20000, OpenRunIdleMs: 2000, DeviceAcquireMs: 90000, DebugPauseMs: 4000, RunnerBuildMs: session.DefaultRunnerBuildTimeoutMs}) {
 		t.Fatalf("with environment = %+v, want the environment to beat config and leave the open-run timeout alone", withEnv)
 	}
 }
