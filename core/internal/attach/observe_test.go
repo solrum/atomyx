@@ -394,3 +394,52 @@ func TestASecondSubscribeReplacesTheFirstOnTheSameConnection(t *testing.T) {
 		t.Fatalf("frame = %+v, %+v, want the second subscription's tree notice", f, notice)
 	}
 }
+
+func TestResponseDuringAReplayLongerThanTheQueueKeepsTheConnection(t *testing.T) {
+	h := newFakeObserve()
+	const queueSize = 8
+	cfg := ServerConfig{
+		Handlers:   Handlers{Observe: h, Session: fakeSession{Status{State: "idle"}}},
+		QueueSize:  queueSize,
+		QueueBytes: 1 << 20,
+	}
+	g := installGate(t, &cfg)
+	srv := startServer(t, cfg, nil)
+	t.Cleanup(g.open)
+	client := dialRaw(t, srv.Path())
+	sub := subscribed(t, client, h, "", 0)
+	g.waitFor(t, g.dispatched, "the subscribe answered")
+	g.armed.Store(true)
+
+	notice := Notice{Type: NoticeTree, Data: TreeNotice{Revision: 1, Epoch: 1}}
+	send := func() {
+		t.Helper()
+		select {
+		case sub.notices <- notice:
+		case <-sub.ctx.Done():
+			t.Fatal("the connection ended during the replay")
+		case <-time.After(testGuard):
+			t.Fatal("the server stopped consuming notices")
+		}
+	}
+	send()
+	g.waitFor(t, g.entered, "the writer holding the first notice")
+	// One notice is held by the writer, the pump fills every notice slot,
+	// and the next is received by the pump, which then waits for a slot.
+	for range noticeSlotCount(queueSize) + 1 {
+		send()
+	}
+
+	id := client.send(TypeStatus, nil)
+	g.waitFor(t, g.dispatched, "the status request answered")
+	g.open()
+	for {
+		f := client.read()
+		if f.Kind() == KindResponse && f.ID == id {
+			if f.Ok == nil || !*f.Ok {
+				t.Fatalf("status response = %+v", f)
+			}
+			return
+		}
+	}
+}

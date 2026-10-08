@@ -19,6 +19,9 @@ var zeroTime time.Time
 // close after the frames before it have been written.
 type outbound struct {
 	line []byte
+	// notice marks a frame that holds one of the connection's notice
+	// slots, which the writer releases once it takes the frame.
+	notice bool
 	// fireAfter asks the writer to release the connection's pending
 	// after-reply callback once this frame has been written.
 	fireAfter bool
@@ -32,7 +35,10 @@ type conn struct {
 	nc     *net.UnixConn
 	reader *FrameReader
 	out    chan outbound
-	id     uint64
+	// noticeSlots bounds how many pump frames may sit in out, so responses
+	// and other frames always find room.
+	noticeSlots chan struct{}
+	id          uint64
 	// client is the name from the accepted hello request.
 	client string
 
@@ -80,17 +86,29 @@ func newLiveSubscription(parent context.Context) (context.Context, *liveSubscrip
 	return ctx, &liveSubscription{cancel: cancel, done: make(chan struct{})}
 }
 
+// responseReserve is how many queue positions the notice pump leaves
+// free. A replay longer than the queue would otherwise keep the queue
+// full, and the response to a viewer request sent meanwhile would find no
+// room and close the connection. It is capped at half the queue so a small
+// queue still carries notices.
+const responseReserve = 16
+
+func noticeSlotCount(queueSize int) int {
+	return queueSize - min(responseReserve, queueSize/2)
+}
+
 func newConn(s *Server, nc *net.UnixConn) *conn {
 	ctx, cancel := context.WithCancel(s.ctx)
 	return &conn{
-		srv:        s,
-		nc:         nc,
-		id:         s.nextConnID.Add(1),
-		reader:     NewFrameReader(nc),
-		out:        make(chan outbound, s.cfg.QueueSize),
-		writerDone: make(chan struct{}),
-		ctx:        ctx,
-		cancel:     cancel,
+		srv:         s,
+		nc:          nc,
+		id:          s.nextConnID.Add(1),
+		reader:      NewFrameReader(nc),
+		out:         make(chan outbound, s.cfg.QueueSize),
+		noticeSlots: make(chan struct{}, noticeSlotCount(s.cfg.QueueSize)),
+		writerDone:  make(chan struct{}),
+		ctx:         ctx,
+		cancel:      cancel,
 	}
 }
 
@@ -130,6 +148,9 @@ func (c *conn) writeLoop() {
 		case <-c.ctx.Done():
 			return
 		case item := <-c.out:
+			if item.notice {
+				<-c.noticeSlots
+			}
 			if item.line == nil {
 				return
 			}
@@ -174,25 +195,23 @@ func (c *conn) enqueueItem(item outbound) bool {
 	}
 }
 
-// enqueueWaiting hands a line to the writer and waits for room in the
-// queue, so a burst of notices larger than the queue reaches a viewer
-// that is reading. It gives up when ctx or the connection ends. A viewer
-// that stops reading is still disconnected, by the byte budget or by the
-// write timeout.
+// enqueueWaiting hands a line to the writer and waits for a notice slot,
+// so a burst of notices larger than the queue reaches a viewer that is
+// reading while the rest of the queue stays free for responses. It gives
+// up when ctx or the connection ends. A viewer that stops reading is
+// still disconnected, by the byte budget or by the write timeout.
 func (c *conn) enqueueWaiting(ctx context.Context, line []byte) bool {
-	size := int64(len(line))
-	if c.queuedBytes.Add(size) > c.srv.cfg.QueueBytes {
-		c.queuedBytes.Add(-size)
-		c.close()
+	select {
+	case c.noticeSlots <- struct{}{}:
+	case <-ctx.Done():
+		return false
+	case <-c.ctx.Done():
 		return false
 	}
-	select {
-	case c.out <- outbound{line: line}:
+	if c.enqueueItem(outbound{line: line, notice: true}) {
 		return true
-	case <-ctx.Done():
-	case <-c.ctx.Done():
 	}
-	c.queuedBytes.Add(-size)
+	<-c.noticeSlots
 	return false
 }
 
