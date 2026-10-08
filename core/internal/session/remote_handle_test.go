@@ -615,3 +615,37 @@ func TestRemoteHandle_TheStateNoticeRefreshesInfoWithoutAskingTheHolder(t *testi
 		t.Fatalf("Info().Holder.Command = %q after the notice, want atomyx-mcp", info.Holder.Command)
 	}
 }
+
+func TestRemoteHandle_ThePausedStateNoticeCarriesThePauseAndTheDroppedInterventionCount(t *testing.T) {
+	released := make(chan struct{})
+	thenRunning := make(chan struct{})
+	path, _ := serveScript(t, func(h *scriptedHolder) {
+		h.prime(7, 1000)
+		<-released
+		h.notice(attach.NoticeState, attach.StateNotice{
+			State: "paused", Command: "atomyx run", DroppedInterventions: 4,
+			Pause: &attach.PauseLocation{Source: "/work/flow.yml", Line: 3, Command: "tap"},
+		})
+		<-thenRunning
+		h.notice(attach.NoticeState, attach.StateNotice{State: "running", Command: "atomyx run"})
+	})
+	h := dialRemote(t, path)
+	feed, err := h.Subscribe(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	close(released)
+
+	paused := awaitObservation(t, feed, session.ObservedState, 0)
+	if paused.State != session.StatePaused || paused.DroppedInterventions != 4 {
+		t.Fatalf("observation = %+v, want the paused state with 4 dropped interventions", paused)
+	}
+	if paused.Pause == nil || paused.Pause.Line != 3 {
+		t.Fatalf("observation pause = %+v, want line 3", paused.Pause)
+	}
+	close(thenRunning)
+	running := awaitObservation(t, feed, session.ObservedState, 0)
+	if running.DroppedInterventions != 0 || running.Pause != nil {
+		t.Fatalf("observation = %+v, want a notice with no count and no pause", running)
+	}
+}

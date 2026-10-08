@@ -3,8 +3,11 @@ package session_test
 import (
 	"context"
 	"errors"
+	"runtime"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"dev.atomyx/internal/attach"
 	"dev.atomyx/internal/clock"
@@ -131,22 +134,25 @@ func TestDebugLock_ResumeWaitsForAnInFlightAct(t *testing.T) {
 	go func() { _, err := s.Act(context.Background(), "tap: {id: ok}"); done <- err }()
 	<-dbg.actEntered
 
-	if _, err := s.Resume(canceledContext(), session.ResumeOptions{}); !errors.Is(err, context.Canceled) {
-		t.Fatalf("resume during an act: %v, want it to wait for the lock and give up", err)
-	}
+	resumed := make(chan session.ResumeResult, 1)
+	go func() {
+		res, _ := s.Resume(context.Background(), session.ResumeOptions{})
+		resumed <- res
+	}()
+	awaitParkedIn(t, "lockDebug")
 	if _, resumes := dbg.counts(); resumes != 0 {
 		t.Fatalf("the runner was woken %d times while an act ran", resumes)
 	}
 	if _, paused := s.Paused(); !paused {
-		t.Fatal("a resume that gave up cleared the pause")
+		t.Fatal("a resume that waits for the lock cleared the pause")
 	}
 
 	close(dbg.actRelease)
 	if err := <-done; err != nil {
 		t.Fatal(err)
 	}
-	if res, err := s.Resume(context.Background(), session.ResumeOptions{}); err != nil || !res.Resumed {
-		t.Fatalf("resume after the act = %+v, %v", res, err)
+	if res := <-resumed; !res.Resumed {
+		t.Fatalf("resume after the act = %+v", res)
 	}
 	if _, paused := s.Paused(); paused {
 		t.Fatal("still paused after a successful resume")
@@ -240,8 +246,46 @@ func TestAttachTreeFresh_IsAdmittedWhilePausedEvenWithACallInFlight(t *testing.T
 	}
 }
 
-func canceledContext() context.Context {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	return ctx
+func TestLeavePause_WaitsForAnActInFlight(t *testing.T) {
+	dbg := &fakeDebugger{actEntered: make(chan struct{}), actRelease: make(chan struct{})}
+	s, _, _ := debuggableHolder(t, dbg)
+	s.EnterPause(testPause)
+	actDone := make(chan error, 1)
+	go func() { _, err := s.Act(context.Background(), "tap: {id: ok}"); actDone <- err }()
+	<-dbg.actEntered
+
+	left := make(chan struct{})
+	go func() {
+		s.LeavePause()
+		close(left)
+	}()
+	awaitParkedIn(t, "lockDebugUninterruptibly")
+	if _, paused := s.Paused(); !paused {
+		t.Fatal("LeavePause cleared the pause while an act was still running")
+	}
+
+	close(dbg.actRelease)
+	if err := <-actDone; err != nil {
+		t.Fatal(err)
+	}
+	<-left
+	if _, paused := s.Paused(); paused {
+		t.Fatal("still paused after LeavePause returned")
+	}
+}
+
+// awaitParkedIn returns once some goroutine is blocked inside a function
+// whose name contains frame, so a test knows a call has reached its lock
+// without sleeping.
+func awaitParkedIn(t *testing.T, frame string) {
+	t.Helper()
+	buf := make([]byte, 1<<20)
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if strings.Contains(string(buf[:runtime.Stack(buf, true)]), "(*Session)."+frame) {
+			return
+		}
+		runtime.Gosched()
+	}
+	t.Fatalf("no goroutine reached %s", frame)
 }
