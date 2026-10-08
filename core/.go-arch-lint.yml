@@ -331,6 +331,8 @@ deps:
   debugrun:
     mayDependOn:
       - diag
+      - driver
+      - drivermock
       - script
       - orchestra
       - runner
