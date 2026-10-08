@@ -118,6 +118,10 @@ type CommandContext struct {
 	// command reading an API response). NewVariablesLookup adapts
 	// this map for expression syntax such as assertExpr.
 	Variables map[string]ScriptValue
+	// Secrets names the variables in Variables that hold a secret. A
+	// command that writes a variable records its secrecy through
+	// markSecret.
+	Secrets map[string]bool
 	// Captures holds captured API responses, keyed by the variable
 	// name a `capture ... as: varName` step bound them to.
 	Captures map[string]CapturedRequest
@@ -202,4 +206,17 @@ type conditionalCommand interface {
 	// emitting StepStarted, so a true result means Execute never runs
 	// for this step.
 	shouldSkip(ctx *CommandContext) bool
+}
+
+// markSecret records whether the variable name now holds a secret.
+// Overwriting a secret variable with a plain value clears the tag.
+func (c *CommandContext) markSecret(name string, secret bool) {
+	if c.Secrets == nil {
+		return
+	}
+	if secret {
+		c.Secrets[name] = true
+		return
+	}
+	delete(c.Secrets, name)
 }

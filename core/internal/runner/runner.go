@@ -243,6 +243,9 @@ type runState struct {
 	// failure surfaces as a failed step, and Run then returns gateErr
 	// instead of a script result.
 	gateErr error
+	// secrets names the variables that hold a secret. It is a side
+	// table so the value type stays a plain number, string or boolean.
+	secrets map[string]bool
 }
 
 // Run executes def step by step. It returns a non-nil error when ctx
@@ -288,6 +291,7 @@ func (r *ScriptRunner) Run(ctx context.Context, def *script.ScriptDefinition) (S
 	rs := &runState{
 		def:                         def,
 		variables:                   variablesFromEnv(def.Env),
+		secrets:                     secretsFromEnv(def.Env),
 		captures:                    make(map[string]CapturedRequest),
 		artifacts:                   artifacts,
 		completedPreconditionSetups: make(map[string]struct{}),
@@ -515,6 +519,7 @@ func (r *ScriptRunner) contextFor(ctx context.Context, rs *runState, stepIndex i
 		Clock:            r.deps.Clock,
 		Logger:           r.deps.Logger,
 		Variables:        rs.variables,
+		Secrets:          rs.secrets,
 		Captures:         rs.captures,
 		NetworkCapture:   r.deps.NetworkCapture,
 		StepIndex:        stepIndex,

@@ -294,7 +294,7 @@ func TestPausedRun_ExecuteStepTouchesNoRunBookkeeping(t *testing.T) {
 
 func TestVariableSnapshot_CopiesValues(t *testing.T) {
 	src := map[string]ScriptValue{"a": expression.StringValue("one")}
-	snap := snapshotVariables(src)
+	snap := snapshotVariables(src, nil)
 	snap.Values["a"] = expression.StringValue("changed")
 	snap.Values["b"] = expression.StringValue("new")
 	if src["a"].Str() != "one" || len(src) != 1 {

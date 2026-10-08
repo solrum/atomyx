@@ -51,6 +51,19 @@ func variablesFromEnv(env map[string]string) map[string]ScriptValue {
 	return variables
 }
 
+// secretsFromEnv tags every env entry as secret. The env map merges the
+// script's own env block, the config environment's vars (including
+// resolved ${ENV:...} references) and the caller's external env, and
+// the merge no longer says which entry came from where, so the whole
+// map is treated as secret rather than risking a leak.
+func secretsFromEnv(env map[string]string) map[string]bool {
+	secrets := make(map[string]bool, len(env))
+	for k := range env {
+		secrets[k] = true
+	}
+	return secrets
+}
+
 // environmentFromVariables renders variables to the string form
 // `${var}` interpolation needs: a string passes through unchanged, a
 // number renders via the same decimal form the expression engine's

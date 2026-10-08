@@ -5,6 +5,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"dev.atomyx/internal/redact"
 	"dev.atomyx/internal/script"
 	"dev.atomyx/internal/script/expression"
 )
@@ -41,6 +42,7 @@ func (ExtractCommand) Execute(step script.ScriptStep, ctx *CommandContext) Comma
 		}
 		stored := jsStringOf(value)
 		ctx.Variables[name] = expression.StringValue(stored)
+		ctx.markSecret(name, looksLikeToken(stored))
 		extracted = append(extracted, fmt.Sprintf("%s (%d characters)", name, utf8.RuneCountInString(stored)))
 	}
 
@@ -63,4 +65,11 @@ func capturedRequestAsAny(c CapturedRequest) map[string]any {
 		"body":      c.Body,
 		"timestamp": float64(c.TimestampMs),
 	}
+}
+
+// looksLikeToken reports whether an API value has the shape of a
+// credential. A response carries no secure marker, so the shape is the
+// only signal available.
+func looksLikeToken(value string) bool {
+	return redact.New(nil).String(value) != value
 }

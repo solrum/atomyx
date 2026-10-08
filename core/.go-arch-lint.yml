@@ -178,6 +178,7 @@ deps:
       - script
       - expression
       - diag
+      - redact
   scenario:
     mayDependOn:
       - wire

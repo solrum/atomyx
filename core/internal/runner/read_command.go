@@ -47,6 +47,7 @@ func (ReadCommand) Execute(step script.ScriptStep, ctx *CommandContext) CommandR
 			return CommandResult{Ok: false, Detail: strPtr(fmt.Sprintf("Element has no \"%s\" field", field))}
 		}
 		ctx.Variables[s.As] = expression.StringValue(value)
+		ctx.markSecret(s.As, orchestra.IsSecure(node) && value != "")
 		return CommandResult{Ok: true, Detail: strPtr(fmt.Sprintf("Read %s into \"%s\"", field, writtenAs))}
 	}
 
@@ -55,6 +56,7 @@ func (ReadCommand) Execute(step script.ScriptStep, ctx *CommandContext) CommandR
 		return CommandResult{Ok: false, Detail: strPtr(fmt.Sprintf("Element does not report the \"%s\" field", field))}
 	}
 	ctx.Variables[s.As] = expression.BoolValue(value)
+	ctx.markSecret(s.As, false)
 	return CommandResult{Ok: true, Detail: strPtr(fmt.Sprintf("Read %s into \"%s\"", field, writtenAs))}
 }
 

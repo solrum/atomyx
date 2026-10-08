@@ -60,6 +60,8 @@ type PausedRun interface {
 // Mutating it never affects the run.
 type VariableSnapshot struct {
 	Values map[string]ScriptValue
+	// Secret names the variables in Values that hold a secret.
+	Secret map[string]bool
 }
 
 // ErrPausedRunClosed is returned by ExecuteStep once the gate call that
@@ -76,12 +78,16 @@ func (RunFlowCommand) runsNestedSteps() {}
 func (HandleCommand) runsNestedSteps()  {}
 func (BranchCommand) runsNestedSteps()  {}
 
-func snapshotVariables(variables map[string]ScriptValue) VariableSnapshot {
+func snapshotVariables(variables map[string]ScriptValue, secrets map[string]bool) VariableSnapshot {
 	values := make(map[string]ScriptValue, len(variables))
 	for k, v := range variables {
 		values[k] = v
 	}
-	return VariableSnapshot{Values: values}
+	secret := make(map[string]bool, len(secrets))
+	for k, v := range secrets {
+		secret[k] = v
+	}
+	return VariableSnapshot{Values: values, Secret: secret}
 }
 
 // stepLocation renders the location a gate sees for a top-level step.
@@ -132,9 +138,9 @@ func (p *pausedRun) Variables() VariableSnapshot {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	if p.closed {
-		return VariableSnapshot{Values: map[string]ScriptValue{}}
+		return VariableSnapshot{Values: map[string]ScriptValue{}, Secret: map[string]bool{}}
 	}
-	return snapshotVariables(p.rs.variables)
+	return snapshotVariables(p.rs.variables, p.rs.secrets)
 }
 
 func (p *pausedRun) ExecuteStep(ctx context.Context, step script.ScriptStep) (CommandResult, error) {
@@ -165,7 +171,9 @@ func (p *pausedRun) childScope() (*runState, error) {
 		return nil, ErrPausedRunClosed
 	}
 	child := *p.rs
-	child.variables = snapshotVariables(p.rs.variables).Values
+	scope := snapshotVariables(p.rs.variables, p.rs.secrets)
+	child.variables = scope.Values
+	child.secrets = scope.Secret
 	child.captures = make(map[string]CapturedRequest, len(p.rs.captures))
 	for k, v := range p.rs.captures {
 		child.captures[k] = v
