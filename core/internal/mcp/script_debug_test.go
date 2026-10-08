@@ -202,3 +202,51 @@ func TestScriptDebug_ABreakpointThatMatchesNoStepIsRefusedAndBetweenScriptsNothi
 	close(h.drv.release)
 	h.awaitResult()
 }
+
+func TestScriptDebug_APausedCallDoesNotTimeOutAndKeepsReportingProgress(t *testing.T) {
+	h := newDebugHarness(t)
+	h.pauseBeforeLine(debugScript, "5")
+	h.clk.AwaitSleepers(1)
+
+	h.clk.Advance(pauseProgressIntervalMs)
+	select {
+	case p := <-h.progress:
+		if p.message != pausedProgressMessage || p.progress != 1 || p.total != 0 {
+			t.Fatalf("progress = %+v, want beat 1 of an unknown total with the paused message", p)
+		}
+	case <-time.After(yieldWait):
+		t.Fatal("no progress while paused")
+	}
+
+	const farPastAnyToolBudgetMs = 3_600_000
+	h.clk.Advance(farPastAnyToolBudgetMs)
+	select {
+	case r := <-h.result:
+		t.Fatalf("the paused call returned: %v", r)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	if _, err := h.held().Resume(h.ctx, session.ResumeOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if got := h.awaitResult(); got["ok"] != true {
+		t.Fatalf("result = %v, want the script to pass instead of timing out", got)
+	}
+}
+
+func TestScriptDebug_APausedSessionNeverYieldsToAnotherProcess(t *testing.T) {
+	h := newDebugHarness(t)
+	h.pauseBeforeLine(debugScript, "5")
+
+	_, err := h.srv.session.Yield(h.ctx, "atomyx run")
+	if got := codeOfErr(err); got != diag.CodeHolderBusy {
+		t.Fatalf("yield while paused = %q (%v), want %s", got, err, diag.CodeHolderBusy)
+	}
+	if h.held() == nil {
+		t.Fatal("the session gave its device up while paused")
+	}
+	if _, err := h.held().Resume(h.ctx, session.ResumeOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	h.awaitResult()
+}

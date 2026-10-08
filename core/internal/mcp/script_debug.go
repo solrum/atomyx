@@ -4,12 +4,21 @@ import (
 	"context"
 	"sync"
 
+	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/debugrun"
 	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/runner"
 	"dev.atomyx/internal/script"
 	"dev.atomyx/internal/session"
+)
+
+const (
+	// pauseProgressIntervalMs is how often a paused run_script tells its
+	// client that the call is alive, so a client that gives up on a silent
+	// request does not abandon a run a person is debugging.
+	pauseProgressIntervalMs int64 = 10_000
+	pausedProgressMessage         = "Paused while a person debugs the run"
 )
 
 // scriptDebugHost is the session.Debugger of an MCP session. A session
@@ -44,6 +53,7 @@ func (h *scriptDebugHost) end(run *scriptDebugRun) {
 		h.run = nil
 	}
 	h.mu.Unlock()
+	run.endPause()
 }
 
 func (h *scriptDebugHost) current() *scriptDebugRun {
@@ -95,10 +105,19 @@ func (h *scriptDebugHost) Variables() (session.VariablesView, error) {
 
 // scriptDebugRun is the debugging of one run_script call. It is the
 // call's runner.StepGate, and it is the debugrun.Pauser that marks the
-// held session paused.
+// held session paused, keeps the call's tool budget stopped, and sends
+// progress while the run waits.
 type scriptDebugRun struct {
 	adapter *debugrun.Adapter
 	sess    *session.Session
+	timers  clock.Clock
+	// ctx is the call's context, which carries its tool budget and the
+	// client's progress token.
+	ctx context.Context
+
+	mu           sync.Mutex
+	stopWatch    context.CancelFunc
+	resumeBudget func()
 }
 
 var (
@@ -110,14 +129,14 @@ var (
 // ctx. It returns nil and a no-op when the session holds no device or
 // another script is already being debugged. The returned function must
 // run when the script ends.
-func (s *DeviceSession) beginScriptDebug(_ context.Context, orch *orchestra.Orchestra, def *script.ScriptDefinition) (*scriptDebugRun, func()) {
+func (s *DeviceSession) beginScriptDebug(ctx context.Context, orch *orchestra.Orchestra, def *script.ScriptDefinition) (*scriptDebugRun, func()) {
 	s.mu.Lock()
 	held := s.sess
 	s.mu.Unlock()
 	if held == nil {
 		return nil, func() {}
 	}
-	run := &scriptDebugRun{sess: held}
+	run := &scriptDebugRun{sess: held, timers: s.timers, ctx: ctx}
 	run.adapter = debugrun.New(debugrun.Options{
 		Scripts: func() []runner.BreakScript { return []runner.BreakScript{{Definition: def}} },
 		Finder:  orch,
@@ -129,19 +148,24 @@ func (s *DeviceSession) beginScriptDebug(_ context.Context, orch *orchestra.Orch
 	return run, func() { s.debug.end(run) }
 }
 
-// BeforeStep implements runner.StepGate.
+// BeforeStep implements runner.StepGate. The pause ends whenever the
+// adapter returns, whatever the reason.
 func (r *scriptDebugRun) BeforeStep(ctx context.Context, step runner.GateStep, run runner.PausedRun) error {
-	return r.adapter.BeforeStep(ctx, step, run)
+	err := r.adapter.BeforeStep(ctx, step, run)
+	r.endPause()
+	return err
 }
 
 // EnterPause implements debugrun.Pauser.
 func (r *scriptDebugRun) EnterPause(loc session.PauseLocation) {
 	r.sess.EnterPause(loc)
+	r.beginPause()
 }
 
 // LeavePause implements debugrun.Pauser.
 func (r *scriptDebugRun) LeavePause() {
 	r.sess.LeavePause()
+	r.endPause()
 }
 
 // Closed implements debugrun.Pauser.
@@ -149,3 +173,37 @@ func (r *scriptDebugRun) Closed() <-chan struct{} { return r.sess.Closed() }
 
 // Lost implements debugrun.Pauser.
 func (r *scriptDebugRun) Lost() <-chan struct{} { return r.sess.Lost() }
+
+// beginPause stops the call's tool budget and starts the progress ticker.
+func (r *scriptDebugRun) beginPause() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.stopWatch != nil {
+		return
+	}
+	r.resumeBudget = pauseToolBudget(r.ctx)
+	watchCtx, cancel := context.WithCancel(r.ctx)
+	r.stopWatch = cancel
+	go r.watchPause(watchCtx)
+}
+
+// endPause restarts the tool budget and stops the ticker. It is a no-op
+// when the run is not paused.
+func (r *scriptDebugRun) endPause() {
+	r.mu.Lock()
+	stop, resume := r.stopWatch, r.resumeBudget
+	r.stopWatch, r.resumeBudget = nil, nil
+	r.mu.Unlock()
+	if stop != nil {
+		stop()
+		resume()
+	}
+}
+
+// watchPause reports progress every pauseProgressIntervalMs until ctx
+// ends.
+func (r *scriptDebugRun) watchPause(ctx context.Context) {
+	for beat := float64(1); r.timers.Sleep(ctx, pauseProgressIntervalMs) == nil; beat++ {
+		reportPhase(ctx, acquirePhase{step: beat, message: pausedProgressMessage})
+	}
+}

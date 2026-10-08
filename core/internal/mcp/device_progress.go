@@ -9,16 +9,19 @@ import (
 // acquirePhase is one step of bringing a device up, reported to a
 // client that asked for progress on the call that triggered it.
 type acquirePhase struct {
-	step    float64
+	step float64
+	// total is the number of steps there are, or zero when the client
+	// cannot know it.
+	total   float64
 	message string
 }
 
 const acquirePhaseCount = 3
 
 var (
-	phaseBuilding  = acquirePhase{step: 1, message: "Preparing the device"}
-	phaseLaunching = acquirePhase{step: 2, message: "Launching the device runner"}
-	phaseConnected = acquirePhase{step: 3, message: "Device connected"}
+	phaseBuilding  = acquirePhase{step: 1, total: acquirePhaseCount, message: "Preparing the device"}
+	phaseLaunching = acquirePhase{step: 2, total: acquirePhaseCount, message: "Launching the device runner"}
+	phaseConnected = acquirePhase{step: 3, total: acquirePhaseCount, message: "Device connected"}
 )
 
 // phaseReporter delivers acquisition phases to the client that issued
@@ -48,7 +51,7 @@ func progressReporter(session *mcp.ServerSession, token any) phaseReporter {
 		_ = session.NotifyProgress(ctx, &mcp.ProgressNotificationParams{
 			ProgressToken: token,
 			Progress:      phase.step,
-			Total:         acquirePhaseCount,
+			Total:         phase.total,
 			Message:       phase.message,
 		})
 	}
