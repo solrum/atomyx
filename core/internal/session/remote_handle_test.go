@@ -161,8 +161,15 @@ func TestRemoteHandle_ASubscriberThatStopsReadingIsDroppedAndTheHandleKeepsFollo
 		t.Fatal(err)
 	}
 	const published = 40
+	// The following feed holds fewer notifications than are published, so
+	// the producer stays a fixed window ahead of what it has read. Only
+	// the subscriber that never reads may overflow.
+	const window = 8
 	for seq := int64(1); seq <= published; seq++ {
 		s.PublishStep(stepLine(seq))
+		if seq > window {
+			awaitObservation(t, following, session.ObservedStep, uint64(seq-window))
+		}
 	}
 	awaitObservation(t, following, session.ObservedStep, published)
 

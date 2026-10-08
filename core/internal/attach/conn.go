@@ -169,6 +169,28 @@ func (c *conn) enqueueItem(item outbound) bool {
 	}
 }
 
+// enqueueWaiting hands a line to the writer and waits for room in the
+// queue, so a burst of notices larger than the queue reaches a viewer
+// that is reading. It gives up when ctx or the connection ends. A viewer
+// that stops reading is still disconnected, by the byte budget or by the
+// write timeout.
+func (c *conn) enqueueWaiting(ctx context.Context, line []byte) bool {
+	size := int64(len(line))
+	if c.queuedBytes.Add(size) > c.srv.cfg.QueueBytes {
+		c.queuedBytes.Add(-size)
+		c.close()
+		return false
+	}
+	select {
+	case c.out <- outbound{line: line}:
+		return true
+	case <-ctx.Done():
+	case <-c.ctx.Done():
+	}
+	c.queuedBytes.Add(-size)
+	return false
+}
+
 func (c *conn) send(f Frame) bool {
 	return c.sendItem(f, false)
 }

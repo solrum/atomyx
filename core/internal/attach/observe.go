@@ -73,9 +73,11 @@ func (c *conn) endSubscription() {
 	c.sub = nil
 }
 
-// pump moves notices from a subscription to the writer queue. It never
-// waits on the viewer, because enqueue closes a connection whose queue is
-// full.
+// pump moves notices from a subscription to the writer queue. It waits
+// for queue room, so a replay longer than the queue reaches a viewer that
+// keeps reading. A viewer that stops reading is disconnected by the byte
+// budget or the write timeout, and the subscription's own buffer drops it
+// from the hub meanwhile.
 func (c *conn) pump(ctx context.Context, notices <-chan Notice, done chan<- struct{}) {
 	defer c.srv.wg.Done()
 	defer close(done)
@@ -92,7 +94,12 @@ func (c *conn) pump(ctx context.Context, notices <-chan Notice, done chan<- stru
 				c.close()
 				return
 			}
-			if !c.send(f) {
+			line, err := EncodeFrame(f)
+			if err != nil {
+				c.close()
+				return
+			}
+			if !c.enqueueWaiting(ctx, line) {
 				return
 			}
 		}
