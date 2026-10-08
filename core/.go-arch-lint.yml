@@ -91,6 +91,8 @@ components:
     in: internal/redact
   stepstream:
     in: internal/stepstream
+  debugrun:
+    in: internal/debugrun
   cmd:
     in: cmd/**
   scripttools:
@@ -245,6 +247,7 @@ deps:
       - sessiontest
       - redact
       - stepstream
+      - debugrun
   skills:
     anyVendorDeps: true
   storage:
@@ -269,6 +272,7 @@ deps:
       - sessiontest
       - runfolder
       - stepstream
+      - debugrun
   config:
     anyVendorDeps: true
   report:
@@ -324,6 +328,14 @@ deps:
   redact:
     mayDependOn:
       - redact
+  debugrun:
+    mayDependOn:
+      - diag
+      - script
+      - orchestra
+      - runner
+      - session
+      - debugrun
   inspector:
     mayDependOn:
       - wire
