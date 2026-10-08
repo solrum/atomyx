@@ -18,12 +18,22 @@
 # runfolder.Writer. Every file under the directory is checked, tests
 # included, and comment-only lines are ignored so documentation may name
 # the forbidden things.
+#
+# A second list, STEP_PATTERN, keeps the inspector from executing a
+# script step: any reference to ExecuteStep, StepGate or ScriptRunner
+# fails. Stepping and pausing are requests the inspector forwards to
+# the holder through its session ports, and the run host that owns the
+# runner is the only code that executes steps. Extend STEP_PATTERN with
+# the name of each new debug port as the port lands, so the inspector
+# keeps using the ports and never the concrete runner types behind them.
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 DIR="internal/inspector"
 PATTERN='\.Built\(|\.Orchestra\(|orchestra\.Orchestra([^A-Za-z0-9_]|$)|"dev\.atomyx/internal/driver(/[^"]*)?"|session\.Open\(|session\.Attach\(|AppendStep|AppendIntervention|runfolder\.Writer'
+
+STEP_PATTERN='ExecuteStep|StepGate|ScriptRunner'
 
 if [ ! -d "$DIR" ]; then
   echo "PASS: $DIR does not exist yet"
@@ -45,9 +55,23 @@ while IFS= read -r hit; do
   violations=1
 done < <(grep -rEn --include='*.go' "$PATTERN" "$DIR" || true)
 
+while IFS= read -r hit; do
+  path="${hit%%:*}"
+  rest="${hit#*:}"
+  line="${rest%%:*}"
+  content="${rest#*:}"
+  trimmed="${content#"${content%%[![:space:]]*}"}"
+  case "$trimmed" in
+    //*) continue ;;
+  esac
+  echo "FORBIDDEN: $path:$line: the inspector never executes a script step"
+  violations=1
+done < <(grep -rEn --include='*.go' "$STEP_PATTERN" "$DIR" || true)
+
 if [ "$violations" -ne 0 ]; then
   echo ""
   echo "Do not call .Built(, .Orchestra(, session.Open( or session.Attach(, write run folder lines, or use orchestra.Orchestra or the driver package under core/$DIR."
+  echo "Do not reference ExecuteStep, StepGate or ScriptRunner under core/$DIR. Forward debug requests through the session ports."
   echo "Take the device through the opener the composition in internal/cli hands over."
   exit 1
 fi
