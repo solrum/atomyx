@@ -37,11 +37,20 @@ const (
 
 // scriptDebugHost is the session.Debugger of an MCP session. A session
 // outlives any one script, so the host delegates to the debugger of the
-// run_script in flight and answers that nothing is running between
-// scripts. It is safe for concurrent use.
+// run_script in flight. Between scripts it keeps only the breakpoint list
+// and the pause request a viewer sets, and applies them to the next
+// run_script before its first step, so an operator can arm a run before
+// it starts. The locations are checked for syntax when set, but not
+// against the script, which is not known yet: an inline location whose
+// line starts no top-level step never stops the run and is not an error.
+// Every other request is refused between scripts. It is safe for
+// concurrent use.
 type scriptDebugHost struct {
 	mu  sync.Mutex
 	run *scriptDebugRun
+	// pendingBreakpoints and pendingPause wait for the next script.
+	pendingBreakpoints []runner.BreakLocation
+	pendingPause       bool
 }
 
 var _ session.Debugger = (*scriptDebugHost)(nil)
@@ -58,6 +67,8 @@ func (h *scriptDebugHost) begin(run *scriptDebugRun) bool {
 		return false
 	}
 	h.run = run
+	run.adapter.Arm(h.pendingBreakpoints, h.pendingPause)
+	h.pendingBreakpoints, h.pendingPause = nil, false
 	return true
 }
 
@@ -74,7 +85,10 @@ func (h *scriptDebugHost) end(run *scriptDebugRun) {
 // run if it is paused, because nobody is left to resume it. It runs on a
 // viewer's connection goroutine, so it does not wait for the resume.
 func (h *scriptDebugHost) lastViewerLeft() {
-	run := h.current()
+	h.mu.Lock()
+	h.pendingBreakpoints, h.pendingPause = nil, false
+	run := h.run
+	h.mu.Unlock()
 	if run == nil {
 		return
 	}
@@ -92,18 +106,37 @@ func (h *scriptDebugHost) current() *scriptDebugRun {
 
 // SetBreakpoints implements session.Debugger.
 func (h *scriptDebugHost) SetBreakpoints(locations []string) error {
-	if run := h.current(); run != nil {
-		return run.adapter.SetBreakpoints(locations)
+	h.mu.Lock()
+	run := h.run
+	if run == nil {
+		defer h.mu.Unlock()
+		parsed := make([]runner.BreakLocation, 0, len(locations))
+		for _, spec := range locations {
+			loc, err := runner.ParseBreakLocation(spec, "")
+			if err != nil {
+				return err
+			}
+			parsed = append(parsed, loc)
+		}
+		h.pendingBreakpoints = parsed
+		return nil
 	}
-	return errNoScriptRunning()
+	h.mu.Unlock()
+	return run.adapter.SetBreakpoints(locations)
 }
 
-// Pause implements session.Debugger.
+// Pause implements session.Debugger. Between scripts it asks the next
+// script to stop before its first step.
 func (h *scriptDebugHost) Pause() error {
-	if run := h.current(); run != nil {
-		return run.adapter.Pause()
+	h.mu.Lock()
+	run := h.run
+	if run == nil {
+		h.pendingPause = true
+		h.mu.Unlock()
+		return nil
 	}
-	return errNoScriptRunning()
+	h.mu.Unlock()
+	return run.adapter.Pause()
 }
 
 // Resume implements session.Debugger.

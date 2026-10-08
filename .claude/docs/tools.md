@@ -78,6 +78,13 @@ group, and the handler only reports what happened:
   request does not time out.
 - A pause ends on resume, when the last debugging viewer leaves, or
   after `session.debugPauseTimeoutMs`.
+- Between scripts, `debug.breakpoints.set` and `debug.pause` are kept
+  and applied to the next `run_script` before its first step, and a
+  pause request stops that script before step 1. Locations are checked
+  for syntax when set but not against the script, so an inline
+  location whose line starts no top-level step never stops the run
+  and is not an error. The last debugging viewer leaving clears them.
+  Every other debug request answers `HOLDER_BUSY` between scripts.
 - Closing the session, losing the lease or `disconnect_device` ends the
   run as device lost, with the steps already run in the result.
 - The result lists the steps an operator ran by hand in `humanActions`,

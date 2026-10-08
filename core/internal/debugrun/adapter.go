@@ -197,6 +197,19 @@ func (a *Adapter) SetBreakpoints(locations []string) error {
 	return nil
 }
 
+// Arm sets breakpoints and an optional stop before the first step on a
+// run that has not started, without checking the locations against the
+// run's scripts. A location that starts no top-level step never stops the
+// run and stays in Unhit.
+func (a *Adapter) Arm(locations []runner.BreakLocation, pause bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	for _, loc := range locations {
+		a.breakpoints[loc.String()] = true
+	}
+	a.pauseNext = a.pauseNext || pause
+}
+
 // Pause implements session.Debugger. It does nothing while the run is
 // already paused, so the next resume does not stop again at once.
 func (a *Adapter) Pause() error {

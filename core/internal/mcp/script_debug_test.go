@@ -235,11 +235,8 @@ func TestScriptDebug_AnInlineScriptPausesAtItsInlineLocation(t *testing.T) {
 	}
 }
 
-func TestScriptDebug_ABreakpointThatMatchesNoStepIsRefusedAndBetweenScriptsNothingIsRunning(t *testing.T) {
+func TestScriptDebug_ABreakpointThatMatchesNoStepIsRefusedWhileAScriptRuns(t *testing.T) {
 	h := newDebugHarness(t)
-	if got := codeOfErr(h.held().SetBreakpoints([]string{"inline:5"})); got != diag.CodeHolderBusy {
-		t.Fatalf("breakpoints between scripts: %q, want %s", got, diag.CodeHolderBusy)
-	}
 	h.startScript(debugScript)
 	h.awaitEntered()
 	if got := codeOfErr(h.held().SetBreakpoints([]string{"inline:9"})); got != diag.CodeInvalidArgument {
@@ -247,6 +244,136 @@ func TestScriptDebug_ABreakpointThatMatchesNoStepIsRefusedAndBetweenScriptsNothi
 	}
 	close(h.drv.release)
 	h.awaitResult()
+}
+
+func TestScriptDebug_ABreakpointSetBeforeRunScriptPausesAtItsInlineLine(t *testing.T) {
+	h := newDebugHarness(t)
+	if err := h.viewer.SetBreakpoints([]string{"inline:5"}); err != nil {
+		t.Fatalf("breakpoints between scripts: %v", err)
+	}
+	h.startScript(debugScript)
+	close(h.drv.release)
+	var loc session.PauseLocation
+	eventually(t, "the run to pause at the pending breakpoint", func() bool {
+		var paused bool
+		loc, paused = h.held().Paused()
+		return paused
+	})
+	if loc.Source != "inline" || loc.Line != 5 {
+		t.Fatalf("paused at %+v, want inline line 5", loc)
+	}
+	if _, err := h.held().Resume(h.ctx, session.ResumeOptions{Force: true}); err != nil {
+		t.Fatal(err)
+	}
+	h.awaitResult()
+}
+
+func TestScriptDebug_APendingBreakpointOnALineWithNoStepIsNotAnErrorAndNeverStopsTheRun(t *testing.T) {
+	h := newDebugHarness(t)
+	if err := h.held().SetBreakpoints([]string{"inline:9"}); err != nil {
+		t.Fatalf("pending breakpoint on an unknown line: %v", err)
+	}
+	if got := codeOfErr(h.held().SetBreakpoints([]string{"nonsense"})); got != diag.CodeInvalidArgument {
+		t.Fatalf("malformed pending breakpoint: %q, want %s", got, diag.CodeInvalidArgument)
+	}
+	h.startScript(debugScript)
+	close(h.drv.release)
+	if got := h.awaitResult(); got["ok"] != true {
+		t.Fatalf("result = %v, want the run to finish without pausing", got)
+	}
+}
+
+func TestScriptDebug_APauseRequestedBeforeRunScriptStopsBeforeTheFirstStep(t *testing.T) {
+	h := newDebugHarness(t)
+	if err := h.held().Pause(); err != nil {
+		t.Fatalf("pause between scripts: %v", err)
+	}
+	h.startScript(debugScript)
+	var loc session.PauseLocation
+	eventually(t, "the run to pause before its first step", func() bool {
+		var paused bool
+		loc, paused = h.held().Paused()
+		return paused
+	})
+	if loc.Line != 4 || loc.Command != "screenshot" {
+		t.Fatalf("paused at %+v, want before the screenshot on line 4", loc)
+	}
+	select {
+	case <-h.drv.entered:
+		t.Fatal("the first step ran before the pause")
+	default:
+	}
+	if _, err := h.held().Resume(h.ctx, session.ResumeOptions{Force: true}); err != nil {
+		t.Fatal(err)
+	}
+	close(h.drv.release)
+	h.awaitResult()
+}
+
+func TestScriptDebug_PendingRequestsAreAppliedToOneScriptOnly(t *testing.T) {
+	h := newDebugHarness(t)
+	if err := h.held().Pause(); err != nil {
+		t.Fatal(err)
+	}
+	h.startScript(debugScript)
+	eventually(t, "the first run to pause", func() bool { _, paused := h.held().Paused(); return paused })
+	if _, err := h.held().Resume(h.ctx, session.ResumeOptions{Force: true}); err != nil {
+		t.Fatal(err)
+	}
+	close(h.drv.release)
+	h.awaitResult()
+
+	h.startScript(debugScript)
+	if got := h.awaitResult(); got["ok"] != true {
+		t.Fatalf("second run = %v, want it to finish without pausing", got)
+	}
+}
+
+func TestScriptDebug_TheLastViewerLeavingClearsWhatWasSetBetweenScripts(t *testing.T) {
+	h := newDebugHarness(t)
+	if err := h.viewer.SetBreakpoints([]string{"inline:5"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.held().Pause(); err != nil {
+		t.Fatal(err)
+	}
+	host := h.srv.session.debug
+	pending := func() int {
+		host.mu.Lock()
+		defer host.mu.Unlock()
+		n := len(host.pendingBreakpoints)
+		if host.pendingPause {
+			n++
+		}
+		return n
+	}
+	if pending() != 2 {
+		t.Fatalf("pending = %d, want the breakpoint and the pause", pending())
+	}
+
+	if err := h.viewer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "the pending requests to be dropped", func() bool { return pending() == 0 })
+
+	close(h.drv.release)
+	h.startScript(debugScript)
+	if got := h.awaitResult(); got["ok"] != true {
+		t.Fatalf("result = %v, want the run to finish without pausing", got)
+	}
+}
+
+func TestScriptDebug_EveryOtherRequestIsRefusedBetweenScripts(t *testing.T) {
+	h := newDebugHarness(t)
+	if _, err := h.held().Resume(h.ctx, session.ResumeOptions{Force: true}); codeOfErr(err) != diag.CodeHolderBusy {
+		t.Errorf("resume: %v, want %s", err, diag.CodeHolderBusy)
+	}
+	if _, err := h.held().Act(h.ctx, "screenshot: by-hand"); codeOfErr(err) != diag.CodeHolderBusy {
+		t.Errorf("act: %v, want %s", err, diag.CodeHolderBusy)
+	}
+	if _, err := h.held().Variables(); codeOfErr(err) != diag.CodeHolderBusy {
+		t.Errorf("variables: %v, want %s", err, diag.CodeHolderBusy)
+	}
 }
 
 func TestScriptDebug_APausedCallDoesNotTimeOutAndKeepsReportingProgress(t *testing.T) {
