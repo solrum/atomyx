@@ -175,7 +175,9 @@ type ScreenshotNotice struct {
 // StateNotice announces that the holder moved to State, one of the holder
 // state names Status carries. Command is the holder's command line name
 // and RunID is the open run, absent while none is open. Pause says where
-// the run stands and is present only when State is paused.
+// the run stands and is present only when State is paused. The paused
+// value is sent only by a holder that advertises FeatureDebug, and a
+// viewer treats a State it does not know as opaque.
 type StateNotice struct {
 	State   string         `json:"state"`
 	Command string         `json:"command"`

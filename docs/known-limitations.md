@@ -23,6 +23,8 @@ current code or docs.
 - [A focus-timeout error omits the field name for role-only selectors](#a-focus-timeout-error-omits-the-field-name-for-role-only-selectors)
 - [The CLI needs signing settings in the environment to drive a physical iPhone](#the-cli-needs-signing-settings-in-the-environment-to-drive-a-physical-iphone)
 - [An iOS run without --device is not provisioned](#an-ios-run-without---device-is-not-provisioned)
+- [A scenario file cannot carry a breakpoint](#a-scenario-file-cannot-carry-a-breakpoint)
+- [Terminal debugging of atomyx run only resumes](#terminal-debugging-of-atomyx-run-only-resumes)
 
 ## Obscurement check can flag a dialog's backdrop as blocking the dialog's own button
 
@@ -193,3 +195,35 @@ that is already served.
 
 **Workaround**: pass `--device <udid>`, or start a runner yourself
 with `make serve` before the command.
+
+## A scenario file cannot carry a breakpoint
+
+**Symptom**: `atomyx run --break scenario.yml:3` is refused with
+`no script of this run is at <path>`, although the scenario names
+scripts on that line.
+
+**Where**: `atomyx run --break` on a scenario file, and a breakpoint set
+from the inspector.
+
+**Why**: a breakpoint stops the run before a script step. A scenario
+only lists the scripts to run, so it has no step of its own to stop
+before.
+
+**Workaround**: put the breakpoint in a script the scenario runs, for
+example `--break first.yml:2`. The run stops there when the scenario
+reaches that script.
+
+## Terminal debugging of atomyx run only resumes
+
+**Symptom**: while `atomyx run --break` holds a run at a breakpoint,
+pressing Enter resumes the run, and there is no key to step one step,
+run a step, or read variables.
+
+**Where**: `atomyx run --break` in a terminal.
+
+**Why**: the terminal prompt reads only Enter and maps it to resume.
+The other debugging actions are served to an attached inspector.
+
+**Workaround**: attach the inspector with `atomyx inspect` while the run
+is paused, and step, run a step or read variables from there. See the
+`driver inspect` section of `cli.md`.

@@ -624,7 +624,10 @@ Message groups:
   in order with the other notices. When the state is `paused`, the
   notice also carries `pause`, an object with the script `source`, the
   `line`, the nesting `depth` and the `command` of the step about to run,
-  and the field is absent in every other state. A holder that sends the
+  and the field is absent in every other state. `paused` is a value of
+  the v1 `state` field that only a holder advertising the feature
+  `debug` sends. A viewer treats a `state` value it does not know as
+  opaque and keeps it as the holder reported it. A holder that sends the
   notice lists the feature `observe.state` in its hello answer, and a
   viewer that does not know the notice ignores it.
   `observe.tree.fresh` returns a matched tree and screenshot pair.
