@@ -14,6 +14,7 @@ import (
 	"dev.atomyx/internal/runner"
 	"dev.atomyx/internal/script"
 	"dev.atomyx/internal/session"
+	"dev.atomyx/internal/wire"
 )
 
 const waitTimeout = 5 * time.Second
@@ -124,3 +125,17 @@ func (h *harness) resume(opts session.ResumeOptions) session.ResumeResult {
 }
 
 func loc(line int) string { return sourcePath + ":" + strconv.Itoa(line) }
+
+func goButtonTree() wire.TreeNodeWire {
+	button := wire.TreeNodeWire{Attributes: map[string]string{"id": "go", "text": "Go", "label": "Go", "bounds": "0,0,10,10"}}
+	return wire.TreeNodeWire{Attributes: map[string]string{"id": "root"}, Children: []wire.TreeNodeWire{button}}
+}
+
+func threeShotScripts(t *testing.T) []runner.BreakScript {
+	t.Helper()
+	def, err := script.ParseScript(threeShots, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return []runner.BreakScript{{Path: sourcePath, Definition: def}}
+}

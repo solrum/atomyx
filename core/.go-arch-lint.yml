@@ -331,6 +331,7 @@ deps:
   debugrun:
     mayDependOn:
       - diag
+      - wire
       - driver
       - drivermock
       - script

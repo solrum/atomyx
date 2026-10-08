@@ -25,8 +25,14 @@ type Pauser interface {
 // Options configures an Adapter. The zero value is usable and debugs a
 // run with no breakpoints.
 type Options struct {
+	// BaseDir resolves a relative file in a breakpoint location a viewer
+	// sets.
+	BaseDir string
 	// Breakpoints are set before the run starts.
 	Breakpoints []runner.BreakLocation
+	// Scripts lists the scripts the run executes, so a location a viewer
+	// sets is checked against their authored steps. Nil skips the check.
+	Scripts func() []runner.BreakScript
 }
 
 // Adapter implements runner.StepGate and session.Debugger over one run
@@ -150,6 +156,36 @@ func splitLocation(location string) (string, int) {
 	return location[:cut], line
 }
 
+// SetBreakpoints implements session.Debugger.
+func (a *Adapter) SetBreakpoints(locations []string) error {
+	parsed := make([]runner.BreakLocation, 0, len(locations))
+	for _, spec := range locations {
+		loc, err := runner.ParseBreakLocation(spec, a.opts.BaseDir)
+		if err != nil {
+			return err
+		}
+		parsed = append(parsed, loc)
+	}
+	if a.opts.Scripts != nil {
+		if err := runner.ValidateBreakLocations(parsed, a.opts.Scripts()); err != nil {
+			return err
+		}
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	next := make(map[string]bool, len(parsed))
+	for _, loc := range parsed {
+		next[loc.String()] = true
+	}
+	for loc := range a.hit {
+		if !next[loc] {
+			delete(a.hit, loc)
+		}
+	}
+	a.breakpoints = next
+	return nil
+}
+
 // Pause implements session.Debugger.
 func (a *Adapter) Pause() error {
 	a.mu.Lock()
@@ -170,6 +206,21 @@ func (a *Adapter) Resume(_ context.Context, opts session.ResumeOptions) (session
 	a.stopNext = opts.Step
 	close(state.wake)
 	return session.ResumeResult{Resumed: true}, nil
+}
+
+// Variables implements session.Debugger.
+func (a *Adapter) Variables() (session.VariablesView, error) {
+	state := a.current()
+	if state == nil {
+		return session.VariablesView{}, errNotPaused()
+	}
+	return session.VariablesView{Variables: state.run.Variables().Redacted()}, nil
+}
+
+func (a *Adapter) current() *pauseState {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.paused
 }
 
 func errNotPaused() error { return diag.NewHolderBusy("the run is not paused") }
