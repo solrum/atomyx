@@ -176,6 +176,40 @@ func attachControlTranscript() (AttachTranscript, error) {
 	return b.build("control")
 }
 
+func attachDebugTranscript() (AttachTranscript, error) {
+	var b attachTranscriptBuilder
+	b.request(1, attach.TypeHello, attach.Hello{
+		Protocol: attach.VersionRange{Min: 1, Max: 1},
+		Client:   "atomyx inspect",
+		Features: []string{attach.FeatureObserve, attach.FeatureDebug},
+	})
+	b.response(1, attach.TypeHello, attach.HelloResult{Protocol: 1, Features: []string{attach.FeatureObserve, attach.FeatureObserveState, attach.FeatureDebug}})
+	b.request(2, attach.TypeSubscribe, attach.Subscribe{})
+	b.response(2, attach.TypeSubscribe, nil)
+	b.request(3, attach.TypeDebugVariablesGet, nil)
+	b.failure(3, attach.TypeDebugVariablesGet, diag.NewHolderBusy("the run is not paused"))
+	b.request(4, attach.TypeDebugBreakpointsSet, attach.DebugBreakpoints{Locations: []string{"/work/login.yml:7", "inline:2"}})
+	b.response(4, attach.TypeDebugBreakpointsSet, nil)
+	b.request(5, attach.TypeDebugPause, nil)
+	b.response(5, attach.TypeDebugPause, nil)
+	b.notice(attach.NoticeState, attach.StateNotice{
+		State: "paused", Command: "atomyx run", RunID: "20261003-101500-smoke",
+		Pause: &attach.PauseLocation{Source: "/work/login.yml", Line: 7, Depth: 0, Command: "tap"},
+	})
+	b.request(6, attach.TypeDebugVariablesGet, nil)
+	b.response(6, attach.TypeDebugVariablesGet, attach.DebugVariables{Variables: map[string]string{"user": "ann", "password": "****"}})
+	b.request(7, attach.TypeActStep, attach.ActStep{Step: "tap: {id: submit}"})
+	b.response(7, attach.TypeActStep, attach.ActResult{Command: "tap", Outcome: "passed", DurationMs: 41, Artifacts: []string{}})
+	b.request(8, attach.TypeDebugStep, attach.DebugResume{})
+	b.response(8, attach.TypeDebugStep, attach.DebugResumeResult{Resumed: false, MissReason: "no element matches the next step"})
+	b.request(9, attach.TypeDebugStep, attach.DebugResume{Force: true})
+	b.response(9, attach.TypeDebugStep, attach.DebugResumeResult{Resumed: true})
+	b.notice(attach.NoticeState, attach.StateNotice{State: "running", Command: "atomyx run", RunID: "20261003-101500-smoke"})
+	b.request(10, attach.TypeDebugResume, attach.DebugResume{})
+	b.failure(10, attach.TypeDebugResume, diag.NewHolderBusy("the run is not paused"))
+	return b.build("debug")
+}
+
 // AttachCorpus returns the attach transcripts of protocol major version
 // 1. Each one is frozen as goldens/attach/v1-<name>.json.
 func AttachCorpus() ([]AttachTranscript, error) {
@@ -184,6 +218,7 @@ func AttachCorpus() ([]AttachTranscript, error) {
 		attachObserveTranscript,
 		attachErrorsTranscript,
 		attachControlTranscript,
+		attachDebugTranscript,
 	}
 	transcripts := make([]AttachTranscript, 0, len(builders))
 	for _, build := range builders {

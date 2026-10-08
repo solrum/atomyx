@@ -621,9 +621,12 @@ Message groups:
   holds one subscription, and a new `observe.subscribe` on it ends the
   previous one. A state notice carries the holder state, its command and
   the open run id, and the holder sends one on every state transition,
-  in order with the other notices. A holder that sends it lists the
-  feature `observe.state` in its hello answer, and a viewer that does
-  not know the notice ignores it.
+  in order with the other notices. When the state is `paused`, the
+  notice also carries `pause`, an object with the script `source`, the
+  `line`, the nesting `depth` and the `command` of the step about to run,
+  and the field is absent in every other state. A holder that sends the
+  notice lists the feature `observe.state` in its hello answer, and a
+  viewer that does not know the notice ignores it.
   `observe.tree.fresh` returns a matched tree and screenshot pair.
 - `control`: `control.yield`, whose data is `{"command": "..."}`, a
   short human readable name of the borrower such as
@@ -635,7 +638,37 @@ Message groups:
   that accepts writes the `ok` response and then closes its session, so
   the borrower reads `ok` before the connection ends and acquires the
   device afterwards. `attach.RequestYield` is the client side.
-- There is no group that drives the device.
+- `debug`: `debug.breakpoints.set`, `debug.pause`, `debug.resume`,
+  `debug.step`, `debug.variables.get` and `act.step`. A holder lists the
+  feature `debug` in its hello answer only while its host injected a
+  debugger, and a holder without one answers `UNSUPPORTED` to every one
+  of these requests.
+  - `debug.breakpoints.set` carries `{"locations": [...]}`, each location
+    written `<script file>:<line>` or `inline:<line>`. It replaces every
+    breakpoint, so the last writer wins, and a location that matches no
+    authored step is refused with `INVALID_ARGUMENT`.
+  - `debug.pause` asks the run to stop before its next step. It and
+    `debug.breakpoints.set` are admitted at any time.
+  - `debug.resume` and `debug.step` carry an optional `{"force": true}`
+    and answer `{"resumed": bool, "missReason": "..."}`. `debug.step`
+    resumes and stops again after the next step. An advisory check of the
+    next step may leave `resumed` false with a `missReason`, and repeating
+    the request with `force` overrides it.
+  - `debug.variables.get` answers `{"variables": {name: value}}` with
+    every secret already masked by the holder.
+  - `act.step` carries `{"step": "<one step in script YAML>"}` and
+    answers the command, `outcome` (`passed` or `failed`), `message`,
+    `durationMs` and `artifacts`. A step that nests other steps is
+    refused with `INVALID_ARGUMENT`.
+  - Every request except `debug.pause` and `debug.breakpoints.set` is
+    refused with `HOLDER_BUSY` unless the holder is paused. The session
+    applies that check, so a viewer needs no knowledge of the lock that
+    keeps an act and a fresh capture apart.
+  - The viewer side is `session.DebugClient`, taken from
+    `RemoteHandle.Debug`, which reports false when the holder lacks the
+    feature.
+- Apart from `act.step` while paused, there is no group that drives the
+  device.
 
 The step line travels as `attach.StepLine`, whose JSON equals one line
 of `steps.jsonl`. The golden transcripts under
@@ -662,6 +695,8 @@ Connections:
 - `Server.Close` writes the frames already queued for each connection,
   bounded by one write timeout in total, then ends every connection and
   every goroutine, but leaves the socket file for its owner to remove.
+- The owner may supply a `DebugHandler`. In the session package the
+  host injects the port as `Request.Debugger`.
 - The owner may supply a `ControlHandler`. When it accepts a yield, the
   server queues the `ok` response with the handler's `afterReply`
   callback, and runs the callback once on its own goroutine after that

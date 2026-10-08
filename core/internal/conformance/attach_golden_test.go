@@ -41,6 +41,12 @@ func attachDataShape(messageType string) any {
 		return &attach.Subscribe{}
 	case attach.TypeControlYield:
 		return &attach.ControlYield{}
+	case attach.TypeDebugBreakpointsSet:
+		return &attach.DebugBreakpoints{}
+	case attach.TypeDebugResume, attach.TypeDebugStep:
+		return &attach.DebugResume{}
+	case attach.TypeActStep:
+		return &attach.ActStep{}
 	case attach.TypeTreeLatest:
 		return &attach.TreeResult{}
 	case attach.TypeScreenshotLatest:
@@ -57,6 +63,23 @@ func attachDataShape(messageType string) any {
 		return &attach.StepGapNotice{}
 	case attach.NoticeState:
 		return &attach.StateNotice{}
+	default:
+		return nil
+	}
+}
+
+// attachResponseShape maps a message type to the value its response data
+// must decode into, for the types whose response differs from the request.
+func attachResponseShape(messageType string) any {
+	switch messageType {
+	case attach.TypeHello:
+		return &attach.HelloResult{}
+	case attach.TypeDebugResume, attach.TypeDebugStep:
+		return &attach.DebugResumeResult{}
+	case attach.TypeDebugVariablesGet:
+		return &attach.DebugVariables{}
+	case attach.TypeActStep:
+		return &attach.ActResult{}
 	default:
 		return nil
 	}
@@ -97,8 +120,10 @@ func TestAttachGoldensReplayThroughTheFrameReader(t *testing.T) {
 				}
 				isFailure := frame.Ok != nil && !*frame.Ok
 				shape := attachDataShape(frame.Type)
-				if step.From == attachFromHolder && frame.Kind() == attach.KindResponse && frame.Type == attach.TypeHello {
-					shape = &attach.HelloResult{}
+				if step.From == attachFromHolder && frame.Kind() == attach.KindResponse {
+					if response := attachResponseShape(frame.Type); response != nil {
+						shape = response
+					}
 				}
 				if shape == nil || isFailure || len(frame.Data) == 0 {
 					continue

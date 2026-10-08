@@ -1,0 +1,262 @@
+[
+  {
+    "frame": {
+      "data": {
+        "client": "atomyx inspect",
+        "features": [
+          "observe",
+          "debug"
+        ],
+        "protocol": {
+          "max": 1,
+          "min": 1
+        }
+      },
+      "id": 1,
+      "type": "session.hello",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "data": {
+        "features": [
+          "observe",
+          "observe.state",
+          "debug"
+        ],
+        "protocol": 1
+      },
+      "id": 1,
+      "ok": true,
+      "type": "session.hello",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "data": {
+        "sinceSeq": 0
+      },
+      "id": 2,
+      "type": "observe.subscribe",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "id": 2,
+      "ok": true,
+      "type": "observe.subscribe",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "id": 3,
+      "type": "debug.variables.get",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "code": "HOLDER_BUSY",
+      "id": 3,
+      "message": "the device holder is busy: the run is not paused",
+      "ok": false,
+      "remedy": "Wait for that work to finish, then ask again.",
+      "type": "debug.variables.get",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "data": {
+        "locations": [
+          "/work/login.yml:7",
+          "inline:2"
+        ]
+      },
+      "id": 4,
+      "type": "debug.breakpoints.set",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "id": 4,
+      "ok": true,
+      "type": "debug.breakpoints.set",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "id": 5,
+      "type": "debug.pause",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "id": 5,
+      "ok": true,
+      "type": "debug.pause",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "data": {
+        "command": "atomyx run",
+        "pause": {
+          "command": "tap",
+          "depth": 0,
+          "line": 7,
+          "source": "/work/login.yml"
+        },
+        "runId": "20261003-101500-smoke",
+        "state": "paused"
+      },
+      "type": "observe.notice.state",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "id": 6,
+      "type": "debug.variables.get",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "data": {
+        "variables": {
+          "password": "****",
+          "user": "ann"
+        }
+      },
+      "id": 6,
+      "ok": true,
+      "type": "debug.variables.get",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "data": {
+        "step": "tap: {id: submit}"
+      },
+      "id": 7,
+      "type": "act.step",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "data": {
+        "command": "tap",
+        "durationMs": 41,
+        "outcome": "passed"
+      },
+      "id": 7,
+      "ok": true,
+      "type": "act.step",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "data": {},
+      "id": 8,
+      "type": "debug.step",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "data": {
+        "missReason": "no element matches the next step",
+        "resumed": false
+      },
+      "id": 8,
+      "ok": true,
+      "type": "debug.step",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "data": {
+        "force": true
+      },
+      "id": 9,
+      "type": "debug.step",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "data": {
+        "resumed": true
+      },
+      "id": 9,
+      "ok": true,
+      "type": "debug.step",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "data": {
+        "command": "atomyx run",
+        "runId": "20261003-101500-smoke",
+        "state": "running"
+      },
+      "type": "observe.notice.state",
+      "v": 1
+    },
+    "from": "holder"
+  },
+  {
+    "frame": {
+      "data": {},
+      "id": 10,
+      "type": "debug.resume",
+      "v": 1
+    },
+    "from": "client"
+  },
+  {
+    "frame": {
+      "code": "HOLDER_BUSY",
+      "id": 10,
+      "message": "the device holder is busy: the run is not paused",
+      "ok": false,
+      "remedy": "Wait for that work to finish, then ask again.",
+      "type": "debug.resume",
+      "v": 1
+    },
+    "from": "holder"
+  }
+]
