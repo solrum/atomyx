@@ -58,6 +58,8 @@ type conn struct {
 	// or the read goroutine's exit consumes.
 	afterMu sync.Mutex
 	after   []func()
+	// actRunning is set while an act.step request runs on its own goroutine.
+	actRunning atomic.Bool
 	// draining is set once the last frame is queued, so the writer closes
 	// the socket after writing everything before it.
 	draining atomic.Bool
@@ -318,7 +320,11 @@ func (c *conn) serve() {
 			c.finish(invalidFrame("a viewer sends only requests"))
 			return
 		}
-		ok = c.dispatch(c.ctx, f)
+		if f.Type == TypeActStep {
+			ok = c.serveAct(f)
+		} else {
+			ok = c.dispatch(c.ctx, f)
+		}
 		if hook := c.srv.cfg.hooks.afterDispatch; hook != nil {
 			hook()
 		}
