@@ -649,3 +649,27 @@ func TestRemoteHandle_ThePausedStateNoticeCarriesThePauseAndTheDroppedInterventi
 		t.Fatalf("observation = %+v, want a notice with no count and no pause", running)
 	}
 }
+
+func TestRemoteHandle_InfoCarriesThePauseTheStatusReportedAtDial(t *testing.T) {
+	path, _ := serveScript(t, func(h *scriptedHolder) {
+		h.reply(h.expect(attach.TypeHello), attach.HelloResult{Protocol: attach.ProtocolMajor, Features: []string{attach.FeatureObserve}})
+		h.reply(h.expect(attach.TypeStatus), attach.Status{
+			State:  "paused",
+			Device: attach.DeviceInfo{ID: "A", Platform: "android"},
+			Holder: attach.HolderInfo{PID: 7, Command: "atomyx run", StartedAt: 1000},
+			Pause:  &attach.PauseLocation{Source: "/work/flow.yml", Line: 3, Depth: 1, Command: "tap"},
+		})
+		h.reply(h.expect(attach.TypeSubscribe), nil)
+		h.reply(h.expect(attach.TypeTreeLatest), attach.TreeResult{})
+		h.reply(h.expect(attach.TypeScreenshotLatest), attach.ScreenshotResult{})
+	})
+	h := dialRemote(t, path)
+	_ = h.Close()
+
+	info := h.Info()
+
+	want := session.PauseLocation{Source: "/work/flow.yml", Line: 3, Depth: 1, Command: "tap"}
+	if info.Pause == nil || *info.Pause != want {
+		t.Fatalf("Info().Pause = %+v, want %+v", info.Pause, want)
+	}
+}

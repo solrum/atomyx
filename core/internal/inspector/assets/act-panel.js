@@ -9,7 +9,7 @@ const TYPE_ACTION = 'type';
 // runs it and reports the outcome. The text to type is a password input
 // so it is not shown, it is cleared after every run, and the rendered
 // step is never displayed.
-export function createActPanel(host, { operate, readSelector }) {
+export function createActPanel(host, { operate, readSelector, onActed }) {
   const body = addPanel(host, 'Run step');
   const section = body.parentElement;
   section.hidden = true;
@@ -57,6 +57,7 @@ export function createActPanel(host, { operate, readSelector }) {
       const out = await operate('/api/v1/act', { step: rendered.yaml });
       const detail = out.message ? ` ${out.message}` : '';
       show(`${out.command} ${out.outcome} in ${out.durationMs} ms.${detail}`);
+      onActed();
     } catch (err) {
       show(describeError(err));
     } finally {

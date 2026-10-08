@@ -164,7 +164,11 @@ func (h *RemoteHandle) infoFrom(s attach.Status) Info {
 	if s.Holder.StartedAt > 0 {
 		holder.StartedAt = time.UnixMilli(s.Holder.StartedAt).UTC()
 	}
-	return Info{Device: d, Holder: holder, State: HolderState(s.State), Generation: h.generation}
+	info := Info{Device: d, Holder: holder, State: HolderState(s.State), Generation: h.generation}
+	if s.Pause != nil && info.State == StatePaused {
+		info.Pause = &PauseLocation{Source: s.Pause.Source, Line: s.Pause.Line, Depth: s.Pause.Depth, Command: s.Pause.Command}
+	}
+	return info
 }
 
 // Info asks the holder for its status. When the holder cannot answer, it
@@ -189,7 +193,7 @@ func (h *RemoteHandle) Info() Info {
 	}
 	info = h.infoFrom(status)
 	h.mu.Lock()
-	if info.State == StatePaused {
+	if info.State == StatePaused && info.Pause == nil {
 		info.Pause = h.info.Pause
 	}
 	h.info = info

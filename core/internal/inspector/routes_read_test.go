@@ -384,3 +384,32 @@ func TestEventKind_NamesEveryObservationKind(t *testing.T) {
 		}
 	}
 }
+
+func TestRoutes_SessionReadCarriesThePauseOnlyWhilePaused(t *testing.T) {
+	loc := &session.PauseLocation{Source: "/work/flow.yml", Line: 3, Depth: 1, Command: "tap"}
+	cases := []struct {
+		name      string
+		info      session.Info
+		wantPause bool
+	}{
+		{"paused", session.Info{State: session.StatePaused, Pause: loc}, true},
+		{"running", session.Info{State: session.StateRunning}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newAPIHarness(t, &stubController{info: tc.info}, ReadRoutes)
+			rec := h.get("/api/v1/session")
+			var body map[string]json.RawMessage
+			if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+				t.Fatalf("body: %v", err)
+			}
+			raw, has := body["pause"]
+			if has != tc.wantPause {
+				t.Fatalf("pause present = %v, want %v, body %s", has, tc.wantPause, rec.Body.String())
+			}
+			if tc.wantPause {
+				containsAll(t, string(raw), `"source":"/work/flow.yml"`, `"line":3`, `"depth":1`, `"command":"tap"`)
+			}
+		})
+	}
+}

@@ -121,12 +121,16 @@ type HolderInfo struct {
 
 // Status answers session.status. State holds the holder state name, for
 // example idle or running. Generation counts the sessions the holder has
-// opened, because revisions restart with each one.
+// opened, because revisions restart with each one. Pause says where the
+// run stands and is present only when State is paused, so a viewer that
+// attaches to a paused holder learns the location without waiting for a
+// state notice.
 type Status struct {
-	State      string     `json:"state"`
-	Device     DeviceInfo `json:"device"`
-	Holder     HolderInfo `json:"holder"`
-	Generation uint64     `json:"generation"`
+	State      string         `json:"state"`
+	Device     DeviceInfo     `json:"device"`
+	Holder     HolderInfo     `json:"holder"`
+	Generation uint64         `json:"generation"`
+	Pause      *PauseLocation `json:"pause,omitempty"`
 }
 
 // Subscribe is the data of observe.subscribe. A viewer that resumes sends

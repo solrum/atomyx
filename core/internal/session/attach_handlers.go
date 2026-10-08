@@ -45,7 +45,7 @@ func (h *attachHandlers) Status() attach.Status {
 	if !info.Holder.StartedAt.IsZero() {
 		holder.StartedAt = info.Holder.StartedAt.UnixMilli()
 	}
-	return attach.Status{
+	status := attach.Status{
 		State: string(info.State),
 		Device: attach.DeviceInfo{
 			ID:       info.Device.ID,
@@ -55,6 +55,10 @@ func (h *attachHandlers) Status() attach.Status {
 		Holder:     holder,
 		Generation: info.Generation,
 	}
+	if info.Pause != nil && info.State == StatePaused {
+		status.Pause = &attach.PauseLocation{Source: info.Pause.Source, Line: info.Pause.Line, Depth: info.Pause.Depth, Command: info.Pause.Command}
+	}
+	return status
 }
 
 // TreeLatest implements attach.ObserveHandler. Hub.Latest already masks
