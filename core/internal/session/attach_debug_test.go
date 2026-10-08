@@ -52,7 +52,7 @@ func (d *scriptedDebugger) Act(_ context.Context, stepYAML string) (session.ActR
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.acts = append(d.acts, stepYAML)
-	return session.ActResult{Command: "tap", Outcome: "passed", DurationMs: 12, Artifacts: []string{"artifacts/a.png"}}, nil
+	return session.ActResult{Command: "tap", Outcome: "passed", DurationMs: 12, Artifacts: []string{"artifacts/a.png"}, Step: "- tap: ok"}, nil
 }
 
 func (d *scriptedDebugger) Variables() (session.VariablesView, error) {

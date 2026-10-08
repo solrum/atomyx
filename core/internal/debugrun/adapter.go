@@ -50,6 +50,8 @@ type Adapter struct {
 	stopNext    bool
 	lastSource  string
 	paused      *pauseState
+	actFiles    []string
+	actRunning  bool
 }
 
 // pauseState is the run blocked at the gate.

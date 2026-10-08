@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 
+	"dev.atomyx/internal/attach"
 	"dev.atomyx/internal/diag"
 )
 
@@ -71,7 +72,16 @@ func (s *Session) Act(ctx context.Context, stepYAML string) (ActResult, error) {
 	if _, paused := s.Paused(); !paused {
 		return ActResult{}, notPaused()
 	}
-	return s.debugger.Act(ctx, stepYAML)
+	result, err := s.debugger.Act(ctx, stepYAML)
+	if err != nil {
+		return ActResult{}, err
+	}
+	s.recordEntry(Intervention{
+		Kind: InterventionHumanAction, Client: attach.ClientFromContext(ctx),
+		Step: result.Step, Command: result.Command, Outcome: result.Outcome,
+		Message: result.Message, DurationMs: result.DurationMs, Artifacts: result.Artifacts,
+	})
+	return result, nil
 }
 
 // Resume lets the paused run continue. It waits for an act in flight,

@@ -225,3 +225,11 @@ func breakScriptsOf(absPath, content string, externalEnv map[string]string) ([]r
 	}
 	return []runner.BreakScript{{Path: absPath, Definition: def}}, nil
 }
+
+// noteFile tells the adapter about a screenshot file the run folder just
+// received, so an act that took the screenshot can name it.
+func (d *runDebug) noteFile(file string) {
+	if d != nil {
+		d.adapter.NoteArtifact(file)
+	}
+}

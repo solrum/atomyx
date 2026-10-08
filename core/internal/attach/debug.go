@@ -66,7 +66,7 @@ func (c *conn) debug(ctx context.Context, h DebugHandler, f Frame) bool {
 		if len(request.Step) > MaxActStepBytes {
 			return c.fail(f, invalidFrame(fmt.Sprintf("the step is longer than %d bytes", MaxActStepBytes)))
 		}
-		result, err := h.Act(ctx, request.Step)
+		result, err := h.Act(withClient(ctx, c.client), request.Step)
 		return c.answer(f, result, err)
 	}
 }

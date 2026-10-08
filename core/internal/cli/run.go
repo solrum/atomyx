@@ -166,6 +166,8 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		}
 		preconditionsOverride := resolvePreconditionsOverride(cliPreconditionsFlag, fromScenarioPreconditions, fromConfigPreconditions)
 
+		childArtifacts := newArtifactSequence(runfolder.ArtifactsDir(record.Dir()))
+		childArtifacts.onFile = dbg.noteFile
 		scenarioRunner := scenario.NewScenarioRunner(scenario.ScenarioRunnerDeps{
 			Orchestra:             built.Orchestra,
 			Clock:                 deps.clock(),
@@ -176,7 +178,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 			LoadScript:            fsScenarioScriptLoader(filepath.Dir(absPath)),
 			ExternalEnv:           externalEnv,
 			PreconditionsOverride: preconditionsOverride,
-			ChildArtifacts:        newArtifactSequence(runfolder.ArtifactsDir(record.Dir())).forTarget,
+			ChildArtifacts:        childArtifacts.forTarget,
 			StepGate:              dbg.gate(),
 			SourceDir:             filepath.Dir(absPath),
 			OnStep:                stepstream.NewSink(record.writer, deps.logger(), stepstream.WithPublisher(opened.PublishStep)),
@@ -237,6 +239,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	opened.recordRun(record)
 
 	artifacts := newLiveArtifacts(runfolder.ArtifactsDir(record.Dir()))
+	artifacts.seq.onFile = dbg.noteFile
 	scriptRunner := runner.NewScriptRunner(runner.ScriptRunnerDeps{
 		Orchestra:             built.Orchestra,
 		Clock:                 deps.clock(),

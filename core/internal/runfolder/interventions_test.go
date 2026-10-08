@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -36,7 +37,7 @@ func TestAppendInterventionWritesOneJSONLinePerEntryInOrder(t *testing.T) {
 	}
 	for i, raw := range lines {
 		var got InterventionLine
-		if err := json.Unmarshal([]byte(raw), &got); err != nil || got != entries[i] {
+		if err := json.Unmarshal([]byte(raw), &got); err != nil || !reflect.DeepEqual(got, entries[i]) {
 			t.Fatalf("line %d = %q (%v), want %+v", i, raw, err, entries[i])
 		}
 	}

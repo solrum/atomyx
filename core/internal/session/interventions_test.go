@@ -3,6 +3,7 @@ package session_test
 import (
 	"context"
 	"errors"
+	"reflect"
 	"sync"
 	"testing"
 
@@ -124,5 +125,55 @@ func TestInterventions_ARecordedHostInterventionIsDrainedWithItsClient(t *testin
 	got := s.Interventions()
 	if len(got) != 1 || got[0].Kind != session.InterventionControlBorrowed || got[0].Client != "atomyx run login.yml" || got[0].AtMs <= 0 {
 		t.Fatalf("Interventions() = %+v, want one controlBorrowed entry for the borrower's command", got)
+	}
+}
+
+func TestInterventions_AnActIsRecordedAsAHumanActionWithItsResultAndWhoRanIt(t *testing.T) {
+	dbg := &scriptedDebugger{}
+	s, _, path := debuggableHolder(t, dbg)
+	recorder := &fakeRecorder{}
+	s.SetInterventionRecorder(recorder)
+	s.EnterPause(testPause)
+
+	client, err := attach.Dial(context.Background(), attach.ClientConfig{Path: path, Client: "atomyx inspect"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = client.Close() })
+	if err := client.Call(context.Background(), attach.TypeActStep, attach.ActStep{Step: "tap: ok"}, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	var acts []runfolder.InterventionLine
+	for _, line := range recorder.recorded() {
+		if line.Kind == session.InterventionHumanAction {
+			acts = append(acts, line)
+		}
+	}
+	want := runfolder.InterventionLine{
+		Kind: session.InterventionHumanAction, Client: "atomyx inspect", Step: "- tap: ok",
+		Command: "tap", Outcome: "passed", DurationMs: 12, Artifacts: []string{"artifacts/a.png"},
+	}
+	if len(acts) != 1 || acts[0].AtMs <= 0 {
+		t.Fatalf("recorded humanAction lines = %+v, want exactly one with a time", acts)
+	}
+	acts[0].AtMs = 0
+	if !reflect.DeepEqual(acts[0], want) {
+		t.Fatalf("humanAction line = %+v, want %+v", acts[0], want)
+	}
+}
+
+func TestInterventions_ARefusedActIsNotRecorded(t *testing.T) {
+	s, _, _ := debuggableHolder(t, &scriptedDebugger{})
+	recorder := &fakeRecorder{}
+	s.SetInterventionRecorder(recorder)
+
+	if _, err := s.Act(context.Background(), "tap: ok"); err == nil {
+		t.Fatal("an act on a run that is not paused succeeded")
+	}
+	for _, line := range recorder.recorded() {
+		if line.Kind == session.InterventionHumanAction {
+			t.Fatalf("a refused act was recorded: %+v", line)
+		}
 	}
 }

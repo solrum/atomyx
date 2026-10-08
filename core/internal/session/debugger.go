@@ -75,6 +75,11 @@ type ActResult struct {
 	DurationMs int64 `json:"durationMs"`
 	// Artifacts lists the run-relative files the step produced.
 	Artifacts []string `json:"artifacts,omitempty"`
+	// Step is the step as the person wrote it, with the text of a type
+	// step masked and every secret value redacted. It is the command
+	// name when the text cannot be rebuilt. It is recorded in the run
+	// folder and is not sent to viewers.
+	Step string `json:"-"`
 }
 
 // VariablesView is the redacted set of variables at a pause.

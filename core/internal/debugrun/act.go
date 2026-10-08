@@ -27,20 +27,25 @@ func (a *Adapter) Act(ctx context.Context, stepYAML string) (session.ActResult, 
 	}
 	ctx, cancel := context.WithTimeout(ctx, defaultActBudget)
 	defer cancel()
+	finish := a.collectArtifacts()
 	started := time.Now()
 	result, err := state.run.ExecuteStep(ctx, step)
+	artifacts := finish()
 	if err != nil {
 		return session.ActResult{}, err
 	}
+	redactor := state.run.Variables().Redactor()
 	out := session.ActResult{
 		Command:    step.StepCommand(),
 		Outcome:    "passed",
 		DurationMs: time.Since(started).Milliseconds(),
+		Artifacts:  artifacts,
+		Step:       writtenText(step, redactor),
 	}
 	if !result.Ok {
 		out.Outcome = "failed"
 		if result.Detail != nil {
-			out.Message = state.run.Variables().Redactor().String(*result.Detail)
+			out.Message = redactor.String(*result.Detail)
 		}
 	}
 	return out, nil

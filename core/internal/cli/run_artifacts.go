@@ -25,6 +25,9 @@ import (
 // failure.
 type artifactSequence struct {
 	dir string
+	// onFile, when set, receives the run-relative path of each screenshot
+	// file as it is written.
+	onFile func(string)
 
 	mu    sync.Mutex
 	shots []report.ReportScreenshot
@@ -109,7 +112,11 @@ func newLiveArtifacts(dir string) *liveArtifacts {
 
 func (a *liveArtifacts) AddScreenshot(label string, data []byte, mimeType string) {
 	a.screenshots = append(a.screenshots, runner.Screenshot{Label: label, Data: data, MimeType: mimeType})
-	_ = a.seq.write(a.seq.fileFor(a.scope, label, mimeType), data)
+	name := a.seq.fileFor(a.scope, label, mimeType)
+	_ = a.seq.write(name, data)
+	if a.seq.onFile != nil {
+		a.seq.onFile(filepath.ToSlash(filepath.Join(filepath.Base(a.seq.dir), name)))
+	}
 }
 
 func (a *liveArtifacts) Screenshots() []runner.Screenshot {

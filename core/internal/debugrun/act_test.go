@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"dev.atomyx/internal/diag"
+	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/runner"
 	"dev.atomyx/internal/script"
 	"dev.atomyx/internal/script/expression"
@@ -130,5 +131,53 @@ func TestActMessageNeverShowsASecretValue(t *testing.T) {
 	}
 	if strings.Contains(res.Message, "hunter2hunter2") {
 		t.Fatalf("message leaks the secret: %q", res.Message)
+	}
+}
+
+func TestActRecordsTheWrittenStepWithTypedTextMaskedAndFallsBackToTheCommandName(t *testing.T) {
+	h := pausedAt(t, tapFlow, 3)
+	cases := []struct{ step, want string }{
+		{"tap: Go", "- tap: Go"},
+		{"type: hunter2hunter2", "- type: '" + orchestra.SecureMask + "'"},
+		{"screenshot: shot", "screenshot"},
+	}
+	for _, c := range cases {
+		res, err := h.adapter.Act(context.Background(), c.step)
+		if err != nil {
+			t.Fatalf("%q: %v", c.step, err)
+		}
+		if res.Step != c.want || strings.Contains(res.Step, "hunter2hunter2") {
+			t.Errorf("%q: Step = %q, want %q", c.step, res.Step, c.want)
+		}
+	}
+	finish(h)
+}
+
+// shootingRun is a paused run whose step reports a screenshot file.
+type shootingRun struct {
+	leakyRun
+	adapter *Adapter
+}
+
+func (r shootingRun) ExecuteStep(context.Context, script.ScriptStep) (runner.CommandResult, error) {
+	r.adapter.NoteArtifact("artifacts/shot.png")
+	return runner.CommandResult{Ok: true}, nil
+}
+
+func TestActReportsOnlyTheFilesNotedWhileItRuns(t *testing.T) {
+	a := New(Options{})
+	a.NoteArtifact("artifacts/before.png")
+	a.paused = &pauseState{run: shootingRun{adapter: a}}
+
+	res, err := a.Act(context.Background(), "screenshot: shot")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Artifacts) != 1 || res.Artifacts[0] != "artifacts/shot.png" {
+		t.Fatalf("artifacts = %v, want only the file noted during the act", res.Artifacts)
+	}
+	a.NoteArtifact("artifacts/after.png")
+	if again, _ := a.Act(context.Background(), "screenshot: shot"); len(again.Artifacts) != 1 {
+		t.Fatalf("a file noted between acts leaked into the next one: %v", again.Artifacts)
 	}
 }

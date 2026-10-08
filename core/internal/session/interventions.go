@@ -13,6 +13,9 @@ const (
 	// InterventionControlBorrowed marks the holder giving the device to
 	// another process that asked for it. Client is that process's command.
 	InterventionControlBorrowed = "controlBorrowed"
+	// InterventionHumanAction marks a step a person ran on the device while
+	// the run was paused.
+	InterventionHumanAction = "humanAction"
 )
 
 // maxPendingInterventions bounds the entries a session keeps for its
@@ -31,6 +34,16 @@ type Intervention struct {
 	Kind   string `json:"kind"`
 	AtMs   int64  `json:"atMs"`
 	Client string `json:"client"`
+
+	// The fields below describe a humanAction and are empty for the other
+	// kinds. Step is the step as the person wrote it, with the text of a
+	// type step masked. Artifacts are run-relative files.
+	Step       string   `json:"step,omitempty"`
+	Command    string   `json:"command,omitempty"`
+	Outcome    string   `json:"outcome,omitempty"`
+	Message    string   `json:"message,omitempty"`
+	DurationMs int64    `json:"durationMs,omitempty"`
+	Artifacts  []string `json:"artifacts,omitempty"`
 }
 
 // InterventionSource hands the interventions that happened since the
@@ -94,7 +107,13 @@ func (s *Session) RecordIntervention(kind, client string) {
 }
 
 func (s *Session) recordIntervention(kind, client string) {
-	entry := Intervention{Kind: kind, AtMs: s.deps.Clock.NowMs(), Client: client}
+	s.recordEntry(Intervention{Kind: kind, Client: client})
+}
+
+// recordEntry stamps entry with the time and files it for the drainer and
+// the open run.
+func (s *Session) recordEntry(entry Intervention) {
+	entry.AtMs = s.deps.Clock.NowMs()
 	s.interventionMu.Lock()
 	defer s.interventionMu.Unlock()
 	if len(s.interventions) >= maxPendingInterventions {
@@ -118,7 +137,11 @@ func (s *Session) recordIntervention(kind, client string) {
 // folder in the order they were recorded. A host that clears the recorder
 // is also guaranteed that no write is in flight afterwards.
 func (s *Session) appendIntervention(entry Intervention) {
-	line := runfolder.InterventionLine{Kind: entry.Kind, AtMs: entry.AtMs, Client: entry.Client}
+	line := runfolder.InterventionLine{
+		Kind: entry.Kind, AtMs: entry.AtMs, Client: entry.Client,
+		Step: entry.Step, Command: entry.Command, Outcome: entry.Outcome,
+		Message: entry.Message, DurationMs: entry.DurationMs, Artifacts: entry.Artifacts,
+	}
 	if err := s.recorder.AppendIntervention(line); err != nil {
 		s.deps.Logger.Warn("run.intervention_line_failed", logging.LogContext{"error": err.Error()})
 	}

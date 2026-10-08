@@ -19,6 +19,16 @@ type InterventionLine struct {
 	Kind   string `json:"kind"`
 	AtMs   int64  `json:"atMs"`
 	Client string `json:"client"`
+
+	// The fields below describe a humanAction line and are empty for the
+	// other kinds. Step is the step as the person wrote it, with the text
+	// of a type step always masked.
+	Step       string   `json:"step,omitempty"`
+	Command    string   `json:"command,omitempty"`
+	Outcome    string   `json:"outcome,omitempty"`
+	Message    string   `json:"message,omitempty"`
+	DurationMs int64    `json:"durationMs,omitempty"`
+	Artifacts  []string `json:"artifacts,omitempty"`
 }
 
 // AppendIntervention appends line to interventions.jsonl. Once the file
