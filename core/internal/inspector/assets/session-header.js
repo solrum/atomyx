@@ -1,4 +1,5 @@
 import { getJson } from './api.js';
+import { emit } from './bus.js';
 
 // Holder states in which the holder owns the device, so a fresh capture
 // would interleave with what it is doing.
@@ -40,6 +41,7 @@ function render(info) {
   setText('session-kind', info.device.kind);
   setText('session-holder', holderText(info));
   showRefreshAvailability(info);
+  emit('session', info);
 }
 
 // Applies a holder state the server pushed, so the header and the fresh
@@ -50,7 +52,7 @@ export function applyState(event) {
     return;
   }
   pushes += 1;
-  current = { ...current, state: event.state };
+  current = { ...current, state: event.state, pause: event.pause };
   render(current);
 }
 

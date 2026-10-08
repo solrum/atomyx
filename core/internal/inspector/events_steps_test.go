@@ -38,7 +38,8 @@ func TestHostOverAViewer_StepLinesReachTheEventsFeed(t *testing.T) {
 // eventView decodes any line of the feed, a step line or a state line.
 type eventView struct {
 	stepEventLine
-	State string `json:"state"`
+	State string                 `json:"state"`
+	Pause *session.PauseLocation `json:"pause"`
 }
 
 // readStepEvents serves the events feed of v until its feed closes and
@@ -126,6 +127,19 @@ func TestHostOverAViewer_AHolderStateTransitionIsRelayedAsAStateEvent(t *testing
 	want := stateEventLine{Kind: "state", State: "running", Command: "tap", RunID: "run-1"}
 	if len(got) != 1 || got[0] != want {
 		t.Fatalf("events = %+v, want [%+v]", got, want)
+	}
+}
+
+func TestHostOverAViewer_APausedStateEventCarriesTheLocation(t *testing.T) {
+	v := newFakeViewer()
+	loc := &session.PauseLocation{Source: "/work/login.yaml", Line: 12, Depth: 1, Command: "tap"}
+	v.feed <- session.Observation{Kind: session.ObservedState, State: session.StatePaused, Pause: loc, Stable: true}
+	close(v.feed)
+
+	got := readStepEvents(t, v)
+
+	if len(got) != 1 || got[0].State != "paused" || got[0].Pause == nil || *got[0].Pause != *loc {
+		t.Fatalf("events = %+v, want one paused event at %+v", got, *loc)
 	}
 }
 

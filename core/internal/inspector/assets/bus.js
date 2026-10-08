@@ -9,6 +9,9 @@ const listeners = new Map();
 //              selected row. path is the child index chain from the
 //              root, the shape the selector routes take, and generation
 //              with revision name the tree the path was read from.
+//   session    payload is the session info with the holder state and,
+//              while paused, the pause location, announced after every
+//              read or pushed state change.
 export function on(topic, listener) {
   if (!listeners.has(topic)) {
     listeners.set(topic, new Set());

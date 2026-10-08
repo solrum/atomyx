@@ -3,6 +3,8 @@ import { bootstrap } from './bootstrap.js';
 import {
   hideReleased, showFatal, showNotice, showReleased, unavailableText,
 } from './banners.js';
+import { createActPanel } from './act-panel.js';
+import { createDebugPanel } from './debug-panel.js';
 import { createEventStream } from './events.js';
 import { createHighlight } from './highlight.js';
 import { createPropertiesPanel } from './properties-panel.js';
@@ -11,6 +13,7 @@ import { applyState, refreshBlocked, refreshSession } from './session-header.js'
 import { createStepsPanel } from './steps-panel.js';
 import { createSuggestionsPanel } from './suggestions-panel.js';
 import { createTesterPanel } from './tester-panel.js';
+import { createVariablesPanel } from './variables-panel.js';
 import { createYamlPanel } from './yaml-panel.js';
 import { bindSearch } from './tree-search.js';
 import { createTreeView } from './tree-view.js';
@@ -155,6 +158,9 @@ async function start() {
   createSuggestionsPanel(panels, { operate, notify: showNotice, reloadTree: loadTree, onUse: (selector) => tester.setSelector(selector) });
   const tester = createTesterPanel(panels, { operate, notify: showNotice, selectPath: (path) => view.selectPath(path) });
   createYamlPanel(panels, { operate, notify: showNotice, readSelector: tester.readSelector });
+  createDebugPanel(panels, { operate });
+  createVariablesPanel(panels);
+  createActPanel(panels, { operate, readSelector: tester.readSelector });
   steps = createStepsPanel(panels);
   createHighlight({
     img: byId('screenshot'),

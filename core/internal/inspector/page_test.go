@@ -216,3 +216,15 @@ func TestEmbeddedScriptsNeverParseDeviceTextAsMarkupOrCode(t *testing.T) {
 		}
 	}
 }
+
+// The text a person types into the run step control may be a password,
+// so its field must be a password input that the browser does not show.
+func TestRunStepTextFieldIsAPasswordInput(t *testing.T) {
+	raw, err := fs.ReadFile(mustSub(embeddedAssets, "assets"), "act-panel.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), "text.type = 'password'") {
+		t.Error("act-panel.js does not make the text field a password input")
+	}
+}

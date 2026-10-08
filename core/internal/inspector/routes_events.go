@@ -42,12 +42,13 @@ type eventLine struct {
 // stateEventLine announces a holder state transition with the new state,
 // so a page shows it without asking for the session again. Command and
 // RunID name the call and run the holder is in, and are empty when it is
-// in none.
+// in none. Pause says where the run stands while the state is paused.
 type stateEventLine struct {
-	Kind    string `json:"kind"`
-	State   string `json:"state"`
-	Command string `json:"command,omitempty"`
-	RunID   string `json:"runId,omitempty"`
+	Kind    string                 `json:"kind"`
+	State   string                 `json:"state"`
+	Command string                 `json:"command,omitempty"`
+	RunID   string                 `json:"runId,omitempty"`
+	Pause   *session.PauseLocation `json:"pause,omitempty"`
 }
 
 // stepEventLine is one step line of a run the holder drives. It carries
@@ -131,7 +132,7 @@ func eventsHandler(c session.Viewer) http.Handler {
 					return
 				}
 				if obs.Kind == session.ObservedState {
-					line := stateEventLine{Kind: eventState, State: string(obs.State), Command: obs.Command, RunID: obs.RunID}
+					line := stateEventLine{Kind: eventState, State: string(obs.State), Command: obs.Command, RunID: obs.RunID, Pause: obs.Pause}
 					if enc.Encode(line) != nil || flusher.Flush() != nil {
 						return
 					}
