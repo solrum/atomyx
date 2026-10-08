@@ -108,7 +108,9 @@ func (s *Session) Resume(ctx context.Context, opts ResumeOptions) (ResumeResult,
 	result, err := s.debugger.Resume(ctx, opts)
 	if err != nil || !result.Resumed {
 		s.mu.Lock()
-		s.pause = &loc
+		if s.pause == nil {
+			s.pause = &loc
+		}
 		s.mu.Unlock()
 		return result, err
 	}

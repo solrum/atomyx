@@ -49,12 +49,16 @@ type Adapter struct {
 	pauseNext   bool
 	stopNext    bool
 	paused      *pauseState
+	pauseSeq    uint64
 	actFiles    []string
 	actRunning  bool
 }
 
 // pauseState is the run blocked at the gate.
 type pauseState struct {
+	// id tells this pause from every other pause of the run, so a resume
+	// aimed at an earlier pause never wakes a later one.
+	id   uint64
 	run  runner.PausedRun
 	step runner.GateStep
 	wake chan struct{}
@@ -119,7 +123,8 @@ func (a *Adapter) BeforeStep(ctx context.Context, step runner.GateStep, run runn
 	a.pauseNext, a.stopNext = false, false
 	left := make(chan struct{})
 	defer close(left)
-	state := &pauseState{run: run, step: step, wake: make(chan struct{}), left: left}
+	a.pauseSeq++
+	state := &pauseState{id: a.pauseSeq, run: run, step: step, wake: make(chan struct{}), left: left}
 	a.paused = state
 	loc := a.pauseLocation(step)
 	a.mu.Unlock()
@@ -206,7 +211,7 @@ func (a *Adapter) Pause() error {
 // Resume implements session.Debugger.
 func (a *Adapter) Resume(ctx context.Context, opts session.ResumeOptions) (session.ResumeResult, error) {
 	state := a.current()
-	if state == nil {
+	if state == nil || (opts.Pause != 0 && state.id != opts.Pause) {
 		return session.ResumeResult{}, errNotPaused()
 	}
 	if !opts.Force {
@@ -223,6 +228,26 @@ func (a *Adapter) Resume(ctx context.Context, opts session.ResumeOptions) (sessi
 	a.stopNext = opts.Step
 	close(state.wake)
 	return session.ResumeResult{Resumed: true}, nil
+}
+
+// PauseID identifies the pause the run is in, or is 0 while the run is
+// not paused. Passing it as ResumeOptions.Pause limits a resume to that
+// pause.
+func (a *Adapter) PauseID() uint64 {
+	if state := a.current(); state != nil {
+		return state.id
+	}
+	return 0
+}
+
+// ClearRequests drops every breakpoint and the pending pause and step
+// requests, so a viewer that left does not stop the run after it is gone.
+// A run that is already paused stays paused.
+func (a *Adapter) ClearRequests() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.breakpoints, a.hit = map[string]bool{}, map[string]bool{}
+	a.pauseNext, a.stopNext = false, false
 }
 
 // Variables implements session.Debugger.

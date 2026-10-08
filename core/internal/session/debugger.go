@@ -52,6 +52,10 @@ type ResumeOptions struct {
 	Step bool
 	// Force skips the advisory check of the next step.
 	Force bool
+	// Pause, when not 0, limits the resume to the pause with this
+	// identity. A run that is paused anywhere else is left paused and the
+	// resume fails as if the run were not paused.
+	Pause uint64
 }
 
 // ResumeResult reports whether a resume took effect.

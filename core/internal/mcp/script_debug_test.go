@@ -412,3 +412,79 @@ func TestScriptDebug_AScriptNobodyDebuggedCarriesNoHumanActions(t *testing.T) {
 		t.Fatalf("result = %v, want ok and no humanActions field", got)
 	}
 }
+
+// threeStepScript has its steps on lines 4, 5 and 6.
+const threeStepScript = "appId: com.example.app\nname: Debug\nsteps:\n  - screenshot: first\n  - screenshot: second\n  - screenshot: third\n"
+
+func (h *debugHarness) debugRun() *scriptDebugRun {
+	h.t.Helper()
+	run := h.srv.session.debug.current()
+	if run == nil {
+		h.t.Fatal("no script is being debugged")
+	}
+	return run
+}
+
+func TestScriptDebug_WhatAViewerAskedForEndsWithTheViewer(t *testing.T) {
+	h := newDebugHarness(t)
+	h.startScript(debugScript)
+	h.awaitEntered()
+	if err := h.viewer.SetBreakpoints([]string{"inline:5"}); err != nil {
+		t.Fatal(err)
+	}
+	run := h.debugRun()
+	if got := run.adapter.Unhit(); len(got) != 1 {
+		t.Fatalf("breakpoints = %v, want the one the viewer set", got)
+	}
+
+	if err := h.viewer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "the viewer's breakpoints to be dropped", func() bool { return len(run.adapter.Unhit()) == 0 })
+
+	close(h.drv.release)
+	if got := h.awaitResult(); got["ok"] != true {
+		t.Fatalf("result = %v, want the run to pass the old breakpoint line without pausing", got)
+	}
+}
+
+func TestScriptDebug_ARunAViewerStillDebugsIsNotResumedOnItsBehalf(t *testing.T) {
+	h := newDebugHarness(t)
+	h.pauseBeforeLine(debugScript, "5")
+	run := h.debugRun()
+
+	run.resumeIfAbandoned(run.adapter.PauseID())
+
+	if _, paused := h.held().Paused(); !paused {
+		t.Fatal("the run was resumed while a viewer was debugging it")
+	}
+}
+
+func TestScriptDebug_AnAutoResumeAimedAtAnEarlierPauseLeavesTheNextPauseAlone(t *testing.T) {
+	h := newDebugHarness(t)
+	h.startScript(threeStepScript)
+	h.awaitEntered()
+	if err := h.viewer.SetBreakpoints([]string{"inline:5", "inline:6"}); err != nil {
+		t.Fatal(err)
+	}
+	close(h.drv.release)
+	awaitPausedAtLine := func(line int) {
+		eventually(t, "the run to pause", func() bool {
+			loc, paused := h.held().Paused()
+			return paused && loc.Line == line
+		})
+	}
+	awaitPausedAtLine(5)
+	run := h.debugRun()
+	firstPause := run.adapter.PauseID()
+	if _, err := h.held().Resume(h.ctx, session.ResumeOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	awaitPausedAtLine(6)
+
+	run.autoResume(h.ctx, firstPause)
+
+	if loc, paused := h.held().Paused(); !paused || loc.Line != 6 {
+		t.Fatalf("paused = %v at %+v, want the second pause untouched by the timeout of the first", paused, loc)
+	}
+}

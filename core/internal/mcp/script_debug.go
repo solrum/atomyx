@@ -70,12 +70,17 @@ func (h *scriptDebugHost) end(run *scriptDebugRun) {
 	run.endPause()
 }
 
-// lastViewerLeft resumes the paused run, because nobody is left to
-// resume it. It runs on a viewer's connection goroutine, so it does not
-// wait for the resume.
+// lastViewerLeft drops what the viewers asked of the run and resumes the
+// run if it is paused, because nobody is left to resume it. It runs on a
+// viewer's connection goroutine, so it does not wait for the resume.
 func (h *scriptDebugHost) lastViewerLeft() {
-	if run := h.current(); run != nil {
-		go run.autoResume(run.ctx)
+	run := h.current()
+	if run == nil {
+		return
+	}
+	run.adapter.ClearRequests()
+	if id := run.adapter.PauseID(); id != 0 {
+		go run.resumeIfAbandoned(id)
 	}
 }
 
@@ -220,10 +225,14 @@ func (r *scriptDebugRun) beginPause() {
 	if r.stopWatch != nil {
 		return
 	}
+	id := r.adapter.PauseID()
+	if id == 0 {
+		return
+	}
 	r.resumeBudget = pauseToolBudget(r.ctx)
 	watchCtx, cancel := context.WithCancel(r.ctx)
 	r.stopWatch = cancel
-	go r.watchPause(watchCtx)
+	go r.watchPause(watchCtx, id)
 }
 
 // endPause restarts the tool budget and stops the ticker. It is a no-op
@@ -240,26 +249,33 @@ func (r *scriptDebugRun) endPause() {
 }
 
 // watchPause reports progress every pauseProgressIntervalMs and resumes
-// the run once it has been paused for pauseTimeoutMs, until ctx ends.
-func (r *scriptDebugRun) watchPause(ctx context.Context) {
+// pause id once it has lasted pauseTimeoutMs, until ctx ends.
+func (r *scriptDebugRun) watchPause(ctx context.Context, id uint64) {
 	var pausedMs int64
 	for beat := float64(1); r.timers.Sleep(ctx, pauseProgressIntervalMs) == nil; beat++ {
 		pausedMs += pauseProgressIntervalMs
 		if pausedMs >= r.pauseTimeoutMs {
-			r.autoResume(ctx)
+			r.autoResume(ctx, id)
 			return
 		}
 		reportPhase(ctx, acquirePhase{step: beat, message: pausedProgressMessage})
 	}
 }
 
-// autoResume resumes the run without the advisory check, because no
-// person is there to answer it.
-func (r *scriptDebugRun) autoResume(ctx context.Context) {
-	if _, paused := r.sess.Paused(); !paused {
+// resumeIfAbandoned resumes pause id unless a viewer is debugging again
+// by now, because that viewer owns the pause.
+func (r *scriptDebugRun) resumeIfAbandoned(id uint64) {
+	if r.sess.DebugViewers() > 0 {
 		return
 	}
-	_, _ = r.sess.Resume(context.WithoutCancel(ctx), session.ResumeOptions{Force: true})
+	r.autoResume(r.ctx, id)
+}
+
+// autoResume resumes pause id without the advisory check, because no
+// person is there to answer it. It does nothing when the run has left
+// that pause, so a run that paused again keeps its new pause.
+func (r *scriptDebugRun) autoResume(ctx context.Context, id uint64) {
+	_, _ = r.sess.Resume(context.WithoutCancel(ctx), session.ResumeOptions{Force: true, Pause: id})
 }
 
 // settleDeviceLoss reports a run that ended because its device went away
