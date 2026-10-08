@@ -63,7 +63,13 @@ func openDevice(ctx context.Context, deps Deps, command string, desc device.Desc
 // idle holder able to yield it. borrower is the command string the holder
 // shows to its own user, for example "atomyx run login.yml".
 func borrowDevice(ctx context.Context, deps Deps, command, borrower string, desc device.Descriptor) (*deviceSession, error) {
-	opened, err := borrowSession(ctx, deps, command, borrower, session.Request{Descriptor: desc})
+	return borrowDebuggable(ctx, deps, command, borrower, desc, nil)
+}
+
+// borrowDebuggable is borrowDevice for a command that can pause its run.
+// A nil debugger leaves the session undebuggable.
+func borrowDebuggable(ctx context.Context, deps Deps, command, borrower string, desc device.Descriptor, debugger session.Debugger) (*deviceSession, error) {
+	opened, err := borrowSession(ctx, deps, command, borrower, session.Request{Descriptor: desc, Debugger: debugger})
 	if err != nil {
 		return nil, err
 	}

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -92,6 +93,18 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
 
+	dbg, err := newRunDebug(deps, flags, func() ([]runner.BreakScript, error) {
+		return breakScriptsOf(absPath, string(content), externalEnv)
+	}, jsonOutput)
+	if err != nil {
+		var usage usageError
+		if errors.As(err, &usage) {
+			_, _ = fmt.Fprintf(stderr, "error: %s\n", usage.message)
+			return 2
+		}
+		return reportUncaught(ctx, stderr, deps.Debug, err)
+	}
+
 	// The device connects before the script or scenario is parsed.
 	// When both the device is unreachable and the file fails to
 	// parse, the device error is the one reported, because parsing
@@ -100,7 +113,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
-	opened, err := borrowDevice(ctx, deps, "atomyx run", "atomyx run "+filepath.Base(absPath), desc)
+	opened, err := borrowDebuggable(ctx, deps, "atomyx run", "atomyx run "+filepath.Base(absPath), desc, dbg.debugger())
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
@@ -109,6 +122,8 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	runCtx, cancelRun := context.WithCancelCause(ctx)
 	defer cancelRun(nil)
 	opened.cancelOnLost(cancelRun)
+	dbg.attach(runCtx, opened.Session, built.Orchestra)
+	defer dbg.stop()
 
 	captureConfig := parseCaptureFlag(proxyFlag)
 	networkCapture, err := netcapture.New(captureConfig)
@@ -227,6 +242,8 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		PreconditionsOverride: preconditionsOverride,
 		NetworkCapture:        networkCapture,
 		Artifacts:             artifacts,
+		StepGate:              dbg.gate(),
+		SourcePath:            absPath,
 		OnStep:                stepstream.NewSink(record.writer, deps.logger(), stepstream.WithPublisher(opened.PublishStep)),
 		FailureCapture: runner.NewFailureBundle(runner.FailureBundleDeps{
 			Orchestra: built.Orchestra, Clock: deps.clock(), Logger: deps.logger(), Sink: artifacts,

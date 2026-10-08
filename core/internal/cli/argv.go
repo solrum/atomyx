@@ -92,6 +92,7 @@ var commandFlags = map[Command][]flagDef{
 		{"--preconditions", flagValue},
 		{"--skip-preconditions", flagBoolean},
 		{"--report", flagValue},
+		{"--break", flagRepeatable},
 		{"--report-dir", flagValue},
 		{"--help", flagBoolean},
 		{"-h", flagBoolean},

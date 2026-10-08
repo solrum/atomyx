@@ -25,12 +25,13 @@ type Finder interface {
 // a selector, when no Finder is set, or when the target is on screen.
 func (a *Adapter) missReason(ctx context.Context, step runner.GateStep) string {
 	selector := immediateTarget(step.Step)
-	if selector == nil || a.opts.Finder == nil {
+	finder := a.finder()
+	if selector == nil || finder == nil {
 		return ""
 	}
 	ctx, cancel := context.WithTimeout(ctx, checkBudget)
 	defer cancel()
-	match, err := a.opts.Finder.FindOne(ctx, runner.SelectorFor(*selector))
+	match, err := finder.FindOne(ctx, runner.SelectorFor(*selector))
 	if err != nil || match != nil {
 		return ""
 	}
@@ -53,4 +54,10 @@ func immediateTarget(step script.ScriptStep) *script.ScriptSelector {
 		}
 	}
 	return nil
+}
+
+func (a *Adapter) finder() Finder {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.opts.Finder
 }

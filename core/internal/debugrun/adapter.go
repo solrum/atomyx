@@ -234,3 +234,12 @@ func (a *Adapter) current() *pauseState {
 }
 
 func errNotPaused() error { return diag.NewHolderBusy("the run is not paused") }
+
+// SetFinder sets the finder behind the advisory check on resume. A host
+// that learns its device after it built the adapter calls it once the
+// device is open.
+func (a *Adapter) SetFinder(f Finder) {
+	a.mu.Lock()
+	a.opts.Finder = f
+	a.mu.Unlock()
+}

@@ -67,6 +67,7 @@ func main() {
 		},
 		Debug: os.Getenv("ATOMYX_DEBUG") == "1",
 	}
+	deps.StdinTerminal = stdinIsTerminal()
 
 	// A plain cli.Run would leave Ctrl-C during a run or suite command
 	// killing the process immediately, skipping every deferred driver
@@ -97,4 +98,11 @@ func main() {
 	}
 	//nolint:gocritic // see the comment above
 	os.Exit(code)
+}
+
+// stdinIsTerminal reports whether standard input is an interactive
+// terminal rather than a pipe or a file.
+func stdinIsTerminal() bool {
+	info, err := os.Stdin.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
 }

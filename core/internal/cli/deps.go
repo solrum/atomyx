@@ -50,6 +50,10 @@ type Deps struct {
 	// Stdin is read by the inspect command for the Enter key that asks
 	// for a fresh URL. Nil means no key is read.
 	Stdin io.Reader
+	// StdinTerminal reports whether Stdin is an interactive terminal. The run
+	// command refuses --break without one, because a paused run waits for a
+	// key.
+	StdinTerminal bool
 	// HostCommand runs a host tool for the doctor bundle's version
 	// queries. Nil records every tool as unavailable.
 	HostCommand HostCommand
