@@ -218,12 +218,15 @@ func jsonFields(t reflect.Type) (all, required []string) {
 func TestSchemaMatchesJSONTags(t *testing.T) {
 	defs := GenerateJSONSchema()["definitions"].(map[string]any)
 	types := map[string]reflect.Type{
-		"RunMeta": reflect.TypeOf(Meta{}),
-		"Device":  reflect.TypeOf(Device{}),
-		"Host":    reflect.TypeOf(Host{}),
-		"MCPInfo": reflect.TypeOf(MCPInfo{}),
-		"Finding": reflect.TypeOf(Finding{}),
+		"RunMeta":                reflect.TypeOf(Meta{}),
+		"Device":                 reflect.TypeOf(Device{}),
+		"Host":                   reflect.TypeOf(Host{}),
+		"MCPInfo":                reflect.TypeOf(MCPInfo{}),
+		"Finding":                reflect.TypeOf(Finding{}),
+		"Intervention":           reflect.TypeOf(InterventionLine{}),
+		"InterventionsTruncated": reflect.TypeOf(InterventionsTruncated{}),
 	}
+	delete(defs, "InterventionEntry")
 	if len(defs) != len(types) {
 		t.Fatalf("schema has %d definitions, test covers %d", len(defs), len(types))
 	}

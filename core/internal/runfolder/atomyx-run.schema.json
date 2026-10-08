@@ -65,6 +65,86 @@
       },
       "type": "object"
     },
+    "Intervention": {
+      "additionalProperties": true,
+      "properties": {
+        "artifacts": {
+          "description": "A humanAction only: run-relative files the step produced.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "atMs": {
+          "description": "Epoch milliseconds when it happened.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "client": {
+          "description": "Name of the process that acted.",
+          "type": "string"
+        },
+        "command": {
+          "description": "A humanAction only: the command name of the step.",
+          "type": "string"
+        },
+        "durationMs": {
+          "description": "A humanAction only: how long the step took.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kind": {
+          "description": "What happened, such as viewerAttached, viewerDetached, controlBorrowed or humanAction.",
+          "type": "string"
+        },
+        "message": {
+          "description": "A humanAction only: why the step failed, with secret values masked.",
+          "type": "string"
+        },
+        "outcome": {
+          "description": "A humanAction only: passed or failed.",
+          "type": "string"
+        },
+        "step": {
+          "description": "A humanAction only: the step as the person wrote it. The text of a type step is always masked.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "atMs",
+        "client"
+      ],
+      "type": "object"
+    },
+    "InterventionEntry": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/Intervention"
+        },
+        {
+          "$ref": "#/definitions/InterventionsTruncated"
+        }
+      ]
+    },
+    "InterventionsTruncated": {
+      "additionalProperties": true,
+      "properties": {
+        "limitBytes": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "truncated": {
+          "const": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "truncated",
+        "limitBytes"
+      ],
+      "type": "object"
+    },
     "MCPInfo": {
       "additionalProperties": true,
       "properties": {

@@ -8,11 +8,14 @@ func GenerateJSONSchema() map[string]any {
 		"$id":     "https://schemas.atomyx.dev/run.schema.json",
 		"$ref":    "#/definitions/RunMeta",
 		"definitions": map[string]any{
-			"Device":  deviceSchema(),
-			"Finding": findingSchema(),
-			"Host":    hostSchema(),
-			"MCPInfo": mcpInfoSchema(),
-			"RunMeta": metaSchema(),
+			"Device":                 deviceSchema(),
+			"Finding":                findingSchema(),
+			"Host":                   hostSchema(),
+			"Intervention":           interventionSchema(),
+			"InterventionEntry":      interventionEntrySchema(),
+			"InterventionsTruncated": interventionsTruncatedSchema(),
+			"MCPInfo":                mcpInfoSchema(),
+			"RunMeta":                metaSchema(),
 		},
 	}
 }
@@ -105,4 +108,32 @@ func metaSchema() map[string]any {
 		"mcp":           ref("MCPInfo"),
 		"importedFrom":  map[string]any{"type": "string", "description": "Id of the record of another store this folder was imported from. Absent for a run written natively."},
 	}, []string{"schemaVersion", "runId", "kind", "startedAt"})
+}
+
+// interventionEntrySchema describes one line of interventions.jsonl: an
+// intervention, or the single marker that ends a file that reached its
+// size bound.
+func interventionEntrySchema() map[string]any {
+	return map[string]any{"oneOf": []any{ref("Intervention"), ref("InterventionsTruncated")}}
+}
+
+func interventionSchema() map[string]any {
+	return object(map[string]any{
+		"kind":       map[string]any{"type": "string", "description": "What happened, such as viewerAttached, viewerDetached, controlBorrowed or humanAction."},
+		"atMs":       epochMs("Epoch milliseconds when it happened."),
+		"client":     map[string]any{"type": "string", "description": "Name of the process that acted."},
+		"step":       map[string]any{"type": "string", "description": "A humanAction only: the step as the person wrote it. The text of a type step is always masked."},
+		"command":    map[string]any{"type": "string", "description": "A humanAction only: the command name of the step."},
+		"outcome":    map[string]any{"type": "string", "description": "A humanAction only: passed or failed."},
+		"message":    map[string]any{"type": "string", "description": "A humanAction only: why the step failed, with secret values masked."},
+		"durationMs": map[string]any{"type": "integer", "minimum": 0, "description": "A humanAction only: how long the step took."},
+		"artifacts":  map[string]any{"type": "array", "items": str(), "description": "A humanAction only: run-relative files the step produced."},
+	}, []string{"kind", "atMs", "client"})
+}
+
+func interventionsTruncatedSchema() map[string]any {
+	return object(map[string]any{
+		"truncated":  map[string]any{"type": "boolean", "const": true},
+		"limitBytes": map[string]any{"type": "integer", "minimum": 1},
+	}, []string{"truncated", "limitBytes"})
 }

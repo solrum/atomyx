@@ -1,0 +1,4 @@
+{"kind":"viewerAttached","atMs":1000,"client":"atomyx inspect"}
+{"kind":"humanAction","atMs":2000,"client":"atomyx inspect","step":"- type: '********'","command":"type","outcome":"failed","message":"no field was ready for input","durationMs":1500,"artifacts":["artifacts/root-01-shot.png"]}
+{"kind":"viewerDetached","atMs":3000,"client":"atomyx inspect"}
+{"truncated":true,"limitBytes":400}

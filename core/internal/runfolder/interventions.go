@@ -31,6 +31,13 @@ type InterventionLine struct {
 	Artifacts  []string `json:"artifacts,omitempty"`
 }
 
+// InterventionsTruncated is the last line of an interventions.jsonl that
+// reached its size bound.
+type InterventionsTruncated struct {
+	Truncated  bool `json:"truncated"`
+	LimitBytes int  `json:"limitBytes"`
+}
+
 // AppendIntervention appends line to interventions.jsonl. Once the file
 // would pass MaxInterventionsBytes, the line is dropped, one truncation
 // marker line is written, and every later call drops its line and returns
@@ -57,7 +64,7 @@ func (w *Writer) AppendIntervention(line InterventionLine) error {
 	}
 	if w.interventionBytes+len(body)+1 > w.maxInterventionBytes {
 		w.interventionsTruncated = true
-		marker, _ := json.Marshal(map[string]any{"truncated": true, "limitBytes": w.maxInterventionBytes})
+		marker, _ := json.Marshal(InterventionsTruncated{Truncated: true, LimitBytes: w.maxInterventionBytes})
 		_, err := w.interventions.Write(append(marker, '\n'))
 		return err
 	}
