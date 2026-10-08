@@ -139,6 +139,14 @@ type ScenarioRunnerDeps struct {
 	// ChildArtifacts, when non-nil, supplies each child script's
 	// artifacts and enables failure evidence capture for it.
 	ChildArtifacts ArtifactsFactory
+	// StepGate, when non-nil, is consulted before every step of every
+	// child script.
+	StepGate runner.StepGate
+	// SourceDir is the directory the scenario names its child scripts
+	// from. Each child reports its absolute source path to the gate, so
+	// a breakpoint addresses the child file. Empty leaves the children
+	// without a source path.
+	SourceDir string
 }
 
 // emit invokes the configured OnScenarioEvent hook with event, doing
@@ -198,13 +206,7 @@ func (r *ScenarioRunner) Run(ctx context.Context, def *script.ScenarioDefinition
 		onFailure = *def.OnFailure
 	}
 
-	childEnv := make(map[string]string, len(def.Env)+len(r.deps.ExternalEnv))
-	for k, v := range def.Env {
-		childEnv[k] = v
-	}
-	for k, v := range r.deps.ExternalEnv {
-		childEnv[k] = v
-	}
+	childEnv := mergeChildEnv(def.Env, r.deps.ExternalEnv)
 
 	total := len(def.Scripts)
 	results := make([]ScenarioScriptResult, 0, total)
@@ -332,6 +334,8 @@ func (r *ScenarioRunner) runOne(ctx context.Context, scriptIndex int, scriptPath
 		PreconditionsOverride: r.deps.PreconditionsOverride,
 		Artifacts:             artifacts,
 		FailureCapture:        failureCapture,
+		StepGate:              r.deps.StepGate,
+		SourcePath:            childSourcePath(r.deps.SourceDir, scriptPath),
 	})
 
 	result, err := childRunner.Run(ctx, def)
