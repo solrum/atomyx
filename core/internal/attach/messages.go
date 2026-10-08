@@ -25,6 +25,17 @@ const (
 	TypeControlYield = "control.yield"
 )
 
+// Request types of the debug group, and act.step, which runs one step
+// while the run is paused.
+const (
+	TypeDebugBreakpointsSet = "debug.breakpoints.set"
+	TypeDebugPause          = "debug.pause"
+	TypeDebugResume         = "debug.resume"
+	TypeDebugStep           = "debug.step"
+	TypeDebugVariablesGet   = "debug.variables.get"
+	TypeActStep             = "act.step"
+)
+
 // Notice types that a subscription starts.
 const (
 	NoticeTree       = "observe.notice.tree"
@@ -48,6 +59,11 @@ const FeatureObserveState = "observe.state"
 // advertises it only while it can yield the device, so a client that
 // finds it absent must not send control.yield.
 const FeatureControl = "control"
+
+// FeatureDebug is the feature name of the debug group and act.step. A
+// holder advertises it only while its host can pause the run, so a client
+// that finds it absent must not send a debug or act request.
+const FeatureDebug = "debug"
 
 // VersionRange is an inclusive range of major protocol versions.
 type VersionRange struct {
@@ -158,11 +174,25 @@ type ScreenshotNotice struct {
 
 // StateNotice announces that the holder moved to State, one of the holder
 // state names Status carries. Command is the holder's command line name
-// and RunID is the open run, absent while none is open.
+// and RunID is the open run, absent while none is open. Pause says where
+// the run stands and is present only when State is paused.
 type StateNotice struct {
-	State   string `json:"state"`
+	State   string         `json:"state"`
+	Command string         `json:"command"`
+	RunID   string         `json:"runId,omitempty"`
+	Pause   *PauseLocation `json:"pause,omitempty"`
+}
+
+// PauseLocation says where a paused run stands. Source is the absolute
+// path of the script file, or "inline" for a script passed as text. Line
+// is the step's line, zero for a nested step that has none. Depth is the
+// nesting depth, zero for a top-level step. Command is the command name
+// of the step about to run.
+type PauseLocation struct {
+	Source  string `json:"source"`
+	Line    int    `json:"line"`
+	Depth   int    `json:"depth"`
 	Command string `json:"command"`
-	RunID   string `json:"runId,omitempty"`
 }
 
 // StepLine is one line of a run's step stream. Its JSON is identical to
@@ -237,4 +267,54 @@ const MaxBorrowerCommandBytes = 256
 // stays usable.
 type ControlYield struct {
 	Command string `json:"command"`
+}
+
+// DebugBreakpoints is the data of debug.breakpoints.set. Locations
+// replaces every breakpoint, each written as "<script file>:<line>" or
+// "inline:<line>", and the last writer wins. A location that matches no
+// authored step is refused with diag.CodeInvalidArgument and leaves the
+// earlier breakpoints in place. The request is admitted at any time while
+// a run is open.
+type DebugBreakpoints struct {
+	Locations []string `json:"locations"`
+}
+
+// DebugResume is the data of debug.resume and debug.step. Force skips the
+// advisory check of the next step. debug.step resumes and stops again
+// after the next step.
+type DebugResume struct {
+	Force bool `json:"force,omitempty"`
+}
+
+// DebugResumeResult answers debug.resume and debug.step. Resumed is false
+// when the advisory check refused to resume, and MissReason then says why
+// the next step looks unable to run. The viewer may repeat the request
+// with Force set.
+type DebugResumeResult struct {
+	Resumed    bool   `json:"resumed"`
+	MissReason string `json:"missReason,omitempty"`
+}
+
+// DebugVariables answers debug.variables.get with the variables visible
+// at the pause. Every value is already redacted by the holder.
+type DebugVariables struct {
+	Variables map[string]string `json:"variables"`
+}
+
+// ActStep is the data of act.step. Step is one step written in script
+// YAML. A step that nests other steps is refused with
+// diag.CodeInvalidArgument.
+type ActStep struct {
+	Step string `json:"step"`
+}
+
+// ActResult answers act.step. Outcome is "passed" or "failed", Message
+// describes a failure, and Artifacts lists the run-relative files the
+// step produced.
+type ActResult struct {
+	Command    string   `json:"command"`
+	Outcome    string   `json:"outcome"`
+	Message    string   `json:"message,omitempty"`
+	DurationMs int64    `json:"durationMs"`
+	Artifacts  []string `json:"artifacts,omitempty"`
 }

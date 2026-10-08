@@ -330,6 +330,10 @@ func (c *conn) dispatch(ctx context.Context, f Frame) bool {
 		if h := c.srv.cfg.Handlers.Control; h != nil {
 			return c.yield(ctx, h, f)
 		}
+	case TypeDebugBreakpointsSet, TypeDebugPause, TypeDebugResume, TypeDebugStep, TypeDebugVariablesGet, TypeActStep:
+		if h := c.srv.cfg.Handlers.Debug; h != nil {
+			return c.debug(ctx, h, f)
+		}
 	}
 	return c.fail(f, diag.NewUnsupported(f.Type))
 }

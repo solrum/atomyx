@@ -84,6 +84,10 @@ type Handlers struct {
 	// Control is optional. A nil value leaves the control feature out of
 	// the hello answer.
 	Control ControlHandler
+	// Debug is optional. A nil value leaves the debug feature out of the
+	// hello answer, and every debug and act request is answered with
+	// UNSUPPORTED.
+	Debug DebugHandler
 	// Viewers is optional. A nil value skips the attach and detach calls.
 	Viewers ViewerHandler
 }
@@ -95,6 +99,9 @@ func (h Handlers) features() []string {
 	}
 	if h.Control != nil {
 		features = append(features, FeatureControl)
+	}
+	if h.Debug != nil {
+		features = append(features, FeatureDebug)
 	}
 	return features
 }

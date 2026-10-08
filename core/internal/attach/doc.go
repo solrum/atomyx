@@ -15,9 +15,11 @@
 //
 // Message groups: session (hello, status, bye), observe (subscribe,
 // tree.latest, screenshot.latest, tree.fresh, plus the notices that
-// subscribe starts) and control (yield, served only by a holder that
-// advertises the control feature). An unknown type is answered with UNSUPPORTED and the
-// connection stays open.
+// subscribe starts), control (yield, served only by a holder that
+// advertises the control feature) and debug (breakpoints.set, pause,
+// resume, step, variables.get, plus act.step, served only by a holder that
+// advertises the debug feature). An unknown type is answered with
+// UNSUPPORTED and the connection stays open.
 //
 // The package depends only on wire and diag, so the holder's own session
 // types reach it through interfaces its owner supplies. Screenshots
