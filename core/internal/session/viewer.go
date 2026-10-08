@@ -155,6 +155,11 @@ const (
 	// keeps only a viewer connection. A Session never reports it, for the
 	// same reason as StateReleased.
 	StateBorrowed HolderState = "borrowed"
+	// StatePaused: the holder's run is stopped at a step for a person to
+	// debug. Only a session whose host injected a Debugger ever reports it.
+	// It is never written to the lease metadata, which keeps reporting the
+	// activity underneath.
+	StatePaused HolderState = "paused"
 	// StateLost: the holder lost the device without choosing to.
 	StateLost HolderState = "lost"
 	// StateClosed: the session was closed by its owner.
@@ -168,6 +173,9 @@ type Info struct {
 	Device device.Descriptor `json:"device"`
 	Holder lease.Holder      `json:"holder"`
 	State  HolderState       `json:"state"`
+	// Pause is where the run stands while State is StatePaused, and nil
+	// otherwise.
+	Pause *PauseLocation `json:"pause,omitempty"`
 	// Generation is the host's count of sessions opened so far, as for
 	// Snapshot.Generation. A Session leaves it zero.
 	Generation uint64 `json:"generation"`

@@ -96,6 +96,9 @@ type Request struct {
 	// socket. Nil means the session cannot yield, so its hello omits the
 	// control feature.
 	Yielder Yielder
+	// Debugger controls a paused run on the session's behalf. Nil means
+	// the session cannot be debugged.
+	Debugger Debugger
 	// Lender names the process that lent the device to this open. A runner
 	// the driver factory adopts records it, and the opener's exit hands the
 	// runner back to it while it lives. The zero value means nobody lent
@@ -202,6 +205,7 @@ func Open(ctx context.Context, deps Deps, req Request) (*Session, error) {
 	s.relaunched = relaunched
 	s.socketRefresher = req.SocketRefresher
 	s.yielder = req.Yielder
+	s.debugger = req.Debugger
 	if held != nil {
 		if deps.Sockets == nil {
 			s.socketError = reasonNoSocketConfigured

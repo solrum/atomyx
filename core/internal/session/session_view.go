@@ -20,7 +20,11 @@ func (s *Session) Info() Info {
 	if s.lease != nil {
 		holder = s.lease.Holder()
 	}
-	return Info{Device: s.desc, Holder: holder, State: s.holderState()}
+	info := Info{Device: s.desc, Holder: holder, State: s.holderState()}
+	if loc, paused := s.Paused(); paused && info.State == StatePaused {
+		info.Pause = &loc
+	}
+	return info
 }
 
 // holderState reports the session's state. A closed session wins over a
@@ -38,6 +42,9 @@ func (s *Session) holderState() HolderState {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.pause != nil {
+		return StatePaused
+	}
 	return s.activity
 }
 

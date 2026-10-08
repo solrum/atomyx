@@ -55,6 +55,13 @@ type Session struct {
 	// only an owner that manages the activity gate ever marks it idle.
 	// Open records the starting value in the lease holder record.
 	activity HolderState
+	// pause is the location of the paused run, nil while none is paused.
+	// It lives beside activity but outside it, so SetRunning and SetIdle
+	// cannot clear it and the lease metadata never sees it.
+	pause *PauseLocation
+	// publishMu keeps the state a viewer is told in step with the state
+	// Info reports, so a stale running notice never follows a paused one.
+	publishMu sync.Mutex
 
 	relaunched bool
 
@@ -71,7 +78,10 @@ type Session struct {
 	socketRefresher Refresher
 	// yielder answers control.yield. Nil leaves the control feature out of
 	// the hello answer. It never changes after Open.
-	yielder    Yielder
+	yielder Yielder
+	// debugger controls a paused run. Nil means the session cannot be
+	// debugged. It never changes after Open.
+	debugger   Debugger
 	attach     *attachListener
 	attachDone bool
 	attachOnce sync.Once
@@ -218,8 +228,14 @@ func (s *Session) SetIdle() error {
 }
 
 // publishState tells the viewers of the session that the holder moved to
-// state.
+// state. A paused session reports paused whatever activity moved, because
+// the pause outranks it.
 func (s *Session) publishState(state HolderState, runID string) {
+	s.publishMu.Lock()
+	defer s.publishMu.Unlock()
+	if _, paused := s.Paused(); paused && (state == StateRunning || state == StateIdle) {
+		state = StatePaused
+	}
 	s.hub.PublishState(state, s.Info().Holder.Command, runID)
 }
 
