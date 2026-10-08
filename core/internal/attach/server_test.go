@@ -279,8 +279,9 @@ func TestCloseLeavesNoGoroutineOrDescriptor(t *testing.T) {
 }
 
 type viewerEvent struct {
-	attached bool
-	info     ViewerInfo
+	attached  bool
+	debugging bool
+	info      ViewerInfo
 }
 
 type viewerRecorder struct{ events chan viewerEvent }
@@ -295,6 +296,14 @@ func (r *viewerRecorder) ViewerAttached(info ViewerInfo) {
 
 func (r *viewerRecorder) ViewerDetached(info ViewerInfo) {
 	r.events <- viewerEvent{info: info}
+}
+
+func (r *viewerRecorder) ViewerDebugging(info ViewerInfo) {
+	r.events <- viewerEvent{debugging: true, attached: true, info: info}
+}
+
+func (r *viewerRecorder) ViewerStoppedDebugging(info ViewerInfo) {
+	r.events <- viewerEvent{debugging: true, info: info}
 }
 
 func (r *viewerRecorder) next(t *testing.T) viewerEvent {
@@ -478,4 +487,41 @@ func TestCheckSocketDirRequiresTheOwningUser(t *testing.T) {
 	if err := checkSocketDir(dir, uint32(os.Getuid())+1); err == nil {
 		t.Fatal("a directory owned by another user was accepted")
 	}
+}
+
+func TestViewerHandlerSeesAConnectionStartDebuggingOnceAndStopWhenItEnds(t *testing.T) {
+	rec := newViewerRecorder()
+	srv := startServer(t, ServerConfig{Handlers: Handlers{Viewers: rec, Debug: &fakeDebug{}}}, nil)
+	client := dialRaw(t, srv.Path())
+	helloAs(client, "inspector")
+	client.call(TypeDebugPause, nil)
+	client.call(TypeDebugVariablesGet, nil)
+
+	start := rec.next(t)
+	if !start.debugging || !start.attached || start.info.Client != "inspector" {
+		t.Fatalf("first event = %+v, want one debugging start for inspector", start)
+	}
+	rec.expectNone(t)
+
+	client.call(TypeBye, nil)
+	if stop := rec.next(t); !stop.debugging || stop.attached || stop.info != start.info {
+		t.Fatalf("event on bye = %+v, want the debugging stop", stop)
+	}
+	rec.expectNone(t)
+}
+
+func TestAConnectionThatOnlyObservesIsNeverADebuggingViewer(t *testing.T) {
+	rec := newViewerRecorder()
+	srv := startServer(t, ServerConfig{Handlers: Handlers{Viewers: rec, Observe: newFakeObserve(), Debug: &fakeDebug{}}}, nil)
+	client := dialRaw(t, srv.Path())
+	helloAs(client, "watcher")
+	client.call(TypeTreeLatest, nil)
+	if first := rec.next(t); first.debugging {
+		t.Fatalf("observing announced debugging: %+v", first)
+	}
+	client.call(TypeBye, nil)
+	if last := rec.next(t); last.debugging {
+		t.Fatalf("detaching announced a debugging stop: %+v", last)
+	}
+	rec.expectNone(t)
 }

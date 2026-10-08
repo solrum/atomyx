@@ -51,6 +51,9 @@ type conn struct {
 	// announced is set once the viewer handler was told this connection
 	// observes. Only the read goroutine touches it.
 	announced bool
+	// debugging is set once the viewer handler was told this connection
+	// sends debug requests.
+	debugging bool
 	// sub is the connection's live notice subscription. Only the read
 	// goroutine touches it.
 	sub *liveSubscription
@@ -360,6 +363,7 @@ func (c *conn) dispatch(ctx context.Context, f Frame) bool {
 		}
 	case TypeDebugBreakpointsSet, TypeDebugPause, TypeDebugResume, TypeDebugStep, TypeDebugVariablesGet, TypeActStep:
 		if h := c.srv.cfg.Handlers.Debug; h != nil {
+			c.announceDebugging()
 			return c.debug(ctx, h, f)
 		}
 	}
@@ -378,8 +382,23 @@ func (c *conn) announceAttached() {
 	h.ViewerAttached(c.viewerInfo())
 }
 
-// announceDetached pairs the attach call, when one was made.
+// announceDebugging tells the viewer handler that this connection sent a
+// debug request, once.
+func (c *conn) announceDebugging() {
+	h := c.srv.cfg.Handlers.Viewers
+	if h == nil || c.debugging {
+		return
+	}
+	c.debugging = true
+	h.ViewerDebugging(c.viewerInfo())
+}
+
+// announceDetached pairs the attach and debugging calls, when they were
+// made.
 func (c *conn) announceDetached() {
+	if c.debugging {
+		c.srv.cfg.Handlers.Viewers.ViewerStoppedDebugging(c.viewerInfo())
+	}
 	if c.announced {
 		c.srv.cfg.Handlers.Viewers.ViewerDetached(c.viewerInfo())
 	}

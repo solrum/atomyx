@@ -84,10 +84,15 @@ type Session struct {
 	yielder Yielder
 	// debugger controls a paused run. Nil means the session cannot be
 	// debugged. It never changes after Open.
-	debugger   Debugger
-	attach     *attachListener
-	attachDone bool
-	attachOnce sync.Once
+	debugger Debugger
+	// onLastDebugViewerLeft never changes after Open. debugViewers holds
+	// the ids of the attached viewers that sent a debug or act request,
+	// guarded by mu.
+	onLastDebugViewerLeft func()
+	debugViewers          map[uint64]struct{}
+	attach                *attachListener
+	attachDone            bool
+	attachOnce            sync.Once
 
 	// interventionMu guards the pending interventions, the entries kept
 	// for a recorder not yet set, and the recorder. It is held while a

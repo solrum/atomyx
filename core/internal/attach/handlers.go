@@ -73,6 +73,14 @@ type ViewerHandler interface {
 	// ViewerDetached is called once for each ViewerAttached, when the
 	// connection ends for any reason.
 	ViewerDetached(info ViewerInfo)
+	// ViewerDebugging is called once per connection, when its first
+	// request of the debug group or act.step arrives and a debug handler
+	// serves it. A connection that only observes is never a debugging
+	// viewer.
+	ViewerDebugging(info ViewerInfo)
+	// ViewerStoppedDebugging is called once for each ViewerDebugging, when
+	// the connection ends for any reason.
+	ViewerStoppedDebugging(info ViewerInfo)
 }
 
 // Handlers groups what a server's owner supplies. A nil group is not

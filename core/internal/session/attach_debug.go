@@ -50,3 +50,34 @@ func (h *attachHandlers) Act(ctx context.Context, stepYAML string) (attach.ActRe
 		Artifacts:  result.Artifacts,
 	}, nil
 }
+
+// DebugViewers reports how many attached viewers have sent a debug or act
+// request and are still connected.
+func (s *Session) DebugViewers() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.debugViewers)
+}
+
+// ViewerDebugging implements attach.ViewerHandler.
+func (h *attachHandlers) ViewerDebugging(info attach.ViewerInfo) {
+	h.s.mu.Lock()
+	defer h.s.mu.Unlock()
+	if h.s.debugViewers == nil {
+		h.s.debugViewers = map[uint64]struct{}{}
+	}
+	h.s.debugViewers[info.ID] = struct{}{}
+}
+
+// ViewerStoppedDebugging implements attach.ViewerHandler.
+func (h *attachHandlers) ViewerStoppedDebugging(info attach.ViewerInfo) {
+	h.s.mu.Lock()
+	_, was := h.s.debugViewers[info.ID]
+	delete(h.s.debugViewers, info.ID)
+	last := was && len(h.s.debugViewers) == 0
+	notify := h.s.onLastDebugViewerLeft
+	h.s.mu.Unlock()
+	if last && notify != nil {
+		notify()
+	}
+}
