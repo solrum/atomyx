@@ -5,8 +5,10 @@ import (
 	"errors"
 	"strconv"
 	"testing"
+	"time"
 
 	"dev.atomyx/internal/diag"
+	"dev.atomyx/internal/script"
 	"dev.atomyx/internal/script/expression"
 	"dev.atomyx/internal/wire"
 )
@@ -322,5 +324,52 @@ func TestStepGate_ReceivesTheStepAboutToRun(t *testing.T) {
 		if s.Step == nil || s.Step.StepCommand() != s.Command {
 			t.Fatalf("gate step %+v does not carry the step it describes", s)
 		}
+	}
+}
+
+// blockingScreenshot replaces the screenshot command with one that
+// signals entry and then waits to be released.
+type blockingScreenshot struct {
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (blockingScreenshot) Command() string { return "screenshot" }
+
+func (b blockingScreenshot) Execute(script.ScriptStep, *CommandContext) CommandResult {
+	close(b.entered)
+	<-b.release
+	return CommandResult{Ok: true}
+}
+
+func TestPausedRun_CloseWaitsForAStepInFlight(t *testing.T) {
+	block := blockingScreenshot{entered: make(chan struct{}), release: make(chan struct{})}
+	tr := newTestRunner(block)
+	p := &pausedRun{runner: tr.runner, rs: &runState{}}
+	step := mustParse(t, "appId: com.test\n---\n- screenshot: a\n").Steps[0]
+
+	stepDone := make(chan struct{})
+	go func() {
+		defer close(stepDone)
+		_, _ = p.ExecuteStep(context.Background(), step)
+	}()
+	<-block.entered
+
+	closed := make(chan struct{})
+	go func() {
+		p.close()
+		close(closed)
+	}()
+	select {
+	case <-closed:
+		t.Fatal("close returned while a step was still running")
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(block.release)
+	<-stepDone
+	select {
+	case <-closed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("close never returned after the step finished")
 	}
 }

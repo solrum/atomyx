@@ -46,7 +46,9 @@ type StepGate interface {
 
 // PausedRun acts on a run that is blocked inside a StepGate. Both
 // methods are safe to call from a goroutine other than the one running
-// the script.
+// the script. The run does not leave the gate until a step started by
+// ExecuteStep has returned, so a step never overlaps the run's own
+// resumption.
 type PausedRun interface {
 	// ExecuteStep runs one parsed step through the same dispatch the
 	// run loop uses, in a child scope that reads the run's current
@@ -153,11 +155,15 @@ func (p *pausedRun) Variables() VariableSnapshot {
 	return snapshotVariables(p.rs.variables, p.rs.secrets)
 }
 
+// ExecuteStep holds the read lock for the whole step, so close, and with
+// it the run's resumption, waits for a step in flight.
 func (p *pausedRun) ExecuteStep(ctx context.Context, step script.ScriptStep) (CommandResult, error) {
-	child, err := p.childScope()
-	if err != nil {
-		return CommandResult{}, err
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if p.closed {
+		return CommandResult{}, ErrPausedRunClosed
 	}
+	child := p.childScope()
 	name := step.StepCommand()
 	cmd, ok := p.runner.registry[name]
 	if !ok {
@@ -173,13 +179,8 @@ func (p *pausedRun) ExecuteStep(ctx context.Context, step script.ScriptStep) (Co
 }
 
 // childScope copies the run state a single step may read, so its
-// writes never reach the paused run.
-func (p *pausedRun) childScope() (*runState, error) {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	if p.closed {
-		return nil, ErrPausedRunClosed
-	}
+// writes never reach the paused run. The caller holds the read lock.
+func (p *pausedRun) childScope() *runState {
 	child := *p.rs
 	scope := snapshotVariables(p.rs.variables, p.rs.secrets)
 	child.variables = scope.Values
@@ -188,5 +189,5 @@ func (p *pausedRun) childScope() (*runState, error) {
 	for k, v := range p.rs.captures {
 		child.captures[k] = v
 	}
-	return &child, nil
+	return &child
 }
