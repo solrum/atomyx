@@ -109,7 +109,11 @@ func (h *scriptDebugHost) Act(ctx context.Context, stepYAML string) (session.Act
 	if run == nil {
 		return session.ActResult{}, errNoScriptRunning()
 	}
-	return run.adapter.Act(ctx, stepYAML)
+	result, err := run.adapter.Act(ctx, stepYAML)
+	if err == nil {
+		run.recordAction(result)
+	}
+	return result, err
 }
 
 // Variables implements session.Debugger.
@@ -136,6 +140,7 @@ type scriptDebugRun struct {
 	ctx context.Context
 
 	mu           sync.Mutex
+	actions      []humanActionWire
 	stopWatch    context.CancelFunc
 	gateEnded    bool
 	resumeBudget func()
@@ -267,4 +272,36 @@ func deviceLostResult(name string) runner.ScriptResult {
 		Message: deviceLostWhilePausedMessage,
 		Remedy:  deviceLostWhilePausedRemedy,
 	}}
+}
+
+// humanActionWire is a step a person ran on the device while the run was
+// paused, as run_script reports it to the agent. Step has the text of a
+// type step masked and every secret value redacted.
+type humanActionWire struct {
+	Step       string   `json:"step"`
+	Command    string   `json:"command"`
+	Outcome    string   `json:"outcome"`
+	Message    string   `json:"message,omitempty"`
+	DurationMs int64    `json:"durationMs"`
+	Artifacts  []string `json:"artifacts,omitempty"`
+}
+
+func (r *scriptDebugRun) recordAction(result session.ActResult) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.actions = append(r.actions, humanActionWire{
+		Step: result.Step, Command: result.Command, Outcome: result.Outcome,
+		Message: result.Message, DurationMs: result.DurationMs, Artifacts: result.Artifacts,
+	})
+}
+
+// humanActions lists, in order, the steps people ran while the run was
+// paused. A nil run has none.
+func (r *scriptDebugRun) humanActions() []humanActionWire {
+	if r == nil {
+		return nil
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]humanActionWire(nil), r.actions...)
 }

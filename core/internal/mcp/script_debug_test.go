@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -304,5 +305,45 @@ func TestScriptDebug_DisconnectingTheDeviceWhilePausedEndsTheRunAsDeviceLost(t *
 	abort, _ := got["abort"].(map[string]any)
 	if got["ok"] != false || got["deviceLost"] != true || abort["reason"] != "deviceLost" {
 		t.Fatalf("result = %v, want a run that ended as device lost", got)
+	}
+}
+
+func TestScriptDebug_TheAgentSeesEachHumanActionWithTypedTextMasked(t *testing.T) {
+	h := newDebugHarness(t)
+	h.pauseBeforeLine(debugScript, "5")
+
+	for _, step := range []string{"screenshot: by-hand", "type: hunter2hunter2"} {
+		if _, err := h.held().Act(h.ctx, step); err != nil {
+			t.Fatalf("Act(%q): %v", step, err)
+		}
+	}
+	if _, err := h.held().Resume(h.ctx, session.ResumeOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	got := h.awaitResult()
+
+	actions, _ := got["humanActions"].([]any)
+	if len(actions) != 2 {
+		t.Fatalf("humanActions = %v, want the two steps in order", got["humanActions"])
+	}
+	first, _ := actions[0].(map[string]any)
+	second, _ := actions[1].(map[string]any)
+	if first["command"] != "screenshot" || first["outcome"] != "passed" || second["command"] != "type" {
+		t.Fatalf("humanActions = %v", actions)
+	}
+	encoded, _ := json.Marshal(got)
+	if strings.Contains(string(encoded), "hunter2hunter2") {
+		t.Fatalf("the result leaks the typed text: %s", encoded)
+	}
+}
+
+func TestScriptDebug_AScriptNobodyDebuggedCarriesNoHumanActions(t *testing.T) {
+	h := newDebugHarness(t)
+	h.startScript(debugScript)
+	h.awaitEntered()
+	close(h.drv.release)
+	got := h.awaitResult()
+	if _, present := got["humanActions"]; present || got["ok"] != true {
+		t.Fatalf("result = %v, want ok and no humanActions field", got)
 	}
 }

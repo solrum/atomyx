@@ -68,6 +68,10 @@ type scriptResultWire struct {
 	// one a caller has not seen before, without requiring a new
 	// boolean field each time.
 	Abort *abortWire `json:"abort,omitempty"`
+	// HumanActions lists, in order, each step a person ran on the device
+	// while a viewer had the run paused, so the agent knows the device
+	// state was changed by hand. Omitted when there were none.
+	HumanActions []humanActionWire `json:"humanActions,omitempty"`
 }
 
 // abortWire is the run_script result's shape for runner.RunAbort.
@@ -156,11 +160,13 @@ func registerRunScriptTool(server *mcp.Server, tc *ToolContext) {
 			return errorResult(err), nil
 		}
 
+		var actions []humanActionWire
 		result, err := tc.RunSession.RunScript(ctx, def.Name, tc.Session.SelectedDescriptor(),
 			func(target scriptTarget) (runner.ScriptResult, error) {
 				var gate runner.StepGate
 				dbg, endDebug := tc.Session.beginScriptDebug(target.Ctx, orch, def)
 				defer endDebug()
+				defer func() { actions = dbg.humanActions() }()
 				if dbg != nil {
 					gate = dbg
 				}
@@ -186,6 +192,8 @@ func registerRunScriptTool(server *mcp.Server, tc *ToolContext) {
 		if err != nil {
 			return errorResult(err), nil
 		}
-		return jsonToolResult(toScriptResultWire(result))
+		wire := toScriptResultWire(result)
+		wire.HumanActions = actions
+		return jsonToolResult(wire)
 	})
 }
