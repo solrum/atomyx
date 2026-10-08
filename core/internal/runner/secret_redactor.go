@@ -62,3 +62,10 @@ func (s VariableSnapshot) Redacted() map[string]string {
 	}
 	return out
 }
+
+// Environment renders the variables to the string form `${var}`
+// placeholders resolve against, so a host can parse a step written
+// while the run is paused against the run's current values.
+func (s VariableSnapshot) Environment() map[string]string {
+	return environmentFromVariables(s.Values)
+}

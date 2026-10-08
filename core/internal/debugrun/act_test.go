@@ -181,3 +181,43 @@ func TestActReportsOnlyTheFilesNotedWhileItRuns(t *testing.T) {
 		t.Fatalf("a file noted between acts leaked into the next one: %v", again.Artifacts)
 	}
 }
+
+// capturingRun records the step it was asked to run.
+type capturingRun struct {
+	leakyRun
+	got script.ScriptStep
+}
+
+func (r *capturingRun) ExecuteStep(_ context.Context, step script.ScriptStep) (runner.CommandResult, error) {
+	r.got = step
+	return runner.CommandResult{Ok: true}, nil
+}
+
+func TestActResolvesPlaceholdersAgainstTheRunVariablesWithoutRecordingTheValue(t *testing.T) {
+	cases := []struct{ step, wantStep string }{
+		{"tap: ${PASSWORD}", "- tap: ${PASSWORD}"},
+		{"type: ${PASSWORD}", "- type: '" + orchestra.SecureMask + "'"},
+	}
+	for _, c := range cases {
+		run := &capturingRun{}
+		a := New(Options{})
+		a.paused = &pauseState{run: run}
+		res, err := a.Act(context.Background(), c.step)
+		if err != nil || res.Outcome != "passed" {
+			t.Fatalf("%q: act = %+v err=%v", c.step, res, err)
+		}
+		var ran string
+		switch s := run.got.(type) {
+		case *script.TapStep:
+			ran = *s.Selector.Text
+		case *script.TypeStep:
+			ran = s.Text
+		}
+		if ran != "hunter2hunter2" {
+			t.Errorf("%q: step ran with %q, want the variable value", c.step, ran)
+		}
+		if res.Step != c.wantStep || strings.Contains(res.Step, "hunter2hunter2") {
+			t.Errorf("%q: Step = %q, want %q", c.step, res.Step, c.wantStep)
+		}
+	}
+}

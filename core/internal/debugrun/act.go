@@ -14,14 +14,21 @@ import (
 // session's debug lock forever.
 const defaultActBudget = 30 * time.Second
 
-// Act implements session.Debugger. The step runs in a child scope, so
-// nothing it writes reaches the paused run's variables.
+// Act implements session.Debugger. Placeholders in the step resolve
+// against the paused run's variables, and the recorded step keeps them
+// unresolved. The step runs in a child scope, so nothing it writes
+// reaches the paused run's variables.
 func (a *Adapter) Act(ctx context.Context, stepYAML string) (session.ActResult, error) {
 	state := a.current()
 	if state == nil {
 		return session.ActResult{}, errNotPaused()
 	}
-	step, err := parseActStep(stepYAML)
+	variables := state.run.Variables()
+	authored, err := parseActStep(stepYAML, nil)
+	if err != nil {
+		return session.ActResult{}, err
+	}
+	step, err := parseActStep(stepYAML, variables.Environment())
 	if err != nil {
 		return session.ActResult{}, err
 	}
@@ -34,13 +41,13 @@ func (a *Adapter) Act(ctx context.Context, stepYAML string) (session.ActResult, 
 	if err != nil {
 		return session.ActResult{}, err
 	}
-	redactor := state.run.Variables().Redactor()
+	redactor := variables.Redactor()
 	out := session.ActResult{
 		Command:    step.StepCommand(),
 		Outcome:    "passed",
 		DurationMs: time.Since(started).Milliseconds(),
 		Artifacts:  artifacts,
-		Step:       writtenText(step, redactor),
+		Step:       writtenText(authored, redactor),
 	}
 	if !result.Ok {
 		out.Outcome = "failed"
@@ -51,14 +58,15 @@ func (a *Adapter) Act(ctx context.Context, stepYAML string) (session.ActResult, 
 	return out, nil
 }
 
-// parseActStep reads exactly one step. The text may be a bare mapping
-// such as "tap: Sign in" or a one-item sequence.
-func parseActStep(stepYAML string) (script.ScriptStep, error) {
+// parseActStep reads exactly one step, resolving its ${var} placeholders
+// against env. The text may be a bare mapping such as "tap: Sign in" or a
+// one-item sequence.
+func parseActStep(stepYAML string, env map[string]string) (script.ScriptStep, error) {
 	text := strings.TrimSpace(stepYAML)
 	if !strings.HasPrefix(text, "-") {
 		text = "- " + strings.ReplaceAll(text, "\n", "\n  ")
 	}
-	def, err := script.ParseScript(text, nil)
+	def, err := script.ParseScript(text, env)
 	if err != nil {
 		return nil, invalidStep("The step could not be read: " + err.Error())
 	}
