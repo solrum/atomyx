@@ -301,9 +301,6 @@ func (r *ScriptRunner) Run(ctx context.Context, def *script.ScriptDefinition) (S
 	if rs.gateErr != nil {
 		return ScriptResult{}, rs.gateErr
 	}
-	if rs.gateErr != nil {
-		return ScriptResult{}, rs.gateErr
-	}
 	if err != nil {
 		return ScriptResult{}, err
 	}
@@ -396,9 +393,6 @@ func (r *ScriptRunner) Run(ctx context.Context, def *script.ScriptDefinition) (S
 
 		stepStart := r.deps.Clock.NowMs()
 		result := r.execute(cmd, step, cmdCtx)
-		if rs.gateErr != nil {
-			return ScriptResult{}, rs.gateErr
-		}
 		durationMs := r.deps.Clock.NowMs() - stepStart
 
 		stepResults = append(stepResults, StepResult{
@@ -413,6 +407,10 @@ func (r *ScriptRunner) Run(ctx context.Context, def *script.ScriptDefinition) (S
 			Summary: summary.Text, Tokens: summary.Tokens, Ok: result.Ok, Detail: result.Detail,
 			DurationMs: durationMs, Depth: 0, Line: line,
 		})
+
+		if rs.gateErr != nil {
+			return ScriptResult{}, rs.gateErr
+		}
 
 		if !result.Ok {
 			idx := i

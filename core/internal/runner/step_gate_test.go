@@ -373,3 +373,57 @@ func TestPausedRun_CloseWaitsForAStepInFlight(t *testing.T) {
 		t.Fatal("close never returned after the step finished")
 	}
 }
+
+func TestStepGate_NestedErrorLeavesNoUnmatchedStartedEvent(t *testing.T) {
+	gate := &funcGate{fn: func(s GateStep, _ PausedRun) error {
+		if s.Depth == 1 {
+			return context.Canceled
+		}
+		return nil
+	}}
+	tr := gatedRunner(gate, "")
+	var events []StepEvent
+	deps := tr.runner.deps
+	deps.OnStep = func(e StepEvent) { events = append(events, e) }
+	tr.runner = NewScriptRunner(deps)
+	tr.driver.StageHierarchy(rootTree(button("go", "Go", "0,0,10,10")))
+	if _, err := tr.runner.Run(context.Background(), mustParse(t, nestedYAML)); !errors.Is(err, context.Canceled) {
+		t.Fatalf("got err %v, want context.Canceled", err)
+	}
+	open := map[int]string{}
+	for _, e := range events {
+		switch e.Type {
+		case StepStarted:
+			open[e.StepIndex] = e.Command
+		case StepCompleted:
+			delete(open, e.StepIndex)
+		}
+	}
+	if len(open) != 0 {
+		t.Fatalf("steps started but never completed: %v", open)
+	}
+}
+
+func TestStepGate_SourceIsSetAtEveryDepth(t *testing.T) {
+	for name, tc := range map[string]struct{ path, want string }{
+		"file":   {"/s/flow.yaml", "/s/flow.yaml"},
+		"inline": {"", "inline"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			gate := &funcGate{}
+			tr := gatedRunner(gate, tc.path)
+			tr.driver.StageHierarchy(rootTree(button("go", "Go", "0,0,10,10")))
+			run(t, tr, nestedYAML)
+			sawNested := false
+			for _, s := range gate.seen {
+				sawNested = sawNested || s.Depth > 0
+				if s.Source != tc.want {
+					t.Fatalf("step %+v has Source %q, want %q", s, s.Source, tc.want)
+				}
+			}
+			if !sawNested {
+				t.Fatal("the script ran no nested step")
+			}
+		})
+	}
+}

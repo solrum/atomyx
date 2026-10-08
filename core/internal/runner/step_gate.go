@@ -18,9 +18,15 @@ const inlineSource = "inline"
 
 // GateStep describes the step a StepGate is about to let run.
 type GateStep struct {
+	// Source is the path of the script file being run, or "inline" when
+	// the runner has no source path. It is set for every step at every
+	// depth, and a step nested in a flow reports the file of the script
+	// the runner was started on.
+	Source string
 	// Location is "<source path>:<line>" for a top-level step, or
 	// "inline:<line>" when the runner has no source path. It is empty
 	// for a nested step and for a top-level step with no known line.
+	// Breakpoints match against it, so it never names a nested step.
 	Location string
 	// Depth is 0 for a top-level step and one higher for each level of
 	// nesting.
@@ -106,11 +112,15 @@ func (r *ScriptRunner) stepLocation(line *int) string {
 	if line == nil {
 		return ""
 	}
-	source := r.deps.SourcePath
-	if source == "" {
-		source = inlineSource
+	return r.sourceName() + ":" + strconv.Itoa(*line)
+}
+
+// sourceName is the script file the runner reports for its steps.
+func (r *ScriptRunner) sourceName() string {
+	if r.deps.SourcePath == "" {
+		return inlineSource
 	}
-	return source + ":" + strconv.Itoa(*line)
+	return r.deps.SourcePath
 }
 
 // gateStep asks the configured gate whether step may run. A nil gate
@@ -122,6 +132,7 @@ func (r *ScriptRunner) gateStep(ctx context.Context, rs *runState, location stri
 	run := &pausedRun{runner: r, rs: rs}
 	defer run.close()
 	return r.deps.StepGate.BeforeStep(ctx, GateStep{
+		Source:    r.sourceName(),
 		Location:  location,
 		Depth:     rs.depth,
 		StepIndex: rs.globalStepIndex,
