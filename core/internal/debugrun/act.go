@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"dev.atomyx/internal/diag"
+	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/script"
 	"dev.atomyx/internal/session"
 )
@@ -53,6 +54,9 @@ func (a *Adapter) Act(ctx context.Context, stepYAML string) (session.ActResult, 
 		out.Outcome = "failed"
 		if result.Detail != nil {
 			out.Message = redactor.String(*result.Detail)
+			if variables.MentionsSecret(stepYAML) {
+				out.Message = orchestra.SecureMask
+			}
 		}
 	}
 	return out, nil

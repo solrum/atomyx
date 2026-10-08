@@ -221,3 +221,37 @@ func TestActResolvesPlaceholdersAgainstTheRunVariablesWithoutRecordingTheValue(t
 		}
 	}
 }
+
+// pinRun is a paused run holding a four digit secret that a failure
+// detail echoes.
+type pinRun struct{}
+
+func (pinRun) ExecuteStep(context.Context, script.ScriptStep) (runner.CommandResult, error) {
+	detail := "the field held 4827 when it should be empty"
+	return runner.CommandResult{Ok: false, Detail: &detail}, nil
+}
+
+func (pinRun) Variables() runner.VariableSnapshot {
+	return runner.VariableSnapshot{
+		Values: map[string]runner.ScriptValue{"PIN": expression.StringValue("4827")},
+		Secret: map[string]bool{"PIN": true},
+	}
+}
+
+func TestActWithholdsTheMessageOfAStepThatNamesAShortSecret(t *testing.T) {
+	a := New(Options{})
+	a.paused = &pauseState{run: pinRun{}}
+	for _, step := range []string{"tap: ${PIN}", "type: 4827"} {
+		res, err := a.Act(context.Background(), step)
+		if err != nil || res.Outcome != "failed" {
+			t.Fatalf("%q: act = %+v err=%v", step, res, err)
+		}
+		if res.Message != orchestra.SecureMask {
+			t.Errorf("%q: message = %q, want it withheld", step, res.Message)
+		}
+	}
+	res, _ := a.Act(context.Background(), "tap: Go")
+	if strings.Contains(res.Message, "4827") || !strings.Contains(res.Message, "held") {
+		t.Errorf("unrelated step: message = %q, want the value masked in place", res.Message)
+	}
+}

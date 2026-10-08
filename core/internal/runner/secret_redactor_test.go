@@ -23,7 +23,15 @@ func secretSnapshot() VariableSnapshot {
 
 func TestRedactor_MasksSecretValuesInFreeText(t *testing.T) {
 	got := secretSnapshot().Redactor().String("typed hunter2hunter2 for alice, 42 times")
-	want := "typed " + orchestra.SecureMask + " for alice, 42 times"
+	want := "typed " + orchestra.SecureMask + " for alice, " + orchestra.SecureMask + " times"
+	if got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestRedactor_MasksAShortSecretOnlyAsAWholeWord(t *testing.T) {
+	got := secretSnapshot().Redactor().String("a142b 42x _42 42, (42) 420")
+	want := "a142b 42x _42 " + orchestra.SecureMask + ", (" + orchestra.SecureMask + ") 420"
 	if got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
