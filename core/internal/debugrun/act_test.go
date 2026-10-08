@@ -2,8 +2,10 @@ package debugrun
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/orchestra"
@@ -254,4 +256,50 @@ func TestActWithholdsTheMessageOfAStepThatNamesAShortSecret(t *testing.T) {
 	if strings.Contains(res.Message, "4827") || !strings.Contains(res.Message, "held") {
 		t.Errorf("unrelated step: message = %q, want the value masked in place", res.Message)
 	}
+}
+
+// blockUntilCancelled is a screenshot command that reports entry and
+// then waits for its context to end.
+type blockUntilCancelled struct {
+	entered chan struct{}
+	seen    chan error
+}
+
+func (blockUntilCancelled) Command() string { return "screenshot" }
+
+func (b blockUntilCancelled) Execute(_ script.ScriptStep, ctx *runner.CommandContext) runner.CommandResult {
+	b.entered <- struct{}{}
+	<-ctx.Context.Done()
+	b.seen <- ctx.Context.Err()
+	return runner.CommandResult{Ok: false}
+}
+
+func TestRunEndCancelsAnActInFlight(t *testing.T) {
+	block := blockUntilCancelled{entered: make(chan struct{}, 1), seen: make(chan error, 1)}
+	commands := []runner.CommandDefinition{block}
+	h := newHarnessWith(t, breakAt(3), commands)
+	h.start(threeShots)
+	h.awaitPause()
+
+	actDone := make(chan error, 1)
+	go func() {
+		_, err := h.adapter.Act(context.Background(), "screenshot: x")
+		actDone <- err
+	}()
+	<-block.entered
+
+	h.cancel()
+	out := h.awaitDone()
+	if !errors.Is(out.err, context.Canceled) {
+		t.Fatalf("run err = %v, want context.Canceled", out.err)
+	}
+	select {
+	case err := <-block.seen:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("act saw %v, want context.Canceled", err)
+		}
+	case <-time.After(waitTimeout):
+		t.Fatal("the act never saw a cancellation")
+	}
+	<-actDone
 }

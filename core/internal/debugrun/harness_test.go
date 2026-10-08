@@ -56,6 +56,11 @@ const sourcePath = "/work/flow.yaml"
 
 func newHarness(t *testing.T, opts Options) *harness {
 	t.Helper()
+	return newHarnessWith(t, opts, runner.DefaultCommands())
+}
+
+func newHarnessWith(t *testing.T, opts Options, commands []runner.CommandDefinition) *harness {
+	t.Helper()
 	d := mock.New()
 	d.Apps = []driver.InstalledApp{{BundleID: "com.test"}}
 	clock := orchestra.NewFakeClock(0)
@@ -67,7 +72,7 @@ func newHarness(t *testing.T, opts Options) *harness {
 		Orchestra:  h.orch,
 		Clock:      clock,
 		Logger:     logging.NoopLogger{},
-		Commands:   runner.DefaultCommands(),
+		Commands:   commands,
 		StepGate:   h.adapter,
 		SourcePath: sourcePath,
 		OnStep: func(e runner.StepEvent) {

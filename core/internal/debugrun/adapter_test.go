@@ -93,16 +93,13 @@ const nestedFlow = "appId: com.test\n---\n" +
 	"        - screenshot: n1\n" +
 	"- screenshot: last\n"
 
-func TestPauseRequestStopsAtANestedStep(t *testing.T) {
+func TestStepStopsAtANestedStep(t *testing.T) {
 	h := newHarness(t, breakAt(5))
 	h.driver.StageHierarchy(goButtonTree())
 	h.start(nestedFlow)
 
 	h.awaitPause()
-	if err := h.adapter.Pause(); err != nil {
-		t.Fatal(err)
-	}
-	h.resume(session.ResumeOptions{})
+	h.resume(session.ResumeOptions{Step: true})
 	nested := h.awaitPause()
 	want := session.PauseLocation{Source: sourcePath, Line: 0, Depth: 1, Command: "screenshot"}
 	if nested != want {
@@ -198,4 +195,35 @@ func TestVariablesAreRedactedAndRefusedWhenNotPaused(t *testing.T) {
 	}
 	h.resume(session.ResumeOptions{})
 	h.awaitDone()
+}
+
+func TestNestedPauseReportsTheScriptFileBeforeAnyTopLevelStep(t *testing.T) {
+	h := newHarness(t, Options{})
+	if err := h.adapter.Pause(); err != nil {
+		t.Fatal(err)
+	}
+	h.start("appId: com.test\npreconditions:\n  - check: { visible: \"Home\" }\n    setup:\n      - sleep: 0\n    policy: always\n---\n- launchApp\n")
+
+	got := h.awaitPause()
+	want := session.PauseLocation{Source: sourcePath, Line: 0, Depth: 1, Command: "sleep"}
+	if got != want {
+		t.Fatalf("paused at %+v, want %+v", got, want)
+	}
+	h.resume(session.ResumeOptions{Force: true})
+	h.awaitDone()
+}
+
+func TestPauseWhileAlreadyPausedDoesNotStopTheRunAgain(t *testing.T) {
+	h := newHarness(t, breakAt(3))
+	h.start(threeShots)
+	h.awaitPause()
+
+	if err := h.adapter.Pause(); err != nil {
+		t.Fatal(err)
+	}
+	h.resume(session.ResumeOptions{})
+	out := h.awaitDone()
+	if out.err != nil || !out.result.Ok || h.started.Load() != 3 {
+		t.Fatalf("got err=%v ok=%v started=%d, want the run to finish without a second stop", out.err, out.result.Ok, h.started.Load())
+	}
 }

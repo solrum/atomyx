@@ -35,6 +35,13 @@ func (a *Adapter) Act(ctx context.Context, stepYAML string) (session.ActResult, 
 	}
 	ctx, cancel := context.WithTimeout(ctx, defaultActBudget)
 	defer cancel()
+	go func() {
+		select {
+		case <-state.left:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
 	finish := a.collectArtifacts()
 	started := time.Now()
 	result, err := state.run.ExecuteStep(ctx, step)

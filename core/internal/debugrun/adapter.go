@@ -48,7 +48,6 @@ type Adapter struct {
 	hit         map[string]bool
 	pauseNext   bool
 	stopNext    bool
-	lastSource  string
 	paused      *pauseState
 	actFiles    []string
 	actRunning  bool
@@ -59,6 +58,10 @@ type pauseState struct {
 	run  runner.PausedRun
 	step runner.GateStep
 	wake chan struct{}
+	// left closes when the run leaves the gate for any reason, so an act
+	// in flight stops before the run's resumption waits for it. A nil
+	// channel never closes.
+	left <-chan struct{}
 }
 
 var (
@@ -106,9 +109,6 @@ func (a *Adapter) BeforeStep(ctx context.Context, step runner.GateStep, run runn
 	a.mu.Lock()
 	pauser := a.pauser
 	atBreakpoint := step.Depth == 0 && step.Location != "" && a.breakpoints[step.Location]
-	if step.Depth == 0 && step.Location != "" {
-		a.lastSource, _ = splitLocation(step.Location)
-	}
 	if pauser == nil || (!atBreakpoint && !a.pauseNext && !a.stopNext) {
 		a.mu.Unlock()
 		return nil
@@ -117,7 +117,9 @@ func (a *Adapter) BeforeStep(ctx context.Context, step runner.GateStep, run runn
 		a.hit[step.Location] = true
 	}
 	a.pauseNext, a.stopNext = false, false
-	state := &pauseState{run: run, step: step, wake: make(chan struct{})}
+	left := make(chan struct{})
+	defer close(left)
+	state := &pauseState{run: run, step: step, wake: make(chan struct{}), left: left}
 	a.paused = state
 	loc := a.pauseLocation(step)
 	a.mu.Unlock()
@@ -145,13 +147,13 @@ func (a *Adapter) BeforeStep(ctx context.Context, step runner.GateStep, run runn
 }
 
 // pauseLocation names where step stands. A nested step has no line, so
-// it reports the file of the top-level step that holds it.
+// it reports the line 0 and the file the run was started on.
 func (a *Adapter) pauseLocation(step runner.GateStep) session.PauseLocation {
-	source, line := a.lastSource, 0
+	line := 0
 	if step.Location != "" {
-		source, line = splitLocation(step.Location)
+		_, line = splitLocation(step.Location)
 	}
-	return session.PauseLocation{Source: source, Line: line, Depth: step.Depth, Command: step.Command}
+	return session.PauseLocation{Source: step.Source, Line: line, Depth: step.Depth, Command: step.Command}
 }
 
 func splitLocation(location string) (string, int) {
@@ -190,10 +192,13 @@ func (a *Adapter) SetBreakpoints(locations []string) error {
 	return nil
 }
 
-// Pause implements session.Debugger.
+// Pause implements session.Debugger. It does nothing while the run is
+// already paused, so the next resume does not stop again at once.
 func (a *Adapter) Pause() error {
 	a.mu.Lock()
-	a.pauseNext = true
+	if a.paused == nil {
+		a.pauseNext = true
+	}
 	a.mu.Unlock()
 	return nil
 }
