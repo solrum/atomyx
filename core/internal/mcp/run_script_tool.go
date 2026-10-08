@@ -158,7 +158,14 @@ func registerRunScriptTool(server *mcp.Server, tc *ToolContext) {
 
 		result, err := tc.RunSession.RunScript(ctx, def.Name, tc.Session.SelectedDescriptor(),
 			func(target scriptTarget) (runner.ScriptResult, error) {
+				var gate runner.StepGate
+				dbg, endDebug := tc.Session.beginScriptDebug(target.Ctx, orch, def)
+				defer endDebug()
+				if dbg != nil {
+					gate = dbg
+				}
 				return runner.NewScriptRunner(runner.ScriptRunnerDeps{
+					StepGate:       gate,
 					Orchestra:      orch,
 					Clock:          tc.Clock,
 					Logger:         tc.Logger,

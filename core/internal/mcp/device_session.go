@@ -237,6 +237,8 @@ type DeviceSession struct {
 	// gate keeps a fresh capture of any session this host holds from
 	// interleaving with a tool call. It outlives each held session.
 	gate *session.ActivityGate
+	// debug is the Debugger of every session this host opens.
+	debug *scriptDebugHost
 
 	// recMu guards the three fields below. It is a leaf lock, so a run
 	// session may call SetInterventionRecorder while it holds its own lock.
@@ -316,7 +318,7 @@ func NewDeviceSession(deps DeviceSessionDeps) *DeviceSession {
 		life: life, cancelLife: cancelLife,
 		state: holderUnselected, probe: deps.Probe, runners: deps.Runners, clock: nowClock, timers: timers, timerBase: context.Background(), logger: logger,
 		deps: sessionDeps, timeouts: deps.Timeouts.WithDefaults(), runs: deps.Runs, pinned: deps.Pinned,
-		gate: session.NewActivityGate(),
+		gate: session.NewActivityGate(), debug: &scriptDebugHost{},
 	}
 }
 
@@ -591,6 +593,7 @@ func (s *DeviceSession) prepare(ctx context.Context, desc device.Descriptor) err
 func (s *DeviceSession) open(ctx context.Context, req session.Request, borrow bool) (*session.Session, error) {
 	req.Gate = s.gate
 	req.Yielder = s
+	req.Debugger = s.debug
 	acq := session.Acquisition{
 		BudgetMs: s.timeouts.DeviceAcquireMs,
 		Clock:    s.timers,
