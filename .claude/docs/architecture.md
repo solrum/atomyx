@@ -775,6 +775,20 @@ Contract the hand-over keeps:
   the borrower's command in its own interventions. The borrower records
   nothing.
 
+Paused invariant the code is held to:
+
+- One driver user acts at a time. While a run is paused, the runner is
+  blocked at the step gate and does not touch the driver.
+- A debug action on the device and a fresh capture are serialized under
+  one debug lock, so they never overlap.
+- An agent device tool is refused while the holder is paused, because the
+  paused operator is the one driver user.
+- `session`, `attach` and `inspector` never import `runner`. The run host
+  that owns the runner injects a debug port, and the inspector only
+  forwards requests through that port. The layer-import gate enforces the
+  import rule, and the inspector boundary gate rejects any inspector
+  reference to `ExecuteStep`, `StepGate` or `ScriptRunner`.
+
 ## Inspector server
 
 `core/internal/inspector` is the HTTP server behind the browser
