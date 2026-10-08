@@ -60,6 +60,32 @@ func TestBudgetContext_APausedBudgetDoesNotExpireAndResumesWithAFullBudget(t *te
 	}
 }
 
+func TestBudgetContext_ASuspendedBudgetResumesWithWhatWasLeft(t *testing.T) {
+	clk := clock.NewManualClock(0)
+	b, stop := newBudgetContext(context.Background(), clk, 30_000)
+	defer stop()
+	clk.AwaitSleepers(1)
+	clk.Advance(10_000)
+
+	resume := suspendToolBudget(b)
+	clk.Advance(40_000)
+	if err := b.Err(); err != nil {
+		t.Fatalf("Err() = %v, want a suspended budget to ignore the wait", err)
+	}
+
+	resume()
+	clk.AwaitSleepers(1)
+	clk.Advance(19_999)
+	if err := b.Err(); err != nil {
+		t.Fatalf("Err() = %v, want the 20 seconds that were left", err)
+	}
+	clk.Advance(1)
+	<-b.Done()
+	if !errors.Is(b.Err(), context.DeadlineExceeded) {
+		t.Fatalf("Err() = %v, want DeadlineExceeded once what was left elapsed", b.Err())
+	}
+}
+
 func TestBudgetContext_ParentCancellationEndsIt(t *testing.T) {
 	parent, cancel := context.WithCancel(context.Background())
 	clk := clock.NewManualClock(0)

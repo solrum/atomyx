@@ -17,7 +17,8 @@ type budgetContextKey struct{}
 // context.DeadlineExceeded when its time budget elapses, like a context
 // with a deadline, but the budget can be paused: a call that must
 // acquire a device does that outside the budget, and the budget starts
-// over, in full, once acquisition has finished.
+// over, in full, once acquisition has finished. A call that waits for a
+// person keeps the part of its budget it had left instead.
 type budgetContext struct {
 	context.Context
 	clk      clock.Clock
@@ -28,6 +29,7 @@ type budgetContext struct {
 	err         error
 	paused      bool
 	armedAtMs   int64
+	armedForMs  int64
 	cancelTimer context.CancelFunc
 	stopParent  func() bool
 	timers      sync.WaitGroup
@@ -39,7 +41,7 @@ type budgetContext struct {
 func newBudgetContext(parent context.Context, clk clock.Clock, budgetMs int64) (context.Context, func()) {
 	b := &budgetContext{Context: parent, clk: clk, budgetMs: budgetMs, done: make(chan struct{})}
 	b.mu.Lock()
-	b.armLocked()
+	b.armLocked(budgetMs)
 	b.mu.Unlock()
 	b.stopParent = context.AfterFunc(parent, func() { b.finish(parent.Err()) })
 	return b, func() {
@@ -49,15 +51,16 @@ func newBudgetContext(parent context.Context, clk clock.Clock, budgetMs int64) (
 	}
 }
 
-// armLocked starts the timer for a full budget.
-func (b *budgetContext) armLocked() {
+// armLocked starts the timer for forMs milliseconds of budget.
+func (b *budgetContext) armLocked(forMs int64) {
 	timerCtx, cancel := context.WithCancel(b.Context)
 	b.cancelTimer = cancel
 	b.armedAtMs = b.clk.NowMs()
+	b.armedForMs = forMs
 	b.timers.Add(1)
 	go func() {
 		defer b.timers.Done()
-		if b.clk.Sleep(timerCtx, b.budgetMs) == nil {
+		if b.clk.Sleep(timerCtx, forMs) == nil {
 			b.expire(timerCtx)
 		}
 	}()
@@ -110,7 +113,7 @@ func (b *budgetContext) Deadline() (time.Time, bool) {
 	if b.paused || b.err != nil {
 		return time.Time{}, false
 	}
-	remaining := b.budgetMs - (b.clk.NowMs() - b.armedAtMs)
+	remaining := b.armedForMs - (b.clk.NowMs() - b.armedAtMs)
 	return time.Now().Add(time.Duration(remaining) * time.Millisecond), true
 }
 
@@ -122,14 +125,19 @@ func (b *budgetContext) Value(key any) any {
 	return b.Context.Value(key)
 }
 
-// pause stops the budget and returns the function that restarts it with
-// a full budget. A budget that already ended, or is already paused,
-// returns a no-op.
-func (b *budgetContext) pause() (resume func()) {
+// pause stops the budget and returns the function that restarts it. A
+// budget that already ended, or is already paused, returns a no-op. The
+// restarted budget is a full one when keepRemaining is false, and
+// otherwise the part that was left when the pause began.
+func (b *budgetContext) pause(keepRemaining bool) (resume func()) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.err != nil || b.paused {
 		return func() {}
+	}
+	restartForMs := b.budgetMs
+	if keepRemaining {
+		restartForMs = max(b.armedForMs-(b.clk.NowMs()-b.armedAtMs), 0)
 	}
 	b.paused = true
 	b.cancelTimer()
@@ -140,18 +148,32 @@ func (b *budgetContext) pause() (resume func()) {
 			return
 		}
 		b.paused = false
-		b.armLocked()
+		b.armLocked(restartForMs)
 	}
 }
 
 // pauseToolBudget pauses the time budget of the tool call ctx belongs
-// to, and returns the function that restarts it. A ctx outside any
-// tool call returns a no-op, so code that is also reached from a CLI
-// never needs to know whether a budget exists.
+// to, and returns the function that restarts it with a full budget. It
+// is for a call that acquires a device. A ctx outside any tool call
+// returns a no-op, so code that is also reached from a CLI never needs
+// to know whether a budget exists.
 func pauseToolBudget(ctx context.Context) (resume func()) {
+	return pauseBudgetOf(ctx, false)
+}
+
+// suspendToolBudget pauses the time budget of the tool call ctx belongs
+// to, and returns the function that restarts it with the part of the
+// budget that was left, so time spent waiting for a person is not
+// counted and the time spent working is. A ctx outside any tool call
+// returns a no-op.
+func suspendToolBudget(ctx context.Context) (resume func()) {
+	return pauseBudgetOf(ctx, true)
+}
+
+func pauseBudgetOf(ctx context.Context, keepRemaining bool) func() {
 	b, ok := ctx.Value(budgetContextKey{}).(*budgetContext)
 	if !ok {
 		return func() {}
 	}
-	return b.pause() //nolint:contextcheck // the restarted budget timer is owned by the call context it was created with
+	return b.pause(keepRemaining) //nolint:contextcheck // the restarted budget timer is owned by the call context it was created with
 }

@@ -234,7 +234,7 @@ func (r *scriptDebugRun) beginPause() {
 	if id == 0 {
 		return
 	}
-	r.resumeBudget = pauseToolBudget(r.ctx)
+	r.resumeBudget = suspendToolBudget(r.ctx)
 	watchCtx, cancel := context.WithCancel(r.ctx)
 	r.stopWatch = cancel
 	go r.watchPause(watchCtx, id)

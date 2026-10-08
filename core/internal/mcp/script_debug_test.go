@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -26,9 +27,19 @@ type blockingDriver struct {
 	once    sync.Once
 	entered chan struct{}
 	release chan struct{}
+	// holdSecond, when set, makes the second screenshot wait until its
+	// context ends and close secondEntered when it starts waiting.
+	holdSecond    bool
+	secondEntered chan struct{}
+	calls         atomic.Int32
 }
 
 func (b *blockingDriver) Screenshot(ctx context.Context) ([]byte, error) {
+	if b.calls.Add(1) == 2 && b.holdSecond {
+		close(b.secondEntered)
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
 	b.once.Do(func() {
 		close(b.entered)
 		select {
@@ -91,7 +102,7 @@ func newDebugHarnessWithPause(t *testing.T, pauseMs int64) *debugHarness {
 	}
 	h := &debugHarness{
 		t: t, ctx: context.Background(), clk: clock.NewManualClock(0),
-		drv:      &blockingDriver{Driver: mockdriver.New(), entered: make(chan struct{}), release: make(chan struct{})},
+		drv:      &blockingDriver{Driver: mockdriver.New(), entered: make(chan struct{}), release: make(chan struct{}), secondEntered: make(chan struct{})},
 		progress: make(chan recordedPhase, 32), result: make(chan map[string]any, 1),
 		lost: make(chan error, 1),
 	}
@@ -514,5 +525,47 @@ func TestScriptDebug_AScreenshotAPersonTookIsNamedInTheActionAndTheIntervention(
 	first, _ := actions[0].(map[string]any)
 	if got, _ := first["artifacts"].([]any); len(got) != 1 || got[0] != acted.Artifacts[0] {
 		t.Fatalf("humanActions[0] = %v, want the screenshot %s", first, acted.Artifacts[0])
+	}
+}
+
+func TestScriptDebug_ACallKeepsWhatWasLeftOfItsBudgetAcrossAPause(t *testing.T) {
+	const (
+		beforePauseMs = 10_000
+		pausedMs      = 5_000
+	)
+	h := newDebugHarness(t)
+	h.drv.holdSecond = true
+	t.Cleanup(func() { h.clk.Advance(2 * defaultToolTimeoutMs) })
+	h.startScript(debugScript)
+	h.awaitEntered()
+	h.clk.AwaitSleepers(1)
+	h.clk.Advance(beforePauseMs)
+	if err := h.viewer.SetBreakpoints([]string{"inline:5"}); err != nil {
+		t.Fatal(err)
+	}
+	close(h.drv.release)
+	eventually(t, "the run to pause", func() bool { _, paused := h.held().Paused(); return paused })
+
+	h.clk.AwaitSleepers(1)
+	h.clk.Advance(pausedMs)
+	if _, err := h.held().Resume(h.ctx, session.ResumeOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-h.drv.secondEntered:
+	case <-time.After(yieldWait):
+		t.Fatal("the second step never started")
+	}
+	h.clk.AwaitSleepers(1)
+
+	h.clk.Advance(defaultToolTimeoutMs - beforePauseMs - 1)
+	select {
+	case r := <-h.result:
+		t.Fatalf("the call ended with budget left: %v", r)
+	case <-time.After(50 * time.Millisecond):
+	}
+	h.clk.Advance(1)
+	if got := h.awaitResult(); got["code"] != diag.CodeToolTimeout {
+		t.Fatalf("result = %v, want %s once the part of the budget left after the pause was spent", got, diag.CodeToolTimeout)
 	}
 }
