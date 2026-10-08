@@ -181,6 +181,10 @@ type StateNotice struct {
 	Command string         `json:"command"`
 	RunID   string         `json:"runId,omitempty"`
 	Pause   *PauseLocation `json:"pause,omitempty"`
+	// DroppedInterventions counts the intervention lines the run folder could
+	// not keep because its file reached the size bound. Absent when none
+	// were lost.
+	DroppedInterventions int `json:"droppedInterventions,omitempty"`
 }
 
 // PauseLocation says where a paused run stands. Source is the absolute

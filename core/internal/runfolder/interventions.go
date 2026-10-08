@@ -38,6 +38,15 @@ type InterventionsTruncated struct {
 	LimitBytes int  `json:"limitBytes"`
 }
 
+// InterventionsDropped reports how many lines AppendIntervention discarded
+// because interventions.jsonl reached its bound. Finalize records a
+// non-zero count in meta.json.
+func (w *Writer) InterventionsDropped() int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.interventionsDropped
+}
+
 // AppendIntervention appends line to interventions.jsonl. Once the file
 // would pass MaxInterventionsBytes, the line is dropped, one truncation
 // marker line is written, and every later call drops its line and returns
@@ -49,6 +58,7 @@ func (w *Writer) AppendIntervention(line InterventionLine) error {
 		return err
 	}
 	if w.interventionsTruncated {
+		w.interventionsDropped++
 		return nil
 	}
 	body, err := json.Marshal(line)
@@ -64,6 +74,7 @@ func (w *Writer) AppendIntervention(line InterventionLine) error {
 	}
 	if w.interventionBytes+len(body)+1 > w.maxInterventionBytes {
 		w.interventionsTruncated = true
+		w.interventionsDropped++
 		marker, _ := json.Marshal(InterventionsTruncated{Truncated: true, LimitBytes: w.maxInterventionBytes})
 		_, err := w.interventions.Write(append(marker, '\n'))
 		return err

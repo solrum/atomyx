@@ -86,3 +86,45 @@ func TestInterventionSchemaRejectsALineWithoutItsRequiredFields(t *testing.T) {
 		}
 	}
 }
+
+func TestDroppedInterventionLinesAreCountedAndRecordedInTheMeta(t *testing.T) {
+	w := startOne(t, t.TempDir())
+	w.maxInterventionBytes = 100
+	for range 6 {
+		if err := w.AppendIntervention(InterventionLine{Kind: "viewerAttached", AtMs: 1, Client: "c"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dropped := w.InterventionsDropped()
+	if dropped < 4 {
+		t.Fatalf("dropped = %d, want at least the 4 lines past the bound", dropped)
+	}
+	if err := w.Finalize(OutcomePassed, nil); err != nil {
+		t.Fatal(err)
+	}
+	meta, err := os.ReadFile(filepath.Join(w.Dir(), MetaFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got Meta
+	if err := json.Unmarshal(meta, &got); err != nil || got.InterventionsDropped != dropped {
+		t.Fatalf("meta.interventionsDropped = %d (%v), want %d", got.InterventionsDropped, err, dropped)
+	}
+}
+
+func TestMetaOmitsTheDroppedCounterWhenNothingWasDropped(t *testing.T) {
+	w := startOne(t, t.TempDir())
+	if err := w.AppendIntervention(InterventionLine{Kind: "viewerAttached", AtMs: 1, Client: "c"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Finalize(OutcomePassed, nil); err != nil {
+		t.Fatal(err)
+	}
+	meta, err := os.ReadFile(filepath.Join(w.Dir(), MetaFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(meta), "interventionsDropped") {
+		t.Fatalf("meta = %s, want no interventionsDropped", meta)
+	}
+}

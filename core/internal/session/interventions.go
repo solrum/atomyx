@@ -89,6 +89,7 @@ func (s *Session) SetInterventionRecorder(recorder InterventionRecorder) {
 	defer s.interventionMu.Unlock()
 	s.recorder = recorder
 	s.recorderDecided = true
+	s.setDroppedInterventions(0)
 	early := s.unrecorded
 	s.unrecorded = nil
 	if recorder == nil {
@@ -145,6 +146,9 @@ func (s *Session) appendIntervention(entry Intervention) {
 	if err := s.recorder.AppendIntervention(line); err != nil {
 		s.deps.Logger.Warn("run.intervention_line_failed", logging.LogContext{"error": err.Error()})
 	}
+	if counter, ok := s.recorder.(interface{ InterventionsDropped() int }); ok {
+		s.setDroppedInterventions(counter.InterventionsDropped())
+	}
 }
 
 // ViewerAttached implements attach.ViewerHandler.
@@ -155,4 +159,10 @@ func (h *attachHandlers) ViewerAttached(info attach.ViewerInfo) {
 // ViewerDetached implements attach.ViewerHandler.
 func (h *attachHandlers) ViewerDetached(info attach.ViewerInfo) {
 	h.s.recordIntervention(InterventionViewerDetached, info.Client)
+}
+
+func (s *Session) setDroppedInterventions(n int) {
+	if s.hub != nil {
+		s.hub.SetDroppedInterventions(n)
+	}
 }

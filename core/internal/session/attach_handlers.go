@@ -191,7 +191,7 @@ func (h *attachHandlers) relay(ctx context.Context, observations <-chan Observat
 }
 
 func stateNotice(o Observation) attach.StateNotice {
-	n := attach.StateNotice{State: string(o.State), Command: o.Command, RunID: o.RunID}
+	n := attach.StateNotice{State: string(o.State), Command: o.Command, RunID: o.RunID, DroppedInterventions: o.DroppedInterventions}
 	if o.Pause != nil && o.State == StatePaused {
 		n.Pause = &attach.PauseLocation{Source: o.Pause.Source, Line: o.Pause.Line, Depth: o.Pause.Depth, Command: o.Pause.Command}
 	}

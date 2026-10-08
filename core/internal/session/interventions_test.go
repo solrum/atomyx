@@ -2,8 +2,10 @@ package session_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 
@@ -175,5 +177,46 @@ func TestInterventions_ARefusedActIsNotRecorded(t *testing.T) {
 		if line.Kind == session.InterventionHumanAction {
 			t.Fatalf("a refused act was recorded: %+v", line)
 		}
+	}
+}
+
+// droppingRecorder is a recorder that reports how many lines it dropped.
+type droppingRecorder struct {
+	fakeRecorder
+	dropped int
+}
+
+func (r *droppingRecorder) InterventionsDropped() int { return r.dropped }
+
+func TestInterventions_DroppedLinesAreReportedOnTheNextStateChange(t *testing.T) {
+	s, _, path := debuggableHolder(t, &scriptedDebugger{})
+	if err := s.SetIdle(); err != nil {
+		t.Fatal(err)
+	}
+	client := dialHolder(t, path)
+	subscribe(t, client, "", 0)
+
+	s.EnterPause(testPause)
+	clean := stateNoticeJSON(t, client)
+	if strings.Contains(string(clean), "droppedInterventions") {
+		t.Fatalf("notice before any drop = %s, want no droppedInterventions", clean)
+	}
+
+	recorder := &droppingRecorder{dropped: 3}
+	s.SetInterventionRecorder(recorder)
+	attachNamed(t, path, "late viewer")
+	s.LeavePause()
+	var notice attach.StateNotice
+	if err := json.Unmarshal(stateNoticeJSON(t, client), &notice); err != nil {
+		t.Fatal(err)
+	}
+	if notice.DroppedInterventions != 3 {
+		t.Fatalf("notice = %+v, want droppedInterventions 3", notice)
+	}
+
+	s.SetInterventionRecorder(nil)
+	s.EnterPause(testPause)
+	if after := stateNoticeJSON(t, client); strings.Contains(string(after), "droppedInterventions") {
+		t.Fatalf("notice after the run ended = %s, want the count cleared", after)
 	}
 }

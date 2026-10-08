@@ -205,6 +205,11 @@
           "description": "Id of the record of another store this folder was imported from. Absent for a run written natively.",
           "type": "string"
         },
+        "interventionsDropped": {
+          "description": "How many intervention lines did not fit in interventions.jsonl. Absent when none were dropped.",
+          "minimum": 1,
+          "type": "integer"
+        },
         "kind": {
           "description": "What started the run.",
           "enum": [

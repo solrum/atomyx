@@ -37,6 +37,8 @@ type Hub struct {
 	closed bool
 	fanout fanout
 
+	droppedInterventions int
+
 	tree       wire.TreeNodeWire
 	treeEpoch  uint64
 	treeSeq    uint64
@@ -109,7 +111,16 @@ func (h *Hub) ObserveScreenSize(size wire.Size, epoch uint64, stable bool) {
 func (h *Hub) PublishState(state HolderState, command, runID string, pause *PauseLocation) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.fanout.notifyLocked(Observation{Kind: ObservedState, Stable: true, State: state, Command: command, RunID: runID, Pause: pause})
+	h.fanout.notifyLocked(Observation{Kind: ObservedState, Stable: true, State: state, Command: command, RunID: runID, Pause: pause, DroppedInterventions: h.droppedInterventions})
+}
+
+// SetDroppedInterventions records how many intervention lines the run folder
+// could not keep. The next PublishState reports it, so a viewer learns of
+// the loss at the next state change.
+func (h *Hub) SetDroppedInterventions(n int) {
+	h.mu.Lock()
+	h.droppedInterventions = n
+	h.mu.Unlock()
 }
 
 // Latest returns the newest captures. The masked copy of a tree is made

@@ -180,6 +180,9 @@ type Writer struct {
 	interventions          *os.File
 	interventionBytes      int
 	interventionsTruncated bool
+	// interventionsDropped counts the lines AppendIntervention discarded
+	// because the file reached its bound.
+	interventionsDropped int
 }
 
 type writerState int
@@ -234,6 +237,7 @@ func (w *Writer) Finalize(outcome Outcome, mutate func(*Meta)) error {
 	done := w.now().UnixMilli()
 	next.SchemaVersion, next.RunID, next.StartedAt = w.meta.SchemaVersion, w.meta.RunID, w.meta.StartedAt
 	next.CompletedAt, next.Result, next.Outcome = &done, result, outcome
+	next.InterventionsDropped = w.interventionsDropped
 	prev := w.meta
 	w.meta = next
 	if err := w.writeMeta(); err != nil {

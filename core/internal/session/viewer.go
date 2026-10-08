@@ -73,6 +73,9 @@ type Observation struct {
 	// Pause is the location of a paused run. It is set only on an
 	// ObservedState whose State is StatePaused.
 	Pause *PauseLocation
+	// DroppedInterventions counts the intervention lines the run folder could
+	// not keep. It is set on an ObservedState and is zero when none were lost.
+	DroppedInterventions int
 }
 
 // Snapshot is the newest capture of each kind, as a viewer may show it.

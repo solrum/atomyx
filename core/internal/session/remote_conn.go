@@ -229,5 +229,5 @@ func (h *RemoteHandle) storeState(n attach.StateNotice) {
 		pause = &PauseLocation{Source: n.Pause.Source, Line: n.Pause.Line, Depth: n.Pause.Depth, Command: n.Pause.Command}
 	}
 	h.info.Pause = pause
-	h.fanout.notifyLocked(Observation{Kind: ObservedState, Stable: true, State: HolderState(n.State), Command: n.Command, RunID: n.RunID, Pause: pause})
+	h.fanout.notifyLocked(Observation{Kind: ObservedState, Stable: true, State: HolderState(n.State), Command: n.Command, RunID: n.RunID, Pause: pause, DroppedInterventions: n.DroppedInterventions})
 }

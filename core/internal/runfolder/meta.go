@@ -127,6 +127,9 @@ type Meta struct {
 	TotalSteps    int      `json:"totalSteps,omitempty"`
 	MCP           *MCPInfo `json:"mcp,omitempty"`
 	ImportedFrom  string   `json:"importedFrom,omitempty"`
+	// InterventionsDropped counts the intervention lines that did not fit in
+	// interventions.jsonl. Absent when none were dropped.
+	InterventionsDropped int `json:"interventionsDropped,omitempty"`
 }
 
 // ResultOf returns the Result an Outcome belongs to, and false for a
