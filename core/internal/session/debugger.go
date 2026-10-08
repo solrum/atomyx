@@ -28,6 +28,10 @@ type Debugger interface {
 	// check of the next step may refuse to resume, in which case Resumed is
 	// false and MissReason says why. A nil error with Resumed false is the
 	// only refusal a caller may override with Force.
+	//
+	// Resume wakes the runner and returns. It must not wait for the runner
+	// to reach its next step or to leave the step gate, because the session
+	// holds its debug lock for the whole call.
 	Resume(ctx context.Context, opts ResumeOptions) (ResumeResult, error)
 
 	// Act runs one step written in script YAML on the device, in a scope

@@ -73,7 +73,7 @@ func (h *attachHandlers) TreeFresh(ctx context.Context) (attach.FreshResult, err
 	if refresher := h.s.socketRefresher; refresher != nil {
 		snap, err = refresher.FreshTree(ctx)
 	} else {
-		snap, err = h.s.FreshTreeIf(ctx, h.admitFresh)
+		snap, err = h.s.freshTree(ctx, h.admitFresh)
 	}
 	if err != nil {
 		return attach.FreshResult{}, err
@@ -87,11 +87,14 @@ func (h *attachHandlers) TreeFresh(ctx context.Context) (attach.FreshResult, err
 	}, nil
 }
 
-func (h *attachHandlers) admitFresh() error {
-	if state := h.s.holderState(); state != StateIdle {
-		return diag.NewHolderBusy("the holder is " + string(state))
+// admitFresh admits a capture while the holder is idle, or while it is
+// paused and the capture holds the debug lock.
+func (h *attachHandlers) admitFresh(underDebugLock bool) error {
+	state := h.s.holderState()
+	if state == StateIdle || (state == StatePaused && underDebugLock) {
+		return nil
 	}
-	return nil
+	return diag.NewHolderBusy("the holder is " + string(state))
 }
 
 func captureState(stable bool, snap Snapshot) attach.CaptureState {

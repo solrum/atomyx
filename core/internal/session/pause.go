@@ -26,17 +26,32 @@ func (s *Session) EnterPause(loc PauseLocation) {
 }
 
 // LeavePause clears the pause mark and tells the viewers the activity
-// the session returns to. It is a no-op when the run is not paused.
+// the session returns to. It waits for an act in flight, so the runner
+// never drives the device while an act does. It is a no-op when the run
+// is not paused, which is the case after Resume has already cleared it.
 func (s *Session) LeavePause() {
+	release := s.lockDebugUninterruptibly()
+	defer release()
+	if _, was := s.clearPause(); was {
+		s.publishCurrent()
+	}
+}
+
+func (s *Session) clearPause() (PauseLocation, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.pause == nil {
+		return PauseLocation{}, false
+	}
+	loc := *s.pause
+	s.pause = nil
+	return loc, true
+}
+
+// publishCurrent tells the viewers the state Info reports now.
+func (s *Session) publishCurrent() {
 	s.publishMu.Lock()
 	defer s.publishMu.Unlock()
-	s.mu.Lock()
-	was := s.pause != nil
-	s.pause = nil
-	s.mu.Unlock()
-	if !was {
-		return
-	}
 	info := s.Info()
 	s.hub.PublishState(info.State, info.Holder.Command, info.Holder.RunID)
 }

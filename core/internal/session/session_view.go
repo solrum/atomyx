@@ -81,13 +81,24 @@ func admitAlways() error { return nil }
 // admit runs under the gate, so it must not enter the gate itself, because
 // the gate is not reentrant. A held gate still wins: the call returns a
 // diag.CodeHolderBusy error without running admit.
+//
+// While the run is paused, the capture is serialized with act by the
+// debug lock instead of the gate, because the paused run is itself inside
+// the gate. A capture then fails with a diag.CodeHolderBusy error while an
+// act or another capture holds the lock.
 func (s *Session) FreshTreeIf(ctx context.Context, admit func() error) (Snapshot, error) {
+	return s.freshTree(ctx, func(bool) error { return admit() })
+}
+
+// freshTree is FreshTreeIf with an admit that learns whether the capture
+// runs under the debug lock.
+func (s *Session) freshTree(ctx context.Context, admit func(underDebugLock bool) error) (Snapshot, error) {
 	if err := ctx.Err(); err != nil {
 		return Snapshot{}, err
 	}
-	release, ok := s.gate.TryExclusive()
+	release, underDebugLock, ok := s.takeCaptureSlot()
 	if !ok {
-		return Snapshot{}, diag.NewHolderBusy("a tool call or another fresh capture is running")
+		return Snapshot{}, diag.NewHolderBusy("a tool call, an act or another fresh capture is running")
 	}
 	defer release()
 	select {
@@ -95,7 +106,7 @@ func (s *Session) FreshTreeIf(ctx context.Context, admit func() error) (Snapshot
 		return Snapshot{}, ErrClosed
 	default:
 	}
-	if err := admit(); err != nil {
+	if err := admit(underDebugLock); err != nil {
 		return Snapshot{}, err
 	}
 

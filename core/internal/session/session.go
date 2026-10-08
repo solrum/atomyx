@@ -62,6 +62,9 @@ type Session struct {
 	// publishMu keeps the state a viewer is told in step with the state
 	// Info reports, so a stale running notice never follows a paused one.
 	publishMu sync.Mutex
+	// debugLock has one slot. Whoever fills it is the only driver user
+	// while the run is paused.
+	debugLock chan struct{}
 
 	relaunched bool
 
@@ -106,9 +109,10 @@ type Session struct {
 func newSession(ctx context.Context, deps Deps, desc device.Descriptor, identity device.Identity, held *lease.Lease, built device.Built, hub *Hub, gate *ActivityGate) *Session {
 	s := &Session{
 		deps: deps, desc: desc, identity: identity, lease: held, built: built, hub: hub, gate: gate,
-		activity: StateRunning,
-		lost:     make(chan struct{}),
-		closed:   make(chan struct{}),
+		activity:  StateRunning,
+		debugLock: make(chan struct{}, 1),
+		lost:      make(chan struct{}),
+		closed:    make(chan struct{}),
 	}
 	// The watcher outlives the Open call that started it, so it keeps
 	// ctx's values but not its cancellation.
