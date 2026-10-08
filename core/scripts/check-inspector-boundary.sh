@@ -20,12 +20,14 @@
 # the forbidden things.
 #
 # A second list, STEP_PATTERN, keeps the inspector from executing a
-# script step: any reference to ExecuteStep, StepGate or ScriptRunner
-# fails. Stepping and pausing are requests the inspector forwards to
-# the holder through its session ports, and the run host that owns the
-# runner is the only code that executes steps. Extend STEP_PATTERN with
-# the name of each new debug port as the port lands, so the inspector
-# keeps using the ports and never the concrete runner types behind them.
+# script step: any reference to ExecuteStep, StepGate, ScriptRunner or
+# the holder-side session.Debugger port fails. The inspector uses the
+# viewer-side DebugClient only. Stepping and pausing are requests the
+# inspector forwards to the holder through its session ports, and the
+# run host that owns the runner is the only code that executes steps.
+# Extend STEP_PATTERN with the name of each new debug port as the port
+# lands, so the inspector keeps using the ports and never the concrete
+# runner types behind them.
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -33,7 +35,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 DIR="internal/inspector"
 PATTERN='\.Built\(|\.Orchestra\(|orchestra\.Orchestra([^A-Za-z0-9_]|$)|"dev\.atomyx/internal/driver(/[^"]*)?"|session\.Open\(|session\.Attach\(|AppendStep|AppendIntervention|runfolder\.Writer'
 
-STEP_PATTERN='ExecuteStep|StepGate|ScriptRunner'
+STEP_PATTERN='ExecuteStep|StepGate|ScriptRunner|session\.Debugger'
 
 if [ ! -d "$DIR" ]; then
   echo "PASS: $DIR does not exist yet"
