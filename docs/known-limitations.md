@@ -25,6 +25,9 @@ current code or docs.
 - [An iOS run without --device is not provisioned](#an-ios-run-without---device-is-not-provisioned)
 - [A scenario file cannot carry a breakpoint](#a-scenario-file-cannot-carry-a-breakpoint)
 - [Terminal debugging of atomyx run only resumes](#terminal-debugging-of-atomyx-run-only-resumes)
+- [A nested step cannot carry a breakpoint](#a-nested-step-cannot-carry-a-breakpoint)
+- [A deduplicated launchApp never fires its breakpoint](#a-deduplicated-launchapp-never-fires-its-breakpoint)
+- [A short secret is masked only as a whole word](#a-short-secret-is-masked-only-as-a-whole-word)
 
 ## Obscurement check can flag a dialog's backdrop as blocking the dialog's own button
 
@@ -227,3 +230,45 @@ The other debugging actions are served to an attached inspector.
 **Workaround**: attach the inspector with `atomyx inspect` while the run
 is paused, and step, run a step or read variables from there. See the
 `driver inspect` section of `cli.md`.
+
+## A nested step cannot carry a breakpoint
+
+**Symptom**: a breakpoint on a line inside a `runFlow`, `handle`,
+`branch`, precondition or `requires` step list is refused with a message
+that the line is inside a nested step list.
+
+**Where**: `atomyx run --break` and breakpoints set from the inspector.
+
+**Why**: a nested step has no line of its own, so a location cannot
+name it.
+
+**Workaround**: put the breakpoint on the top-level step that holds the
+nested list, then step. Step runs the next step at any depth.
+
+## A deduplicated launchApp never fires its breakpoint
+
+**Symptom**: a breakpoint on a `launchApp` step never pauses the run,
+and the run ends with a warning that the breakpoint was never reached.
+
+**Where**: a `launchApp` that the run skips because the same app was
+already launched.
+
+**Why**: the step gate sits after the skip decision, so a skipped step
+never reaches it.
+
+**Workaround**: put the breakpoint on the step after the `launchApp`.
+
+## A short secret is masked only as a whole word
+
+**Symptom**: a very short secret value, for example two characters,
+appears unmasked inside a longer word of a free-text message, such as
+an act failure message.
+
+**Where**: free text that the debugger shows. The variables panel
+masks a secret variable by name, so it is not affected.
+
+**Why**: masking a short value anywhere in the text would also hit
+ordinary words, so a short secret is masked only when it stands as a
+whole word.
+
+**Workaround**: use a secret of normal length.

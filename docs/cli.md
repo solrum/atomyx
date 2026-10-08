@@ -95,6 +95,7 @@ Flags:
 | `--skip-preconditions` | Shorthand for `--preconditions skip`. | off | no |
 | `--report <formats>` | Enables report generation and selects its output formats: `html`, `json`, or both, separated by a comma. Overrides the project config's `report` block. | the project config's `report.formats`, or `html` when reporting is enabled by `--report-dir` alone | no |
 | `--report-dir <path>` | Root directory the run folder is written under. See "Run folder" below. | the project config's `report.outDir`, or the storage root | no |
+| `--break <file>:<line>` | Holds the run before the authored top-level step at this location. See "Debugging a run" below. | none | yes |
 | `--json` | Outputs the result as JSON instead of text. | off | no |
 | `--help`, `-h` | Prints this command's usage and exits. | off | no |
 
@@ -126,6 +127,41 @@ failed, `2` when the command was misused or a usage or config error
 occurred, `130` when SIGINT interrupted the run, and `143` when SIGTERM
 did. An interrupted run prints `interrupted` and finalizes its run folder as
 cancelled before it exits.
+
+### Debugging a run
+
+`--break <file>:<line>` pauses the run before the step written at that
+line of that script file, and `--break` can be repeated. Example:
+
+```
+atomyx run --file test.yml --break test.yml:12 --break login.yml:3
+```
+
+- A location is a script file and a 1-based line. The file may be the
+  script given to `--file` or a script a scenario runs. The inline
+  `inline:<line>` form applies only to MCP `run_script` and is refused
+  here.
+- A location that matches no authored top-level step of the run's
+  scripts is a usage error. The check runs before the device is taken,
+  so a typo never holds a device.
+- When the run stops, the terminal prints where it stopped and says to
+  press Enter. Enter resumes the run.
+- Before a resume, the run checks that the next tap, type, long press
+  or read can find its target. When it cannot, the terminal prints why
+  and a second Enter resumes anyway.
+- Under `--json` the pause prompt goes to stderr, so the JSON result on
+  stdout stays parseable.
+- Standard input must be a terminal, because a paused run waits for a
+  key. Otherwise the command exits with `2` before the device is taken,
+  so a job without a terminal can never hang.
+- A breakpoint the run never reached is reported as a warning on stderr
+  when the run ends.
+- Ctrl-C while paused interrupts the run and exits with `130`.
+- `atomyx suite` refuses `--break`.
+
+Terminal debugging only resumes. To step, run a step or read variables
+while the run is paused, attach `atomyx inspect` to the paused run. See
+[known limitations](./known-limitations.md).
 
 ### Run folder
 
@@ -228,8 +264,9 @@ Flags:
 Selecting by tag alone requires `testRoots` in the project config, or
 a `--glob` to narrow the search, because a tag-only selector has no
 other way to bound which directory to scan. `atomyx driver suite`
-does not accept `--file`, `--platform`, `--device`, `--proxy`, or
-`--json`, because those are specific to `atomyx driver run`.
+does not accept `--file`, `--platform`, `--device`, `--proxy`,
+`--json`, or `--break`, because those are specific to
+`atomyx driver run`.
 
 Example:
 
@@ -499,6 +536,14 @@ The page works only on this machine, because the command listens on
     as an environment variable when the script runs. Copy puts the step
     on the clipboard. When the browser refuses, the step stays selectable
     so you can copy it by hand.
+- **Debugging controls.** While the watched holder runs a script with
+  debugging enabled, the page shows a Debugger panel with Pause, Resume,
+  Step and a breakpoint list written as `<file>:<line>`, and a Run step
+  panel that runs one step on the device. Resume, Step and Run step work
+  only while the run is paused. When the next step may not find its
+  target, the panel says why and offers Resume anyway. A person who runs
+  steps here is recorded as a human action in the run folder. See
+  [Debugging a run](#debugging-a-run).
 - **Live updates.** The page follows the device as the holder captures,
   so the screenshot and the header change on their own. A page and tree
   from before a reconnect are never mixed with ones after it.

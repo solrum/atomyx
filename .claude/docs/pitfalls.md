@@ -452,6 +452,34 @@ corresponding area. For the high-level map see
   gets mode 0600 by an explicit chmod right after bind, and the runtime
   directory is 0700.
 
+## Debugging a paused run
+
+- **Never import `runner` from `session`, `attach` or `inspector`.** A
+  viewer drives a paused run through `session.Debugger` and
+  `session.DebugClient`, whose result types belong to `session`. The
+  layer-import gate rejects the import, and the inspector boundary gate
+  rejects any reference to `ExecuteStep`, `StepGate` or `ScriptRunner`.
+- **Never let a paused holder serve an agent device tool or yield.** The
+  paused operator is the only driver user, so agent device tools fail
+  with `HOLDER_BUSY` and no idle timer runs. `SetRunning` and the call
+  settle path must not clear the paused flag, and the flag is never
+  written to lease metadata.
+- **Act runs in a child scope and discards its writes.** A step run by
+  hand reads the paused variables but never changes the run's own, so
+  resuming continues from the state the script expects. Steps that nest
+  other steps are refused.
+- **Cancel an act when its viewer disconnects or the run ends.** An act
+  holds the debug lock, and resume waits for it, so an act left running
+  would stall the run or touch the device after the run moved on.
+- **Never render an unredacted variable.** The variables panel, a
+  `humanAction` entry, the run folder and logs all pass through the
+  redactor built from the tagged secrets. The text of a `type` act is
+  always masked, and a masked value never shows its length.
+- **Keep queue room for responses when replaying notices.** The attach
+  writer queue reserves positions for responses, so a long notice replay
+  waits for room instead of filling the queue and costing a viewer its
+  `act.step` or resume answer.
+
 ## Holder socket lifecycle
 
 - **Bind the holder socket only after the driver is built.** A failed

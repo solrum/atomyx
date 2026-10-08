@@ -827,6 +827,26 @@ Paused invariant the code is held to:
   import rule, and the inspector boundary gate rejects any inspector
   reference to `ExecuteStep`, `StepGate` or `ScriptRunner`.
 
+Debug ports:
+
+- `session.Debugger` is the holder side. The run host injects it through
+  `Request.Debugger`, and a session without one advertises no `debug`
+  feature. It has five methods: `SetBreakpoints`, `Pause`, `Resume`,
+  `Act` and `Variables`.
+- `session.DebugClient` is the viewer side, taken from the remote handle,
+  and the inspector consumes it. Both ports are narrow and their result
+  types (`ResumeResult`, `ActResult`, `VariablesView`, `PauseLocation`)
+  belong to `session`, so a viewer names no `runner` type.
+- `runner` owns the step gate (`StepGate`) and single-step execution
+  (`PausedRun.ExecuteStep`). `core/internal/debugrun` is the only package
+  that adapts the gate to the ports, and the command line and the MCP
+  server both host scripts through its `Adapter`.
+- `debugrun` may import `runner` and `session`. Only the run hosts, the
+  command line and the MCP server, import `debugrun`, and `session`,
+  `attach` and `inspector` never do.
+- Every string a `Debugger` returns is already redacted, so no layer
+  above it handles a secret value.
+
 ## Inspector server
 
 `core/internal/inspector` is the HTTP server behind the browser

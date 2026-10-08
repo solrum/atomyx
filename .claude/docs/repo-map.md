@@ -76,6 +76,7 @@ atomyx/
 | `clock` | Time-source abstraction every polling loop, timeout, and retry uses instead of calling the standard library directly. |
 | `config` | Owns the project config schema, including the `session` timeouts block, its file-discovery and YAML loader, schema validation, and environment reference resolution. |
 | `conformance` | Drives the Go runtime's implementation of an operation and asserts its output against a frozen golden fixture. |
+| `debugrun` | Adapts a script run to the debug ports of a device session. Its `Adapter` implements `runner.StepGate`, which holds the run at breakpoints and pause requests, and `session.Debugger`, which a viewer drives while the run is paused. The command line and the MCP server share it. It is the only package that joins the runner gate to the session ports. |
 | `device` | Discovers reachable Android and iOS devices and builds a live Driver plus Orchestra pair for whichever one a caller selects. For an iOS target it launches the runner through a provisioner and ties the runner's lifetime to the driver, and it ends a runner a crashed process left behind. |
 | `diag` | Defines the stable error-code taxonomy every user-facing surface reports a failure through. |
 | `driver` | Defines the platform-neutral Driver contract every concrete adapter implements. |

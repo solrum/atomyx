@@ -69,6 +69,21 @@ type system enforces it.
 | **Script execution** | | | | |
 | `run_script` | `core/internal/mcp/run_script_tool.go` | `script` (YAML), `env` | structured per-step results: `{scriptName, ok, steps[], totalSteps, passedSteps, failedAtStep?, durationMs, deviceLost?, humanActions?}`, and each step carries its own `deviceLost?`. `humanActions` lists the steps an operator ran by hand while a viewer had the run paused | `script.ParseScript` then `runSession.RunScript`, which runs `runner.ScriptRunner.Run` inside the open run, or inside a run of its own finalized when the script ends. The handler passes the runner a `runner.NewFailureBundle` over the target's evidence writer, which writes `script-NNN-step-SSS-failure`, `-tree.json`, and `-log.jsonl` into the run's `artifacts` directory for a failed step. `NNN` is drawn from the run's shared artifact counter on the first write of each script execution |
 
+`run_script` adds no tool for debugging. An operator attaches an
+inspector to the holder and pauses the run through the attach `debug`
+group, and the handler only reports what happened:
+
+- The tool budget excludes paused time through `pauseToolBudget`, and
+  the call sends progress notifications while paused, so the client
+  request does not time out.
+- A pause ends on resume, when the last debugging viewer leaves, or
+  after `session.debugPauseTimeoutMs`.
+- Closing the session, losing the lease or `disconnect_device` ends the
+  run as device lost, with the steps already run in the result.
+- The result lists the steps an operator ran by hand in `humanActions`,
+  capped at 50 entries, with `humanActionsOmittedCount` for the rest. The
+  field contract is in [`docs/mcp-tools.md`](../../docs/mcp-tools.md).
+
 Run verdicts in `list_runs` and `get_run` depend on liveness. A run
 with no completion time and a live writer has status `running` and no
 `result` or `outcome`. A run with no completion time and no live writer
