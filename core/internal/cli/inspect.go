@@ -122,7 +122,7 @@ func Inspect(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	}
 	_, _ = fmt.Fprintln(stderr, "Press Enter for a fresh URL. "+stopHint(watching))
 
-	enter, stopReading := readEnterKeys(deps.Stdin)
+	enter, stopReading := readEnterKeys(deps.Stdin, nil)
 	defer stopReading()
 	for {
 		select {
@@ -251,12 +251,13 @@ func inspectFollower(deps Deps, desc device.Descriptor) inspector.Opener {
 	}
 }
 
-// readEnterKeys delivers one value per line read from in. The end of
-// in stops the delivery and nothing else. The returned stop ends the
+// readEnterKeys delivers one value per line read from in, carrying the
+// stamp at the moment the line was read. A nil stamp delivers 0. The end
+// of in stops the delivery and nothing else. The returned stop ends the
 // delivery, though a read already blocked on in returns only when in
 // does. A nil in delivers nothing.
-func readEnterKeys(in io.Reader) (<-chan struct{}, func()) {
-	keys := make(chan struct{})
+func readEnterKeys(in io.Reader, stamp func() uint64) (<-chan uint64, func()) {
+	keys := make(chan uint64)
 	done := make(chan struct{})
 	if in == nil {
 		return keys, func() {}
@@ -264,8 +265,12 @@ func readEnterKeys(in io.Reader) (<-chan struct{}, func()) {
 	go func() {
 		scanner := bufio.NewScanner(in)
 		for scanner.Scan() {
+			var at uint64
+			if stamp != nil {
+				at = stamp()
+			}
 			select {
-			case keys <- struct{}{}:
+			case keys <- at:
 			case <-done:
 				return
 			}

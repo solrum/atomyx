@@ -6,14 +6,19 @@ import (
 	"encoding/json"
 	"io"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
+	"dev.atomyx/internal/debugrun"
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/orchestra"
+	"dev.atomyx/internal/session"
+	"dev.atomyx/internal/shutdown"
 )
 
 const debugWait = 5 * time.Second
@@ -261,4 +266,102 @@ func TestRunBreakInASkippedScenarioChildIsReportedUnhit(t *testing.T) {
 	if !strings.Contains(r.stderr.String(), "breakpoint at "+later+":1 was never reached") {
 		t.Fatalf("stderr = %q", r.stderr.String())
 	}
+}
+
+func TestReadEnterKeysStampsEachLineWhenItIsRead(t *testing.T) {
+	pr, pw := io.Pipe()
+	t.Cleanup(func() { _ = pw.Close() })
+	var current atomic.Uint64
+	current.Store(5)
+	stamped := make(chan struct{}, 4)
+	keys, stop := readEnterKeys(pr, func() uint64 {
+		at := current.Load()
+		stamped <- struct{}{}
+		return at
+	})
+	t.Cleanup(stop)
+	go func() { _, _ = pw.Write([]byte("\n\n")) }()
+
+	if first := <-keys; first != 5 {
+		t.Fatalf("first key stamped %d, want 5", first)
+	}
+	<-stamped
+	<-stamped
+	current.Store(6)
+	if second := <-keys; second != 5 {
+		t.Fatalf("second key stamped %d, want 5, the pause number when it was read", second)
+	}
+}
+
+// fakePausedSession reports a fixed pause state and counts resumes.
+type fakePausedSession struct {
+	resumes int
+}
+
+func (*fakePausedSession) Paused() (session.PauseLocation, bool) {
+	return session.PauseLocation{}, true
+}
+
+func (f *fakePausedSession) Resume(context.Context, session.ResumeOptions) (session.ResumeResult, error) {
+	f.resumes++
+	return session.ResumeResult{Resumed: true}, nil
+}
+
+// quietPauser is a debugrun.Pauser that ignores every call.
+type quietPauser struct{ debugrun.Pauser }
+
+func (quietPauser) EnterPause(session.PauseLocation) {}
+
+func TestResumeOnEnterDropsAKeyReadBeforeTheLatestPause(t *testing.T) {
+	sess := &fakePausedSession{}
+	pauser := &promptPauser{Pauser: quietPauser{}, out: io.Discard}
+	d := &runDebug{sess: sess, pauser: pauser, prompt: io.Discard}
+	pauser.EnterPause(session.PauseLocation{})
+	typedAhead := pauser.currentPause()
+	pauser.EnterPause(session.PauseLocation{})
+
+	d.resumeOnEnter(context.Background(), typedAhead)
+	if sess.resumes != 0 {
+		t.Fatalf("a key read before the latest pause resumed the run %d times", sess.resumes)
+	}
+	d.resumeOnEnter(context.Background(), pauser.currentPause())
+	if sess.resumes != 1 {
+		t.Fatalf("a key read during the pause resumed %d times, want 1", sess.resumes)
+	}
+}
+
+func TestRunBreakStopsOnCtrlCWhilePausedAndLeavesNoKeyReaderBehind(t *testing.T) {
+	r := newDebugRun(t, true)
+	path := writeScript(t, "flow.yml", sleepFlow)
+	flags := breakFlags(path)
+	flags["--report-dir"] = t.TempDir()
+	ctx, cancel := context.WithCancelCause(context.Background())
+	t.Cleanup(func() { cancel(nil) })
+	done := make(chan int, 1)
+	go func() { done <- RunScript(ctx, r.deps, flags) }()
+
+	r.stdout.waitFor(t, "Press Enter to resume")
+	cancel(shutdown.InterruptCause(syscall.SIGINT))
+	if code := awaitExit(t, done); code != shutdown.ExitCodeSigint {
+		t.Fatalf("exit code = %d, want %d; stderr: %s", code, shutdown.ExitCodeSigint, r.stderr.String())
+	}
+	if !strings.Contains(r.stderr.String(), "interrupted") {
+		t.Fatalf("stderr = %q, want the interrupted line", r.stderr.String())
+	}
+
+	// A reader blocked on stdin returns only when a line arrives. Once it
+	// has consumed one, it must see that the command stopped and exit.
+	go func() { _, _ = r.stdin.Write([]byte("\n")) }()
+	deadline := time.Now().Add(debugWait)
+	for keyReaderRunning() {
+		if time.Now().After(deadline) {
+			t.Fatal("a goroutine is still reading Enter keys after the command ended")
+		}
+		runtime.Gosched()
+	}
+}
+
+func keyReaderRunning() bool {
+	buf := make([]byte, 1<<20)
+	return strings.Contains(string(buf[:runtime.Stack(buf, true)]), "cli.readEnterKeys")
 }

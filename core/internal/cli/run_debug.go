@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 
 	"dev.atomyx/internal/debugrun"
 	"dev.atomyx/internal/diag"
@@ -23,6 +24,13 @@ type usageError struct{ message string }
 
 func (e usageError) Error() string { return e.message }
 
+// pausedSession is the part of a session the terminal drives: it reads
+// whether the run is paused and resumes it.
+type pausedSession interface {
+	Paused() (session.PauseLocation, bool)
+	Resume(ctx context.Context, opts session.ResumeOptions) (session.ResumeResult, error)
+}
+
 // runDebug is the debugging side of one run command: the adapter that
 // holds the run at its breakpoints, and the terminal that shows where
 // the run stopped and resumes it on Enter.
@@ -32,7 +40,7 @@ type runDebug struct {
 	stderr  io.Writer
 	stdin   io.Reader
 
-	sess     *session.Session
+	sess     pausedSession
 	pauser   *promptPauser
 	stopKeys func()
 }
@@ -113,16 +121,16 @@ func (d *runDebug) attach(ctx context.Context, opened *session.Session, orch *or
 		return
 	}
 	d.sess = opened
-	d.pauser = &promptPauser{Session: opened, out: d.prompt}
+	d.pauser = &promptPauser{Pauser: opened, out: d.prompt}
 	d.adapter.SetFinder(orch)
 	d.adapter.Bind(d.pauser)
-	enter, stopReading := readEnterKeys(d.stdin)
+	enter, stopReading := readEnterKeys(d.stdin, d.pauser.currentPause)
 	done := make(chan struct{})
 	go func() {
 		for {
 			select {
-			case <-enter:
-				d.resumeOnEnter(ctx)
+			case pause := <-enter:
+				d.resumeOnEnter(ctx, pause)
 			case <-done:
 				return
 			}
@@ -154,10 +162,15 @@ func (d *runDebug) reportUnhit() {
 	}
 }
 
-// resumeOnEnter resumes a paused run. When the advisory check says the
-// next step cannot find its target, the first Enter explains and the
-// next one resumes anyway.
-func (d *runDebug) resumeOnEnter(ctx context.Context) {
+// resumeOnEnter resumes a paused run. pause is the pause number current
+// when the key was read, and a key read before the latest pause began is
+// dropped, so an extra Enter typed ahead never skips the next stop. When
+// the advisory check says the next step cannot find its target, the first
+// Enter explains and the next one resumes anyway.
+func (d *runDebug) resumeOnEnter(ctx context.Context, pause uint64) {
+	if pause != d.pauser.currentPause() {
+		return
+	}
 	if _, paused := d.sess.Paused(); !paused {
 		return
 	}
@@ -172,15 +185,22 @@ func (d *runDebug) resumeOnEnter(ctx context.Context) {
 // promptPauser shows where the run stopped on the terminal, in addition
 // to marking the session paused.
 type promptPauser struct {
-	*session.Session
+	debugrun.Pauser
 	out io.Writer
+
+	// pause counts the pauses entered so far.
+	pause atomic.Uint64
 
 	mu    sync.Mutex
 	force bool
 }
 
+// currentPause numbers the pause the run is in, or last was in.
+func (p *promptPauser) currentPause() uint64 { return p.pause.Load() }
+
 func (p *promptPauser) EnterPause(loc session.PauseLocation) {
-	p.Session.EnterPause(loc)
+	p.pause.Add(1)
+	p.Pauser.EnterPause(loc)
 	p.mu.Lock()
 	p.force = false
 	p.mu.Unlock()
