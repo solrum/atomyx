@@ -34,7 +34,7 @@ func (TypeCommand) Execute(step script.ScriptStep, ctx *CommandContext) CommandR
 		if !result.Ok {
 			return CommandResult{Ok: false, Detail: strPtr(actionFailureDetail(result))}
 		}
-		return CommandResult{Ok: true, Detail: strPtr(typedDetail(s.Text, ""))}
+		return CommandResult{Ok: true, Detail: strPtr(typedDetail(ctx, s.Text, ""))}
 	}
 
 	if err := ctx.Orchestra.TypeText(ctx.Context, s.Text); err != nil {
@@ -43,12 +43,17 @@ func (TypeCommand) Execute(step script.ScriptStep, ctx *CommandContext) CommandR
 		}
 		panic(err)
 	}
-	return CommandResult{Ok: true, Detail: strPtr(typedDetail(s.Text, " into focused field"))}
+	return CommandResult{Ok: true, Detail: strPtr(typedDetail(ctx, s.Text, " into focused field"))}
 }
 
 // typedDetail reports how many characters a type step entered and never
 // the text itself, because the text can be a secret and the detail
-// flows into run logs, results, failure bundles and reports.
-func typedDetail(text, suffix string) string {
+// flows into run logs, results, failure bundles and reports. Text that
+// is or contains a secret value reports no count either, because the
+// length of a secret is itself a leak.
+func typedDetail(ctx *CommandContext, text, suffix string) string {
+	if snapshotVariables(ctx.Variables, ctx.Secrets).MentionsSecret(text) {
+		return "Typed a secret value" + suffix
+	}
 	return fmt.Sprintf("Typed %d characters%s", utf8.RuneCountInString(text), suffix)
 }

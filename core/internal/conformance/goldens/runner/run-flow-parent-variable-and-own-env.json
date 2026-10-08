@@ -150,7 +150,7 @@
     {
       "command": "type",
       "depth": 1,
-      "detail": "Typed 21 characters",
+      "detail": "Typed a secret value",
       "durationMs": 0,
       "line": null,
       "ok": true,

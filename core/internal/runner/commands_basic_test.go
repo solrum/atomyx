@@ -10,6 +10,7 @@ import (
 	"dev.atomyx/internal/driver/mock"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/script"
+	"dev.atomyx/internal/script/expression"
 	"dev.atomyx/internal/wire"
 )
 
@@ -560,12 +561,45 @@ func (cancelPanicCommand) Execute(script.ScriptStep, *CommandContext) CommandRes
 
 func TestTypedDetail_CountsRunesAndNeverEchoesText(t *testing.T) {
 	const secret = "pässwörd🙂"
-	got := typedDetail(secret, "")
+	got := typedDetail(&CommandContext{}, secret, "")
 	if got != "Typed 9 characters" {
 		t.Fatalf("got %q, want the rune count", got)
 	}
 	if strings.Contains(got, "ss") {
 		t.Fatalf("detail %q echoes the typed text", got)
+	}
+}
+
+func TestTypedDetail_SecretTextReportsNoCount(t *testing.T) {
+	ctx := &CommandContext{
+		Variables: map[string]ScriptValue{"PASSWORD": expression.StringValue("hunter2hunter2")},
+		Secrets:   map[string]bool{"PASSWORD": true},
+	}
+	cases := []struct{ text, suffix, want string }{
+		{"hunter2hunter2", "", "Typed a secret value"},
+		{"pw is hunter2hunter2 ok", " into focused field", "Typed a secret value into focused field"},
+		{"${PASSWORD}", "", "Typed a secret value"},
+		{"plain", "", "Typed 5 characters"},
+	}
+	for _, c := range cases {
+		if got := typedDetail(ctx, c.text, c.suffix); got != c.want {
+			t.Errorf("typedDetail(%q) = %q, want %q", c.text, got, c.want)
+		}
+	}
+}
+
+func TestTypeCommand_SecretValueStepDetailHasNoCount(t *testing.T) {
+	tr := newTestRunner()
+	tr.driver.StageHierarchy(rootTree(focusedButton("email", "", "0,200,100,250")))
+
+	result := run(t, tr, "appId: com.test\nenv:\n  PASSWORD: hunter2hunter2\n---\n- type: ${PASSWORD}\n")
+
+	if !result.Ok {
+		t.Fatalf("got Ok=false: %s", debugSteps(result.Steps))
+	}
+	got := detail(lastStep(t, result))
+	if got != "Typed a secret value into focused field" {
+		t.Fatalf("got detail %q, want no character count", got)
 	}
 }
 

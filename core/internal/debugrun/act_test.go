@@ -303,3 +303,33 @@ func TestRunEndCancelsAnActInFlight(t *testing.T) {
 	}
 	<-actDone
 }
+
+func TestPausedRunTypeStepNeverReportsTheLengthOfASecret(t *testing.T) {
+	h := newHarness(t, breakAt(5))
+	focused := true
+	tree := goButtonTree()
+	tree.Children[0].Focused = &focused
+	h.driver.StageHierarchy(tree)
+	h.start("appId: com.test\nenv:\n  PASSWORD: hunter2hunter2\n---\n- screenshot: a\n- screenshot: b\n")
+	h.awaitPause()
+	run := h.adapter.current().run
+	typed := func(text string) string {
+		step, err := parseActStep("type: "+text, map[string]string{"PASSWORD": "hunter2hunter2"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		result, err := run.ExecuteStep(context.Background(), step)
+		if err != nil || !result.Ok || result.Detail == nil {
+			t.Fatalf("type %q: result = %+v err=%v", text, result, err)
+		}
+		return *result.Detail
+	}
+
+	if got := typed("${PASSWORD}"); got != "Typed a secret value into focused field" {
+		t.Errorf("secret detail = %q, want no length", got)
+	}
+	if got := typed("hello"); got != "Typed 5 characters into focused field" {
+		t.Errorf("plain detail = %q, want the count", got)
+	}
+	finish(h)
+}
