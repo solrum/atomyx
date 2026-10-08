@@ -308,3 +308,19 @@ func ptrText(p *string) string {
 	}
 	return *p
 }
+
+func TestStepGate_ReceivesTheStepAboutToRun(t *testing.T) {
+	gate := &funcGate{}
+	tr := gatedRunner(gate, "/s/flow.yaml")
+	tr.driver.StageHierarchy(rootTree(button("go", "Go", "0,0,10,10")))
+
+	run(t, tr, nestedYAML)
+	if len(gate.seen) == 0 {
+		t.Fatal("the gate saw no step")
+	}
+	for _, s := range gate.seen {
+		if s.Step == nil || s.Step.StepCommand() != s.Command {
+			t.Fatalf("gate step %+v does not carry the step it describes", s)
+		}
+	}
+}

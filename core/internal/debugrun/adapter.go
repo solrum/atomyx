@@ -33,6 +33,8 @@ type Options struct {
 	// Scripts lists the scripts the run executes, so a location a viewer
 	// sets is checked against their authored steps. Nil skips the check.
 	Scripts func() []runner.BreakScript
+	// Finder backs the advisory check on resume. Nil skips the check.
+	Finder Finder
 }
 
 // Adapter implements runner.StepGate and session.Debugger over one run
@@ -195,11 +197,19 @@ func (a *Adapter) Pause() error {
 }
 
 // Resume implements session.Debugger.
-func (a *Adapter) Resume(_ context.Context, opts session.ResumeOptions) (session.ResumeResult, error) {
+func (a *Adapter) Resume(ctx context.Context, opts session.ResumeOptions) (session.ResumeResult, error) {
+	state := a.current()
+	if state == nil {
+		return session.ResumeResult{}, errNotPaused()
+	}
+	if !opts.Force {
+		if reason := a.missReason(ctx, state.step); reason != "" {
+			return session.ResumeResult{MissReason: reason}, nil
+		}
+	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	state := a.paused
-	if state == nil {
+	if a.paused != state {
 		return session.ResumeResult{}, errNotPaused()
 	}
 	a.paused = nil

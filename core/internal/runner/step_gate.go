@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"dev.atomyx/internal/diag"
+	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/script"
 )
 
@@ -29,6 +30,8 @@ type GateStep struct {
 	StepIndex int
 	// Command is the step's command name.
 	Command string
+	// Step is the step about to run, as the runner will execute it.
+	Step script.ScriptStep
 }
 
 // StepGate is consulted before every step that is about to run. It may
@@ -90,6 +93,12 @@ func snapshotVariables(variables map[string]ScriptValue, secrets map[string]bool
 	return VariableSnapshot{Values: values, Secret: secret}
 }
 
+// SelectorFor compiles a script selector the way the selector commands do,
+// so a host that looks for the element of a step finds what the step would.
+func SelectorFor(sel script.ScriptSelector) orchestra.Selector {
+	return compileScriptSelector(sel)
+}
+
 // stepLocation renders the location a gate sees for a top-level step.
 func (r *ScriptRunner) stepLocation(line *int) string {
 	if line == nil {
@@ -104,7 +113,7 @@ func (r *ScriptRunner) stepLocation(line *int) string {
 
 // gateStep asks the configured gate whether step may run. A nil gate
 // always allows it.
-func (r *ScriptRunner) gateStep(ctx context.Context, rs *runState, location string, command string) error {
+func (r *ScriptRunner) gateStep(ctx context.Context, rs *runState, location string, step script.ScriptStep) error {
 	if r.deps.StepGate == nil {
 		return nil
 	}
@@ -114,7 +123,8 @@ func (r *ScriptRunner) gateStep(ctx context.Context, rs *runState, location stri
 		Location:  location,
 		Depth:     rs.depth,
 		StepIndex: rs.globalStepIndex,
-		Command:   command,
+		Command:   step.StepCommand(),
+		Step:      step,
 	}, run)
 }
 

@@ -380,7 +380,7 @@ func (r *ScriptRunner) Run(ctx context.Context, def *script.ScriptDefinition) (S
 		}
 
 		line := lineForStep(def, i)
-		if err := r.gateStep(ctx, rs, r.stepLocation(line), step.StepCommand()); err != nil {
+		if err := r.gateStep(ctx, rs, r.stepLocation(line), step); err != nil {
 			return ScriptResult{}, err
 		}
 
@@ -628,7 +628,7 @@ func (r *ScriptRunner) runNestedSteps(ctx context.Context, rs *runState, steps [
 			continue
 		}
 
-		if err := r.gateStep(ctx, rs, "", step.StepCommand()); err != nil {
+		if err := r.gateStep(ctx, rs, "", step); err != nil {
 			rs.gateErr = err
 			return CommandResult{Ok: false, Detail: strPtr(err.Error())}
 		}

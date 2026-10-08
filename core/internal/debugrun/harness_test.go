@@ -45,6 +45,7 @@ type harness struct {
 	adapter *Adapter
 	pauser  *fakePauser
 	driver  *mock.Driver
+	orch    *orchestra.Orchestra
 	runner  *runner.ScriptRunner
 	started atomic.Int32
 	done    chan outcome
@@ -59,10 +60,11 @@ func newHarness(t *testing.T, opts Options) *harness {
 	d.Apps = []driver.InstalledApp{{BundleID: "com.test"}}
 	clock := orchestra.NewFakeClock(0)
 	h := &harness{t: t, driver: d, pauser: newFakePauser(), done: make(chan outcome, 1)}
+	h.orch = orchestra.New(orchestra.OrchestraDeps{Driver: d, Clock: clock})
 	h.adapter = New(opts)
 	h.adapter.Bind(h.pauser)
 	h.runner = runner.NewScriptRunner(runner.ScriptRunnerDeps{
-		Orchestra:  orchestra.New(orchestra.OrchestraDeps{Driver: d, Clock: clock}),
+		Orchestra:  h.orch,
 		Clock:      clock,
 		Logger:     logging.NoopLogger{},
 		Commands:   runner.DefaultCommands(),

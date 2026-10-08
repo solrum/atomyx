@@ -1,0 +1,134 @@
+package debugrun
+
+import (
+	"context"
+	"strings"
+	"testing"
+
+	"dev.atomyx/internal/diag"
+	"dev.atomyx/internal/runner"
+	"dev.atomyx/internal/script"
+	"dev.atomyx/internal/script/expression"
+	"dev.atomyx/internal/session"
+)
+
+const tapFlow = "appId: com.test\n---\n" +
+	"- screenshot: a\n" + // line 3
+	"- tap: Missing\n" // line 4
+
+func pausedAt(t *testing.T, yaml string, line int) *harness {
+	t.Helper()
+	h := newHarness(t, breakAt(line))
+	h.adapter.opts.Finder = h.orch
+	h.driver.StageHierarchy(goButtonTree())
+	h.start(yaml)
+	h.awaitPause()
+	return h
+}
+
+func finish(h *harness) {
+	h.resume(session.ResumeOptions{Force: true})
+	h.awaitDone()
+}
+
+func errorCode(err error) string {
+	code, _, _ := diag.Describe(err)
+	return code
+}
+
+func TestActRunsAStepAndLeavesTheRunVariablesAlone(t *testing.T) {
+	h := pausedAt(t, tapFlow, 3)
+	before, _ := h.adapter.Variables()
+
+	res, err := h.adapter.Act(context.Background(), "read: { selector: { id: go }, field: text, as: scratch }")
+	if err != nil || res.Outcome != "passed" || res.Command != "read" {
+		t.Fatalf("act = %+v err=%v, want a passed read", res, err)
+	}
+	after, _ := h.adapter.Variables()
+	if _, leaked := after.Variables["scratch"]; leaked || len(after.Variables) != len(before.Variables) {
+		t.Fatalf("act wrote into the run: before %v after %v", before.Variables, after.Variables)
+	}
+	finish(h)
+}
+
+func TestActRefusesStepsThatRunOtherSteps(t *testing.T) {
+	h := pausedAt(t, tapFlow, 3)
+	for _, step := range []string{"runFlow: other.yaml", "- handle:\n    - when:\n        visible: Go\n      do:\n        - screenshot: x"} {
+		if _, err := h.adapter.Act(context.Background(), step); errorCode(err) != diag.CodeInvalidArgument {
+			t.Errorf("%q: code %q, want %q", step, errorCode(err), diag.CodeInvalidArgument)
+		}
+	}
+	finish(h)
+}
+
+func TestActReportsAFailedStepAndRejectsUnreadableText(t *testing.T) {
+	h := pausedAt(t, tapFlow, 3)
+	res, err := h.adapter.Act(context.Background(), "tap: Nowhere to be found")
+	if err != nil || res.Outcome != "failed" || res.Message == "" {
+		t.Fatalf("act = %+v err=%v, want a failed result with a message", res, err)
+	}
+	for _, bad := range []string{"", "tap: [", "- tap: a\n- tap: b"} {
+		if _, err := h.adapter.Act(context.Background(), bad); errorCode(err) != diag.CodeInvalidArgument {
+			t.Errorf("%q: code %q, want %q", bad, errorCode(err), diag.CodeInvalidArgument)
+		}
+	}
+	finish(h)
+}
+
+func TestActAndVariablesRefuseWhenNotPaused(t *testing.T) {
+	_, err := New(Options{}).Act(context.Background(), "tap: Go")
+	if errorCode(err) != diag.CodeHolderBusy {
+		t.Fatalf("code %q, want %q", errorCode(err), diag.CodeHolderBusy)
+	}
+}
+
+func TestResumeIsAdvisoryWhenTheNextTargetIsMissing(t *testing.T) {
+	h := pausedAt(t, tapFlow, 4)
+
+	res := h.resume(session.ResumeOptions{})
+	if res.Resumed || res.MissReason == "" {
+		t.Fatalf("resume = %+v, want a refusal that says why", res)
+	}
+	if h.adapter.current() == nil {
+		t.Fatal("a refused resume must leave the run paused")
+	}
+	if forced := h.resume(session.ResumeOptions{Force: true}); !forced.Resumed {
+		t.Fatalf("forced resume = %+v, want it to go through", forced)
+	}
+	h.awaitDone()
+}
+
+func TestResumeChecksOnlyImmediateActionsWithATarget(t *testing.T) {
+	h := pausedAt(t, tapFlow, 3)
+	if res := h.resume(session.ResumeOptions{}); !res.Resumed {
+		t.Fatalf("a screenshot step was checked: %+v", res)
+	}
+	h.awaitDone()
+}
+
+// leakyRun is a paused run whose step failure echoes a secret value.
+type leakyRun struct{}
+
+func (leakyRun) ExecuteStep(context.Context, script.ScriptStep) (runner.CommandResult, error) {
+	detail := "the field held hunter2hunter2 when it should not"
+	return runner.CommandResult{Ok: false, Detail: &detail}, nil
+}
+
+func (leakyRun) Variables() runner.VariableSnapshot {
+	return runner.VariableSnapshot{
+		Values: map[string]runner.ScriptValue{"PASSWORD": expression.StringValue("hunter2hunter2")},
+		Secret: map[string]bool{"PASSWORD": true},
+	}
+}
+
+func TestActMessageNeverShowsASecretValue(t *testing.T) {
+	a := New(Options{})
+	a.paused = &pauseState{run: leakyRun{}}
+	res, err := a.Act(context.Background(), "tap: Go")
+	if err != nil || res.Outcome != "failed" {
+		t.Fatalf("act = %+v err=%v, want a failed result", res, err)
+	}
+	if strings.Contains(res.Message, "hunter2hunter2") {
+		t.Fatalf("message leaks the secret: %q", res.Message)
+	}
+}
