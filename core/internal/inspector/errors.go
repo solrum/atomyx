@@ -87,6 +87,8 @@ func writeFailure(w http.ResponseWriter, err error) {
 		writeCoded(w, http.StatusConflict, code, message, remedy)
 	case diag.CodeInvalidArgument:
 		writeCoded(w, http.StatusBadRequest, code, message, remedy)
+	case diag.CodeUnsupported:
+		writeCoded(w, http.StatusNotImplemented, code, message, remedy)
 	case diag.CodeUnknown:
 		writeCoded(w, http.StatusInternalServerError, diag.CodeUnknown, "the request failed", "")
 	default:

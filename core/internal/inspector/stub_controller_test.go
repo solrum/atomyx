@@ -26,7 +26,11 @@ type stubController struct {
 	// records one. duringFresh runs inside FreshTree.
 	holder      string
 	duringFresh func()
+	// debug is the client Debug offers, nil for a holder without debugging.
+	debug session.DebugClient
 }
+
+func (c *stubController) Debug() (session.DebugClient, bool) { return c.debug, c.debug != nil }
 
 func (c *stubController) Info() session.Info { return c.info }
 

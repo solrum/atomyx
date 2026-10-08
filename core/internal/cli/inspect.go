@@ -92,7 +92,7 @@ func Inspect(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		Source: host,
 		Logger: logger,
 		Clock:  deps.clock(),
-		Groups: []inspector.RouteGroup{inspector.PageRoutes, host.Routes(inspector.ReadRoutes, inspector.SelectorRoutes)},
+		Groups: []inspector.RouteGroup{inspector.PageRoutes, host.Routes(inspector.ReadRoutes, inspector.SelectorRoutes, inspector.DebugRoutes)},
 	})
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
