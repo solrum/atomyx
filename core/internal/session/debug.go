@@ -105,3 +105,36 @@ func (s *Session) Resume(ctx context.Context, opts ResumeOptions) (ResumeResult,
 	s.publishCurrent()
 	return result, nil
 }
+
+// SetBreakpoints replaces every breakpoint of the run. It is admitted at
+// any time, and fails with diag.CodeUnsupported when the session has no
+// Debugger.
+func (s *Session) SetBreakpoints(locations []string) error {
+	if s.debugger == nil {
+		return diag.NewUnsupported("debug.breakpoints.set")
+	}
+	return s.debugger.SetBreakpoints(locations)
+}
+
+// Pause asks the run to stop before its next step. It is admitted at any
+// time, and fails with diag.CodeUnsupported when the session has no
+// Debugger.
+func (s *Session) Pause() error {
+	if s.debugger == nil {
+		return diag.NewUnsupported("debug.pause")
+	}
+	return s.debugger.Pause()
+}
+
+// Variables reports the variables visible at the pause, already redacted.
+// It fails with diag.CodeUnsupported when the session has no Debugger and
+// with diag.CodeHolderBusy when the run is not paused.
+func (s *Session) Variables() (VariablesView, error) {
+	if s.debugger == nil {
+		return VariablesView{}, diag.NewUnsupported("debug.variables.get")
+	}
+	if _, paused := s.Paused(); !paused {
+		return VariablesView{}, notPaused()
+	}
+	return s.debugger.Variables()
+}

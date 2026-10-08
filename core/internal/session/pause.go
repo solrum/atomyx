@@ -22,7 +22,7 @@ func (s *Session) EnterPause(loc PauseLocation) {
 	s.pause = &loc
 	s.mu.Unlock()
 	holder := s.Info().Holder
-	s.hub.PublishState(StatePaused, holder.Command, holder.RunID)
+	s.hub.PublishState(StatePaused, holder.Command, holder.RunID, &loc)
 }
 
 // LeavePause clears the pause mark and tells the viewers the activity
@@ -53,5 +53,5 @@ func (s *Session) publishCurrent() {
 	s.publishMu.Lock()
 	defer s.publishMu.Unlock()
 	info := s.Info()
-	s.hub.PublishState(info.State, info.Holder.Command, info.Holder.RunID)
+	s.hub.PublishState(info.State, info.Holder.Command, info.Holder.RunID, info.Pause)
 }

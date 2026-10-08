@@ -240,7 +240,11 @@ func (s *Session) publishState(state HolderState, runID string) {
 	if _, paused := s.Paused(); paused && (state == StateRunning || state == StateIdle) {
 		state = StatePaused
 	}
-	s.hub.PublishState(state, s.Info().Holder.Command, runID)
+	var pause *PauseLocation
+	if loc, paused := s.Paused(); paused && state == StatePaused {
+		pause = &loc
+	}
+	s.hub.PublishState(state, s.Info().Holder.Command, runID, pause)
 }
 
 // persistActivity writes the session's current activity to the lease

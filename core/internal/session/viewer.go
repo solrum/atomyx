@@ -70,6 +70,9 @@ type Observation struct {
 	State   HolderState
 	Command string
 	RunID   string
+	// Pause is the location of a paused run. It is set only on an
+	// ObservedState whose State is StatePaused.
+	Pause *PauseLocation
 }
 
 // Snapshot is the newest capture of each kind, as a viewer may show it.

@@ -18,6 +18,7 @@ type attachHandlers struct {
 var (
 	_ attach.SessionHandler = (*attachHandlers)(nil)
 	_ attach.ObserveHandler = (*attachHandlers)(nil)
+	_ attach.DebugHandler   = (*attachHandlers)(nil)
 )
 
 func (s *Session) attachHandlers() attach.Handlers {
@@ -25,6 +26,9 @@ func (s *Session) attachHandlers() attach.Handlers {
 	handlers := attach.Handlers{Session: h, Observe: h, Viewers: h}
 	if s.yielder != nil {
 		handlers.Control = s.yielder
+	}
+	if s.debugger != nil {
+		handlers.Debug = h
 	}
 	return handlers
 }
@@ -164,7 +168,7 @@ func (h *attachHandlers) relay(ctx context.Context, observations <-chan Observat
 				return
 			}
 		case ObservedState:
-			if !send(attach.Notice{Type: attach.NoticeState, Data: attach.StateNotice{State: string(o.State), Command: o.Command, RunID: o.RunID}}) {
+			if !send(attach.Notice{Type: attach.NoticeState, Data: stateNotice(o)}) {
 				return
 			}
 		case ObservedStepGap:
@@ -184,6 +188,14 @@ func (h *attachHandlers) relay(ctx context.Context, observations <-chan Observat
 			return
 		}
 	}
+}
+
+func stateNotice(o Observation) attach.StateNotice {
+	n := attach.StateNotice{State: string(o.State), Command: o.Command, RunID: o.RunID}
+	if o.Pause != nil && o.State == StatePaused {
+		n.Pause = &attach.PauseLocation{Source: o.Pause.Source, Line: o.Pause.Line, Depth: o.Pause.Depth, Command: o.Pause.Command}
+	}
+	return n
 }
 
 // noticeState reads the pairing the hub holds when the notice is sent,
