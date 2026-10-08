@@ -123,14 +123,84 @@ func TestDebugLock_AnActWaitsForAFreshCaptureInFlight(t *testing.T) {
 	}
 }
 
-func TestDebug_ActNeedsAPausedRunAndADebugger(t *testing.T) {
+func TestDebugLock_ResumeWaitsForAnInFlightAct(t *testing.T) {
+	dbg := &fakeDebugger{actEntered: make(chan struct{}), actRelease: make(chan struct{}), resumeOut: session.ResumeResult{Resumed: true}}
+	s, _, _ := debuggableHolder(t, dbg)
+	s.EnterPause(testPause)
+	done := make(chan error, 1)
+	go func() { _, err := s.Act(context.Background(), "tap: {id: ok}"); done <- err }()
+	<-dbg.actEntered
+
+	if _, err := s.Resume(canceledContext(), session.ResumeOptions{}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("resume during an act: %v, want it to wait for the lock and give up", err)
+	}
+	if _, resumes := dbg.counts(); resumes != 0 {
+		t.Fatalf("the runner was woken %d times while an act ran", resumes)
+	}
+	if _, paused := s.Paused(); !paused {
+		t.Fatal("a resume that gave up cleared the pause")
+	}
+
+	close(dbg.actRelease)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if res, err := s.Resume(context.Background(), session.ResumeOptions{}); err != nil || !res.Resumed {
+		t.Fatalf("resume after the act = %+v, %v", res, err)
+	}
+	if _, paused := s.Paused(); paused {
+		t.Fatal("still paused after a successful resume")
+	}
+}
+
+func TestResume_ARefusalOrAnErrorKeepsThePause(t *testing.T) {
+	dbg := &fakeDebugger{resumeOut: session.ResumeResult{MissReason: "no match for id ok"}}
+	s, _, _ := debuggableHolder(t, dbg)
+	s.EnterPause(testPause)
+
+	res, err := s.Resume(context.Background(), session.ResumeOptions{})
+	if err != nil || res.Resumed || res.MissReason == "" {
+		t.Fatalf("resume = %+v, %v, want an advisory refusal", res, err)
+	}
+	if loc, paused := s.Paused(); !paused || loc != testPause {
+		t.Fatalf("pause after a refusal = %+v, %v, want it kept", loc, paused)
+	}
+
+	dbg.resumeErr = errors.New("boom")
+	if _, err := s.Resume(context.Background(), session.ResumeOptions{}); err == nil {
+		t.Fatal("resume error was swallowed")
+	}
+	if _, paused := s.Paused(); !paused {
+		t.Fatal("pause cleared by a failed resume")
+	}
+}
+
+func TestResume_ARunThatStopsAtItsNextStepStaysPaused(t *testing.T) {
+	next := session.PauseLocation{Source: testPause.Source, Line: 8, Command: "type"}
+	dbg := &fakeDebugger{resumeOut: session.ResumeResult{Resumed: true}}
+	s, _, _ := debuggableHolder(t, dbg)
+	dbg.onResume = func() { s.EnterPause(next) }
+	s.EnterPause(testPause)
+
+	if _, err := s.Resume(context.Background(), session.ResumeOptions{Step: true}); err != nil {
+		t.Fatal(err)
+	}
+	if loc, paused := s.Paused(); !paused || loc != next {
+		t.Fatalf("pause after a step = %+v, %v, want the new stop at %+v", loc, paused, next)
+	}
+}
+
+func TestDebug_ActAndResumeNeedAPausedRunAndADebugger(t *testing.T) {
 	dbg := &fakeDebugger{resumeOut: session.ResumeResult{Resumed: true}}
 	s, _, _ := debuggableHolder(t, dbg)
 	if _, err := s.Act(context.Background(), "tap: {id: ok}"); codeOf(err) != diag.CodeHolderBusy {
 		t.Fatalf("act while not paused: %v, want %s", err, diag.CodeHolderBusy)
 	}
-	if acts, _ := dbg.counts(); acts != 0 {
-		t.Fatalf("the debugger ran %d acts for a run that is not paused", acts)
+	if _, err := s.Resume(context.Background(), session.ResumeOptions{}); codeOf(err) != diag.CodeHolderBusy {
+		t.Fatalf("resume while not paused: %v, want %s", err, diag.CodeHolderBusy)
+	}
+	if acts, resumes := dbg.counts(); acts+resumes != 0 {
+		t.Fatalf("the debugger was called %d times for a run that is not paused", acts+resumes)
 	}
 
 	plain, _ := openMock(t)
@@ -168,4 +238,10 @@ func TestAttachTreeFresh_IsAdmittedWhilePausedEvenWithACallInFlight(t *testing.T
 	if err := <-done; err != nil {
 		t.Fatal(err)
 	}
+}
+
+func canceledContext() context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	return ctx
 }

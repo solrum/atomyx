@@ -73,3 +73,35 @@ func (s *Session) Act(ctx context.Context, stepYAML string) (ActResult, error) {
 	}
 	return s.debugger.Act(ctx, stepYAML)
 }
+
+// Resume lets the paused run continue. It waits for an act in flight,
+// because the runner must not drive the device while an act does.
+//
+// The pause mark is cleared before the Debugger wakes the runner, so a
+// runner that stops at its very next step is never overwritten by a late
+// clear. A refusal or an error puts the mark back and publishes nothing.
+// It fails with diag.CodeUnsupported when the session has no Debugger and
+// with diag.CodeHolderBusy when the run is not paused.
+func (s *Session) Resume(ctx context.Context, opts ResumeOptions) (ResumeResult, error) {
+	if s.debugger == nil {
+		return ResumeResult{}, diag.NewUnsupported("debug.resume")
+	}
+	release, err := s.lockDebug(ctx)
+	if err != nil {
+		return ResumeResult{}, err
+	}
+	defer release()
+	loc, paused := s.clearPause()
+	if !paused {
+		return ResumeResult{}, notPaused()
+	}
+	result, err := s.debugger.Resume(ctx, opts)
+	if err != nil || !result.Resumed {
+		s.mu.Lock()
+		s.pause = &loc
+		s.mu.Unlock()
+		return result, err
+	}
+	s.publishCurrent()
+	return result, nil
+}

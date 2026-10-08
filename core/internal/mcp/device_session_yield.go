@@ -60,6 +60,8 @@ func (s *DeviceSession) yieldRefusalLocked() string {
 	switch {
 	case s.closed || s.sess == nil:
 		return "the session holds no device at the moment"
+	case s.pausedLocked():
+		return "a person is debugging a run on this device"
 	case s.inFlight > 0:
 		return "a tool call is running"
 	case s.openRunID() != "":

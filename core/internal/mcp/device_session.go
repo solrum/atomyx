@@ -733,6 +733,9 @@ func (s *DeviceSession) BeginCall(tool string) error {
 	if err := s.expiryErrorLocked(tool); err != nil {
 		return err
 	}
+	if toolsNeedingTheDevice[tool] && s.pausedLocked() {
+		return diag.NewHolderBusy("a person is debugging a run on this device")
+	}
 	if tool == "start_run" {
 		s.expired = nil
 	}
@@ -773,6 +776,17 @@ func (s *DeviceSession) expiryErrorLocked(tool string) error {
 		return diag.NewRunExpired(s.expired.id)
 	}
 	return nil
+}
+
+// pausedLocked reports that the held session's run is stopped for a
+// person to debug. A paused session is owned by that person, so no idle
+// timer may release it and no other process may take it.
+func (s *DeviceSession) pausedLocked() bool {
+	if s.sess == nil {
+		return false
+	}
+	_, paused := s.sess.Paused()
+	return paused
 }
 
 func (s *DeviceSession) openRunID() string {
@@ -833,6 +847,11 @@ func (s *DeviceSession) onTimer(gen uint64, kind timerKind) {
 
 	s.mu.Lock()
 	if s.closed || gen != s.timerGen || s.inFlight > 0 || s.sess == nil {
+		s.mu.Unlock()
+		return
+	}
+	if s.pausedLocked() {
+		s.settleLocked()
 		s.mu.Unlock()
 		return
 	}
