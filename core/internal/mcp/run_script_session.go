@@ -168,15 +168,25 @@ type scriptArtifacts struct {
 	mu             sync.Mutex
 	screenshots    []runner.Screenshot
 	evidencePrefix string
+	onFile         func(string)
 }
 
 func newScriptArtifacts(dir string, counter *artifactCounter, logger logging.Logger) *scriptArtifacts {
 	return &scriptArtifacts{dir: dir, counter: counter, logger: logger}
 }
 
+// OnFile sets the function that receives the run-relative path of each
+// screenshot file as it is written.
+func (a *scriptArtifacts) OnFile(fn func(string)) {
+	a.mu.Lock()
+	a.onFile = fn
+	a.mu.Unlock()
+}
+
 func (a *scriptArtifacts) AddScreenshot(label string, data []byte, mimeType string) {
 	a.mu.Lock()
 	a.screenshots = append(a.screenshots, runner.Screenshot{Label: label, Data: data, MimeType: mimeType})
+	onFile := a.onFile
 	a.mu.Unlock()
 
 	name := fmt.Sprintf("script-%03d", a.counter.next())
@@ -186,6 +196,10 @@ func (a *scriptArtifacts) AddScreenshot(label string, data []byte, mimeType stri
 	path := filepath.Join(a.dir, name+"."+detectScreenshotExt(data))
 	if err := os.WriteFile(path, data, artifactFileMode); err != nil {
 		a.logger.Warn("run.artifact_write_failed", logging.LogContext{"path": path, "error": err.Error()})
+		return
+	}
+	if onFile != nil {
+		onFile(filepath.ToSlash(filepath.Join(filepath.Base(a.dir), filepath.Base(path))))
 	}
 }
 

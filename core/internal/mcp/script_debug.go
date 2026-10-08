@@ -165,10 +165,12 @@ var (
 )
 
 // beginScriptDebug starts debugging the script def, run by orch under
-// ctx. It returns nil and a no-op when the session holds no device or
-// another script is already being debugged. The returned function must
+// ctx. Screenshot files that artifacts writes are offered to the debug
+// run, so a step a person runs by hand can name its screenshot. It
+// returns nil and a no-op when the session holds no device or another
+// script is already being debugged. The returned function must
 // run when the script ends.
-func (s *DeviceSession) beginScriptDebug(ctx context.Context, orch *orchestra.Orchestra, def *script.ScriptDefinition) (*scriptDebugRun, func()) {
+func (s *DeviceSession) beginScriptDebug(ctx context.Context, orch *orchestra.Orchestra, def *script.ScriptDefinition, artifacts runner.ScriptArtifacts) (*scriptDebugRun, func()) {
 	s.mu.Lock()
 	held := s.sess
 	s.mu.Unlock()
@@ -183,6 +185,9 @@ func (s *DeviceSession) beginScriptDebug(ctx context.Context, orch *orchestra.Or
 	run.adapter.Bind(run)
 	if !s.debug.begin(run) {
 		return nil, func() {}
+	}
+	if sink, ok := artifacts.(interface{ OnFile(func(string)) }); ok {
+		sink.OnFile(run.adapter.NoteArtifact)
 	}
 	return run, func() { s.debug.end(run) }
 }

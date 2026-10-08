@@ -164,7 +164,7 @@ func registerRunScriptTool(server *mcp.Server, tc *ToolContext) {
 		result, err := tc.RunSession.RunScript(ctx, def.Name, tc.Session.SelectedDescriptor(),
 			func(target scriptTarget) (runner.ScriptResult, error) {
 				var gate runner.StepGate
-				dbg, endDebug := tc.Session.beginScriptDebug(target.Ctx, orch, def)
+				dbg, endDebug := tc.Session.beginScriptDebug(target.Ctx, orch, def, target.Artifacts)
 				defer endDebug()
 				defer func() { actions = dbg.humanActions() }()
 				if dbg != nil {

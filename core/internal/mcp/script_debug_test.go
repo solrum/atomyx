@@ -488,3 +488,31 @@ func TestScriptDebug_AnAutoResumeAimedAtAnEarlierPauseLeavesTheNextPauseAlone(t 
 		t.Fatalf("paused = %v at %+v, want the second pause untouched by the timeout of the first", paused, loc)
 	}
 }
+
+func TestScriptDebug_AScreenshotAPersonTookIsNamedInTheActionAndTheIntervention(t *testing.T) {
+	h := newDebugHarness(t)
+	h.pauseBeforeLine(debugScript, "5")
+
+	acted, err := h.held().Act(h.ctx, "screenshot: by-hand")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(acted.Artifacts) != 1 || !strings.HasPrefix(acted.Artifacts[0], "artifacts/script-") {
+		t.Fatalf("act artifacts = %v, want the screenshot file the act wrote", acted.Artifacts)
+	}
+	var recorded []string
+	for _, entry := range h.held().Interventions() {
+		recorded = append(recorded, entry.Artifacts...)
+	}
+	if len(recorded) != 1 || recorded[0] != acted.Artifacts[0] {
+		t.Fatalf("intervention artifacts = %v, want %v", recorded, acted.Artifacts)
+	}
+	if _, err := h.held().Resume(h.ctx, session.ResumeOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	actions, _ := h.awaitResult()["humanActions"].([]any)
+	first, _ := actions[0].(map[string]any)
+	if got, _ := first["artifacts"].([]any); len(got) != 1 || got[0] != acted.Artifacts[0] {
+		t.Fatalf("humanActions[0] = %v, want the screenshot %s", first, acted.Artifacts[0])
+	}
+}
