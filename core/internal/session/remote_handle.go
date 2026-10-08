@@ -189,6 +189,9 @@ func (h *RemoteHandle) Info() Info {
 	}
 	info = h.infoFrom(status)
 	h.mu.Lock()
+	if info.State == StatePaused {
+		info.Pause = h.info.Pause
+	}
 	h.info = info
 	h.mu.Unlock()
 	return info
