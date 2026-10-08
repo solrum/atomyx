@@ -260,8 +260,9 @@ type runState struct {
 // command handler, or a required flow whose own preconditions or
 // steps fail once it did load) is always reported through the
 // returned ScriptResult, never through the error. When the error is
-// non-nil the returned ScriptResult is the zero value and must be
-// ignored.
+// non-nil the returned ScriptResult is not Ok. It is the zero value
+// except when ctx ended or a StepGate returned an error between steps,
+// in which case it holds the steps that ran before the stop.
 func (r *ScriptRunner) Run(ctx context.Context, def *script.ScriptDefinition) (ScriptResult, error) {
 	if r.deps.RunID != "" {
 		ctx = logging.WithRunID(ctx, r.deps.RunID)
@@ -348,7 +349,7 @@ func (r *ScriptRunner) Run(ctx context.Context, def *script.ScriptDefinition) (S
 
 	for i, step := range def.Steps {
 		if err := ctx.Err(); err != nil {
-			return ScriptResult{}, err
+			return r.interrupted(def, stepResults, startedAt, artifacts), err
 		}
 
 		cmd, cmdOk := r.registry[step.StepCommand()]
@@ -378,7 +379,7 @@ func (r *ScriptRunner) Run(ctx context.Context, def *script.ScriptDefinition) (S
 
 		line := lineForStep(def, i)
 		if err := r.gateStep(ctx, rs, r.stepLocation(line), step); err != nil {
-			return ScriptResult{}, err
+			return r.interrupted(def, stepResults, startedAt, artifacts), err
 		}
 
 		myIndex := rs.globalStepIndex
@@ -409,7 +410,7 @@ func (r *ScriptRunner) Run(ctx context.Context, def *script.ScriptDefinition) (S
 		})
 
 		if rs.gateErr != nil {
-			return ScriptResult{}, rs.gateErr
+			return r.interrupted(def, stepResults, startedAt, artifacts), rs.gateErr
 		}
 
 		if !result.Ok {
@@ -450,6 +451,27 @@ func (r *ScriptRunner) Run(ctx context.Context, def *script.ScriptDefinition) (S
 		Artifacts:    artifacts,
 		Abort:        abort,
 	}, nil
+}
+
+// interrupted is the result of a run that a context end or a StepGate
+// error stopped between steps. It carries the steps that ran before the
+// stop and is never Ok, so a host that knows why the run stopped can
+// report it without losing them.
+func (r *ScriptRunner) interrupted(def *script.ScriptDefinition, steps []StepResult, startedAt int64, artifacts ScriptArtifacts) ScriptResult {
+	passed := 0
+	for _, s := range steps {
+		if s.Ok {
+			passed++
+		}
+	}
+	return ScriptResult{
+		ScriptName:  def.Name,
+		Steps:       steps,
+		TotalSteps:  len(def.Steps),
+		PassedSteps: passed,
+		DurationMs:  r.deps.Clock.NowMs() - startedAt,
+		Artifacts:   artifacts,
+	}
 }
 
 // classifyStepFailure runs a bounded liveness probe after a step has

@@ -39,7 +39,10 @@ func (b *blockingDriver) Screenshot(ctx context.Context) ([]byte, error) {
 	return b.Driver.Screenshot(ctx)
 }
 
-type blockingFactory struct{ drv *blockingDriver }
+type blockingFactory struct {
+	drv  *blockingDriver
+	lost chan error
+}
 
 func (f blockingFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
 	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
@@ -52,6 +55,7 @@ func (f blockingFactory) Build(ctx context.Context, _ device.Descriptor) (device
 	return device.Built{
 		Driver:    f.drv,
 		Orchestra: orchestra.New(orchestra.OrchestraDeps{Driver: f.drv, Clock: orchestra.SystemClock{}}),
+		Lost:      f.lost,
 	}, nil
 }
 
@@ -68,6 +72,7 @@ type debugHarness struct {
 	progress chan recordedPhase
 	result   chan map[string]any
 	viewer   *sessiontest.Viewer
+	lost     chan error
 }
 
 const defaultDebugPauseMs = 3_600_000
@@ -88,10 +93,11 @@ func newDebugHarnessWithPause(t *testing.T, pauseMs int64) *debugHarness {
 		t: t, ctx: context.Background(), clk: clock.NewManualClock(0),
 		drv:      &blockingDriver{Driver: mockdriver.New(), entered: make(chan struct{}), release: make(chan struct{})},
 		progress: make(chan recordedPhase, 32), result: make(chan map[string]any, 1),
+		lost: make(chan error, 1),
 	}
 	h.drv.StageHierarchy(sampleTree())
 	h.srv = mustNewServer(t, ServerDeps{
-		Probe: device.NewStaticProbe(), Factory: blockingFactory{drv: h.drv}, Storage: storage.NewInMemoryStorage(),
+		Probe: device.NewStaticProbe(), Factory: blockingFactory{drv: h.drv, lost: h.lost}, Storage: storage.NewInMemoryStorage(),
 		TimerClock: h.clk,
 		Session:    session.Deps{Leases: leases, Sockets: leases, Clock: clock.SystemClock{}},
 		Timeouts:   session.Timeouts{DebugPauseMs: pauseMs},
@@ -302,9 +308,68 @@ func TestScriptDebug_DisconnectingTheDeviceWhilePausedEndsTheRunAsDeviceLost(t *
 		t.Fatalf("disconnect_device = %v", decoded)
 	}
 	got := h.awaitResult()
+	abort := requireDeviceLostAbort(t, got, diag.CodeDeviceNotFound, deviceDisconnectedPausedMessage)
+	if remedy, _ := abort["remedy"].(string); !strings.Contains(remedy, "select_device") {
+		t.Fatalf("remedy = %q, want the agent told to select a device again", remedy)
+	}
+	requireStepsKept(t, got, 1, 2)
+}
+
+func TestScriptDebug_ADeviceLostWhilePausedEndsTheRunWithItsStepsAndTheCodeOfTheLoss(t *testing.T) {
+	h := newDebugHarness(t)
+	h.pauseBeforeLine(debugScript, "5")
+
+	h.lost <- &device.ProcessExitError{Component: device.LostRunner}
+	got := h.awaitResult()
+	requireDeviceLostAbort(t, got, diag.CodeAgentUnreachable, deviceLostWhilePausedMessage)
+	requireStepsKept(t, got, 1, 2)
+}
+
+func TestScriptDebug_ADeviceLostMidStepDoesNotClaimTheRunWasPaused(t *testing.T) {
+	h := newDebugHarness(t)
+	h.startScript(debugScript)
+	h.awaitEntered()
+
+	h.lost <- &device.ProcessExitError{Component: device.LostRunner}
+	got := h.awaitResult()
+	requireDeviceLostAbort(t, got, diag.CodeAgentUnreachable, deviceLostMessage)
+	requireStepsKept(t, got, 1, 2)
+}
+
+func TestScriptDebug_DisconnectingTheDeviceMidStepEndsTheRunWithoutAPause(t *testing.T) {
+	h := newDebugHarness(t)
+	h.startScript(debugScript)
+	h.awaitEntered()
+
+	if _, decoded := callTool(t, h.cs, h.ctx, "disconnect_device", map[string]any{}); decoded["ok"] == false {
+		t.Fatalf("disconnect_device = %v", decoded)
+	}
+	got := h.awaitResult()
+	requireDeviceLostAbort(t, got, diag.CodeDeviceNotFound, deviceDisconnectedMessage)
+	requireStepsKept(t, got, 1, 2)
+}
+
+// requireDeviceLostAbort checks that got is a failed run that stopped as
+// device lost with the given code and message, and returns the abort.
+func requireDeviceLostAbort(t *testing.T, got map[string]any, code, message string) map[string]any {
+	t.Helper()
 	abort, _ := got["abort"].(map[string]any)
 	if got["ok"] != false || got["deviceLost"] != true || abort["reason"] != "deviceLost" {
 		t.Fatalf("result = %v, want a run that ended as device lost", got)
+	}
+	if abort["code"] != code || abort["message"] != message {
+		t.Fatalf("abort = %v, want code %s and message %q", abort, code, message)
+	}
+	return abort
+}
+
+// requireStepsKept checks that the result still reports the steps that
+// ran and the size of the script.
+func requireStepsKept(t *testing.T, got map[string]any, ran, total int) {
+	t.Helper()
+	steps, _ := got["steps"].([]any)
+	if len(steps) != ran || got["totalSteps"] != float64(total) {
+		t.Fatalf("steps = %v totalSteps = %v, want %d steps of %d kept", got["steps"], got["totalSteps"], ran, total)
 	}
 }
 

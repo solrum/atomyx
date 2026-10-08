@@ -19,14 +19,20 @@ const (
 	// client that the call is alive, so a client that gives up on a silent
 	// request does not abandon a run a person is debugging.
 	pauseProgressIntervalMs int64 = 10_000
-	pausedProgressMessage         = "Paused while a person debugs the run"
+	// pausedProgressMessage is the progress text sent while the run waits.
+	pausedProgressMessage = "Paused while a person debugs the run"
 )
 
-// deviceLostWhilePausedMessage is what the agent reads when the device
-// went away under a paused run.
+// What the agent reads when the device went away under a run. The lost
+// pair is for a device that disappeared on its own, and the disconnected
+// pair is for a device the agent itself disconnected.
 const (
-	deviceLostWhilePausedMessage = "The device was lost or disconnected while the run was paused."
-	deviceLostWhilePausedRemedy  = "Select the device again and rerun the script."
+	deviceLostMessage               = "The device was lost while the script was running."
+	deviceLostWhilePausedMessage    = "The device was lost while the run was paused."
+	deviceDisconnectedMessage       = "The device was disconnected while the script was running."
+	deviceDisconnectedPausedMessage = "The device was disconnected while the run was paused."
+	deviceLostRemedy                = "Select the device again and rerun the script."
+	deviceDisconnectedRemedy        = "Call select_device with a platform and device id from list_devices, then rerun the script."
 )
 
 // scriptDebugHost is the session.Debugger of an MCP session. A session
@@ -139,9 +145,11 @@ type scriptDebugRun struct {
 	// client's progress token.
 	ctx context.Context
 
-	mu           sync.Mutex
-	actions      []humanActionWire
-	stopWatch    context.CancelFunc
+	mu        sync.Mutex
+	actions   []humanActionWire
+	stopWatch context.CancelFunc
+	// gateEnded is true once the run's step gate returned an error, which
+	// happens only to a run that was paused.
 	gateEnded    bool
 	resumeBudget func()
 }
@@ -254,24 +262,57 @@ func (r *scriptDebugRun) autoResume(ctx context.Context) {
 	_, _ = r.sess.Resume(context.WithoutCancel(ctx), session.ResumeOptions{Force: true})
 }
 
-// endedByDeviceLoss reports that the run's gate ended because the device
-// was lost or disconnected, not because a person stopped the call.
-func (r *scriptDebugRun) endedByDeviceLoss() bool {
-	r.mu.Lock()
-	ended := r.gateEnded
-	r.mu.Unlock()
-	return ended && errors.Is(context.Cause(r.ctx), session.ErrDeviceLost) || r.sess.LostErr() != nil
+// settleDeviceLoss reports a run that ended because its device went away
+// as an aborted run, keeping the steps it already ran. A run that
+// finished, that the runner already classified, or that a person stopped
+// is returned as it is.
+func (r *scriptDebugRun) settleDeviceLoss(result runner.ScriptResult, err error) (runner.ScriptResult, error) {
+	if result.Abort != nil || (err == nil && result.Ok) {
+		return result, err
+	}
+	abort := r.deviceLossAbort()
+	if abort == nil {
+		return result, err
+	}
+	result.Ok = false
+	result.Abort = abort
+	return result, nil
 }
 
-// deviceLostResult is the result of a run whose device went away while it
-// was paused.
-func deviceLostResult(name string) runner.ScriptResult {
-	return runner.ScriptResult{ScriptName: name, Abort: &runner.RunAbort{
-		Reason:  runner.RunAbortDeviceLost,
-		Code:    diag.CodeAgentUnreachable,
-		Message: deviceLostWhilePausedMessage,
-		Remedy:  deviceLostWhilePausedRemedy,
-	}}
+// deviceLossAbort describes how the device went away, or returns nil
+// when it did not. A device the session lost reports the code of its
+// cause, and a device the agent disconnected tells the agent to select
+// one again.
+func (r *scriptDebugRun) deviceLossAbort() *runner.RunAbort {
+	lostErr := r.sess.LostErr()
+	if lostErr == nil && !errors.Is(context.Cause(r.ctx), session.ErrDeviceLost) {
+		return nil
+	}
+	r.mu.Lock()
+	paused := r.gateEnded
+	r.mu.Unlock()
+	if lostErr == nil {
+		message := deviceDisconnectedMessage
+		if paused {
+			message = deviceDisconnectedPausedMessage
+		}
+		return &runner.RunAbort{
+			Reason: runner.RunAbortDeviceLost, Code: diag.CodeDeviceNotFound,
+			Message: message, Remedy: deviceDisconnectedRemedy,
+		}
+	}
+	code, _, _ := diag.Describe(lostErr)
+	if code == diag.CodeUnknown {
+		code = diag.CodeAgentUnreachable
+	}
+	message := deviceLostMessage
+	if paused {
+		message = deviceLostWhilePausedMessage
+	}
+	return &runner.RunAbort{
+		Reason: runner.RunAbortDeviceLost, Code: code,
+		Message: message, Remedy: deviceLostRemedy,
+	}
 }
 
 // humanActionWire is a step a person ran on the device while the run was

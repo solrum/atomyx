@@ -184,8 +184,8 @@ func registerRunScriptTool(server *mcp.Server, tc *ToolContext) {
 						Orchestra: orch, Clock: tc.Clock, Logger: tc.Logger, Sink: target.Evidence,
 					}),
 				}).Run(target.Ctx, def)
-				if err != nil && dbg != nil && dbg.endedByDeviceLoss() {
-					return deviceLostResult(def.Name), nil
+				if dbg != nil {
+					return dbg.settleDeviceLoss(result, err)
 				}
 				return result, err
 			})

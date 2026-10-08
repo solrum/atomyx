@@ -155,6 +155,24 @@ func TestStepGate_TopLevelErrorEndsTheRunAsCancelled(t *testing.T) {
 	}
 }
 
+func TestStepGate_ATopLevelErrorKeepsTheStepsThatAlreadyRan(t *testing.T) {
+	gate := &funcGate{fn: func(s GateStep, _ PausedRun) error {
+		if s.StepIndex == 1 {
+			return context.Canceled
+		}
+		return nil
+	}}
+	tr := gatedRunner(gate, "")
+	def := mustParse(t, "appId: com.test\nname: Gated\n---\n- screenshot: a\n- screenshot: b\n- screenshot: c\n")
+	result, err := tr.runner.Run(context.Background(), def)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("got err %v, want context.Canceled", err)
+	}
+	if result.Ok || len(result.Steps) != 1 || result.TotalSteps != 3 || result.PassedSteps != 1 || result.ScriptName != "Gated" {
+		t.Fatalf("result = %+v, want the one step that ran out of three, not Ok", result)
+	}
+}
+
 func TestStepGate_NestedErrorEndsTheRunAsCancelled(t *testing.T) {
 	gate := &funcGate{fn: func(s GateStep, _ PausedRun) error {
 		if s.Depth == 1 {

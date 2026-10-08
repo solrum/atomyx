@@ -1008,8 +1008,8 @@ func (s *DeviceSession) Disconnect(ctx context.Context) error {
 		return nil
 	}
 	desc := previous.Descriptor()
-	if _, paused := previous.Paused(); paused && s.runs != nil {
-		s.runs.CancelScriptsForLostDevice(fmt.Errorf("%w: disconnected while the run was paused", session.ErrDeviceLost))
+	if s.runs != nil {
+		s.runs.CancelScriptsForLostDevice(fmt.Errorf("%w: disconnected by the agent", session.ErrDeviceLost))
 	}
 	err := previous.Close() //nolint:contextcheck // teardown is bounded by its own grace timer, not by a call context
 	s.carryInterventions(previous)
