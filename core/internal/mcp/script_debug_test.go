@@ -153,7 +153,13 @@ func (h *debugHarness) held() *session.Session {
 // startScript runs script as a run_script call that asks for progress.
 func (h *debugHarness) startScript(script string) {
 	h.t.Helper()
-	params := &mcp.CallToolParams{Name: "run_script", Arguments: map[string]any{"script": script}}
+	h.startCall(map[string]any{"script": script})
+}
+
+// startCall runs run_script with args as a call that asks for progress.
+func (h *debugHarness) startCall(args map[string]any) {
+	h.t.Helper()
+	params := &mcp.CallToolParams{Name: "run_script", Arguments: args}
 	params.SetProgressToken("debug-run")
 	go func() {
 		res, err := h.cs.CallTool(h.ctx, params)
@@ -171,7 +177,13 @@ func (h *debugHarness) startScript(script string) {
 // first step is held in the driver, and returns once the run is paused.
 func (h *debugHarness) pauseBeforeLine(script string, line string) session.PauseLocation {
 	h.t.Helper()
-	h.startScript(script)
+	return h.pauseBeforeLineOf(map[string]any{"script": script}, line)
+}
+
+// pauseBeforeLineOf is pauseBeforeLine for a run_script call with args.
+func (h *debugHarness) pauseBeforeLineOf(args map[string]any, line string) session.PauseLocation {
+	h.t.Helper()
+	h.startCall(args)
 	h.awaitEntered()
 	if err := h.viewer.SetBreakpoints([]string{"inline:" + line}); err != nil {
 		h.t.Fatalf("SetBreakpoints: %v", err)
@@ -567,5 +579,68 @@ func TestScriptDebug_ACallKeepsWhatWasLeftOfItsBudgetAcrossAPause(t *testing.T) 
 	h.clk.Advance(1)
 	if got := h.awaitResult(); got["code"] != diag.CodeToolTimeout {
 		t.Fatalf("result = %v, want %s once the part of the budget left after the pause was spent", got, diag.CodeToolTimeout)
+	}
+}
+
+func TestScriptDebug_EachHumanActionSaysWhereTheRunWasPaused(t *testing.T) {
+	h := newDebugHarness(t)
+	h.pauseBeforeLine(debugScript, "5")
+	if _, err := h.held().Act(h.ctx, "screenshot: by-hand"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.held().Resume(h.ctx, session.ResumeOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	actions, _ := h.awaitResult()["humanActions"].([]any)
+	first, _ := actions[0].(map[string]any)
+	if first["source"] != "inline" || first["line"] != float64(5) {
+		t.Fatalf("humanActions[0] = %v, want the pause at inline line 5", first)
+	}
+}
+
+func TestScriptDebug_TheListOfHumanActionsIsCappedAndTheRestCounted(t *testing.T) {
+	const extra = 3
+	h := newDebugHarness(t)
+	h.pauseBeforeLine(debugScript, "5")
+	for range maxHumanActions + extra {
+		if _, err := h.held().Act(h.ctx, "screenshot: by-hand"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := h.held().Resume(h.ctx, session.ResumeOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	got := h.awaitResult()
+	if actions, _ := got["humanActions"].([]any); len(actions) != maxHumanActions {
+		t.Fatalf("humanActions has %d entries, want the cap of %d", len(actions), maxHumanActions)
+	}
+	if got["humanActionsOmittedCount"] != float64(extra) {
+		t.Fatalf("humanActionsOmittedCount = %v, want %d", got["humanActionsOmittedCount"], extra)
+	}
+}
+
+func TestScriptDebug_ASecretInAFailedHumanActionIsMasked(t *testing.T) {
+	const secret = "hunter2hunter2"
+	h := newDebugHarness(t)
+	h.pauseBeforeLineOf(map[string]any{"script": debugScript, "env": map[string]string{"SECRET": secret}}, "5")
+	acted, err := h.held().Act(h.ctx, "tap: ${SECRET}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if acted.Outcome != "failed" {
+		t.Fatalf("act outcome = %q, want the tap to fail", acted.Outcome)
+	}
+	if _, err := h.held().Resume(h.ctx, session.ResumeOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	got := h.awaitResult()
+	encoded, _ := json.Marshal(got)
+	if strings.Contains(string(encoded), secret) {
+		t.Fatalf("the result leaks the secret: %s", encoded)
+	}
+	actions, _ := got["humanActions"].([]any)
+	first, _ := actions[0].(map[string]any)
+	if first["outcome"] != "failed" || first["message"] != orchestra.SecureMask {
+		t.Fatalf("humanActions[0] = %v, want a failed action with its message masked", first)
 	}
 }

@@ -72,6 +72,9 @@ type scriptResultWire struct {
 	// while a viewer had the run paused, so the agent knows the device
 	// state was changed by hand. Omitted when there were none.
 	HumanActions []humanActionWire `json:"humanActions,omitempty"`
+	// HumanActionsOmittedCount is how many steps people ran after the
+	// list reached its cap. Omitted when none were left out.
+	HumanActionsOmittedCount int `json:"humanActionsOmittedCount,omitempty"`
 }
 
 // abortWire is the run_script result's shape for runner.RunAbort.
@@ -160,7 +163,7 @@ func registerRunScriptTool(server *mcp.Server, tc *ToolContext) {
 			return errorResult(err), nil
 		}
 
-		var actions []humanActionWire
+		var actions humanActionLog
 		result, err := tc.RunSession.RunScript(ctx, def.Name, tc.Session.SelectedDescriptor(),
 			func(target scriptTarget) (runner.ScriptResult, error) {
 				var gate runner.StepGate
@@ -193,7 +196,7 @@ func registerRunScriptTool(server *mcp.Server, tc *ToolContext) {
 			return errorResult(err), nil
 		}
 		wire := toScriptResultWire(result)
-		wire.HumanActions = actions
+		wire.HumanActions, wire.HumanActionsOmittedCount = actions.Entries, actions.Omitted
 		return jsonToolResult(wire)
 	})
 }

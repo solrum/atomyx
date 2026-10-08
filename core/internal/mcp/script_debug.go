@@ -150,9 +150,11 @@ type scriptDebugRun struct {
 	// client's progress token.
 	ctx context.Context
 
-	mu        sync.Mutex
-	actions   []humanActionWire
-	stopWatch context.CancelFunc
+	mu      sync.Mutex
+	actions []humanActionWire
+	// omittedActions counts the steps people ran after actions was full.
+	omittedActions int
+	stopWatch      context.CancelFunc
 	// gateEnded is true once the run's step gate returned an error, which
 	// happens only to a run that was paused.
 	gateEnded    bool
@@ -336,9 +338,16 @@ func (r *scriptDebugRun) deviceLossAbort() *runner.RunAbort {
 	}
 }
 
+// maxHumanActions caps the steps run_script lists for one call, so a
+// long debugging session does not flood the agent's context. The rest are
+// counted in the result.
+const maxHumanActions = 50
+
 // humanActionWire is a step a person ran on the device while the run was
 // paused, as run_script reports it to the agent. Step has the text of a
-// type step masked and every secret value redacted.
+// type step masked and every secret value redacted. Source and Line say
+// where the run was paused, and Line is omitted for a nested step, which
+// has none.
 type humanActionWire struct {
 	Step       string   `json:"step"`
 	Command    string   `json:"command"`
@@ -346,24 +355,39 @@ type humanActionWire struct {
 	Message    string   `json:"message,omitempty"`
 	DurationMs int64    `json:"durationMs"`
 	Artifacts  []string `json:"artifacts,omitempty"`
+	Source     string   `json:"source,omitempty"`
+	Line       int      `json:"line,omitempty"`
+}
+
+// humanActionLog is what people did by hand during one call: the first
+// maxHumanActions steps in order, and how many came after them.
+type humanActionLog struct {
+	Entries []humanActionWire
+	Omitted int
 }
 
 func (r *scriptDebugRun) recordAction(result session.ActResult) {
+	loc, _ := r.sess.Paused()
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if len(r.actions) >= maxHumanActions {
+		r.omittedActions++
+		return
+	}
 	r.actions = append(r.actions, humanActionWire{
 		Step: result.Step, Command: result.Command, Outcome: result.Outcome,
 		Message: result.Message, DurationMs: result.DurationMs, Artifacts: result.Artifacts,
+		Source: loc.Source, Line: loc.Line,
 	})
 }
 
 // humanActions lists, in order, the steps people ran while the run was
 // paused. A nil run has none.
-func (r *scriptDebugRun) humanActions() []humanActionWire {
+func (r *scriptDebugRun) humanActions() humanActionLog {
 	if r == nil {
-		return nil
+		return humanActionLog{}
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return append([]humanActionWire(nil), r.actions...)
+	return humanActionLog{Entries: append([]humanActionWire(nil), r.actions...), Omitted: r.omittedActions}
 }
