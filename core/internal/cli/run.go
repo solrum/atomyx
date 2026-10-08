@@ -177,10 +177,15 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 			ExternalEnv:           externalEnv,
 			PreconditionsOverride: preconditionsOverride,
 			ChildArtifacts:        newArtifactSequence(runfolder.ArtifactsDir(record.Dir())).forTarget,
+			StepGate:              dbg.gate(),
+			SourceDir:             filepath.Dir(absPath),
 			OnStep:                stepstream.NewSink(record.writer, deps.logger(), stepstream.WithPublisher(opened.PublishStep)),
 		})
 		result, err := scenarioRunner.Run(runCtx, scenarioDef)
 		finishedAt := time.Now()
+		if err == nil {
+			dbg.reportUnhit()
+		}
 		if opened.reportLost(stderr) {
 			record.setOutcome(runfolder.OutcomeDeviceLost, nil)
 			return 1
@@ -251,6 +256,9 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	})
 	result, err := scriptRunner.Run(runCtx, def)
 	finishedAt := time.Now()
+	if err == nil {
+		dbg.reportUnhit()
+	}
 	if opened.reportLost(stderr) {
 		record.setOutcome(runfolder.OutcomeDeviceLost, nil)
 		return 1

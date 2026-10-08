@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"dev.atomyx/internal/debugrun"
 	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/runner"
+	"dev.atomyx/internal/scenario"
 	"dev.atomyx/internal/script"
 	"dev.atomyx/internal/session"
 )
@@ -142,6 +144,16 @@ func (d *runDebug) stop() {
 	}
 }
 
+// reportUnhit warns about each breakpoint the finished run never reached.
+func (d *runDebug) reportUnhit() {
+	if d == nil {
+		return
+	}
+	for _, loc := range d.adapter.Unhit() {
+		_, _ = fmt.Fprintf(d.stderr, "warning: the breakpoint at %s was never reached.\n", loc)
+	}
+}
+
 // resumeOnEnter resumes a paused run. When the advisory check says the
 // next step cannot find its target, the first Enter explains and the
 // next one resumes anyway.
@@ -199,6 +211,14 @@ func describePause(loc session.PauseLocation) string {
 // breakScriptsOf parses the file a run executes, so break locations can
 // be checked against its authored steps.
 func breakScriptsOf(absPath, content string, externalEnv map[string]string) ([]runner.BreakScript, error) {
+	if script.IsScenarioYaml(content) {
+		scenarioDef, err := script.ParseScenario(content)
+		if err != nil {
+			return nil, err
+		}
+		dir := filepath.Dir(absPath)
+		return scenario.BreakScripts(scenarioDef, externalEnv, fsScenarioScriptLoader(dir), dir)
+	}
 	def, err := script.ParseScript(content, externalEnv)
 	if err != nil {
 		return nil, err

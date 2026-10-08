@@ -3,9 +3,12 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
+	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -46,11 +49,23 @@ func (b *lockedBuffer) waitFor(t *testing.T, text string) {
 	t.Fatalf("never saw %q in %q", text, b.String())
 }
 
+// countingFactory counts how many devices a command builds.
+type countingFactory struct {
+	device.WrappingFactory
+	builds atomic.Int32
+}
+
+func (f *countingFactory) Build(ctx context.Context, d device.Descriptor) (device.Built, error) {
+	f.builds.Add(1)
+	return f.WrappingFactory.Build(ctx, d)
+}
+
 type debugRun struct {
 	deps   Deps
 	stdout *lockedBuffer
 	stderr *lockedBuffer
 	stdin  *io.PipeWriter
+	count  *countingFactory
 }
 
 func newDebugRun(t *testing.T, terminal bool) *debugRun {
@@ -58,11 +73,11 @@ func newDebugRun(t *testing.T, terminal bool) *debugRun {
 	pr, pw := io.Pipe()
 	t.Cleanup(func() { _ = pw.Close() })
 	clock := orchestra.NewFakeClock(0)
-	factory := device.NewMockDriverFactoryWithDeps(device.MockDriverFactoryDeps{Clock: clock})
-	r := &debugRun{stdout: &lockedBuffer{}, stderr: &lockedBuffer{}, stdin: pw}
+	count := &countingFactory{WrappingFactory: device.NewMockDriverFactoryWithDeps(device.MockDriverFactoryDeps{Clock: clock})}
+	r := &debugRun{stdout: &lockedBuffer{}, stderr: &lockedBuffer{}, stdin: pw, count: count}
 	r.deps = Deps{
 		Probe:         device.NewStaticProbe(nil),
-		Factory:       factory,
+		Factory:       count,
 		Clock:         clock,
 		Stdout:        r.stdout,
 		Stderr:        r.stderr,
@@ -120,5 +135,130 @@ func TestRunBreakPausesAtTheLocationAndEnterResumes(t *testing.T) {
 	}
 	if !strings.Contains(r.stdout.String(), "PASS") {
 		t.Fatalf("stdout = %q, want the finished run", r.stdout.String())
+	}
+}
+
+func TestRunBreakWithJSONPutsThePromptOnStderr(t *testing.T) {
+	r := newDebugRun(t, true)
+	path := writeScript(t, "flow.yml", sleepFlow)
+	flags := breakFlags(path)
+	flags["--json"] = true
+	flags["--report-dir"] = t.TempDir()
+
+	done := r.start(flags)
+	r.stderr.waitFor(t, "Press Enter to resume")
+	r.pressEnter(t)
+	if code := awaitExit(t, done); code != 0 {
+		t.Fatalf("exit code = %d", code)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(r.stdout.String()), &payload); err != nil {
+		t.Fatalf("stdout is not one JSON document (%v): %q", err, r.stdout.String())
+	}
+}
+
+func TestRunBreakRefusesWithoutATerminalBeforeTakingTheDevice(t *testing.T) {
+	r := newDebugRun(t, false)
+	path := writeScript(t, "flow.yml", sleepFlow)
+
+	if code := awaitExit(t, r.start(breakFlags(path))); code != 2 {
+		t.Fatalf("exit code = %d, want 2", code)
+	}
+	if !strings.Contains(r.stderr.String(), "--break needs a terminal") || r.count.builds.Load() != 0 {
+		t.Fatalf("stderr = %q builds = %d", r.stderr.String(), r.count.builds.Load())
+	}
+}
+
+func TestRunBreakRejectsALocationThatMatchesNoStepBeforeTakingTheDevice(t *testing.T) {
+	r := newDebugRun(t, true)
+	path := writeScript(t, "flow.yml", sleepFlow)
+	flags := map[string]FlagValue{"--file": path, "--break": []string{path + ":99"}}
+
+	if code := awaitExit(t, r.start(flags)); code != 2 {
+		t.Fatalf("exit code = %d, want 2", code)
+	}
+	if !strings.Contains(r.stderr.String(), "no top-level step starts at line 99") || r.count.builds.Load() != 0 {
+		t.Fatalf("stderr = %q builds = %d", r.stderr.String(), r.count.builds.Load())
+	}
+}
+
+func TestSuiteDoesNotAcceptBreak(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := Run([]string{"suite", "--break", "a.yml:1"}, testDeps(&stdout, &stderr)); code != 2 {
+		t.Fatalf("exit code = %d, want 2; stderr: %s", code, stderr.String())
+	}
+}
+
+func TestRunBreakReportsABreakpointTheRunNeverReached(t *testing.T) {
+	r := newDebugRun(t, true)
+	path := writeScript(t, "flow.yml", "- assertVisible: nothing\n- sleep: 2\n")
+	flags := breakFlags(path)
+	flags["--report-dir"] = t.TempDir()
+
+	if code := awaitExit(t, r.start(flags)); code != 1 {
+		t.Fatalf("exit code = %d, want 1; stderr: %s", code, r.stderr.String())
+	}
+	if !strings.Contains(r.stderr.String(), "breakpoint at "+path+":2 was never reached") {
+		t.Fatalf("stderr = %q", r.stderr.String())
+	}
+}
+
+func TestRunBreakInAScenarioChildPausesAtTheChildFile(t *testing.T) {
+	r := newDebugRun(t, true)
+	dir := t.TempDir()
+	writeFile(t, dir, "first.yml", "- sleep: 1\n")
+	writeFile(t, dir, "second.yml", "- sleep: 1\n- sleep: 2\n")
+	writeFile(t, dir, "all.yml", "name: all\nscripts:\n  - first.yml\n  - second.yml\n")
+	scenarioPath := filepath.Join(dir, "all.yml")
+	child := filepath.Join(dir, "second.yml")
+	flags := map[string]FlagValue{"--file": scenarioPath, "--break": []string{child + ":2"}, "--report-dir": t.TempDir()}
+
+	done := r.start(flags)
+	r.stdout.waitFor(t, "Press Enter to resume")
+	if out := r.stdout.String(); !strings.Contains(out, child+":2") {
+		t.Fatalf("stdout = %q, want the pause at the second child", out)
+	}
+	r.pressEnter(t)
+	if code := awaitExit(t, done); code != 0 {
+		t.Fatalf("exit code = %d, stderr: %s", code, r.stderr.String())
+	}
+}
+
+func TestRunBreakResumeAnywayNeedsASecondEnterWhenTheTargetIsMissing(t *testing.T) {
+	r := newDebugRun(t, true)
+	r.deps.Factory = stagedMockFactory{tree: focusedInputTree()}
+	path := writeScript(t, "flow.yml", "- sleep: 1\n- tap: Nowhere\n")
+	flags := breakFlags(path)
+	flags["--report-dir"] = t.TempDir()
+
+	done := r.start(flags)
+	r.stdout.waitFor(t, "Press Enter to resume")
+	r.pressEnter(t)
+	r.stdout.waitFor(t, "Press Enter again to resume anyway")
+	select {
+	case code := <-done:
+		t.Fatalf("the run finished with %d after the first Enter", code)
+	default:
+	}
+	r.pressEnter(t)
+	if code := awaitExit(t, done); code != 1 {
+		t.Fatalf("exit code = %d, want 1 (the tap fails once forced)", code)
+	}
+}
+
+func TestRunBreakInASkippedScenarioChildIsReportedUnhit(t *testing.T) {
+	r := newDebugRun(t, true)
+	dir := t.TempDir()
+	writeFile(t, dir, "bad.yml", "- assertVisible: nothing\n")
+	writeFile(t, dir, "later.yml", "- sleep: 1\n")
+	writeFile(t, dir, "all.yml", "name: all\nscripts:\n  - bad.yml\n  - later.yml\n")
+	later := filepath.Join(dir, "later.yml")
+	flags := map[string]FlagValue{"--file": filepath.Join(dir, "all.yml"), "--break": []string{later + ":1"}, "--report-dir": t.TempDir()}
+
+	if code := awaitExit(t, r.start(flags)); code != 1 {
+		t.Fatalf("exit code = %d, want 1; stderr: %s", code, r.stderr.String())
+	}
+	if !strings.Contains(r.stderr.String(), "breakpoint at "+later+":1 was never reached") {
+		t.Fatalf("stderr = %q", r.stderr.String())
 	}
 }

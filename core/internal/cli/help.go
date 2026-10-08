@@ -36,6 +36,11 @@ FLAGS
                            force runs every precondition's setup
                            unconditionally.
   --skip-preconditions     Shorthand for --preconditions skip.
+  --break <file>:<line>    Pause the run before the step that starts at
+                           that line of a script file, then wait for
+                           Enter. Repeatable. Needs a terminal on
+                           standard input. With --json the prompt goes
+                           to standard error.
   --json                   Output the result as JSON instead of text.
   --help, -h               Show this message.
 
