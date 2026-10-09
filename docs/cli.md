@@ -325,6 +325,43 @@ command was misused, `130` when SIGINT interrupted the suite, and `143`
 when SIGTERM did. An interrupted suite prints `interrupted` and finalizes its run
 folder as cancelled before it exits.
 
+### Suite index
+
+Every suite run folder holds `index.json`, the per-entry record of the
+run. It is written when the suite ends, before the report, and also
+when the suite is interrupted, in which case it lists the entries that
+ran. The file is replaced atomically, so a reader never sees a partial
+index. Its JSON Schema is `core/internal/runfolder/atomyx-run-index.schema.json`.
+
+Top-level fields:
+
+- `schemaVersion`: the schema version, currently 1.
+- `runId`: the id of the suite run folder.
+- `entries`: one object per entry that ran, in suite order.
+
+Fields of an entry:
+
+- `path`: the entry's file path.
+- `status`: `passed` or `failed`, the result of its last attempt.
+- `flaky`: `true` when the entry failed and then passed. A flaky entry
+  counts as passed. Absent otherwise.
+- `quarantined`: `true` when the entry matched the quarantine list. A
+  quarantined entry that failed does not fail the suite. Absent otherwise.
+- `attempts`: every attempt in order. Each has `number` (from 1) and
+  `result` (`passed` or `failed`).
+
+An attempt also carries `videos`, the kept video file names relative to
+the run folder's `artifacts` directory, when it kept any. The fields
+`deviceId` and `workerRunId` are reserved for a suite that runs on
+several devices and are absent otherwise.
+
+The suite's `meta.json` carries `flakyEntries` and `quarantinedFailures`
+counts, each absent when zero. The suite report lists the same attempts,
+flaky entries and videos as `index.json`.
+
+A schema version only ever gains fields, so a reader written for it keeps
+working.
+
 ## driver doctor
 
 Connects to a device and reports whether it answers a bounded liveness

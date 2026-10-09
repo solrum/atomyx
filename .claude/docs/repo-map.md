@@ -60,6 +60,7 @@ atomyx/
 | `core/cmd/atomyx-mcp` | `atomyx-mcp` | The MCP stdio server over the tool surface in `core/internal/mcp`. |
 | `core/cmd/atomyx-runtime` | `atomyx-runtime` | The sidecar: a newline-delimited JSON-RPC bridge over stdin and stdout that drives a real device on a parent process's behalf. |
 | `core/cmd/gen-config-schema` | `gen-config-schema` | Regenerates the checked-in JSON Schema for the project config type from `core/internal/config`'s Go types. |
+| `core/cmd/gen-index-schema` | `gen-index-schema` | Regenerates the checked-in JSON Schema for the suite run folder `index.json` from `core/internal/runfolder`'s Go types. |
 | `core/cmd/gen-run-schema` | `gen-run-schema` | Regenerates the checked-in JSON Schema for the run folder `meta.json` from `core/internal/runfolder`'s Go types. |
 | `core/cmd/gen-script-schema` | `gen-script-schema` | Regenerates the checked-in JSON Schema for the script definition type from `core/internal/script`'s Go types. |
 | `core/cmd/internal/browseropen` | none | Opens a URL in the platform's default browser through the platform's own opener command, the real browser opener `atomyx inspect` is given. |
@@ -93,7 +94,7 @@ atomyx/
 | `orchestra` | Composes Driver calls into selector resolution, priority broadening, scroll-into-view, obscurement, and retry. |
 | `process` | Abstracts external command execution (adb, xcrun, and similar) behind Runner and BackgroundRunner interfaces, carries extra child environment on the context, and reads process and host start times. |
 | `report` | Renders a run's result into HTML and versioned JSON, and writes its screenshots, into the report and artifacts directories the caller names. |
-| `runfolder` | Defines the run folder contract: the layout names, the `meta.json` record with its result and outcome enums, the legacy status mapping, and the generated JSON Schema. It also writes run folders with an exclusive create and a live lock. Depends on the standard library and `flock`. |
+| `runfolder` | Defines the run folder contract: the layout names, the `meta.json` record with its result and outcome enums, the suite `index.json` record, the legacy status mapping, and the generated JSON Schemas. It also writes run folders with an exclusive create and a live lock. Depends on the standard library and `flock`. |
 | `runner` | Defines the command execution contract and the ScriptRunner that dispatches a parsed script's steps. |
 | `scenario` | Runs ordered groups of scripts and ordered sets of scripts or scenarios against a shared Orchestra. |
 | `stepstream` | Turns the step events of a script run into the lines of a run folder's `steps.jsonl`. Depends on `runner` and `runfolder`. |
