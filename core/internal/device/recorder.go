@@ -28,10 +28,11 @@ type ScreenRecorder interface {
 // Stop ends the recording and returns the paths of the kept segment
 // files in dir, oldest first, and cleans everything the recording left on
 // the device. A cancelled ctx still ends the recording and cleans the
-// device, but the segment files are then not guaranteed to be playable.
-// Discard ends the recording and removes every file it produced, on the
-// device and in dir. Stop and Discard are each safe to call once, and a
-// second call returns an error.
+// device, but it then fails and returns no files. Discard ends the
+// recording if it is still running and removes every file it produced, on
+// the device and in dir, including files an earlier Stop returned, so a
+// caller decides whether to keep a video after it has stopped. A second
+// Stop fails, and Stop after Discard fails. Discard is safe to repeat.
 type Recording interface {
 	Stop(ctx context.Context) ([]string, error)
 	Discard(ctx context.Context) error
@@ -57,7 +58,11 @@ type platformRecorder struct {
 }
 
 func (r platformRecorder) Start(ctx context.Context, desc Descriptor, dir, name string) (Recording, error) {
-	return unsupportedRecorder{}.Start(ctx, desc, dir, name)
+	var recorder ScreenRecorder = unsupportedRecorder{}
+	if desc.Platform == PlatformAndroid {
+		recorder = adbRecorder{deps: r.deps, wait: waitRotationInterval}
+	}
+	return recorder.Start(ctx, desc, dir, name)
 }
 
 // unsupportedRecorder is the recorder for a device that cannot record,
