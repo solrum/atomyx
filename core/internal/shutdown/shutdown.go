@@ -20,6 +20,13 @@ const (
 	// whole exit path against this one value.
 	GracePeriod = 10 * time.Second
 
+	// ParentGracePeriod is the exit budget of a process that stops child
+	// processes of its own, each of which gets GracePeriod to exit and then
+	// a bounded kill. It is GracePeriod plus the kill escalation, the time
+	// to write the parent's own results, and a safety margin, so the
+	// watchdog of a parent never fires before its children are gone.
+	ParentGracePeriod = GracePeriod + 8*time.Second
+
 	// ForcedCleanupBudget is the slice of GracePeriod reserved for a
 	// final bounded cleanup attempt when the graceful path has not
 	// finished, so the forced exit still releases child processes.
@@ -117,6 +124,10 @@ func ForceExitAfter(clk clock.Clock, grace time.Duration, exit func()) (cancel f
 // StopHooks are the steps a binary takes when a stop signal arrives.
 // Cancel and Exit are required. CloseInput and Cleanup may be nil.
 type StopHooks struct {
+	// Grace is the whole exit budget of the process. Zero means
+	// GracePeriod, and a process that stops children of its own sets
+	// ParentGracePeriod.
+	Grace time.Duration
 	// Cancel cancels the context the binary's main work runs under.
 	Cancel func()
 	// CloseInput closes a blocking input stream, such as stdin, whose
@@ -139,14 +150,19 @@ type StopHooks struct {
 // path has not ended the process by the time GracePeriod minus
 // ForcedCleanupBudget has elapsed, the watchdog runs Cleanup bounded
 // by ForcedCleanupBudget and then exits with ExitCodeFor(sig), so the
-// whole exit path stays within GracePeriod. The returned disarm
+// whole exit path stays within the budget, GracePeriod unless hooks.Grace
+// says otherwise. The returned disarm
 // cancels the watchdog.
 func HandleStop(clk clock.Clock, sig os.Signal, hooks StopHooks) (disarm func()) {
 	hooks.Cancel()
 	if hooks.CloseInput != nil {
 		_ = hooks.CloseInput()
 	}
-	return ForceExitAfter(clk, GracePeriod-ForcedCleanupBudget, func() {
+	grace := hooks.Grace
+	if grace <= 0 {
+		grace = GracePeriod
+	}
+	return ForceExitAfter(clk, grace-ForcedCleanupBudget, func() {
 		if hooks.Cleanup != nil {
 			Bounded(context.Background(), clk, ForcedCleanupBudget, hooks.Cleanup)
 		}

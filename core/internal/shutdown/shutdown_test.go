@@ -13,6 +13,9 @@ import (
 )
 
 const (
+	// settleTime is how long a test waits to be sure an exit did not happen.
+	settleTime = 100 * time.Millisecond
+
 	testGraceMs = int64(30)
 	testTimeout = 10 * time.Second
 )
@@ -214,6 +217,33 @@ func TestHandleStopWatchdogLeavesAFlushThatFinishesInTimeAlone(t *testing.T) {
 	case code := <-rec.exited:
 		t.Fatalf("watchdog exited with %d after the flush finished in time", code)
 	default:
+	}
+}
+
+func TestHandleStopWithAParentBudgetWaitsLongerThanThePlainGracePeriod(t *testing.T) {
+	clk := clock.NewManualClock(0)
+	rec := newStopRecorder()
+	hooks := rec.hooks(nil)
+	hooks.Grace = ParentGracePeriod
+	HandleStop(clk, syscall.SIGINT, hooks)
+
+	clk.AwaitSleepers(1)
+	clk.Advance(GracePeriod.Milliseconds())
+	select {
+	case code := <-rec.exited:
+		t.Fatalf("a parent exited with %d after only the plain grace period", code)
+	case <-time.After(settleTime):
+	}
+	clk.Advance((ParentGracePeriod - ForcedCleanupBudget - GracePeriod).Milliseconds())
+	if code := waitExit(t, rec); code != ExitCodeSigint {
+		t.Fatalf("exit code = %d, want %d", code, ExitCodeSigint)
+	}
+}
+
+func TestParentGracePeriodOutlastsTheWorkerGracePeriodAndItsKill(t *testing.T) {
+	const killEscalation = 2 * time.Second
+	if ParentGracePeriod-ForcedCleanupBudget <= GracePeriod+killEscalation {
+		t.Fatalf("a parent watchdog at %v fires before a worker is stopped and killed at %v", ParentGracePeriod-ForcedCleanupBudget, GracePeriod+killEscalation)
 	}
 }
 

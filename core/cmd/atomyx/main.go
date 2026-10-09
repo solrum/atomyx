@@ -84,9 +84,10 @@ func main() {
 	sigCh := make(chan os.Signal, 1)
 	cleanup := runnerprovision.Cleanup(keeper, nil)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	stopGrace := cli.StopGrace(os.Args[1:])
 	go func() {
 		sig := <-sigCh
-		shutdown.HandleStop(clock, sig, shutdown.StopHooks{Cancel: func() { cancel(shutdown.InterruptCause(sig)) }, Cleanup: cleanup, Exit: os.Exit})
+		shutdown.HandleStop(clock, sig, shutdown.StopHooks{Cancel: func() { cancel(shutdown.InterruptCause(sig)) }, Cleanup: cleanup, Exit: os.Exit, Grace: stopGrace})
 	}()
 
 	// cancel deliberately does not run before this os.Exit: the process
