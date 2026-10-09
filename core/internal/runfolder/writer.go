@@ -389,18 +389,23 @@ func (w *Writer) writeMeta() error {
 	return writeMetaFile(w.dir, w.meta)
 }
 
-// writeMetaFile replaces meta.json in dir atomically. The content is
-// flushed to a temporary file in the same directory, renamed over
-// meta.json, and the directory is flushed so the rename survives a
-// crash.
+// writeMetaFile replaces meta.json in dir atomically.
 func writeMetaFile(dir string, meta Meta) error {
-	body, err := json.MarshalIndent(meta, "", "  ")
+	return writeJSONAtomic(dir, MetaFileName, meta)
+}
+
+// writeJSONAtomic replaces the file name in dir with the indented JSON
+// encoding of v. The content is flushed to a temporary file in the same
+// directory, renamed over the target, and the directory is flushed so the
+// rename survives a crash.
+func writeJSONAtomic(dir, name string, v any) error {
+	body, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
-		return fmt.Errorf("encoding %s: %w", MetaFileName, err)
+		return fmt.Errorf("encoding %s: %w", name, err)
 	}
-	tmp, err := os.CreateTemp(dir, MetaFileName+".*.tmp")
+	tmp, err := os.CreateTemp(dir, name+".*.tmp")
 	if err != nil {
-		return fmt.Errorf("creating temporary %s: %w", MetaFileName, err)
+		return fmt.Errorf("creating temporary %s: %w", name, err)
 	}
 	tmpPath := tmp.Name()
 	_, werr := tmp.Write(append(body, '\n'))
@@ -408,11 +413,11 @@ func writeMetaFile(dir string, meta Meta) error {
 	cerr := tmp.Close()
 	if err := errors.Join(werr, serr, cerr); err != nil {
 		_ = os.Remove(tmpPath)
-		return fmt.Errorf("writing temporary %s: %w", MetaFileName, err)
+		return fmt.Errorf("writing temporary %s: %w", name, err)
 	}
-	if err := os.Rename(tmpPath, filepath.Join(dir, MetaFileName)); err != nil {
+	if err := os.Rename(tmpPath, filepath.Join(dir, name)); err != nil {
 		_ = os.Remove(tmpPath)
-		return fmt.Errorf("replacing %s: %w", MetaFileName, err)
+		return fmt.Errorf("replacing %s: %w", name, err)
 	}
 	return syncDir(dir)
 }

@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "runId": "RUN_ID",
+  "entries": [
+    {
+      "path": "flows/a.yml",
+      "status": "passed",
+      "attempts": [
+        {
+          "number": 1,
+          "result": "passed"
+        }
+      ]
+    },
+    {
+      "path": "flows/b.yml",
+      "status": "passed",
+      "flaky": true,
+      "attempts": [
+        {
+          "number": 1,
+          "result": "failed",
+          "videos": [
+            "video-entry-2-1.mp4"
+          ]
+        },
+        {
+          "number": 2,
+          "result": "passed"
+        }
+      ]
+    },
+    {
+      "path": "flows/c.yml",
+      "status": "failed",
+      "quarantined": true,
+      "attempts": [
+        {
+          "number": 1,
+          "result": "failed",
+          "deviceId": "emulator-5554",
+          "workerRunId": "20261002-070309-worker-abcd"
+        }
+      ]
+    }
+  ]
+}
