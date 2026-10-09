@@ -59,6 +59,9 @@ type ServerDeps struct {
 	// the first call that needs a device, and select_device naming any
 	// other device fails with DEVICE_PINNED. Nil lets the agent choose.
 	Pinned *SelectDeviceInput
+	// Recorder records the device screen of a run. A nil value means no
+	// recording is ever started.
+	Recorder device.ScreenRecorder
 }
 
 // NewServer constructs the Atomyx MCP server and registers its tool

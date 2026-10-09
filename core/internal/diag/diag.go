@@ -129,6 +129,10 @@ const (
 	// CodeUnsupportedVersion means two peers share no protocol version,
 	// so they cannot exchange any message.
 	CodeUnsupportedVersion = "UNSUPPORTED_VERSION"
+	// CodeRecordingUnsupported means the target device cannot record its
+	// screen. The condition is permanent for that device, so a run that
+	// asked for a video continues without one.
+	CodeRecordingUnsupported = "RECORDING_UNSUPPORTED"
 )
 
 // Coded is implemented by an error that carries a stable code and an

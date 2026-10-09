@@ -20,6 +20,7 @@ func TestLeaseErrors_CodesAndRemedies(t *testing.T) {
 		{"holder busy", diag.NewHolderBusy("a tool call is running"), diag.CodeHolderBusy, "a tool call is running", "ask again"},
 		{"run expired", diag.NewRunExpired("r-1"), diag.CodeRunExpired, "r-1", "Start a new run"},
 		{"unsupported", diag.NewUnsupported("control.borrow"), diag.CodeUnsupported, "control.borrow", "feature list"},
+		{"recording unsupported", diag.NewRecordingUnsupported(), diag.CodeRecordingUnsupported, "cannot record", "Continue without a video"},
 		{"unsupported version", diag.NewUnsupportedVersion(2, 3, 1, 1), diag.CodeUnsupportedVersion, "2 to 3", "same source"},
 	}
 	if _, _, remedy := diag.Describe(diag.NewDeviceHeld("pid 7 (atomyx run), running")); !strings.Contains(remedy, "atomyx inspect") {

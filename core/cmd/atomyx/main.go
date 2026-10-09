@@ -41,6 +41,7 @@ func main() {
 	)
 	provisioner, keeper := runnerprovision.New(procRunner, background, clock, logger)
 	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Background: background, Clock: clock, Logger: logger, Provisioner: provisioner, OwnAndroidForwards: true})
+	recorder := device.NewScreenRecorder(device.RecorderDeps{Runner: procRunner, Background: background})
 
 	sessionDeps, err := sessionwire.Deps(procRunner, clock, logger, "", "cli")
 	if err != nil {
@@ -60,6 +61,7 @@ func main() {
 		Browser:  browseropen.New(procRunner, runtime.GOOS),
 		Stdin:    os.Stdin,
 		Session:  sessionDeps,
+		Recorder: recorder,
 		Timeouts: sessionwire.ResolveTimeouts(sessionwire.LoadConfigBestEffort(logger), os.Getenv, logger),
 		HostCommand: func(ctx context.Context, name string, args ...string) (string, error) {
 			res, err := procRunner.Run(ctx, name, args...)

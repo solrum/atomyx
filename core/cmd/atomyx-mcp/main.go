@@ -132,6 +132,7 @@ func run(opts options) int {
 	)
 	provisioner, keeper := runnerprovision.New(procRunner, background, clock, logger)
 	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Background: background, Clock: clock, Logger: logger, Provisioner: provisioner, OwnAndroidForwards: true})
+	recorder := device.NewScreenRecorder(device.RecorderDeps{Runner: procRunner, Background: background})
 
 	// storage.NewFileStorage resolves its root as opts.Root, then the
 	// ATOMYX_STORAGE_DIR environment variable, then "~/.atomyx". An
@@ -164,6 +165,7 @@ func run(opts options) int {
 		Logger:     logger,
 		Session:    sessionDeps,
 		Pinned:     opts.pinned,
+		Recorder:   recorder,
 		Timeouts:   sessionwire.ResolveTimeouts(sessionwire.LoadConfigBestEffort(logger), os.Getenv, logger),
 	})
 	if err != nil {

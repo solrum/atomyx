@@ -44,6 +44,9 @@ type Deps struct {
 	// Timeouts bounds a device acquisition. A zero DeviceAcquireMs means
 	// session.DefaultDeviceAcquireTimeoutMs.
 	Timeouts session.Timeouts
+	// Recorder records the device screen of a run. A nil value means no
+	// recording is ever started.
+	Recorder device.ScreenRecorder
 	// Browser opens the inspector page. Nil means the inspect command
 	// only prints the URL.
 	Browser BrowserOpener
