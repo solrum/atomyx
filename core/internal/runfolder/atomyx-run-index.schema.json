@@ -1,0 +1,110 @@
+{
+  "$id": "https://schemas.atomyx.dev/run-index.schema.json",
+  "$ref": "#/definitions/RunIndex",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "IndexAttempt": {
+      "additionalProperties": true,
+      "properties": {
+        "deviceId": {
+          "description": "Device the attempt ran on. Present only for a sharded suite.",
+          "type": "string"
+        },
+        "number": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "result": {
+          "enum": [
+            "passed",
+            "failed"
+          ],
+          "type": "string"
+        },
+        "videos": {
+          "description": "Kept video file names relative to the artifacts directory of the run folder that holds them.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "workerRunId": {
+          "description": "Run folder of the worker that holds the attempt's artifacts. Present only for a sharded suite.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "number",
+        "result"
+      ],
+      "type": "object"
+    },
+    "IndexEntry": {
+      "additionalProperties": true,
+      "properties": {
+        "attempts": {
+          "description": "Every attempt in order.",
+          "items": {
+            "$ref": "#/definitions/IndexAttempt"
+          },
+          "type": "array"
+        },
+        "flaky": {
+          "const": true,
+          "description": "The entry failed and then passed. It counts as passed. Absent otherwise.",
+          "type": "boolean"
+        },
+        "path": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "quarantined": {
+          "const": true,
+          "description": "The entry matched the quarantine list. A quarantined failure does not fail the suite. Absent otherwise.",
+          "type": "boolean"
+        },
+        "status": {
+          "description": "Result of the last attempt.",
+          "enum": [
+            "passed",
+            "failed"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "status",
+        "attempts"
+      ],
+      "type": "object"
+    },
+    "RunIndex": {
+      "additionalProperties": true,
+      "properties": {
+        "entries": {
+          "description": "Every entry that ran, in suite order.",
+          "items": {
+            "$ref": "#/definitions/IndexEntry"
+          },
+          "type": "array"
+        },
+        "runId": {
+          "description": "Id of the suite run folder that holds this file.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "schemaVersion": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "runId",
+        "entries"
+      ],
+      "type": "object"
+    }
+  }
+}

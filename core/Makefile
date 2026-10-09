@@ -71,6 +71,7 @@ gen-schema:
 	go run ./cmd/gen-script-schema -out internal/script/atomyx-script.schema.json
 	go run ./cmd/gen-config-schema -out internal/config/atomyx-config.schema.json
 	go run ./cmd/gen-run-schema -out internal/runfolder/atomyx-run.schema.json
+	go run ./cmd/gen-index-schema -out internal/runfolder/atomyx-run-index.schema.json
 
 # Fail when the committed JSON Schema files no longer match the Go
 # structs they are generated from. Run this before trusting a schema

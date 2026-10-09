@@ -18,6 +18,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 SCRIPT_SCHEMA="internal/script/atomyx-script.schema.json"
 CONFIG_SCHEMA="internal/config/atomyx-config.schema.json"
 RUN_SCHEMA="internal/runfolder/atomyx-run.schema.json"
+INDEX_SCHEMA="internal/runfolder/atomyx-run-index.schema.json"
 
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -25,10 +26,12 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 SCRIPT_SCHEMA_FRESH="$TMP_DIR/atomyx-script.schema.json"
 CONFIG_SCHEMA_FRESH="$TMP_DIR/atomyx-config.schema.json"
 RUN_SCHEMA_FRESH="$TMP_DIR/atomyx-run.schema.json"
+INDEX_SCHEMA_FRESH="$TMP_DIR/atomyx-run-index.schema.json"
 
 go run ./cmd/gen-script-schema -out "$SCRIPT_SCHEMA_FRESH"
 go run ./cmd/gen-config-schema -out "$CONFIG_SCHEMA_FRESH"
 go run ./cmd/gen-run-schema -out "$RUN_SCHEMA_FRESH"
+go run ./cmd/gen-index-schema -out "$INDEX_SCHEMA_FRESH"
 
 stale=0
 
@@ -51,6 +54,7 @@ check_fresh() {
 check_fresh "$SCRIPT_SCHEMA" "$SCRIPT_SCHEMA_FRESH"
 check_fresh "$CONFIG_SCHEMA" "$CONFIG_SCHEMA_FRESH"
 check_fresh "$RUN_SCHEMA" "$RUN_SCHEMA_FRESH"
+check_fresh "$INDEX_SCHEMA" "$INDEX_SCHEMA_FRESH"
 
 if [ "$stale" -ne 0 ]; then
   echo ""

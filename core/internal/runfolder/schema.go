@@ -168,3 +168,45 @@ func stepLineSchema() map[string]any {
 		"attempt":       map[string]any{"type": "integer", "minimum": 2, "description": "Attempt number of a retried suite entry. Absent for the first attempt."},
 	}, []string{"schemaVersion", "runId", "seq", "stepIndex", "command", "phase", "ok", "durationMs", "detail", "artifacts"})
 }
+
+// GenerateIndexJSONSchema returns the JSON Schema of index.json.
+func GenerateIndexJSONSchema() map[string]any {
+	return map[string]any{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"$id":     "https://schemas.atomyx.dev/run-index.schema.json",
+		"$ref":    "#/definitions/RunIndex",
+		"definitions": map[string]any{
+			"RunIndex":     indexSchema(),
+			"IndexEntry":   indexEntrySchema(),
+			"IndexAttempt": indexAttemptSchema(),
+		},
+	}
+}
+
+func indexSchema() map[string]any {
+	return object(map[string]any{
+		"schemaVersion": map[string]any{"type": "integer", "minimum": 1},
+		"runId":         map[string]any{"type": "string", "minLength": 1, "description": "Id of the suite run folder that holds this file."},
+		"entries":       map[string]any{"type": "array", "items": ref("IndexEntry"), "description": "Every entry that ran, in suite order."},
+	}, []string{"schemaVersion", "runId", "entries"})
+}
+
+func indexEntrySchema() map[string]any {
+	return object(map[string]any{
+		"path":        map[string]any{"type": "string", "minLength": 1},
+		"status":      map[string]any{"type": "string", "enum": []string{string(ResultPassed), string(ResultFailed)}, "description": "Result of the last attempt."},
+		"flaky":       map[string]any{"type": "boolean", "const": true, "description": "The entry failed and then passed. It counts as passed. Absent otherwise."},
+		"quarantined": map[string]any{"type": "boolean", "const": true, "description": "The entry matched the quarantine list. A quarantined failure does not fail the suite. Absent otherwise."},
+		"attempts":    map[string]any{"type": "array", "items": ref("IndexAttempt"), "description": "Every attempt in order."},
+	}, []string{"path", "status", "attempts"})
+}
+
+func indexAttemptSchema() map[string]any {
+	return object(map[string]any{
+		"number":      map[string]any{"type": "integer", "minimum": 1},
+		"result":      map[string]any{"type": "string", "enum": []string{string(ResultPassed), string(ResultFailed)}},
+		"videos":      map[string]any{"type": "array", "items": str(), "description": "Kept video file names relative to the artifacts directory of the run folder that holds them."},
+		"deviceId":    map[string]any{"type": "string", "description": "Device the attempt ran on. Present only for a sharded suite."},
+		"workerRunId": map[string]any{"type": "string", "description": "Run folder of the worker that holds the attempt's artifacts. Present only for a sharded suite."},
+	}, []string{"number", "result"})
+}
