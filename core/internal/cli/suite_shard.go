@@ -93,8 +93,8 @@ func runShardedSuite(ctx context.Context, deps Deps, in shardedSuite) int {
 		label:      in.settings.label,
 		startedAt:  startedAt,
 		finishedAt: finishedAt,
-		platform:   joinedPlatforms(devices),
-		deviceID:   joinedDeviceIDs(devices),
+		platform:   joinedPlatforms(outcome.Ready),
+		deviceID:   joinedDeviceIDs(outcome.Ready),
 		envName:    in.environment,
 	}, result, index)
 }

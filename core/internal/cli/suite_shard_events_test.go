@@ -3,6 +3,8 @@ package cli
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
@@ -101,5 +103,24 @@ func TestShardedSuiteInterruptStopsEveryWorkerAndExits130(t *testing.T) {
 	}
 	if meta := readMeta(t, singleRunDir(t, run.root)); meta.Outcome != runfolder.OutcomeCancelled {
 		t.Errorf("outcome = %q, want cancelled", meta.Outcome)
+	}
+}
+
+func TestShardedSuiteReportNamesOnlyTheDevicesThatTookPartInTheRun(t *testing.T) {
+	writeShardFlows(t, "a.yml", "b.yml")
+	held := shard.Line{Kind: shard.LineError, Code: "DEVICE_HELD", Message: "held by atomyx inspect"}
+	scripts := map[string]*shard.FakeScript{"phone": {ReadyLine: &held}, "emu": {Handle: workerEntry}}
+
+	run := runShardedFake(context.Background(), t, map[string]FlagValue{"--shard": "auto", "--report": "html"}, twoAndroidDevices(), scripts)
+
+	if run.code != 0 {
+		t.Fatalf("exit code %d; stderr: %s", run.code, run.stderr)
+	}
+	body, err := os.ReadFile(filepath.Join(runfolder.ReportDir(singleRunDir(t, run.root)), "report.html"))
+	if err != nil {
+		t.Fatalf("no html report: %v", err)
+	}
+	if !strings.Contains(string(body), "emu") || strings.Contains(string(body), "phone") {
+		t.Errorf("html report names devices wrongly, want device emu and not the dropped device phone")
 	}
 }

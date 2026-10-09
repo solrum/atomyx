@@ -2,6 +2,7 @@ package shard
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -151,5 +152,18 @@ func TestRunRequeuesAnEntryTheIdleLostWorkerNeverStartedWithoutUsingItsRequeue(t
 	}
 	if len(warnings) != 2 || !strings.Contains(warnings[0], "device a was lost") || !strings.Contains(warnings[1], "device b was lost") {
 		t.Errorf("warnings = %v, want one per lost device", warnings)
+	}
+}
+
+func TestRunListsOnlyTheDevicesWhoseWorkerBecameReady(t *testing.T) {
+	held := Line{Kind: LineError, Code: "DEVICE_HELD"}
+	launcher := NewFakeLauncher(map[string]*FakeScript{
+		"a": {ReadyLine: &held}, "b": {Handle: passing}, "c": {StartErr: errors.New("no such file")},
+	})
+
+	outcome, _ := runShard(t, launcher, []string{"a", "b", "c"}, paths(2))
+
+	if len(outcome.Ready) != 1 || outcome.Ready[0].ID != "b" {
+		t.Errorf("ready = %+v, want only device b", outcome.Ready)
 	}
 }

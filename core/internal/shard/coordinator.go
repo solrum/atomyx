@@ -34,6 +34,10 @@ type Outcome struct {
 	// Unrun holds the paths no worker ran because every worker stopped,
 	// in suite order.
 	Unrun []string
+	// Ready holds the devices whose worker reported ready, in the order of
+	// Options.Devices. A device whose worker could not start or was dropped
+	// before it was ready is not listed.
+	Ready []Device
 	// Interrupted is true when ctx ended the run.
 	Interrupted bool
 }
@@ -322,6 +326,11 @@ func (c *coordinator) dispatch() {
 
 func (c *coordinator) outcome() Outcome {
 	out := Outcome{Interrupted: c.interrupted}
+	for _, s := range c.slots {
+		if s.ready {
+			out.Ready = append(out.Ready, s.device)
+		}
+	}
 	for _, j := range c.queue {
 		if len(j.attempts) > 0 {
 			c.abandon(j, false)
