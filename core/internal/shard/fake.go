@@ -21,6 +21,9 @@ type FakeScript struct {
 	// Vanish, when set, makes the worker call it and exit on its first path
 	// without answering, like a crashed process.
 	Vanish func()
+	// OnWait, when set, is called each time the coordinator collects the
+	// worker's exit, which happens once its output has ended.
+	OnWait func()
 }
 
 // FakeLauncher is a Launcher whose workers follow FakeScripts, so a test
@@ -170,4 +173,9 @@ func (w *fakeWorker) Stop(grace time.Duration) {
 	close(w.quit)
 }
 
-func (w *fakeWorker) Wait() Exit { return Exit{Stderr: "worker stderr"} }
+func (w *fakeWorker) Wait() Exit {
+	if w.script.OnWait != nil {
+		w.script.OnWait()
+	}
+	return Exit{Stderr: "worker stderr"}
+}

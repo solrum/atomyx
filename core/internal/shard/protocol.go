@@ -104,8 +104,8 @@ func EncodeLine(w io.Writer, line Line) error {
 }
 
 // DecodeLine parses one worker line. It rejects a line of another
-// protocol version, a line of an unknown kind, and an entry line without
-// an entry.
+// protocol version, a line of an unknown kind, an entry line without an
+// entry, and an entry with no path, no attempt, or an unknown status.
 func DecodeLine(raw []byte) (Line, error) {
 	var line Line
 	if err := json.Unmarshal(bytes.TrimSpace(raw), &line); err != nil {
@@ -120,8 +120,40 @@ func DecodeLine(raw []byte) (Line, error) {
 		if line.Entry == nil {
 			return Line{}, errors.New("worker entry line carries no entry")
 		}
+		if err := validateEntry(line.Entry); err != nil {
+			return Line{}, err
+		}
 	default:
 		return Line{}, fmt.Errorf("worker line has unknown kind %q", line.Kind)
 	}
 	return line, nil
 }
+
+// Statuses an entry or an attempt reports.
+const (
+	statusPassed = "passed"
+	statusFailed = "failed"
+)
+
+// validateEntry rejects an entry the coordinator cannot merge: one without
+// a path, without any attempt, or with a status other than passed or
+// failed on the entry or on an attempt.
+func validateEntry(e *Entry) error {
+	if e.Path == "" {
+		return errors.New("worker entry has no path")
+	}
+	if len(e.Attempts) == 0 {
+		return fmt.Errorf("worker entry %s has no attempts", e.Path)
+	}
+	if !knownStatus(e.Status) {
+		return fmt.Errorf("worker entry %s has unknown status %q", e.Path, e.Status)
+	}
+	for _, attempt := range e.Attempts {
+		if !knownStatus(attempt.Status) {
+			return fmt.Errorf("worker entry %s has an attempt with unknown status %q", e.Path, attempt.Status)
+		}
+	}
+	return nil
+}
+
+func knownStatus(status string) bool { return status == statusPassed || status == statusFailed }

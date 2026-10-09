@@ -96,3 +96,19 @@ func TestProcessLauncherReportsAProcessThatCannotStart(t *testing.T) {
 		t.Fatal("Launch succeeded for a process that cannot start")
 	}
 }
+
+func TestProcessWorkerDeliversTheLastLineWrittenBeforeAnInterruptedExit(t *testing.T) {
+	worker, proc, _ := launchFake(t)
+	_ = EncodeLine(proc, Line{Kind: LineReady, RunID: "r1"})
+	_ = EncodeLine(proc, Line{Kind: LineEntry, RunID: "r1", Entry: &Entry{Path: "/flows/a.yml", Status: "passed", Attempts: []Attempt{{Number: 1, Status: "passed"}}}})
+
+	worker.Stop(time.Second)
+
+	var kinds []LineKind
+	for line := range worker.Lines() {
+		kinds = append(kinds, line.Kind)
+	}
+	if len(kinds) != 2 || kinds[1] != LineEntry {
+		t.Errorf("lines after Stop = %v, want the ready line and the entry line", kinds)
+	}
+}

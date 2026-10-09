@@ -38,11 +38,16 @@ func TestEncodeLineRoundTripsEveryKind(t *testing.T) {
 
 func TestDecodeLineRejectsWhatTheParentCannotTrust(t *testing.T) {
 	cases := map[string]string{
-		"other version":   `{"v":2,"kind":"ready"}`,
-		"missing version": `{"kind":"ready"}`,
-		"unknown kind":    `{"v":1,"kind":"progress"}`,
-		"entry no entry":  `{"v":1,"kind":"entry"}`,
-		"not json":        `starting up`,
+		"other version":                `{"v":2,"kind":"ready"}`,
+		"missing version":              `{"kind":"ready"}`,
+		"unknown kind":                 `{"v":1,"kind":"progress"}`,
+		"entry no entry":               `{"v":1,"kind":"entry"}`,
+		"entry no path":                `{"v":1,"kind":"entry","entry":{"path":"","status":"passed","attempts":[{"number":1,"status":"passed"}]}}`,
+		"entry no attempts":            `{"v":1,"kind":"entry","entry":{"path":"a.yml","status":"passed","attempts":[]}}`,
+		"entry attempts missing":       `{"v":1,"kind":"entry","entry":{"path":"a.yml","status":"passed"}}`,
+		"entry unknown status":         `{"v":1,"kind":"entry","entry":{"path":"a.yml","status":"skipped","attempts":[{"number":1,"status":"passed"}]}}`,
+		"entry attempt unknown status": `{"v":1,"kind":"entry","entry":{"path":"a.yml","status":"passed","attempts":[{"number":1,"status":""}]}}`,
+		"not json":                     `starting up`,
 	}
 	for name, raw := range cases {
 		if _, err := DecodeLine([]byte(raw)); err == nil {

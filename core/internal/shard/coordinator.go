@@ -56,6 +56,7 @@ type slot struct {
 	ready      bool
 	closing    bool
 	ended      bool
+	stopped    bool
 	lost       bool
 	current    *job
 	dropReason string
@@ -102,7 +103,9 @@ func Run(ctx context.Context, opts Options) Outcome {
 			done = nil
 			c.interrupted = true
 			for _, s := range c.slots {
-				c.stop(s)
+				if !s.ended {
+					c.stop(s)
+				}
 			}
 		case ev := <-events:
 			if ev.line != nil {
@@ -129,6 +132,10 @@ type coordinator struct {
 
 // stop ends a worker in the background, first asking it to stop on its own.
 func (c *coordinator) stop(s *slot) {
+	if s.stopped {
+		return
+	}
+	s.stopped = true
 	c.stopping.Add(1)
 	go func() {
 		defer c.stopping.Done()
@@ -161,6 +168,14 @@ func (c *coordinator) finishEntry(s *slot, line Line) {
 	if j == nil {
 		return
 	}
+	if err := validateEntry(line.Entry); err != nil {
+		c.rejectReport(s, err.Error())
+		return
+	}
+	if line.Entry.Path != j.path {
+		c.rejectReport(s, fmt.Sprintf("it reported %s while running %s", line.Entry.Path, j.path))
+		return
+	}
 	s.current = nil
 	attempts := make([]Attempt, len(line.Entry.Attempts))
 	for i, attempt := range line.Entry.Attempts {
@@ -171,7 +186,7 @@ func (c *coordinator) finishEntry(s *slot, line Line) {
 		s.lost = true
 		_ = s.worker.CloseInput()
 		c.warn("device %s was lost, its worker stopped", s.device.ID)
-		if line.Entry.Status != "passed" && j.requeues < requeueLimit {
+		if line.Entry.Status != statusPassed && j.requeues < requeueLimit {
 			j.requeues++
 			j.kind = line.Entry.Kind
 			j.attempts = append(j.attempts, attempts...)
@@ -180,6 +195,14 @@ func (c *coordinator) finishEntry(s *slot, line Line) {
 		}
 	}
 	c.record(j, *line.Entry, attempts)
+}
+
+// rejectReport stops a worker whose report cannot be trusted. The entry it
+// held goes back to the queue once its output ends, like the entry of a
+// worker that vanished.
+func (c *coordinator) rejectReport(s *slot, reason string) {
+	c.warn("device %s dropped: its worker sent an invalid report: %s", s.device.ID, reason)
+	c.stop(s)
 }
 
 // record merges the attempts of earlier workers with the final report of
@@ -212,7 +235,7 @@ func (c *coordinator) end(s *slot) {
 			j.requeues++
 			c.queue = append([]*job{j}, c.queue...)
 		} else {
-			c.abandon(j)
+			c.abandon(j, true)
 		}
 	}
 	if !s.ready && !c.interrupted {
@@ -225,12 +248,14 @@ func (c *coordinator) end(s *slot) {
 }
 
 // abandon records an entry no worker finished. It keeps the attempts that
-// did run and adds a failed one for the worker that vanished.
-func (c *coordinator) abandon(j *job) {
+// did run, and when vanished is true it adds a failed attempt for the
+// worker that ended without reporting. An entry with no attempt at all
+// always gets that failed attempt.
+func (c *coordinator) abandon(j *job, vanished bool) {
 	message := "the worker ended before it finished the entry"
 	attempts := append([]Attempt(nil), j.attempts...)
-	if len(attempts) == 0 {
-		attempts = []Attempt{{Number: 1, Status: "failed", Error: &message}}
+	if vanished || len(attempts) == 0 {
+		attempts = append(attempts, Attempt{Number: len(attempts) + 1, Status: statusFailed, Error: &message})
 	}
 	kind := j.kind
 	if kind == "" {
@@ -282,7 +307,7 @@ func (c *coordinator) outcome() Outcome {
 	out := Outcome{Interrupted: c.interrupted}
 	for _, j := range c.queue {
 		if len(j.attempts) > 0 {
-			c.abandon(j)
+			c.abandon(j, false)
 		}
 	}
 	for i, result := range c.results {
