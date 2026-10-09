@@ -227,6 +227,11 @@
           "minimum": 0,
           "type": "integer"
         },
+        "flakyEntries": {
+          "description": "How many suite entries failed and then passed on a retry. Absent when none did.",
+          "minimum": 1,
+          "type": "integer"
+        },
         "host": {
           "$ref": "#/definitions/Host"
         },
@@ -262,6 +267,11 @@
             "interrupted"
           ],
           "type": "string"
+        },
+        "quarantinedFailures": {
+          "description": "How many quarantined suite entries failed. Absent when none did.",
+          "minimum": 1,
+          "type": "integer"
         },
         "recording": {
           "$ref": "#/definitions/Recording"

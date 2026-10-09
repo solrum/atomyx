@@ -281,3 +281,31 @@ func TestMetaRecordingRoundTripsAndIsOmittedWhenAbsent(t *testing.T) {
 		t.Fatalf("encoding = %s", data)
 	}
 }
+
+func TestMetaSuiteCountsAreOmittedWhenZeroAndEncodedWhenSet(t *testing.T) {
+	bare, err := json.Marshal(Meta{SchemaVersion: 1, RunID: "r", Kind: KindSuite})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{`"flakyEntries"`, `"quarantinedFailures"`} {
+		if bytes.Contains(bare, []byte(key)) {
+			t.Errorf("a zero count encoded %s: %s", key, bare)
+		}
+	}
+
+	data, err := json.Marshal(Meta{FlakyEntries: 2, QuarantinedFailures: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(data, []byte(`"flakyEntries":2`)) || !bytes.Contains(data, []byte(`"quarantinedFailures":1`)) {
+		t.Fatalf("encoding = %s", data)
+	}
+	var back Meta
+	if err := json.Unmarshal(data, &back); err != nil || back.FlakyEntries != 2 || back.QuarantinedFailures != 1 {
+		t.Fatalf("round trip = %+v, %v", back, err)
+	}
+	var old Meta
+	if err := json.Unmarshal(bare, &old); err != nil || old.FlakyEntries != 0 || old.QuarantinedFailures != 0 {
+		t.Fatalf("meta without counts = %+v, %v", old, err)
+	}
+}

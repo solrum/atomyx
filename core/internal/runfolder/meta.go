@@ -133,6 +133,13 @@ type Meta struct {
 	// Recording describes the screen recording of the run. Absent when
 	// recording was off or the video was discarded.
 	Recording *Recording `json:"recording,omitempty"`
+	// FlakyEntries counts the suite entries that failed and then passed on
+	// a retry. Absent when none did, and on a run that is not a suite.
+	FlakyEntries int `json:"flakyEntries,omitempty"`
+	// QuarantinedFailures counts the quarantined suite entries that failed.
+	// They do not fail the suite. Absent when none did, and on a run that
+	// is not a suite.
+	QuarantinedFailures int `json:"quarantinedFailures,omitempty"`
 }
 
 // RecordingState is how a run's screen recording ended.
