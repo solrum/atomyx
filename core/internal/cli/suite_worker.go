@@ -93,7 +93,7 @@ func serveWorkerEntries(host *suiteHost, positional *string, paths <-chan string
 		var path string
 		select {
 		case <-host.runCtx.Done():
-			return finished, false
+			return finished, reportIdleLoss(host, stdout)
 		case next, ok := <-paths:
 			if !ok {
 				return finished, false
@@ -102,7 +102,7 @@ func serveWorkerEntries(host *suiteHost, positional *string, paths <-chan string
 		}
 		entry, ran := runWorkerEntry(host, positional, path, len(finished))
 		if !ran {
-			return finished, false
+			return finished, reportIdleLoss(host, stdout)
 		}
 		finished = append(finished, entry)
 		if err := host.record.writer.WriteIndex(suiteIndexEntries(scenario.SuiteResult{Entries: finished})); err != nil {
@@ -114,6 +114,19 @@ func serveWorkerEntries(host *suiteHost, positional *string, paths <-chan string
 			return finished, lost
 		}
 	}
+}
+
+// reportIdleLoss tells the parent that the worker stopped without an entry
+// in flight. It reports true, and writes the device-lost line, only when
+// the device was lost, so the parent warns about the device and requeues
+// the entry it had sent. A stop for any other reason writes nothing.
+func reportIdleLoss(host *suiteHost, stdout io.Writer) bool {
+	err := host.opened.LostErr()
+	if err == nil {
+		return false
+	}
+	_ = shard.EncodeLine(stdout, shard.Line{Kind: shard.LineError, RunID: host.record.ID(), Code: shard.DeviceLostCode, Message: err.Error()})
+	return true
 }
 
 // runWorkerEntry runs the entry at path as the position-th entry of the

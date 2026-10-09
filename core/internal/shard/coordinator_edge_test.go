@@ -129,3 +129,27 @@ func TestRunRejectsAReportForAnotherPathAndRunsTheEntryOnAnotherWorker(t *testin
 		})
 	}
 }
+
+func TestRunRequeuesAnEntryTheIdleLostWorkerNeverStartedWithoutUsingItsRequeue(t *testing.T) {
+	aGot, bLost := make(chan struct{}), make(chan struct{})
+	launcher := NewFakeLauncher(map[string]*FakeScript{
+		"a": {Handle: func(string) Line {
+			close(aGot)
+			return Line{Kind: LineError, Code: DeviceLostCode, Message: "the device was lost"}
+		}},
+		"b": {ReadyAfter: aGot, Handle: losing(bLost)},
+		"c": {ReadyAfter: bLost, Handle: passing},
+	})
+
+	outcome, warnings := runShard(t, launcher, []string{"a", "b", "c"}, paths(1))
+
+	if len(outcome.Entries) != 1 || outcome.Entries[0].Status != "passed" || len(outcome.Entries[0].Attempts) != 2 {
+		t.Fatalf("entries = %+v, want a pass on worker c after the failed attempt on b", outcome.Entries)
+	}
+	if got := outcome.Entries[0].Attempts[1].DeviceID; got != "c" {
+		t.Errorf("last attempt ran on %q, want c", got)
+	}
+	if len(warnings) != 2 || !strings.Contains(warnings[0], "device a was lost") || !strings.Contains(warnings[1], "device b was lost") {
+		t.Errorf("warnings = %v, want one per lost device", warnings)
+	}
+}

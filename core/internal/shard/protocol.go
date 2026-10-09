@@ -34,9 +34,15 @@ const ProtocolVersion = 1
 //   - error: the worker cannot continue. Code is the stable error code,
 //     for example DEVICE_HELD, and Message says why. The worker exits
 //     right after.
+//     A worker that loses its device while it runs no entry sends code
+//     DeviceLostCode, and the entry it was sent, if any, never started.
 //
 // The worker reports human output on standard error. When its input
 // reaches end of file it finishes its run folder and exits.
+
+// DeviceLostCode is the code of the error line a worker sends when it loses
+// its device while it runs no entry.
+const DeviceLostCode = "DEVICE_LOST"
 
 // LineKind names what a worker line reports.
 type LineKind string

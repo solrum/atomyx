@@ -140,7 +140,7 @@ func (w *fakeWorker) run() {
 			case <-w.quit:
 				return
 			}
-			if line.DeviceLost {
+			if line.DeviceLost || line.Kind == LineError {
 				return
 			}
 		case <-w.quit:

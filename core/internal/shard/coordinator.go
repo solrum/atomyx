@@ -154,9 +154,26 @@ func (c *coordinator) handle(s *slot, line Line) {
 	case LineReady:
 		s.ready = true
 	case LineError:
+		if line.Code == DeviceLostCode {
+			c.finishIdleLoss(s)
+			return
+		}
 		s.dropReason = strings.TrimSpace(line.Code + " " + line.Message)
 	case LineEntry:
 		c.finishEntry(s, line)
+	}
+}
+
+// finishIdleLoss settles a worker that lost its device while it ran no
+// entry. An entry it was sent never started, so it goes back to the front
+// of the queue without using up its requeue.
+func (c *coordinator) finishIdleLoss(s *slot) {
+	s.lost = true
+	_ = s.worker.CloseInput()
+	c.warn("device %s was lost, its worker stopped", s.device.ID)
+	if j := s.current; j != nil {
+		s.current = nil
+		c.queue = append([]*job{j}, c.queue...)
 	}
 }
 

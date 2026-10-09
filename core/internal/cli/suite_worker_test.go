@@ -3,12 +3,15 @@ package cli
 import (
 	"bytes"
 	"context"
+	"io"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/diag"
+	"dev.atomyx/internal/driver/mock"
+	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/session/sessiontest"
 	"dev.atomyx/internal/shard"
@@ -28,9 +31,14 @@ type workerRun struct {
 
 func runWorker(t *testing.T, factory device.WrappingFactory, input string, extra map[string]FlagValue) workerRun {
 	t.Helper()
+	return runWorkerReading(t, factory, strings.NewReader(input), extra)
+}
+
+func runWorkerReading(t *testing.T, factory device.WrappingFactory, input io.Reader, extra map[string]FlagValue) workerRun {
+	t.Helper()
 	root := t.TempDir()
 	var stdout, stderr bytes.Buffer
-	deps := Deps{Probe: device.NewStaticProbe(nil), Factory: factory, Stdin: strings.NewReader(input), Stdout: &stdout, Stderr: &stderr}
+	deps := Deps{Probe: device.NewStaticProbe(nil), Factory: factory, Stdin: input, Stdout: &stdout, Stderr: &stderr}
 	flags := map[string]FlagValue{"--worker": true, "--device": "emulator-5556", "--report-dir": root}
 	for k, v := range extra {
 		flags[k] = v
@@ -168,5 +176,44 @@ func TestSuiteWorkerKeepsTheArtifactsOfEveryEntryApart(t *testing.T) {
 	}
 	if first == 0 || second == 0 {
 		t.Errorf("artifacts %v, want files named for entry positions 0 and 1", names)
+	}
+}
+
+// idleLossFactory builds a device that reports its runner gone as soon as
+// it is opened, so the loss reaches a worker that holds no entry.
+type idleLossFactory struct{}
+
+func (f idleLossFactory) WithDriverWrap(wrap device.DriverWrap) device.Factory {
+	return sessiontest.Wrapping(f).WithDriverWrap(wrap)
+}
+
+func (idleLossFactory) Build(ctx context.Context, _ device.Descriptor) (device.Built, error) {
+	lost := make(chan error, 1)
+	drv := mock.New()
+	if err := drv.Connect(ctx); err != nil {
+		return device.Built{}, err
+	}
+	lost <- &device.ProcessExitError{Component: device.LostRunner}
+	return device.Built{
+		Driver:    drv,
+		Orchestra: orchestra.New(orchestra.OrchestraDeps{Driver: drv, Clock: orchestra.SystemClock{}}),
+		Lost:      lost,
+	}, nil
+}
+
+func TestSuiteWorkerThatLosesItsDeviceWhileIdleReportsTheLossAndEndsAsDeviceLost(t *testing.T) {
+	idle, release := io.Pipe()
+	t.Cleanup(func() { _ = release.Close() })
+
+	run := runWorkerReading(t, idleLossFactory{}, idle, nil)
+
+	if run.code != 1 {
+		t.Fatalf("exit code = %d, want 1; stderr: %s", run.code, run.stderr)
+	}
+	if len(run.lines) != 2 || run.lines[1].Kind != shard.LineError || run.lines[1].Code != shard.DeviceLostCode {
+		t.Fatalf("lines = %+v, want ready then a device-lost error line", run.lines)
+	}
+	if meta := readMeta(t, singleRunDir(t, run.root)); meta.Outcome != runfolder.OutcomeDeviceLost {
+		t.Errorf("outcome = %q, want deviceLost", meta.Outcome)
 	}
 }
