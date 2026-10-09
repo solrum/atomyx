@@ -17,6 +17,7 @@ func GenerateJSONSchema() map[string]any {
 			"InterventionsTruncated": interventionsTruncatedSchema(),
 			"MCPInfo":                mcpInfoSchema(),
 			"RunMeta":                metaSchema(),
+			"StepLine":               stepLineSchema(),
 		},
 	}
 }
@@ -147,4 +148,21 @@ func interventionsTruncatedSchema() map[string]any {
 		"truncated":  map[string]any{"type": "boolean", "const": true},
 		"limitBytes": map[string]any{"type": "integer", "minimum": 1},
 	}, []string{"truncated", "limitBytes"})
+}
+
+// stepLineSchema describes one line of steps.jsonl.
+func stepLineSchema() map[string]any {
+	return object(map[string]any{
+		"schemaVersion": map[string]any{"type": "integer", "minimum": 1},
+		"runId":         map[string]any{"type": "string", "minLength": 1},
+		"seq":           map[string]any{"type": "integer", "minimum": 1, "description": "Position of the line in its run, from 1."},
+		"stepIndex":     map[string]any{"type": "integer", "minimum": 0},
+		"command":       str(),
+		"phase":         enum([]StepPhase{StepPhaseStarted, StepPhaseCompleted}, "Which side of the step the line reports."),
+		"ok":            map[string]any{"type": "boolean"},
+		"durationMs":    map[string]any{"type": "integer", "minimum": 0},
+		"detail":        map[string]any{"type": []string{"string", "null"}},
+		"artifacts":     map[string]any{"type": "array", "items": str(), "description": "Run-relative file names the step produced."},
+		"attempt":       map[string]any{"type": "integer", "minimum": 2, "description": "Attempt number of a retried suite entry. Absent for the first attempt."},
+	}, []string{"schemaVersion", "runId", "seq", "stepIndex", "command", "phase", "ok", "durationMs", "detail", "artifacts"})
 }

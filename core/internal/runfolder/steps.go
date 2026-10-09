@@ -52,6 +52,10 @@ type StepLine struct {
 	// Artifacts lists artifact file names, relative to the artifacts
 	// directory, that the step produced. It is never null.
 	Artifacts []string `json:"artifacts"`
+	// Attempt is the 1-based attempt number of a suite entry that was
+	// retried. It is omitted for the first attempt, so a run without
+	// retries writes the same lines it always did.
+	Attempt int `json:"attempt,omitempty"`
 }
 
 // AppendStep stamps line with the schema version, the run id and the next

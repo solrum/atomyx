@@ -306,6 +306,77 @@
         "startedAt"
       ],
       "type": "object"
+    },
+    "StepLine": {
+      "additionalProperties": true,
+      "properties": {
+        "artifacts": {
+          "description": "Run-relative file names the step produced.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "attempt": {
+          "description": "Attempt number of a retried suite entry. Absent for the first attempt.",
+          "minimum": 2,
+          "type": "integer"
+        },
+        "command": {
+          "type": "string"
+        },
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "durationMs": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "phase": {
+          "description": "Which side of the step the line reports.",
+          "enum": [
+            "started",
+            "completed"
+          ],
+          "type": "string"
+        },
+        "runId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "schemaVersion": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "seq": {
+          "description": "Position of the line in its run, from 1.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "stepIndex": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "runId",
+        "seq",
+        "stepIndex",
+        "command",
+        "phase",
+        "ok",
+        "durationMs",
+        "detail",
+        "artifacts"
+      ],
+      "type": "object"
     }
   }
 }

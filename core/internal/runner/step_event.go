@@ -59,6 +59,10 @@ type StepEvent struct {
 	// DurationMs is how long the step took to execute. Meaningful only
 	// when Type is StepCompleted.
 	DurationMs int64
+	// Attempt is the 1-based attempt number of a retried suite entry
+	// that emitted the event. It is zero for a first attempt and for any
+	// run that is not a suite entry.
+	Attempt int
 }
 
 // emitStep logs event's outcome when it is a StepCompleted event, then

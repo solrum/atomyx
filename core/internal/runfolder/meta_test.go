@@ -226,6 +226,7 @@ func TestSchemaMatchesJSONTags(t *testing.T) {
 		"Recording":              reflect.TypeOf(Recording{}),
 		"Intervention":           reflect.TypeOf(InterventionLine{}),
 		"InterventionsTruncated": reflect.TypeOf(InterventionsTruncated{}),
+		"StepLine":               reflect.TypeOf(StepLine{}),
 	}
 	delete(defs, "InterventionEntry")
 	if len(defs) != len(types) {

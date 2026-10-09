@@ -150,3 +150,15 @@ func TestSinkPublishesInSequenceOrderUnderConcurrentEvents(t *testing.T) {
 		}
 	}
 }
+
+func TestSinkCarriesTheAttemptOfARetriedEntry(t *testing.T) {
+	appender := &recordingAppender{}
+	sink := NewSink(appender, &countingLogger{})
+
+	sink(runner.StepEvent{Type: runner.StepStarted, Command: "tap"})
+	sink(runner.StepEvent{Type: runner.StepStarted, Command: "tap", Attempt: 3})
+
+	if appender.lines[0].Attempt != 0 || appender.lines[1].Attempt != 3 {
+		t.Errorf("attempts = %d, %d, want 0, 3", appender.lines[0].Attempt, appender.lines[1].Attempt)
+	}
+}

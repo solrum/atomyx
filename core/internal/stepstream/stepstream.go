@@ -69,6 +69,7 @@ func lineFor(event runner.StepEvent) runfolder.StepLine {
 		StepIndex: event.StepIndex,
 		Command:   event.Command,
 		Phase:     runfolder.StepPhaseStarted,
+		Attempt:   event.Attempt,
 	}
 	if event.Type == runner.StepCompleted {
 		line.Phase = runfolder.StepPhaseCompleted

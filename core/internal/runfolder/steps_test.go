@@ -142,3 +142,20 @@ func TestAppendStepStampsTheRunIDOfTheFolder(t *testing.T) {
 		t.Errorf("steps file line lacks the run id: %s", lines[0])
 	}
 }
+
+func TestStepLineAttemptIsOmittedForTheFirstAttempt(t *testing.T) {
+	first, err := json.Marshal(StepLine{Command: "tap", Phase: StepPhaseStarted})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(first), "attempt") {
+		t.Errorf("a first-attempt line carries an attempt field: %s", first)
+	}
+	retried, err := json.Marshal(StepLine{Command: "tap", Phase: StepPhaseStarted, Attempt: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(retried), `"attempt":2`) {
+		t.Errorf("a retried line misses its attempt: %s", retried)
+	}
+}
