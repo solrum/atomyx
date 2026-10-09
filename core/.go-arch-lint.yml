@@ -93,6 +93,8 @@ components:
     in: internal/stepstream
   debugrun:
     in: internal/debugrun
+  recording:
+    in: internal/recording
   cmd:
     in: cmd/**
   scripttools:
@@ -205,6 +207,7 @@ deps:
       - orchestra
       - process
       - drivermock
+      - diag
   suite:
     anyVendorDeps: true
   sidecar:
@@ -248,6 +251,7 @@ deps:
       - redact
       - stepstream
       - debugrun
+      - recording
   skills:
     anyVendorDeps: true
   storage:
@@ -273,6 +277,7 @@ deps:
       - runfolder
       - stepstream
       - debugrun
+      - recording
   config:
     anyVendorDeps: true
   report:
@@ -341,6 +346,11 @@ deps:
       - runner
       - session
       - debugrun
+  recording:
+    mayDependOn:
+      - device
+      - runfolder
+      - recording
   inspector:
     mayDependOn:
       - wire
