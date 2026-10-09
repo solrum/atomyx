@@ -19,9 +19,11 @@ const (
 	VideoOff       = "off"
 	VideoOnFailure = "onFailure"
 
-	// ReportFormatHTML and ReportFormatJSON are the two values a Report.Formats entry accepts.
-	ReportFormatHTML = "html"
-	ReportFormatJSON = "json"
+	// ReportFormatHTML, ReportFormatJSON and ReportFormatJUnit are the values
+	// a Report.Formats entry accepts.
+	ReportFormatHTML  = "html"
+	ReportFormatJSON  = "json"
+	ReportFormatJUnit = "junit"
 
 	// MaxSuiteRetries is the most retries a suite entry may declare.
 	MaxSuiteRetries = 3

@@ -154,12 +154,13 @@ type ReportOptions struct {
 	ArtifactsDir string
 }
 
-// FormatHTML and FormatJSON are the two values a ReportOptions.Formats
-// entry accepts, re-exported from config so callers that only import
-// report do not also need config for these two literals.
+// FormatHTML, FormatJSON and FormatJUnit are the values a
+// ReportOptions.Formats entry accepts, re-exported from config so callers
+// that only import report do not also need config for these literals.
 const (
-	FormatHTML = config.ReportFormatHTML
-	FormatJSON = config.ReportFormatJSON
+	FormatHTML  = config.ReportFormatHTML
+	FormatJSON  = config.ReportFormatJSON
+	FormatJUnit = config.ReportFormatJUnit
 )
 
 // ReportBundle is where a generated report landed, and every file the

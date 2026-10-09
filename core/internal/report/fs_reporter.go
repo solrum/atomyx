@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+
+	"dev.atomyx/internal/runfolder"
 )
 
 // Reporter turns a run's in-memory result into a persisted report
@@ -20,7 +22,7 @@ type fsReporter struct{}
 
 // NewFsReporter returns a Reporter that writes every screenshot into
 // options.ArtifactsDir, named to match the relative paths the JSON
-// renderer references, and writes report.html and report.json into
+// renderer references, and writes report.html, report.json and junit.xml into
 // options.ReportDir per the requested formats. HTML image links lead
 // from ReportDir to ArtifactsDir. A Reporter given no formats writes the
 // screenshots only and never creates ReportDir.
@@ -90,6 +92,18 @@ func (fsReporter) Generate(input ReportInput, options ReportOptions) (ReportBund
 			return ReportBundle{}, fmt.Errorf("report: writing report.json: %w", err)
 		}
 		files = append(files, jsonPath)
+	}
+
+	if slices.Contains(options.Formats, FormatJUnit) {
+		rendered, err := RenderJUnit(input)
+		if err != nil {
+			return ReportBundle{}, err
+		}
+		junitPath := filepath.Join(options.ReportDir, runfolder.JUnitFileName)
+		if err := os.WriteFile(junitPath, rendered, 0o644); err != nil {
+			return ReportBundle{}, fmt.Errorf("report: writing %s: %w", runfolder.JUnitFileName, err)
+		}
+		files = append(files, junitPath)
 	}
 
 	return ReportBundle{BundleDir: options.ReportDir, Files: files}, nil
