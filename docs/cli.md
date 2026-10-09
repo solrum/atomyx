@@ -93,7 +93,7 @@ Flags:
 | `--var-file <path>` | JSON file of flat key-value string variables, merged in before `--var`. | none | no |
 | `--preconditions <skip\|force>` | Overrides every precondition's own policy for this run. `skip` does nothing for every precondition. `force` runs every precondition's setup unconditionally. Takes precedence over the scenario's and the project config's `preconditions` field. | the precondition's own policy | no |
 | `--skip-preconditions` | Shorthand for `--preconditions skip`. | off | no |
-| `--report <formats>` | Enables report generation and selects its output formats: `html`, `json`, or both, separated by a comma. Overrides the project config's `report` block. | the project config's `report.formats`, or `html` when reporting is enabled by `--report-dir` alone | no |
+| `--report <formats>` | Enables report generation and selects its output formats: `html`, `json`, `junit`, or any combination separated by commas. Overrides the project config's `report` block. | the project config's `report.formats`, or `html` when reporting is enabled by `--report-dir` alone | no |
 | `--report-dir <path>` | Root directory the run folder is written under. See "Run folder" below. | the project config's `report.outDir`, or the storage root | no |
 | `--video` | Records the device screen and keeps the video of a failed run. See "Screen recording" below. | the project config's `video` setting, which defaults to `off` | no |
 | `--break <file>:<line>` | Holds the run before the authored top-level step at this location. See "Debugging a run" below. | none | yes |
@@ -265,8 +265,8 @@ The CLI flags take precedence over the config's `report` block field
 by field, so `--report-dir` alone can redirect a config-declared
 report without repeating `--report`.
 
-Tooling that reads a report uses the `report.html` and `report.json`
-files in the run folder's `report` directory. The flat
+Tooling that reads a report uses the `report.html`, `report.json` and
+`junit.xml` files in the run folder's `report` directory. The flat
 `<outDir>/<runId>/report.html` location is not written.
 
 `meta.json` ends with a result and an outcome. A passing run is
@@ -301,17 +301,19 @@ Flags:
 | `--var-file <path>` | JSON file of flat key-value string variables, merged in before `--var`. | none | no |
 | `--preconditions <skip\|force>` | Overrides every precondition's own policy for every flow in the suite. | the precondition's own policy | no |
 | `--skip-preconditions` | Shorthand for `--preconditions skip`. | off | no |
-| `--report <formats>` | Enables report generation and selects its output formats: `html`, `json`, or both, separated by a comma. Same precedence rule as `atomyx driver run`. | the project config's `report.formats`, or `html` when reporting is enabled by `--report-dir` alone | no |
+| `--report <formats>` | Enables report generation and selects its output formats: `html`, `json`, `junit`, or any combination separated by commas. Same precedence rule as `atomyx driver run`. | the project config's `report.formats`, or `html` when reporting is enabled by `--report-dir` alone | no |
 | `--report-dir <path>` | Root directory the run folder is written under. Same rule as `atomyx driver run`. | the project config's `report.outDir`, or the storage root | no |
+| `--device <id>` | Runs the whole suite on this device, as reported by `atomyx driver list-devices`. The suite runs in this process on that one device and is not split across devices. Resolved like `atomyx driver run --device`. | the project config environment's device, then the platform default | no |
 | `--video` | Records the device screen once per flow and keeps the video of each failed flow. See "Screen recording" below. | the project config's `video` setting, which defaults to `off` | no |
+| `--retries <n>` | Runs a failed flow again up to `n` more times, from 0 to 3. Overrides the config suite's `retries`. See "Retries and quarantine" below. | the config suite's `retries`, or `0` | no |
+| `--json` | Prints one JSON object to stdout with `ok`, `runFolder` and `entries`, and moves the text summary to stderr. See "Suite JSON output" below. | off | no |
 | `--help`, `-h` | Prints this command's usage and exits. | off | no |
 
 Selecting by tag alone requires `testRoots` in the project config, or
 a `--glob` to narrow the search, because a tag-only selector has no
 other way to bound which directory to scan. `atomyx driver suite`
-does not accept `--file`, `--platform`, `--device`, `--proxy`,
-`--json`, or `--break`, because those are specific to
-`atomyx driver run`.
+does not accept `--file`, `--platform`, `--proxy`, or `--break`, because
+those are specific to `atomyx driver run`.
 
 Example:
 
@@ -324,6 +326,64 @@ least one flow failed, `2` when the selector matched no flows or the
 command was misused, `130` when SIGINT interrupted the suite, and `143`
 when SIGTERM did. An interrupted suite prints `interrupted` and finalizes its run
 folder as cancelled before it exits.
+
+### Retries and quarantine
+
+A named suite in the project config may declare `retries` and
+`quarantine`:
+
+```yaml
+suites:
+  nightly:
+    globs: ["flows/**/*.yml"]
+    retries: 2
+    quarantine: ["flows/flaky/**"]
+```
+
+- `retries` is how many more times a failed flow runs after its first
+  attempt, from 0 to 3. The default is 0.
+- `quarantine` is a list of globs matched against flow paths the same
+  way the suite's own `globs` are, relative to each `testRoots`
+  directory or to the current directory when `testRoots` is not set.
+- `--retries <n>` overrides `retries` for one invocation. An ad-hoc
+  suite selected by `--tag` or `--glob` has no config entry, so it
+  retries only when `--retries` is given and quarantines nothing.
+- `atomyx driver run` never retries.
+
+What is retried:
+
+- A flow that ran and failed, because a step failed or a scenario
+  script failed.
+
+What is never retried, because it would fail the same way again or
+hide a real fault:
+
+- A suite that was interrupted by SIGINT or SIGTERM.
+- A flow that cannot be loaded or parsed.
+- A run that stopped early, such as a device that became unreachable.
+
+Before each retry the flow's own `launchApp` runs again. A retry does
+not clear app data, so a flow that needs a clean start declares it with
+its own `launchApp` options or preconditions. Each attempt keeps its own
+artifacts and video, and its step lines in `steps.jsonl` carry an
+`attempt` field from the second attempt on.
+
+How the outcomes are reported:
+
+- A flow that fails and then passes is flaky. It counts as passed, and
+  the text summary, `index.json` and both reports mark it.
+- A quarantined flow still runs and is still retried, but if it fails,
+  the failure does not fail the suite. The exit code stays `0` when
+  every other flow passed, and `meta.json` carries result `passed`.
+- `index.json` lists every attempt of every flow with `flaky` and
+  `quarantined`. See "Suite index" below.
+- `report.html` shows a flaky badge with the attempt count and lists
+  quarantined failures in their own section. `report.json` carries the
+  same facts.
+- `junit.xml` writes a flaky flow as a passing test case with one
+  `flakyFailure` element per failed attempt, and a quarantined failure
+  as a skipped test case with the message `quarantined`. See "JUnit
+  report" below.
 
 ### Suite index
 
@@ -361,6 +421,64 @@ flaky entries and videos as `index.json`.
 
 A schema version only ever gains fields, so a reader written for it keeps
 working.
+
+### Suite JSON output
+
+With `--json`, `atomyx driver suite` prints one JSON object to stdout
+and writes the text summary to stderr, so stdout can be piped to a
+parser. The exit codes do not change.
+
+```json
+{
+  "ok": false,
+  "runFolder": "/home/me/.atomyx/runs/v1/20261009-101500-nightly-ab12",
+  "entries": [
+    {
+      "path": "/work/flows/login.yml",
+      "status": "failed",
+      "attempts": [{ "number": 1, "result": "failed" }]
+    }
+  ]
+}
+```
+
+- `ok` is `true` when the suite's exit code is `0`.
+- `runFolder` is the absolute path of the suite's run folder. The CLI
+  does not print the `Run folder:` line in this mode.
+- `entries` has exactly the shape of the entries in `index.json`.
+
+### JUnit report
+
+`--report junit`, or `junit` in the config's `report.formats`, writes
+`report/junit.xml` in the run folder. It is a single `testsuite`
+element that Jenkins, GitLab and most CI systems read.
+
+For `atomyx driver run`:
+
+- The testsuite holds one `testcase` named after the script or
+  scenario.
+- A failed run carries a `failure` element that names the failing step
+  and its message. A scenario names the first script that did not pass.
+
+For `atomyx driver suite`:
+
+- The testsuite is named after the suite, or `suite` when none was
+  given.
+- Each flow is one `testcase`, with `classname` set to the suite name
+  and `name` set to the flow path. `time` is in seconds.
+- A failed flow carries a `failure` element. A flow that could not run
+  at all, such as one that fails to load, carries an `error` element.
+- A flaky flow passes and carries one `flakyFailure` element per failed
+  attempt. This is the Surefire extension. Jenkins shows it, and
+  GitLab ignores it and shows a pass.
+- A quarantined failure carries a `skipped` element with the message
+  `quarantined`.
+- The `tests`, `failures`, `errors` and `skipped` counts agree with the
+  exit code: `failures` plus `errors` is the number of flows that fail
+  the suite, and `skipped` counts quarantined failures.
+
+The suite's JUnit report and `index.json` are built from the same
+result, so they list the same flows with the same outcomes.
 
 ## driver doctor
 
