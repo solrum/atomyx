@@ -82,10 +82,11 @@ func (r ExecBackground) start(ctx context.Context, interactive bool, name string
 	if env := EnvFrom(ctx); len(env) > 0 {
 		cmd.Env = append(os.Environ(), env...)
 	}
-	cmd.WaitDelay = ioDrainDelay
+	drainDelay := ioDrainDelay
 	if r.waitDelay > 0 {
-		cmd.WaitDelay = r.waitDelay
+		drainDelay = r.waitDelay
 	}
+	cmd.WaitDelay = drainDelay
 	var stdin io.WriteCloser
 	if interactive {
 		pipe, err := cmd.StdinPipe()
@@ -94,16 +95,25 @@ func (r ExecBackground) start(ctx context.Context, interactive bool, name string
 		}
 		stdin = pipe
 	}
-	stdout, err := cmd.StdoutPipe()
+	// The standard output pipe is made here instead of by StdoutPipe,
+	// because Cmd.Wait closes the read end of a StdoutPipe as soon as the
+	// process exits, which drops output the reader has not consumed yet.
+	// With a plain pipe the reader sees every byte up to end of file, and
+	// Wait closes the read end only after drainDelay.
+	stdout, stdoutWriter, err := os.Pipe()
 	if err != nil {
 		return nil, err
 	}
+	cmd.Stdout = stdoutWriter
 	stderr := newCappedBuffer(stderrCaptureLimit)
 	cmd.Stderr = stderr
-	if err := cmd.Start(); err != nil {
-		return nil, err
+	startErr := cmd.Start()
+	_ = stdoutWriter.Close()
+	if startErr != nil {
+		_ = stdout.Close()
+		return nil, startErr
 	}
-	return &execBackgroundProcess{cmd: cmd, stdin: stdin, stdout: stdout, stderr: stderr}, nil
+	return &execBackgroundProcess{cmd: cmd, stdin: stdin, stdout: stdout, stderr: stderr, drainDelay: drainDelay}, nil
 }
 
 // execBackgroundProcess is the BackgroundProcess ExecBackground.Start
@@ -114,6 +124,10 @@ type execBackgroundProcess struct {
 	stdin  io.WriteCloser
 	stdout io.ReadCloser
 	stderr *cappedBuffer
+
+	// drainDelay is how long after the process exits the read end of
+	// stdout stays open for a reader to drain it.
+	drainDelay time.Duration
 
 	mu      sync.Mutex
 	waited  bool
@@ -140,6 +154,7 @@ func (p *execBackgroundProcess) Wait() (BackgroundResult, error) {
 	}
 	p.waited = true
 	p.waitErr = p.cmd.Wait()
+	time.AfterFunc(p.drainDelay, func() { _ = p.stdout.Close() })
 	if p.cmd.ProcessState != nil {
 		p.result.ExitCode = p.cmd.ProcessState.ExitCode()
 	}
