@@ -127,3 +127,32 @@ func assertSingleScreenshot(t *testing.T, what string, refs []report.ReportJsonS
 		t.Errorf("%s: expected a non-empty resolved file name", what)
 	}
 }
+
+func TestSuiteScreenshotScope_EveryAttemptKeepsItsOwnScope(t *testing.T) {
+	first := scriptResultWithScreenshot("flow", "first-try")
+	second := scriptResultWithScreenshot("flow", "second-try")
+	entry := scenario.SuiteEntryResult{
+		Path:   "scripts/flow.yml",
+		Kind:   scenario.KindScript,
+		Status: scenario.EntryPassed,
+		Flaky:  true,
+		Result: &scenario.SuiteEntryOutcome{Script: &second},
+		Attempts: []scenario.SuiteAttempt{
+			{Number: 1, Status: scenario.EntryFailed, Result: &scenario.SuiteEntryOutcome{Script: &first}},
+			{Number: 2, Status: scenario.EntryPassed, Result: &scenario.SuiteEntryOutcome{Script: &second}},
+		},
+	}
+
+	got := suiteReportScreenshots(scenario.SuiteResult{Entries: []scenario.SuiteEntryResult{entry}})
+
+	entryScope := report.SuiteEntryScope(0, entry.Path)
+	if len(got) != 2 || got[0].Scope != entryScope || got[1].Scope != report.SuiteAttemptScope(entryScope, 2) {
+		t.Fatalf("screenshots = %+v, want attempt 1 under the entry scope and attempt 2 under its own", got)
+	}
+	if scopeForTarget(scenario.ChildTarget{EntryIndex: 0, EntryPath: entry.Path, Attempt: 2, ScriptIndex: scenario.NoPosition}) != got[1].Scope {
+		t.Error("the live artifact scope of attempt 2 differs from the report scope")
+	}
+	if scopeForTarget(scenario.ChildTarget{EntryIndex: 0, EntryPath: entry.Path, Attempt: 1, ScriptIndex: scenario.NoPosition}) != entryScope {
+		t.Error("the live artifact scope of attempt 1 changed")
+	}
+}

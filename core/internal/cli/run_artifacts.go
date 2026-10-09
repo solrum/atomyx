@@ -69,15 +69,14 @@ func (q *artifactSequence) forTarget(target scenario.ChildTarget) scenario.Child
 }
 
 func scopeForTarget(target scenario.ChildTarget) string {
-	switch {
-	case target.EntryIndex == scenario.NoPosition:
+	if target.EntryIndex == scenario.NoPosition {
 		return report.ScenarioChildScope(report.RootScriptScope, target.ScriptIndex, target.ScriptPath)
-	case target.ScriptIndex == scenario.NoPosition:
-		return report.SuiteEntryScope(target.EntryIndex, target.EntryPath)
-	default:
-		entry := report.SuiteEntryScope(target.EntryIndex, target.EntryPath)
-		return report.ScenarioChildScope(entry, target.ScriptIndex, target.ScriptPath)
 	}
+	entry := report.SuiteAttemptScope(report.SuiteEntryScope(target.EntryIndex, target.EntryPath), target.Attempt)
+	if target.ScriptIndex == scenario.NoPosition {
+		return entry
+	}
+	return report.ScenarioChildScope(entry, target.ScriptIndex, target.ScriptPath)
 }
 
 var nonAlphanumericRun = regexp.MustCompile(`[^a-z0-9]+`)

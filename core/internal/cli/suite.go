@@ -288,14 +288,14 @@ func printSuiteResult(w io.Writer, result scenario.SuiteResult) {
 		label = fmt.Sprintf(" \"%s\"", *result.SuiteName)
 	}
 	_, _ = fmt.Fprintf(w, "\n%s: suite%s\n", status, label)
-	_, _ = fmt.Fprintf(w, "  %d of %d flows passed (%dms)\n\n", result.Passed, result.Total, result.DurationMs)
+	_, _ = fmt.Fprintf(w, "  %d of %d flows passed%s (%dms)\n\n", result.Passed, result.Total, suiteCountsNote(result), result.DurationMs)
 
 	for _, entry := range result.Entries {
 		entryStatus := "FAIL"
 		if entry.Status == scenario.EntryPassed {
 			entryStatus = "PASS"
 		}
-		_, _ = fmt.Fprintf(w, "  %s [%s] %s, %dms\n", entryStatus, entry.Kind, entry.Path, entry.DurationMs)
+		_, _ = fmt.Fprintf(w, "  %s [%s] %s, %dms%s\n", entryStatus, entry.Kind, entry.Path, entry.DurationMs, entryNote(entry))
 		if entry.Error != nil {
 			_, _ = fmt.Fprintf(w, "    %s\n", *entry.Error)
 		}
@@ -303,34 +303,79 @@ func printSuiteResult(w io.Writer, result scenario.SuiteResult) {
 	_, _ = io.WriteString(w, "\n")
 }
 
+// suiteCountsNote renders the flaky and quarantined counts that follow the
+// passed count, or an empty string when both are zero.
+func suiteCountsNote(result scenario.SuiteResult) string {
+	var note string
+	if result.Flaky > 0 {
+		note += fmt.Sprintf(", %d flaky", result.Flaky)
+	}
+	if result.QuarantinedFailures > 0 {
+		note += fmt.Sprintf(", %d quarantined failures", result.QuarantinedFailures)
+	}
+	return note
+}
+
+// entryNote renders what the retries and the quarantine list did to an
+// entry, or an empty string for an entry that ran once and is not
+// quarantined.
+func entryNote(entry scenario.SuiteEntryResult) string {
+	switch {
+	case entry.Flaky:
+		return fmt.Sprintf(" (flaky, passed on attempt %d)", len(entry.Attempts))
+	case entry.QuarantinedFailure():
+		return " (quarantined)"
+	case len(entry.Attempts) > 1:
+		return fmt.Sprintf(" (failed %d attempts)", len(entry.Attempts))
+	}
+	return ""
+}
+
 // suiteReportScreenshots flattens every entry's screenshots out of a
 // suite result. Each entry's scope carries its position in the
 // suite's entry list, so two entries that run the same file still get
 // distinct scopes; a scenario entry's child screenshots nest inside
 // that entry's own scope via report.ScenarioChildScope, so they stay
-// distinct from every other entry's scope too.
+// distinct from every other entry's scope too. Every attempt of a retried
+// entry contributes its screenshots under its own attempt scope, in the
+// order they were taken, which keeps the file names the live artifact
+// writer assigned valid.
 func suiteReportScreenshots(result scenario.SuiteResult) []report.ReportScreenshot {
 	var out []report.ReportScreenshot
 	for entryIndex, entry := range result.Entries {
-		if entry.Result == nil {
-			continue
+		attempts := entry.Attempts
+		if len(attempts) == 0 {
+			attempts = []scenario.SuiteAttempt{{Number: 1, Result: entry.Result}}
 		}
-		scope := report.SuiteEntryScope(entryIndex, entry.Path)
-		switch {
-		case entry.Result.Scenario != nil:
-			for _, child := range entry.Result.Scenario.Scripts {
-				if child.Result == nil {
-					continue
-				}
-				childScope := report.ScenarioChildScope(scope, child.ScriptIndex, child.ScriptPath)
-				for _, shot := range child.Result.Artifacts.Screenshots() {
-					out = append(out, report.ReportScreenshot{Scope: childScope, Label: shot.Label, Data: shot.Data, MimeType: shot.MimeType})
-				}
+		for _, attempt := range attempts {
+			if attempt.Result == nil {
+				continue
 			}
-		case entry.Result.Script != nil:
-			for _, shot := range entry.Result.Script.Artifacts.Screenshots() {
-				out = append(out, report.ReportScreenshot{Scope: scope, Label: shot.Label, Data: shot.Data, MimeType: shot.MimeType})
+			scope := report.SuiteAttemptScope(report.SuiteEntryScope(entryIndex, entry.Path), attempt.Number)
+			out = append(out, outcomeScreenshots(scope, *attempt.Result)...)
+		}
+	}
+	return out
+}
+
+// outcomeScreenshots flattens the screenshots of one attempt's outcome
+// under scope. A scenario's child screenshots nest inside scope.
+func outcomeScreenshots(scope string, outcome scenario.SuiteEntryOutcome) []report.ReportScreenshot {
+	var out []report.ReportScreenshot
+	switch {
+	case outcome.Scenario != nil:
+		for _, child := range outcome.Scenario.Scripts {
+			if child.Result == nil {
+				continue
 			}
+			childScope := report.ScenarioChildScope(scope, child.ScriptIndex, child.ScriptPath)
+			for _, shot := range child.Result.Artifacts.Screenshots() {
+				out = append(out, report.ReportScreenshot{Scope: childScope, Label: shot.Label, Data: shot.Data, MimeType: shot.MimeType})
+			}
+		}
+	case outcome.Script != nil:
+		for _, shot := range outcome.Script.Artifacts.Screenshots() {
+			out = append(out, report.ReportScreenshot{Scope: scope, Label: shot.Label, Data: shot.Data, MimeType: shot.MimeType})
 		}
 	}
 	return out
