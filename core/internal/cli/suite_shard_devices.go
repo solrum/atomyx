@@ -99,7 +99,7 @@ func resolveShardDevices(ctx context.Context, probe device.Probe, req shardReque
 // workerForwardedValues are the single-value flags a sharded suite passes on
 // to every worker so the worker reads the same project, environment and
 // policy.
-var workerForwardedValues = []string{"--config", "--env", "--var-file", "--preconditions", "--report-dir", "--retries"}
+var workerForwardedValues = []string{"--config", "--env", "--var-file", "--preconditions", "--report-dir", "--report", "--retries"}
 
 // workerForwardedSwitches are the boolean flags passed on to every worker.
 var workerForwardedSwitches = []string{"--skip-preconditions", "--video"}

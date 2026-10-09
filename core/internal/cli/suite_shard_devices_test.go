@@ -90,6 +90,7 @@ func TestWorkerArgsParseAsAWorkerCommandAndCarryTheProjectFlags(t *testing.T) {
 	flags := map[string]FlagValue{
 		"--config": "ci.yaml", "--env": "staging", "--report-dir": "/runs", "--retries": "2",
 		"--var": []string{"A=1", "B=2"}, "--video": true, "--glob": []string{"*.yml"}, "--devices": "a,b", "--json": true,
+		"--report": "junit",
 	}
 
 	args := workerArgs(&name, flags, shard.Device{ID: "emu", Platform: "android"}, "parent-1")
@@ -102,7 +103,7 @@ func TestWorkerArgsParseAsAWorkerCommandAndCarryTheProjectFlags(t *testing.T) {
 	if got["--device"] != "emu" || got["--platform"] != "android" || !flagBool(got, "--worker") || got["--parent-run"] != "parent-1" {
 		t.Errorf("worker flags = %v", got)
 	}
-	if got["--config"] != "ci.yaml" || got["--env"] != "staging" || got["--report-dir"] != "/runs" || got["--retries"] != "2" || !flagBool(got, "--video") {
+	if got["--config"] != "ci.yaml" || got["--env"] != "staging" || got["--report-dir"] != "/runs" || got["--retries"] != "2" || got["--report"] != "junit" || !flagBool(got, "--video") {
 		t.Errorf("project flags = %v", got)
 	}
 	if !reflect.DeepEqual(flagStrings(got, "--var"), []string{"A=1", "B=2"}) {
