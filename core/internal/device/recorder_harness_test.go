@@ -2,6 +2,7 @@ package device
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strconv"
 	"strings"
@@ -18,7 +19,8 @@ const harnessTimeout = 5 * time.Second
 // wraps the fake runners, keeps one ordered log of every command so a test
 // can assert what happened before what, and plays the device side: an
 // interrupt aimed at a device process id ends the matching fake process,
-// and a pull writes the local file.
+// a pull writes the local file, and starting a simulator recording creates
+// its output file.
 type recorderHarness struct {
 	t      *testing.T
 	runner *process.Fake
@@ -29,6 +31,8 @@ type recorderHarness struct {
 	devicePids map[int]*process.FakeBackgroundProcess
 	procs      []*process.FakeBackgroundProcess
 	pullErr    error
+
+	simRecorders []*process.FakeBackgroundProcess
 
 	tick chan struct{}
 	idle chan struct{}
@@ -69,6 +73,17 @@ func (h *recorderHarness) stageAndroid(pids ...int) {
 	}
 }
 
+// stageSimulator queues n recorder processes.
+func (h *recorderHarness) stageSimulator(n int) {
+	for i := 0; i < n; i++ {
+		proc := process.NewFakeBackgroundProcess()
+		h.mu.Lock()
+		h.procs = append(h.procs, proc)
+		h.mu.Unlock()
+		h.bg.Stub(proc)
+	}
+}
+
 func (h *recorderHarness) Run(ctx context.Context, name string, args ...string) (process.Result, error) {
 	res, err := h.runner.Run(ctx, name, args...)
 	h.log(strings.Join(append([]string{name}, args...), " "))
@@ -98,9 +113,26 @@ func (h *recorderHarness) Run(ctx context.Context, name string, args ...string) 
 
 type harnessBackground struct{ h *recorderHarness }
 
+// Start refuses a second simulator recording while one is still running,
+// the way simctl does.
 func (b harnessBackground) Start(ctx context.Context, name string, args ...string) (process.BackgroundProcess, error) {
+	if containsArg(args, "recordVideo") {
+		for _, running := range b.h.simRecorders {
+			if !running.Interrupted() && !running.Killed() {
+				return nil, errors.New("Host recording is already in progress")
+			}
+		}
+	}
 	proc, err := b.h.bg.Start(ctx, name, args...)
+	if fake, ok := proc.(*process.FakeBackgroundProcess); ok && containsArg(args, "recordVideo") {
+		b.h.simRecorders = append(b.h.simRecorders, fake)
+	}
 	b.h.log("start " + strings.Join(append([]string{name}, args...), " "))
+	if err == nil && containsArg(args, "recordVideo") {
+		if werr := os.WriteFile(args[len(args)-1], []byte("video"), 0o600); werr != nil {
+			b.h.t.Fatalf("write recording file: %v", werr)
+		}
+	}
 	return proc, err
 }
 
