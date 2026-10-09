@@ -350,6 +350,7 @@ deps:
     mayDependOn:
       - device
       - runfolder
+      - diag
       - recording
   inspector:
     mayDependOn:
