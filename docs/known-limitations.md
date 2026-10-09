@@ -28,6 +28,13 @@ current code or docs.
 - [A nested step cannot carry a breakpoint](#a-nested-step-cannot-carry-a-breakpoint)
 - [A deduplicated launchApp never fires its breakpoint](#a-deduplicated-launchapp-never-fires-its-breakpoint)
 - [A short secret is masked only as a whole word](#a-short-secret-is-masked-only-as-a-whole-word)
+- [No failure video on a physical iPhone](#no-failure-video-on-a-physical-iphone)
+- [Android secure windows record as black frames](#android-secure-windows-record-as-black-frames)
+- [Failure video segments are not concatenated and may have a gap](#failure-video-segments-are-not-concatenated-and-may-have-a-gap)
+- [An Android run shorter than about six seconds may keep a single frame](#an-android-run-shorter-than-about-six-seconds-may-keep-a-single-frame)
+- [GitLab ignores flaky attempts in JUnit](#gitlab-ignores-flaky-attempts-in-junit)
+- [A sharded suite does not route entries by platform](#a-sharded-suite-does-not-route-entries-by-platform)
+- [The merged report of a sharded suite does not link videos](#the-merged-report-of-a-sharded-suite-does-not-link-videos)
 
 ## Obscurement check can flag a dialog's backdrop as blocking the dialog's own button
 
@@ -272,3 +279,102 @@ ordinary words, so a short secret is masked only when it stands as a
 whole word.
 
 **Workaround**: use a secret of normal length.
+
+## No failure video on a physical iPhone
+
+**Symptom**: a run with `--video` on a physical iPhone keeps no video.
+Its `meta.json` `recording` object has state `unsupported` and the
+code `RECORDING_UNSUPPORTED`.
+
+**Where**: `atomyx driver run` and `atomyx driver suite` with `--video`
+or the config key `video: onFailure`, on a physical iOS device. The iOS
+Simulator and Android devices record.
+
+**Why**: there is no screen recorder for a physical iPhone, so
+recording reports that it is unsupported and the run continues
+normally.
+
+**Workaround**: rely on the failure screenshot and the step lines of
+the run. Reproduce on the iOS Simulator when a video is needed.
+
+## Android secure windows record as black frames
+
+**Symptom**: a failure video shows black frames where the app shows a
+secure window, such as a screen that blocks screenshots.
+
+**Where**: Android failure video.
+
+**Why**: the system screen recorder does not capture windows that the
+app marks as secure.
+
+**Workaround**: use the accessibility tree for such a screen, or run a
+build that does not mark the window secure.
+
+## Failure video segments are not concatenated and may have a gap
+
+**Symptom**: a long run keeps two video files, `video-run-1.mp4` and
+`video-run-2.mp4`, instead of one. The second may start a short moment
+after the first ends.
+
+**Where**: any recorded run or suite entry attempt.
+
+**Why**: the recording rotates into segments and keeps the last two, so
+a long run never grows one file without bound. The files are not
+joined. The iOS Simulator cannot run two recordings at once, so it
+has a gap of a fraction of a second between segments.
+
+**Workaround**: play the files in order.
+
+## An Android run shorter than about six seconds may keep a single frame
+
+**Symptom**: the failure video of a very short Android run shows one
+frame instead of motion.
+
+**Where**: Android failure video.
+
+**Why**: the device writes a frame only when the screen changes, so a
+short run with little change leaves almost nothing to record.
+
+**Workaround**: use the failure screenshot of the run, which covers
+that case.
+
+## GitLab ignores flaky attempts in JUnit
+
+**Symptom**: a flaky flow shows as a plain pass in GitLab, with no sign
+of its failed attempts.
+
+**Where**: `junit.xml` read by GitLab. Jenkins shows the attempts.
+
+**Why**: a flaky flow is written as a passing test case with one
+`flakyFailure` element per failed attempt, and GitLab does not read
+that element.
+
+**Workaround**: read the attempts from `index.json` or `report.json`,
+or use a CI system that reads `flakyFailure`.
+
+## A sharded suite does not route entries by platform
+
+**Symptom**: a flow written for one platform fails on a device of the
+other platform when `--devices` lists devices of both platforms.
+
+**Where**: `atomyx suite --devices` with an Android and an iOS device in
+one list.
+
+**Why**: all flows wait in one queue and any worker takes the next one,
+so no flow is matched to a device by platform.
+
+**Workaround**: write the flows of a mixed-platform shard so they work
+on every platform in it, or run each platform as its own suite.
+
+## The merged report of a sharded suite does not link videos
+
+**Symptom**: the report of a sharded suite links no videos, although a
+worker kept some.
+
+**Where**: `atomyx suite --devices` and `--shard auto`.
+
+**Why**: the command never copies artifacts, so videos stay in each
+worker's run folder.
+
+**Workaround**: open the worker run folder named by `workerRunId` for
+the attempt in `index.json`, and read the files in its `videos`.

@@ -93,6 +93,7 @@ atomyx/
 | `netcapture` | The concrete network-capture adapters a script run observes HTTP traffic through. |
 | `orchestra` | Composes Driver calls into selector resolution, priority broadening, scroll-into-view, obscurement, and retry. |
 | `process` | Abstracts external command execution (adb, xcrun, and similar) behind Runner and BackgroundRunner interfaces, carries extra child environment on the context, and reads process and host start times. |
+| `recording` | Owns the lifecycle of a screen recording tied to a run or to one attempt of a suite entry: start, stop when the result is known, and keep the video in the run folder on failure or discard it. Only the command line and the MCP server import it. |
 | `report` | Renders a run's result into HTML and versioned JSON, and writes its screenshots, into the report and artifacts directories the caller names. |
 | `runfolder` | Defines the run folder contract: the layout names, the `meta.json` record with its result and outcome enums, the suite `index.json` record, the legacy status mapping, and the generated JSON Schemas. It also writes run folders with an exclusive create and a live lock. Depends on the standard library and `flock`. |
 | `runner` | Defines the command execution contract and the ScriptRunner that dispatches a parsed script's steps. |
