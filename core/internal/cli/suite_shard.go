@@ -14,6 +14,15 @@ import (
 	"dev.atomyx/internal/shutdown"
 )
 
+// workerStopMargin is how much longer the parent waits for a worker to stop
+// on its own than the worker spends on its own exit, so a worker that uses
+// its whole budget is not ended while it is still finishing.
+const workerStopMargin = 2 * time.Second
+
+// workerStopGrace is how long the parent gives a worker to stop after an
+// interrupt before it ends the worker.
+const workerStopGrace = shutdown.GracePeriod + workerStopMargin
+
 // shardedSuite is a suite that runs its entries over several devices.
 type shardedSuite struct {
 	flags       map[string]FlagValue
@@ -58,7 +67,7 @@ func runShardedSuite(ctx context.Context, deps Deps, in shardedSuite) int {
 		Devices:   devices,
 		Paths:     in.paths,
 		Args:      func(d shard.Device) []string { return workerArgs(in.positional, in.flags, d, record.ID()) },
-		StopGrace: shutdown.GracePeriod,
+		StopGrace: workerStopGrace,
 		Warn:      func(message string) { _, _ = fmt.Fprintf(in.stderr, "warning: %s\n", message) },
 	})
 	finishedAt := time.Now()

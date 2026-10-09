@@ -28,3 +28,14 @@ func TestStopGraceIsLongerOnlyForASuiteThatShards(t *testing.T) {
 		}
 	}
 }
+
+func TestWorkerStopGraceOutlastsTheWorkerExitAndFitsInsideTheParentWatchdog(t *testing.T) {
+	const killWait = 2 * time.Second
+	if workerStopGrace <= shutdown.GracePeriod {
+		t.Errorf("a worker gets %v to stop, no margin over the %v it spends on its own exit", workerStopGrace, shutdown.GracePeriod)
+	}
+	watchdog := shutdown.ParentGracePeriod - shutdown.ForcedCleanupBudget
+	if workerStopGrace+killWait >= watchdog {
+		t.Errorf("stopping a worker takes up to %v, which reaches the parent watchdog at %v", workerStopGrace+killWait, watchdog)
+	}
+}

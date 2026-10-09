@@ -96,8 +96,8 @@ func TestShardedSuiteInterruptStopsEveryWorkerAndExits130(t *testing.T) {
 	if !run.launcher.Stopped("phone") || !run.launcher.Stopped("emu") {
 		t.Error("an interrupt left a worker running")
 	}
-	if got := run.launcher.StopGrace("phone"); got != shutdown.GracePeriod {
-		t.Errorf("a worker was given %v to stop, want the worker grace period %v", got, shutdown.GracePeriod)
+	if got := run.launcher.StopGrace("phone"); got != workerStopGrace {
+		t.Errorf("a worker was given %v to stop, want %v", got, workerStopGrace)
 	}
 	if meta := readMeta(t, singleRunDir(t, run.root)); meta.Outcome != runfolder.OutcomeCancelled {
 		t.Errorf("outcome = %q, want cancelled", meta.Outcome)
