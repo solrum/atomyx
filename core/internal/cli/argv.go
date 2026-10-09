@@ -101,6 +101,7 @@ var commandFlags = map[Command][]flagDef{
 	CommandSuite: {
 		{"--tag", flagRepeatable},
 		{"--glob", flagRepeatable},
+		{"--device", flagValue},
 		{"--config", flagValue},
 		{"--env", flagValue},
 		{"--var", flagRepeatable},
@@ -111,6 +112,7 @@ var commandFlags = map[Command][]flagDef{
 		{"--report-dir", flagValue},
 		{"--video", flagBoolean},
 		{"--retries", flagValue},
+		{"--json", flagBoolean},
 		{"--help", flagBoolean},
 		{"-h", flagBoolean},
 	},

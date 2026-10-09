@@ -28,6 +28,10 @@ import (
 // positional is the suite command's leading positional argument (a
 // named config suite), nil when none was given.
 //
+// With --device the whole suite runs in this process on that one device.
+// With --json the result object goes to stdout and the human summary goes
+// to deps.Stderr.
+//
 // Exit codes mirror RunScript: 0 when every entry passed, 1 when the
 // suite ran and at least one entry failed, 2 when the command itself
 // was misused (an invalid or missing selector, an undeclared named
@@ -35,6 +39,12 @@ import (
 func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positional *string) int {
 	stdout := deps.stdout()
 	stderr := deps.stderr()
+
+	jsonOutput := flagBool(flags, "--json")
+	humanOut := stdout
+	if jsonOutput {
+		humanOut = stderr
+	}
 
 	loaded, resolvedEnvironment, err := resolveEnvironment(flags)
 	if err != nil {
@@ -199,7 +209,14 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 		return reportUncaught(ctx, stderr, deps.Debug, indexErr)
 	}
 
-	printSuiteResult(stdout, result)
+	printSuiteResult(humanOut, result)
+	if jsonOutput {
+		payload := suiteJSONResult{Ok: result.Ok, RunFolder: record.Dir(), Entries: indexEntries}
+		if err := encodeJSON(stdout, payload); err != nil {
+			return reportUncaught(ctx, stderr, deps.Debug, err)
+		}
+		record.reportedInJSON = true
+	}
 
 	metadata := buildReportMetadata(record.ID(), suiteLabel, runStartedAt, finishedAt, result.DurationMs, platform, deviceID, envName, nil)
 	metadata.Command = report.ReportCommandSuite

@@ -79,6 +79,11 @@ FLAGS
                            test root) matches this glob. Repeatable;
                            a file matches when it matches any of the
                            given globs. Supports *, **, and ?.
+  --device <id>            Run the whole suite on this device, as
+                           reported by atomyx driver list-devices.
+                           The suite runs in this process on that
+                           one device and is not split across
+                           devices.
   --config <path>          Path to the project config file.
   --env <name>             Named environment to resolve platform,
                            device, proxy, and variables from.
@@ -109,11 +114,17 @@ FLAGS
                            fails and then passes is reported as flaky
                            and counts as passed. Overrides the config
                            suite's retries.
+  --json                   Print one JSON object to standard output
+                           with ok, the run folder path, and the
+                           entries as index.json lists them. The
+                           human-readable summary goes to standard
+                           error instead.
   --help, -h               Show this message.
 
 EXAMPLES
   atomyx driver suite smoke
   atomyx driver suite --tag smoke
+  atomyx driver suite smoke --device <UDID> --json
   atomyx driver suite --glob "flows/**/*.yml" --tag critical
 
 EXIT CODES
