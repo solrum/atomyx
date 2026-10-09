@@ -213,6 +213,10 @@ The recording covers the end of the run. It rotates through segments
 and keeps the last two, so a long run keeps its final minutes and never
 grows a file without bound.
 
+On Android the device writes a frame only when the screen changes, so a
+run shorter than about six seconds can keep a video of a single frame.
+The failure screenshot of the run still covers that case.
+
 The video is kept only when the run fails. A passed run, a run stopped
 by SIGINT or SIGTERM, and a run that lost its device keep no video, and
 the recording process on the device is stopped in every case. Kept
