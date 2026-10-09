@@ -26,6 +26,12 @@ import (
 func runSuiteWorker(ctx context.Context, deps Deps, flags map[string]FlagValue, positional *string) int {
 	stdout, stderr := deps.stdout(), deps.stderr()
 	deviceID, _ := flagString(flags, "--device")
+	_, devices := flagString(flags, "--devices")
+	_, mode := flagString(flags, "--shard")
+	if devices || mode {
+		_, _ = fmt.Fprintln(stderr, "error: --worker drives one device and cannot be combined with --devices or --shard")
+		return 2
+	}
 	if deviceID == "" {
 		_, _ = fmt.Fprintln(stderr, "error: --worker requires --device")
 		return 2

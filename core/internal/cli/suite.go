@@ -56,6 +56,15 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 		_, _ = fmt.Fprintf(stderr, "error: %s\n", err)
 		return 2
 	}
+	var shardPlan *shardRequest
+	if shardRequested(flags) {
+		request, err := parseShardRequest(flags)
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "error: %s\n", err)
+			return 2
+		}
+		shardPlan = &request
+	}
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -70,6 +79,22 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 	if len(resolvedFlows) == 0 {
 		_, _ = io.WriteString(stderr, "error: no flows matched the selector. Nothing to run.\n")
 		return 2
+	}
+
+	if shardPlan != nil {
+		paths := make([]string, len(resolvedFlows))
+		for i, flow := range resolvedFlows {
+			paths[i] = flow.Path
+		}
+		var environmentName *string
+		if cfg.environment != nil {
+			environmentName = &cfg.environment.Name
+		}
+		return runShardedSuite(ctx, deps, shardedSuite{
+			flags: flags, positional: positional, settings: cfg, request: *shardPlan,
+			platform: resolvePlatform(flags, cfg.environment), paths: paths,
+			jsonOutput: jsonOutput, humanOut: humanOut, stdout: stdout, stderr: stderr, environment: environmentName,
+		})
 	}
 
 	entries := make([]scenario.SuiteEntry, len(resolvedFlows))

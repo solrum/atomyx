@@ -102,6 +102,8 @@ var commandFlags = map[Command][]flagDef{
 		{"--tag", flagRepeatable},
 		{"--glob", flagRepeatable},
 		{"--device", flagValue},
+		{"--devices", flagValue},
+		{"--shard", flagValue},
 		{"--platform", flagValue},
 		{"--config", flagValue},
 		{"--env", flagValue},

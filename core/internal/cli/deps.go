@@ -7,6 +7,7 @@ import (
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/session"
+	"dev.atomyx/internal/shard"
 )
 
 // Deps are the dependencies Run needs to execute a command. A caller
@@ -44,6 +45,9 @@ type Deps struct {
 	// Timeouts bounds a device acquisition. A zero DeviceAcquireMs means
 	// session.DefaultDeviceAcquireTimeoutMs.
 	Timeouts session.Timeouts
+	// Shards starts the worker processes of a suite sharded over several
+	// devices. A nil value means the command cannot shard.
+	Shards shard.Launcher
 	// Recorder records the device screen of a run. A nil value means no
 	// recording is ever started.
 	Recorder device.ScreenRecorder

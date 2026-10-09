@@ -18,6 +18,7 @@ import (
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/process"
+	"dev.atomyx/internal/shard"
 	"dev.atomyx/internal/shutdown"
 )
 
@@ -43,6 +44,11 @@ func main() {
 	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Background: background, Clock: clock, Logger: logger, Provisioner: provisioner, OwnAndroidForwards: true})
 	recorder := device.NewScreenRecorder(device.RecorderDeps{Runner: procRunner, Background: background, Logger: logger})
 
+	var shards shard.Launcher
+	if executable, err := os.Executable(); err == nil {
+		shards = shard.NewProcessLauncher(background, executable)
+	}
+
 	sessionDeps, err := sessionwire.Deps(procRunner, clock, logger, "", "cli")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "atomyx: %v\n", err)
@@ -62,6 +68,7 @@ func main() {
 		Stdin:    os.Stdin,
 		Session:  sessionDeps,
 		Recorder: recorder,
+		Shards:   shards,
 		Timeouts: sessionwire.ResolveTimeouts(sessionwire.LoadConfigBestEffort(logger), os.Getenv, logger),
 		HostCommand: func(ctx context.Context, name string, args ...string) (string, error) {
 			res, err := procRunner.Run(ctx, name, args...)

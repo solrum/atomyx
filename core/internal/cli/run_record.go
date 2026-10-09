@@ -65,13 +65,15 @@ func startRunRecord(out runOutput, identity runIdentity) (*runRecord, error) {
 		ScriptName:  identity.Label,
 		ParentRunID: identity.ParentRunID,
 		DeviceID:    identity.Device.ID,
-		Device: &runfolder.Device{
+		Host:        &runfolder.Host{AtomyxVersion: version.Read().Version},
+	}
+	if identity.Device.ID != "" {
+		base.Device = &runfolder.Device{
 			Platform:   string(identity.Device.Platform),
 			Kind:       string(identity.Device.Kind),
 			HardwareID: identity.Device.ID,
 			Name:       identity.Device.Name,
-		},
-		Host: &runfolder.Host{AtomyxVersion: version.Read().Version},
+		}
 	}
 	writer, err := runfolder.NewStarter(out.Root, time.Now, rand.Reader).Start(identity.Label, base)
 	if err != nil {
