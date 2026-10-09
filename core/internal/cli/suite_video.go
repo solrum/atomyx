@@ -86,18 +86,6 @@ func scriptDeviceLost(result *runner.ScriptResult) bool {
 	return result != nil && result.Abort != nil && result.Abort.Reason == runner.RunAbortDeviceLost
 }
 
-// entryVideoFiles returns the kept video files of each entry of result,
-// across all of its attempts in order, indexed like result.Entries.
-func entryVideoFiles(result scenario.SuiteResult) [][]string {
-	out := make([][]string, len(result.Entries))
-	for i, entry := range result.Entries {
-		for _, attempt := range entry.Attempts {
-			out[i] = append(out[i], attempt.Videos...)
-		}
-	}
-	return out
-}
-
 // printVideoLocations tells the operator where the kept video files are.
 func printVideoLocations(stderr io.Writer, runDir string, entryVideos [][]string) {
 	for _, files := range entryVideos {

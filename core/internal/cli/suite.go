@@ -183,14 +183,21 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 		Quarantined:          quarantineMatcher(policy.Quarantine, cwd, testRoots),
 	})
 	finishedAt := time.Now()
+	indexEntries := suiteIndexEntries(result)
+	indexErr := record.writer.WriteIndex(indexEntries)
+	counts := suiteMetaCounts(result)
 	if opened.reportLost(stderr) {
-		record.setOutcome(runfolder.OutcomeDeviceLost, nil)
+		record.setOutcome(runfolder.OutcomeDeviceLost, counts)
 		return 1
 	}
 	if err != nil {
+		record.setOutcome(runfolder.OutcomeError, counts)
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
-	record.setOutcome(outcomeForResult(result.Ok), nil)
+	record.setOutcome(outcomeForResult(result.Ok), counts)
+	if indexErr != nil {
+		return reportUncaught(ctx, stderr, deps.Debug, indexErr)
+	}
 
 	printSuiteResult(stdout, result)
 
@@ -200,7 +207,7 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 		Metadata:    metadata,
 		Result:      result,
 		Screenshots: suiteReportScreenshots(result),
-		EntryVideos: entryVideoFiles(result),
+		EntryVideos: indexEntryVideos(indexEntries),
 	}
 	bundle, genErr := report.NewFsReporter().Generate(input, record.reportOptions())
 	if genErr != nil {
