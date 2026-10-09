@@ -286,3 +286,41 @@ func TestParseAndValidate_RejectsInvalidSessionTimeouts(t *testing.T) {
 		t.Run(name, func(t *testing.T) { mustReject(t, baseConfig+block) })
 	}
 }
+
+func TestParseAndValidate_AcceptsEachVideoValue(t *testing.T) {
+	for _, value := range []string{VideoOff, VideoOnFailure} {
+		cfg := mustValidate(t, baseConfig+"video: "+value+"\n")
+		if cfg.Video == nil || *cfg.Video != value {
+			t.Errorf("Video = %v, want %q", cfg.Video, value)
+		}
+	}
+}
+
+func TestParseAndValidate_LeavesVideoNilWhenOmitted(t *testing.T) {
+	if cfg := mustValidate(t, baseConfig); cfg.Video != nil {
+		t.Errorf("Video = %q, want nil", *cfg.Video)
+	}
+}
+
+func TestParseAndValidate_RejectsUnknownVideoValue(t *testing.T) {
+	mustReject(t, baseConfig+"video: always\n")
+}
+
+func TestVideoOnFailure_IsTrueOnlyForTheOnFailureValue(t *testing.T) {
+	on, off := VideoOnFailure, VideoOff
+	cases := []struct {
+		name string
+		cfg  *AtomyxConfig
+		want bool
+	}{
+		{"nil config", nil, false},
+		{"unset", &AtomyxConfig{}, false},
+		{"off", &AtomyxConfig{Video: &off}, false},
+		{"onFailure", &AtomyxConfig{Video: &on}, true},
+	}
+	for _, c := range cases {
+		if got := c.cfg.VideoOnFailure(); got != c.want {
+			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
+		}
+	}
+}

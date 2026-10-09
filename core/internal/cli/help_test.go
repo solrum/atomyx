@@ -47,3 +47,15 @@ func TestInspectHelpDocumentsFlagsEnterAndExitCodes(t *testing.T) {
 		}
 	}
 }
+
+// TestPrintCommandHelpRunAndSuiteDocumentVideo guards against the --video
+// flag being accepted by run and suite while their help omits it.
+func TestPrintCommandHelpRunAndSuiteDocumentVideo(t *testing.T) {
+	for _, command := range []Command{CommandRun, CommandSuite} {
+		var buf bytes.Buffer
+		PrintCommandHelp(command, &buf)
+		if !strings.Contains(buf.String(), "--video") {
+			t.Errorf("%s help: want it to document --video, got %q", command, buf.String())
+		}
+	}
+}

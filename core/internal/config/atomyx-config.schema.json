@@ -100,6 +100,14 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "video": {
+          "description": "Screen recording of a run. onFailure keeps the video of a failed run, and off (the default) records nothing.",
+          "enum": [
+            "off",
+            "onFailure"
+          ],
+          "type": "string"
         }
       },
       "required": [

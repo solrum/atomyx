@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"dev.atomyx/internal/config"
 )
 
 func mustParseArgv(t *testing.T, args []string) ParsedArgv {
@@ -303,5 +305,43 @@ func TestParseArgvInspectAcceptsItsFlagsAndRejectsOthers(t *testing.T) {
 	}
 	if _, err := ParseArgv([]string{"inspect", "--file", "x.yml"}); err == nil {
 		t.Fatal("inspect accepted --file")
+	}
+}
+
+func TestParseArgvVideoFlagIsBooleanOnRunAndSuite(t *testing.T) {
+	run := mustParseArgv(t, []string{"run", "--file", "x.yml", "--video"})
+	if v, ok := run.Flags["--video"].(bool); !ok || !v {
+		t.Errorf("run --video: got %#v", run.Flags["--video"])
+	}
+	suiteArgs := mustParseArgv(t, []string{"suite", "smoke", "--video"})
+	if v, ok := suiteArgs.Flags["--video"].(bool); !ok || !v {
+		t.Errorf("suite --video: got %#v", suiteArgs.Flags["--video"])
+	}
+	if _, ok := mustParseArgv(t, []string{"run", "--file", "x.yml"}).Flags["--video"]; ok {
+		t.Errorf("run without --video: flag present")
+	}
+}
+
+func TestVideoEnabledFlagOverridesConfig(t *testing.T) {
+	on, off := config.VideoOnFailure, config.VideoOff
+	cfg := func(v *string) *config.LoadedConfig {
+		return &config.LoadedConfig{Config: config.AtomyxConfig{Video: v}}
+	}
+	cases := []struct {
+		name   string
+		flags  map[string]FlagValue
+		loaded *config.LoadedConfig
+		want   bool
+	}{
+		{"no flag no config", map[string]FlagValue{}, nil, false},
+		{"flag without config", map[string]FlagValue{"--video": true}, nil, true},
+		{"flag over off", map[string]FlagValue{"--video": true}, cfg(&off), true},
+		{"config onFailure", map[string]FlagValue{}, cfg(&on), true},
+		{"config off", map[string]FlagValue{}, cfg(&off), false},
+	}
+	for _, c := range cases {
+		if got := videoEnabled(c.flags, c.loaded); got != c.want {
+			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
+		}
 	}
 }

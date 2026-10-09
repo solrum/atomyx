@@ -13,6 +13,12 @@ const (
 	PreconditionsSkip  = "skip"
 	PreconditionsForce = "force"
 
+	// VideoOff and VideoOnFailure are the two values AtomyxConfig.Video accepts.
+	// VideoOnFailure records the device screen and keeps the video of a run
+	// that failed.
+	VideoOff       = "off"
+	VideoOnFailure = "onFailure"
+
 	// ReportFormatHTML and ReportFormatJSON are the two values a Report.Formats entry accepts.
 	ReportFormatHTML = "html"
 	ReportFormatJSON = "json"
@@ -92,6 +98,7 @@ type AtomyxConfig struct {
 	Launch           *LaunchPolicy               `json:"launch,omitempty"`
 	Preconditions    *string                     `json:"preconditions,omitempty"`
 	Report           *Report                     `json:"report,omitempty"`
+	Video            *string                     `json:"video,omitempty"`
 	Session          *Session                    `json:"session,omitempty"`
 	Suites           *map[string]SuiteEntry      `json:"suites,omitempty"`
 	TestRoots        *[]string                   `json:"testRoots,omitempty"`
@@ -130,4 +137,11 @@ type ResolvedEnvironment struct {
 	DeviceID *string           `json:"deviceId,omitempty"`
 	Proxy    *string           `json:"proxy,omitempty"`
 	Artifact *string           `json:"artifact,omitempty"`
+}
+
+// VideoOnFailure reports whether the config asks for the screen
+// recording of a failed run to be kept. It is false for a nil config and
+// for a config that leaves video unset, which is the default.
+func (c *AtomyxConfig) VideoOnFailure() bool {
+	return c != nil && c.Video != nil && *c.Video == VideoOnFailure
 }

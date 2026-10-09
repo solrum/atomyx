@@ -56,7 +56,8 @@
     },
     "testRoots": [
       "tests"
-    ]
+    ],
+    "video": "onFailure"
   },
   "envRefError": null,
   "found": true,

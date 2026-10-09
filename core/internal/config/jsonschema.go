@@ -127,6 +127,7 @@ func atomyxConfigSchema() map[string]any {
 			"launch":        ref("LaunchPolicy"),
 			"preconditions": stringEnum([]string{PreconditionsSkip, PreconditionsForce}, "Project-wide precondition override."),
 			"report":        ref("Report"),
+			"video":         stringEnum([]string{VideoOff, VideoOnFailure}, "Screen recording of a run. onFailure keeps the video of a failed run, and off (the default) records nothing."),
 			"session":       ref("Session"),
 			"suites":        recordSchema(ref("SuiteEntry"), "Named test selectors, keyed by suite name."),
 			"testRoots":     arraySchema(stringMinLen(1, ""), 0, "Directories the CLI searches for test scripts."),

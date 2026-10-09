@@ -41,6 +41,10 @@ FLAGS
                            Enter. Repeatable. Needs a terminal on
                            standard input. With --json the prompt goes
                            to standard error.
+  --video                  Record the device screen and keep the video
+                           of a failed run in the run folder, whatever
+                           the config video setting says. A passed or
+                           interrupted run keeps no video.
   --json                   Output the result as JSON instead of text.
   --help, -h               Show this message.
 
@@ -95,6 +99,9 @@ FLAGS
                            implies an html report. Defaults to the
                            config report.outDir, then
                            ATOMYX_STORAGE_DIR, then ~/.atomyx.
+  --video                  Record the device screen and keep the video
+                           of each failed entry in the run folder,
+                           whatever the config video setting says.
   --help, -h               Show this message.
 
 EXAMPLES
