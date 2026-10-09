@@ -95,6 +95,7 @@ Flags:
 | `--skip-preconditions` | Shorthand for `--preconditions skip`. | off | no |
 | `--report <formats>` | Enables report generation and selects its output formats: `html`, `json`, or both, separated by a comma. Overrides the project config's `report` block. | the project config's `report.formats`, or `html` when reporting is enabled by `--report-dir` alone | no |
 | `--report-dir <path>` | Root directory the run folder is written under. See "Run folder" below. | the project config's `report.outDir`, or the storage root | no |
+| `--video` | Records the device screen and keeps the video of a failed run. See "Screen recording" below. | the project config's `video` setting, which defaults to `off` | no |
 | `--break <file>:<line>` | Holds the run before the authored top-level step at this location. See "Debugging a run" below. | none | yes |
 | `--json` | Outputs the result as JSON instead of text. | off | no |
 | `--help`, `-h` | Prints this command's usage and exits. | off | no |
@@ -200,7 +201,46 @@ naming what is missing. A run that stops because the device became
 unreachable writes none of these files, and a capture problem never
 changes the exit code or the step result.
 
-The run folder is `<root>/runs/v1/<id>/`, and the root is the first of
+### Screen recording
+
+A run records the device screen when `--video` is given or when the
+project config sets the top-level key `video` to `onFailure`. The
+values are `off`, the default, and `onFailure`. The flag turns recording
+on whatever the config says, and without the flag the config decides.
+With recording off, the command makes no recorder call.
+
+The recording covers the end of the run. It rotates through segments
+and keeps the last two, so a long run keeps its final minutes and never
+grows a file without bound.
+
+The video is kept only when the run fails. A passed run, a run stopped
+by SIGINT or SIGTERM, and a run that lost its device keep no video, and
+the recording process on the device is stopped in every case. Kept
+files are written to `artifacts/` as `video-run-1.mp4`,
+`video-run-2.mp4`, and so on, oldest first.
+
+The kept files are reported in these places:
+
+- `meta.json` has a `recording` object with `state`, which is `kept`,
+  `unsupported`, or `error`, the `files` when the state is `kept`, and
+  the error `code` otherwise. The object is absent when recording was
+  off or the video was discarded.
+- The `--json` result of `run` carries the same object in a top level
+  `recording` field. Its `files` are names relative to the run folder's
+  `artifacts` directory.
+- `report.json` carries it under `metadata.recording`, and
+  `report.html` links each file in its header.
+- The CLI prints one `Video: <path>` line per kept file on stderr.
+
+A device that cannot record, such as a physical iPhone, reports state
+`unsupported` and the run continues normally.
+
+`atomyx driver suite` records once per flow. Each flow's files are named
+from its one-based position, for example `video-entry-2-1.mp4`, so flows
+never collide. The suite's `meta.json` has no `recording` object. The
+suite report lists the kept files under each flow instead.
+
+
 these that is set:
 
 1. `--report-dir <path>`.
@@ -259,6 +299,7 @@ Flags:
 | `--skip-preconditions` | Shorthand for `--preconditions skip`. | off | no |
 | `--report <formats>` | Enables report generation and selects its output formats: `html`, `json`, or both, separated by a comma. Same precedence rule as `atomyx driver run`. | the project config's `report.formats`, or `html` when reporting is enabled by `--report-dir` alone | no |
 | `--report-dir <path>` | Root directory the run folder is written under. Same rule as `atomyx driver run`. | the project config's `report.outDir`, or the storage root | no |
+| `--video` | Records the device screen once per flow and keeps the video of each failed flow. See "Screen recording" below. | the project config's `video` setting, which defaults to `off` | no |
 | `--help`, `-h` | Prints this command's usage and exits. | off | no |
 
 Selecting by tag alone requires `testRoots` in the project config, or
