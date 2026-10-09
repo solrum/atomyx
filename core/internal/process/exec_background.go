@@ -24,7 +24,10 @@ func NewExecBackground() *ExecBackground {
 	return &ExecBackground{}
 }
 
-var _ BackgroundRunner = (*ExecBackground)(nil)
+var (
+	_ BackgroundRunner  = (*ExecBackground)(nil)
+	_ InteractiveRunner = (*ExecBackground)(nil)
+)
 
 // stderrCaptureLimit bounds how many bytes of a background process's
 // standard error ExecBackground retains for BackgroundResult.Stderr.
@@ -50,6 +53,21 @@ const killGracePeriod = 2 * time.Second
 // started. A canceled or expired ctx kills the process at any later
 // point, including while a caller is blocked reading its stdout.
 func (r ExecBackground) Start(ctx context.Context, name string, args ...string) (BackgroundProcess, error) {
+	return r.start(ctx, false, name, args)
+}
+
+// StartInteractive implements InteractiveRunner. It starts the process
+// exactly as Start does and also gives the caller a pipe to its standard
+// input.
+func (r ExecBackground) StartInteractive(ctx context.Context, name string, args ...string) (InteractiveProcess, error) {
+	proc, err := r.start(ctx, true, name, args)
+	if err != nil {
+		return nil, err
+	}
+	return proc, nil
+}
+
+func (r ExecBackground) start(ctx context.Context, interactive bool, name string, args []string) (*execBackgroundProcess, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -68,6 +86,14 @@ func (r ExecBackground) Start(ctx context.Context, name string, args ...string) 
 	if r.waitDelay > 0 {
 		cmd.WaitDelay = r.waitDelay
 	}
+	var stdin io.WriteCloser
+	if interactive {
+		pipe, err := cmd.StdinPipe()
+		if err != nil {
+			return nil, err
+		}
+		stdin = pipe
+	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
@@ -77,7 +103,7 @@ func (r ExecBackground) Start(ctx context.Context, name string, args ...string) 
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
-	return &execBackgroundProcess{cmd: cmd, stdout: stdout, stderr: stderr}, nil
+	return &execBackgroundProcess{cmd: cmd, stdin: stdin, stdout: stdout, stderr: stderr}, nil
 }
 
 // execBackgroundProcess is the BackgroundProcess ExecBackground.Start
@@ -85,6 +111,7 @@ func (r ExecBackground) Start(ctx context.Context, name string, args ...string) 
 // more than once.
 type execBackgroundProcess struct {
 	cmd    *exec.Cmd
+	stdin  io.WriteCloser
 	stdout io.ReadCloser
 	stderr *cappedBuffer
 
@@ -95,6 +122,8 @@ type execBackgroundProcess struct {
 }
 
 func (p *execBackgroundProcess) Stdout() io.Reader { return p.stdout }
+
+func (p *execBackgroundProcess) Stdin() io.WriteCloser { return p.stdin }
 
 func (p *execBackgroundProcess) Pid() int {
 	if p.cmd.Process == nil {

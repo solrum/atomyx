@@ -33,6 +33,9 @@ type FakeBackgroundProcess struct {
 	buf    bytes.Buffer
 	closed bool
 
+	in       bytes.Buffer
+	inClosed bool
+
 	pid              int
 	killed           bool
 	interrupted      bool
@@ -80,6 +83,50 @@ func (p *FakeBackgroundProcess) ExitWithStderr(exitCode int, stderr string) {
 }
 
 func (p *FakeBackgroundProcess) Stdout() io.Reader { return fakeBackgroundReader{p} }
+
+// Stdin returns the writer a caller feeds the process through.
+func (p *FakeBackgroundProcess) Stdin() io.WriteCloser { return fakeBackgroundInput{p} }
+
+// Input returns a reader over what the caller wrote to Stdin. Like a real
+// pipe it blocks until more data arrives, and it reports io.EOF once the
+// caller closed Stdin or the process exited.
+func (p *FakeBackgroundProcess) Input() io.Reader { return fakeBackgroundInputReader{p} }
+
+type fakeBackgroundInput struct{ p *FakeBackgroundProcess }
+
+func (w fakeBackgroundInput) Write(data []byte) (int, error) {
+	w.p.mu.Lock()
+	defer w.p.mu.Unlock()
+	if w.p.inClosed || w.p.exited {
+		return 0, io.ErrClosedPipe
+	}
+	n, err := w.p.in.Write(data)
+	w.p.cond.Broadcast()
+	return n, err
+}
+
+func (w fakeBackgroundInput) Close() error {
+	w.p.mu.Lock()
+	defer w.p.mu.Unlock()
+	w.p.inClosed = true
+	w.p.cond.Broadcast()
+	return nil
+}
+
+type fakeBackgroundInputReader struct{ p *FakeBackgroundProcess }
+
+func (r fakeBackgroundInputReader) Read(dst []byte) (int, error) {
+	p := r.p
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for p.in.Len() == 0 && !p.inClosed && !p.exited {
+		p.cond.Wait()
+	}
+	if p.in.Len() == 0 {
+		return 0, io.EOF
+	}
+	return p.in.Read(dst)
+}
 
 // fakeBackgroundReader reads from its FakeBackgroundProcess's
 // buffered stdout, blocking until more data arrives or the process
@@ -217,7 +264,10 @@ func NewFakeBackground() *FakeBackground {
 	return &FakeBackground{}
 }
 
-var _ BackgroundRunner = (*FakeBackground)(nil)
+var (
+	_ BackgroundRunner  = (*FakeBackground)(nil)
+	_ InteractiveRunner = (*FakeBackground)(nil)
+)
 
 // Stub appends proc to the queue of processes Start hands out, in
 // order.
@@ -253,4 +303,14 @@ func (f *FakeBackground) Start(ctx context.Context, name string, args ...string)
 	proc := f.queue[0]
 	f.queue = f.queue[1:]
 	return proc, nil
+}
+
+// StartInteractive implements InteractiveRunner over the same staged
+// processes as Start.
+func (f *FakeBackground) StartInteractive(ctx context.Context, name string, args ...string) (InteractiveProcess, error) {
+	proc, err := f.Start(ctx, name, args...)
+	if err != nil {
+		return nil, err
+	}
+	return proc.(InteractiveProcess), nil
 }
