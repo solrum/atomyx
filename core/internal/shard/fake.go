@@ -32,12 +32,13 @@ type FakeLauncher struct {
 	scripts map[string]*FakeScript
 	seen    map[string][]string
 	stopped map[string]bool
+	graces  map[string]time.Duration
 	specs   []WorkerSpec
 }
 
 // NewFakeLauncher returns a FakeLauncher that scripts each device by id.
 func NewFakeLauncher(scripts map[string]*FakeScript) *FakeLauncher {
-	return &FakeLauncher{scripts: scripts, seen: map[string][]string{}, stopped: map[string]bool{}}
+	return &FakeLauncher{scripts: scripts, seen: map[string][]string{}, stopped: map[string]bool{}, graces: map[string]time.Duration{}}
 }
 
 var _ Launcher = (*FakeLauncher)(nil)
@@ -75,6 +76,14 @@ func (l *FakeLauncher) Stopped(id string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.stopped[id]
+}
+
+// StopGrace returns the grace period the worker of device id was stopped
+// with.
+func (l *FakeLauncher) StopGrace(id string) time.Duration {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.graces[id]
 }
 
 type fakeWorker struct {
@@ -153,9 +162,10 @@ func (w *fakeWorker) CloseInput() error {
 	return nil
 }
 
-func (w *fakeWorker) Stop(time.Duration) {
+func (w *fakeWorker) Stop(grace time.Duration) {
 	w.launcher.mu.Lock()
 	w.launcher.stopped[w.id] = true
+	w.launcher.graces[w.id] = grace
 	w.launcher.mu.Unlock()
 	close(w.quit)
 }
