@@ -74,17 +74,29 @@ type ReportJsonSuiteEntry struct {
 	// Videos are the kept video files of the entry, relative to the
 	// artifacts directory. Omitted when none were kept.
 	Videos []string `json:"videos,omitempty"`
+	// Flaky marks an entry that failed and then passed, and Quarantined
+	// marks an entry matched by the quarantine list. Both are omitted when
+	// false.
+	Flaky       bool `json:"flaky,omitempty"`
+	Quarantined bool `json:"quarantined,omitempty"`
+	// Attempts lists every attempt of an entry that ran more than once.
+	Attempts []ReportJsonAttempt `json:"attempts,omitempty"`
 }
 
 // ReportJsonSuiteResult is the "suite" kind of ReportJson.Result.
 type ReportJsonSuiteResult struct {
-	SuiteName  *string                `json:"suiteName,omitempty"`
-	Ok         bool                   `json:"ok"`
-	Total      int                    `json:"total"`
-	Passed     int                    `json:"passed"`
-	Failed     int                    `json:"failed"`
-	DurationMs int64                  `json:"durationMs"`
-	Entries    []ReportJsonSuiteEntry `json:"entries"`
+	SuiteName *string `json:"suiteName,omitempty"`
+	Ok        bool    `json:"ok"`
+	Total     int     `json:"total"`
+	Passed    int     `json:"passed"`
+	Failed    int     `json:"failed"`
+	// Flaky counts entries that failed and then passed, and
+	// QuarantinedFailures counts quarantined entries that failed. Both are
+	// omitted when zero.
+	Flaky               int                    `json:"flaky,omitempty"`
+	QuarantinedFailures int                    `json:"quarantinedFailures,omitempty"`
+	DurationMs          int64                  `json:"durationMs"`
+	Entries             []ReportJsonSuiteEntry `json:"entries"`
 }
 
 // ReportJson is the versioned, machine-readable report RenderJSON
@@ -197,7 +209,7 @@ func toJSONScenario(result scenario.ScenarioResult, byScope ScreenshotsByScope, 
 func toJSONSuite(result scenario.SuiteResult, entryVideos [][]string, byScope ScreenshotsByScope) ReportJsonSuiteResult {
 	entries := make([]ReportJsonSuiteEntry, len(result.Entries))
 	for i, entry := range result.Entries {
-		scope := SuiteEntryScope(i, entry.Path)
+		scope := SuiteAttemptScope(SuiteEntryScope(i, entry.Path), finalAttemptNumber(entry))
 		var jsonResult any
 		if entry.Result != nil {
 			switch {
@@ -208,23 +220,28 @@ func toJSONSuite(result scenario.SuiteResult, entryVideos [][]string, byScope Sc
 			}
 		}
 		entries[i] = ReportJsonSuiteEntry{
-			Path:       entry.Path,
-			Kind:       entry.Kind,
-			Status:     entry.Status,
-			Error:      entry.Error,
-			DurationMs: entry.DurationMs,
-			Result:     jsonResult,
-			Videos:     videosOf(entryVideos, i),
+			Path:        entry.Path,
+			Kind:        entry.Kind,
+			Status:      entry.Status,
+			Error:       entry.Error,
+			DurationMs:  entry.DurationMs,
+			Result:      jsonResult,
+			Videos:      videosOf(entryVideos, i),
+			Flaky:       entry.Flaky,
+			Quarantined: entry.Quarantined,
+			Attempts:    jsonAttempts(entry),
 		}
 	}
 	return ReportJsonSuiteResult{
-		SuiteName:  result.SuiteName,
-		Ok:         result.Ok,
-		Total:      result.Total,
-		Passed:     result.Passed,
-		Failed:     result.Failed,
-		DurationMs: result.DurationMs,
-		Entries:    entries,
+		SuiteName:           result.SuiteName,
+		Ok:                  result.Ok,
+		Total:               result.Total,
+		Passed:              result.Passed,
+		Failed:              result.Failed,
+		Flaky:               result.Flaky,
+		QuarantinedFailures: result.QuarantinedFailures,
+		DurationMs:          result.DurationMs,
+		Entries:             entries,
 	}
 }
 

@@ -68,7 +68,7 @@ func summarizeScenario(result scenario.ScenarioResult) htmlSummary {
 func summarizeSuite(result scenario.SuiteResult) htmlSummary {
 	return htmlSummary{
 		ok:     result.Ok,
-		totals: fmt.Sprintf("%d of %d flows passed, %d failed", result.Passed, result.Total, result.Failed),
+		totals: fmt.Sprintf("%d of %d flows passed, %d failed%s", result.Passed, result.Total, result.Failed, suiteCountsNote(result)),
 	}
 }
 
@@ -222,23 +222,24 @@ func renderSuiteSection(result scenario.SuiteResult, entryVideos [][]string, byS
 		suiteName = *result.SuiteName
 	}
 	return fmt.Sprintf(
-		"<section class=\"suite-result\">\n  <h2><span class=\"%s\">%s</span> %s</h2>\n  <p>%d of %d flows passed, %d failed, %d ms</p>\n  %s\n</section>",
+		"<section class=\"suite-result\">\n  <h2><span class=\"%s\">%s</span> %s</h2>\n  <p>%d of %d flows passed, %d failed%s, %d ms</p>\n  %s%s\n</section>",
 		statusClass, status, escapeHTML(suiteName),
-		result.Passed, result.Total, result.Failed, result.DurationMs,
-		strings.Join(entries, "\n"),
+		result.Passed, result.Total, result.Failed, suiteCountsNote(result), result.DurationMs,
+		strings.Join(entries, "\n"), renderQuarantinedSection(result),
 	)
 }
 
 func renderSuiteEntry(entry scenario.SuiteEntryResult, entryIndex int, videos []string, byScope ScreenshotsByScope, imageBase string) string {
-	scope := SuiteEntryScope(entryIndex, entry.Path)
+	scope := SuiteAttemptScope(SuiteEntryScope(entryIndex, entry.Path), finalAttemptNumber(entry))
 	statusClass := "status-fail"
 	if entry.Status == scenario.EntryPassed {
 		statusClass = "status-pass"
 	}
 	header := fmt.Sprintf(
-		"<h3><span class=\"%s\">%s</span> [%s] %s</h3>",
-		statusClass, escapeHTML(string(entry.Status)), escapeHTML(string(entry.Kind)), escapeHTML(entry.Path),
+		"<h3><span class=\"%s\">%s</span> [%s] %s%s</h3>",
+		statusClass, escapeHTML(string(entry.Status)), escapeHTML(string(entry.Kind)), escapeHTML(entry.Path), entryBadges(entry),
 	)
+	header += renderAttemptList(entry)
 	header += videoLinks(videos, imageBase)
 	if entry.Error != nil {
 		return fmt.Sprintf(
