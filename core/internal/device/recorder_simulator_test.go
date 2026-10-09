@@ -113,8 +113,8 @@ func TestSimulatorRecorder_DiscardOfARunningRecordingEndsItAndRemovesTheFile(t *
 		t.Fatalf("Discard: %v", err)
 	}
 
-	if !h.procs[0].Interrupted() {
-		t.Fatal("the recorder was not ended")
+	if !h.procs[0].Killed() || h.procs[0].Interrupted() {
+		t.Fatalf("killed = %v, interrupted = %v, want killed only", h.procs[0].Killed(), h.procs[0].Interrupted())
 	}
 	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
 		t.Fatalf("files left behind: %v", entries)

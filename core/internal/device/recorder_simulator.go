@@ -31,12 +31,13 @@ func (r simulatorRecorder) Start(ctx context.Context, desc Descriptor, dir, name
 	// keeps the values of ctx but not its cancellation.
 	runCtx := context.WithoutCancel(ctx)
 	rec := &simulatorRecording{
-		deps: r.deps,
-		udid: desc.ID,
-		dir:  dir,
-		name: name,
+		deps:    r.deps,
+		procCtx: runCtx,
+		udid:    desc.ID,
+		dir:     dir,
+		name:    name,
 	}
-	if err := rec.startSegment(runCtx); err != nil {
+	if err := rec.startSegment(); err != nil {
 		return nil, err
 	}
 	rec.rotation = startRotation(runCtx, r.wait, rec.rotate)
@@ -53,7 +54,10 @@ type simulatorSegment struct {
 
 // simulatorRecording is one running simulator recording.
 type simulatorRecording struct {
-	deps     RecorderDeps
+	deps RecorderDeps
+	// procCtx keeps the values of the Start context but not its
+	// cancellation, because segment processes outlive Start.
+	procCtx  context.Context
 	udid     string
 	dir      string
 	name     string
@@ -66,9 +70,9 @@ type simulatorRecording struct {
 	files    []string
 }
 
-func (r *simulatorRecording) startSegment(ctx context.Context) error {
+func (r *simulatorRecording) startSegment() error {
 	file := filepath.Join(r.dir, segmentTempName(r.name, r.next))
-	proc, err := r.deps.Background.Start(ctx, "xcrun", "simctl", "io", r.udid, "recordVideo",
+	proc, err := r.deps.Background.Start(r.procCtx, "xcrun", "simctl", "io", r.udid, "recordVideo",
 		"--codec", simulatorRecordingCodec, "--force", file)
 	if err != nil {
 		return fmt.Errorf("start the simulator recorder: %w", err)
@@ -86,8 +90,10 @@ func (r *simulatorRecording) startSegment(ctx context.Context) error {
 // stopSegment ends one segment. With kill false it interrupts the
 // recorder so it finalizes its file, and with kill true it ends it
 // without regard for the file. A recorder that had already exited with a
-// failure before the stop is reported with its error output.
-func (r *simulatorRecording) stopSegment(seg *simulatorSegment, kill bool) error {
+// failure before the stop is reported with its error output. The
+// interrupt wait ends with ctx, and a recorder still running then is
+// killed.
+func (r *simulatorRecording) stopSegment(ctx context.Context, seg *simulatorSegment, kill bool) error {
 	if seg.stopped {
 		return nil
 	}
@@ -103,13 +109,21 @@ func (r *simulatorRecording) stopSegment(seg *simulatorSegment, kill bool) error
 	if kill {
 		return seg.proc.Kill()
 	}
-	return seg.proc.Interrupt(recordingFinalizeTimeout)
+	interrupted := make(chan error, 1)
+	go func() { interrupted <- seg.proc.Interrupt(recordingFinalizeTimeout) }()
+	select {
+	case err := <-interrupted:
+		return err
+	case <-ctx.Done():
+		_ = seg.proc.Kill()
+		return errors.Join(ctx.Err(), process.ErrInterruptEscalated)
+	}
 }
 
-func (r *simulatorRecording) stopSegments(kill bool) error {
+func (r *simulatorRecording) stopSegments(ctx context.Context, kill bool) error {
 	var first error
 	for _, seg := range r.segments {
-		if err := r.stopSegment(seg, kill); err != nil && first == nil {
+		if err := r.stopSegment(ctx, seg, kill); err != nil && first == nil {
 			first = err
 		}
 	}
@@ -125,10 +139,10 @@ func (r *simulatorRecording) rotate(ctx context.Context) error {
 	if r.state != recordingRunning {
 		return nil
 	}
-	if err := r.stopSegment(r.segments[len(r.segments)-1], false); err != nil {
+	if err := r.stopSegment(ctx, r.segments[len(r.segments)-1], false); err != nil {
 		return err
 	}
-	if err := r.startSegment(ctx); err != nil {
+	if err := r.startSegment(); err != nil {
 		return err
 	}
 	for len(r.segments) > recordingKeptSegments {
@@ -147,7 +161,7 @@ func (r *simulatorRecording) segmentFiles() []string {
 }
 
 func (r *simulatorRecording) Stop(ctx context.Context) ([]string, error) {
-	rotateErr := r.rotation.stop()
+	rotateErr := r.rotation.stop(ctx)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	switch r.state {
@@ -158,7 +172,7 @@ func (r *simulatorRecording) Stop(ctx context.Context) ([]string, error) {
 	}
 	r.state = recordingStopped
 	cancelled := ctx.Err() != nil
-	failure := errors.Join(rotateErr, r.stopSegments(cancelled))
+	failure := errors.Join(rotateErr, r.stopSegments(ctx, cancelled))
 	if cancelled {
 		failure = errors.Join(ctx.Err(), failure)
 	}
@@ -176,12 +190,14 @@ func (r *simulatorRecording) Stop(ctx context.Context) ([]string, error) {
 	return files, nil
 }
 
+// Discard ends a running recording by killing it without waiting for the
+// recorder to finalize its file, because every file is deleted anyway.
 func (r *simulatorRecording) Discard(ctx context.Context) error {
-	_ = r.rotation.stop()
+	_ = r.rotation.stop(ctx)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.state == recordingRunning {
-		_ = r.stopSegments(ctx.Err() != nil)
+		_ = r.stopSegments(ctx, true)
 	}
 	r.state = recordingDiscarded
 	removeAll(r.segmentFiles())

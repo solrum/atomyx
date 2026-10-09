@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -31,6 +32,12 @@ type recorderHarness struct {
 	devicePids map[int]*process.FakeBackgroundProcess
 	procs      []*process.FakeBackgroundProcess
 	pullErr    error
+
+	// hang makes every runner command block until its context ends, the
+	// way a wedged adb server does.
+	hang atomic.Bool
+	// noFinalize makes a device interrupt leave the recorder running.
+	noFinalize atomic.Bool
 
 	simRecorders []*process.FakeBackgroundProcess
 
@@ -85,6 +92,10 @@ func (h *recorderHarness) stageSimulator(n int) {
 }
 
 func (h *recorderHarness) Run(ctx context.Context, name string, args ...string) (process.Result, error) {
+	if h.hang.Load() {
+		<-ctx.Done()
+		return process.Result{}, ctx.Err()
+	}
 	res, err := h.runner.Run(ctx, name, args...)
 	h.log(strings.Join(append([]string{name}, args...), " "))
 	if err != nil || len(args) == 0 {
@@ -104,7 +115,7 @@ func (h *recorderHarness) Run(ctx context.Context, name string, args ...string) 
 		h.mu.Lock()
 		proc := h.devicePids[pid]
 		h.mu.Unlock()
-		if proc != nil {
+		if proc != nil && !h.noFinalize.Load() {
 			proc.Exit(process.FakeInterruptExitCode)
 		}
 	}
