@@ -3,6 +3,7 @@ package process
 import (
 	"bufio"
 	"context"
+	"errors"
 	"testing"
 	"time"
 )
@@ -43,8 +44,8 @@ func TestExecBackground_Interrupt_ProcessIgnoringSigintIsKilledAfterGrace(t *tes
 	proc := startReady(t, "trap '' INT; echo ready; while :; do sleep 0.05; done")
 
 	start := time.Now()
-	if err := proc.Interrupt(interruptTestGrace); err != nil {
-		t.Fatalf("Interrupt() error = %v", err)
+	if err := proc.Interrupt(interruptTestGrace); !errors.Is(err, ErrInterruptEscalated) {
+		t.Fatalf("Interrupt() error = %v, want ErrInterruptEscalated", err)
 	}
 	if elapsed := time.Since(start); elapsed < interruptTestGrace {
 		t.Fatalf("Interrupt() returned after %v, before the %v grace", elapsed, interruptTestGrace)

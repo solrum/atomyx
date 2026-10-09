@@ -151,7 +151,8 @@ func (p *execBackgroundProcess) Kill() error {
 // Interrupt sends SIGINT to the process group, waits up to grace for
 // the process to exit, and escalates to Kill when it has not. Tools
 // such as a screen recorder finalize their output on SIGINT but not on
-// SIGKILL, so the escalation is the last resort.
+// SIGKILL, so the escalation is the last resort and is reported as
+// ErrInterruptEscalated.
 func (p *execBackgroundProcess) Interrupt(grace time.Duration) error {
 	if p.cmd.Process == nil {
 		return nil
@@ -168,7 +169,10 @@ func (p *execBackgroundProcess) Interrupt(grace time.Duration) error {
 		return nil
 	case <-time.After(grace):
 	}
-	return p.Kill()
+	if err := p.Kill(); err != nil {
+		return err
+	}
+	return ErrInterruptEscalated
 }
 
 // cappedBuffer retains the last limit bytes written to it and

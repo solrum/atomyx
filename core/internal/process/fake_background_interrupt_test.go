@@ -1,6 +1,7 @@
 package process
 
 import (
+	"errors"
 	"testing"
 	"time"
 )
@@ -21,8 +22,8 @@ func TestFakeBackgroundProcess_Interrupt_ExitsWithoutKill(t *testing.T) {
 func TestFakeBackgroundProcess_Interrupt_IgnoredFallsBackToKill(t *testing.T) {
 	p := NewFakeBackgroundProcess()
 	p.IgnoreInterrupt()
-	if err := p.Interrupt(time.Second); err != nil {
-		t.Fatalf("Interrupt() error = %v", err)
+	if err := p.Interrupt(time.Second); !errors.Is(err, ErrInterruptEscalated) {
+		t.Fatalf("Interrupt() error = %v, want ErrInterruptEscalated", err)
 	}
 	if !p.Interrupted() || !p.Killed() {
 		t.Fatalf("Interrupted() = %v, Killed() = %v, want both true", p.Interrupted(), p.Killed())

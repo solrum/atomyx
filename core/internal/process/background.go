@@ -2,9 +2,17 @@ package process
 
 import (
 	"context"
+	"errors"
 	"io"
 	"time"
 )
+
+// ErrInterruptEscalated is returned by BackgroundProcess.Interrupt when
+// the process did not exit within the grace period and was killed
+// instead. A tool that finalizes its output on SIGINT but not on SIGKILL
+// leaves that output unusable in this case, so a caller that keeps the
+// output checks for this error.
+var ErrInterruptEscalated = errors.New("the process ignored the interrupt and was killed")
 
 // BackgroundResult carries a BackgroundProcess's outcome once it has
 // exited.
@@ -38,7 +46,8 @@ type BackgroundProcess interface {
 	Kill() error
 	// Interrupt asks the process to stop on its own by sending SIGINT to
 	// its process group, waits up to grace for it to exit, and falls
-	// back to Kill when it has not. It always reaps the process before
+	// back to Kill when it has not, and then returns an error wrapping
+	// ErrInterruptEscalated. It always reaps the process before
 	// returning. Interrupting an already-exited process is a no-op.
 	Interrupt(grace time.Duration) error
 	// Pid reports the operating system process id of the started

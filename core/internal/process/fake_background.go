@@ -172,7 +172,8 @@ func (p *FakeBackgroundProcess) Interrupted() bool {
 
 // Interrupt marks the process interrupted. A running process exits with
 // FakeInterruptExitCode unless IgnoreInterrupt was called, in which case
-// the call falls back to Kill. The grace period is not waited on.
+// the call falls back to Kill and returns ErrInterruptEscalated. The
+// grace period is not waited on.
 func (p *FakeBackgroundProcess) Interrupt(_ time.Duration) error {
 	p.mu.Lock()
 	p.interrupted = true
@@ -182,7 +183,10 @@ func (p *FakeBackgroundProcess) Interrupt(_ time.Duration) error {
 	}
 	if p.ignoresInterrupt {
 		p.mu.Unlock()
-		return p.Kill()
+		if err := p.Kill(); err != nil {
+			return err
+		}
+		return ErrInterruptEscalated
 	}
 	p.closed = true
 	p.exited = true
