@@ -20,6 +20,11 @@ type ChildTarget struct {
 	// EntryPath is the owning suite entry's path, empty when EntryIndex
 	// is NoPosition.
 	EntryPath string
+	// Attempt is the 1-based attempt number of the owning suite entry.
+	// The first attempt and a target outside a suite name their
+	// artifacts alike, and a later attempt names its own so it never
+	// overwrites an earlier one.
+	Attempt int
 	// ScriptIndex is the child's position in its scenario's scripts
 	// list, or NoPosition when the target is a suite entry that is a
 	// script.
@@ -44,14 +49,14 @@ type ChildArtifacts interface {
 // runner's default in-memory collector and no failure capture.
 type ArtifactsFactory func(ChildTarget) ChildArtifacts
 
-// forEntry returns a factory that stamps every target with the suite
-// entry it belongs to before delegating, or nil when f is nil.
-func (f ArtifactsFactory) forEntry(index int, path string) ArtifactsFactory {
+// forAttempt returns a factory that stamps every target with the suite
+// entry attempt it belongs to before delegating, or nil when f is nil.
+func (f ArtifactsFactory) forAttempt(index int, path string, attempt int) ArtifactsFactory {
 	if f == nil {
 		return nil
 	}
 	return func(target ChildTarget) ChildArtifacts {
-		target.EntryIndex, target.EntryPath = index, path
+		target.EntryIndex, target.EntryPath, target.Attempt = index, path, attempt
 		return f(target)
 	}
 }

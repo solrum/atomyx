@@ -13,6 +13,7 @@ import (
 
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/runfolder"
+	"dev.atomyx/internal/scenario"
 	"dev.atomyx/internal/shutdown"
 )
 
@@ -127,5 +128,17 @@ func TestRunSuiteVideoInterruptedEntryDiscards(t *testing.T) {
 		if strings.Contains(name, "video") {
 			t.Errorf("an interrupted entry kept %s", name)
 		}
+	}
+}
+
+func TestEntryVideoBaseKeepsTheFirstAttemptNameAndSeparatesLaterOnes(t *testing.T) {
+	first := entryVideoBase(scenario.EntryTarget{EntryIndex: 1, Attempt: 1})
+	second := entryVideoBase(scenario.EntryTarget{EntryIndex: 1, Attempt: 2})
+	third := entryVideoBase(scenario.EntryTarget{EntryIndex: 1, Attempt: 3})
+	if first != "entry-2" {
+		t.Errorf("first attempt base = %q, want entry-2", first)
+	}
+	if second == first || third == second || second != "entry-2-attempt-2" {
+		t.Errorf("later bases = %q, %q, want distinct names", second, third)
 	}
 }

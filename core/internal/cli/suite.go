@@ -192,14 +192,14 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 		Metadata:    metadata,
 		Result:      result,
 		Screenshots: suiteReportScreenshots(result),
-		EntryVideos: videos.entryFiles(len(result.Entries)),
+		EntryVideos: entryVideoFiles(result),
 	}
 	bundle, genErr := report.NewFsReporter().Generate(input, record.reportOptions())
 	if genErr != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, genErr)
 	}
 	printReportLocation(stderr, record, bundle)
-	videos.printVideoLocations(stderr, record.Dir(), len(result.Entries))
+	printVideoLocations(stderr, record.Dir(), input.EntryVideos)
 
 	if result.Ok {
 		return 0

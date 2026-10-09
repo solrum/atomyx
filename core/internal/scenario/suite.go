@@ -102,6 +102,14 @@ type SuiteRunOptions struct {
 	// resolve that entry's precondition override. Nil leaves every
 	// precondition's own policy in effect for every entry.
 	ResolvePreconditions ResolvePreconditions
+	// Retries is how many more times a failed entry runs after its first
+	// attempt, limited to MaxRetries. Only a test failure is retried, see
+	// retryable. A negative value counts as zero.
+	Retries int
+	// Quarantined, when non-nil, reports whether an entry path is
+	// quarantined. A quarantined entry still runs and is still retried,
+	// but its failure does not fail the suite.
+	Quarantined func(entryPath string) bool
 }
 
 // SuiteEntryOutcome holds the outcome of one suite entry that
@@ -125,25 +133,58 @@ func (o SuiteEntryOutcome) MarshalJSON() ([]byte, error) {
 	return []byte("null"), nil
 }
 
-// SuiteEntryResult is one suite entry's outcome.
-type SuiteEntryResult struct {
-	Path       string             `json:"path"`
-	Kind       SuiteEntryKind     `json:"kind"`
+// SuiteAttempt is one run of a suite entry. Number counts from 1, and
+// Videos lists the files the host kept for the attempt, as the host's
+// EntryEnd callback reported them.
+type SuiteAttempt struct {
+	Number     int                `json:"number"`
 	Status     SuiteEntryStatus   `json:"status"`
-	Result     *SuiteEntryOutcome `json:"result,omitempty"`
 	Error      *string            `json:"error,omitempty"`
 	DurationMs int64              `json:"durationMs"`
+	Videos     []string           `json:"videos,omitempty"`
+	Result     *SuiteEntryOutcome `json:"-"`
 }
 
-// SuiteResult is the outcome of running a whole suite.
+// SuiteEntryResult is one suite entry's outcome. Status, Result and
+// Error describe the last attempt, and DurationMs spans every attempt.
+// Attempts lists them all in order, so it holds one element for an entry
+// that ran once.
+//
+// Flaky marks an entry that failed and then passed, which counts as
+// passed. Quarantined marks an entry matched by the quarantine list,
+// whatever its outcome. A quarantined entry that failed is a quarantined
+// failure and does not fail the suite.
+type SuiteEntryResult struct {
+	Path        string             `json:"path"`
+	Kind        SuiteEntryKind     `json:"kind"`
+	Status      SuiteEntryStatus   `json:"status"`
+	Result      *SuiteEntryOutcome `json:"result,omitempty"`
+	Error       *string            `json:"error,omitempty"`
+	DurationMs  int64              `json:"durationMs"`
+	Attempts    []SuiteAttempt     `json:"attempts,omitempty"`
+	Flaky       bool               `json:"flaky,omitempty"`
+	Quarantined bool               `json:"quarantined,omitempty"`
+}
+
+// QuarantinedFailure reports whether the entry failed while quarantined.
+func (e SuiteEntryResult) QuarantinedFailure() bool {
+	return e.Quarantined && e.Status == EntryFailed
+}
+
+// SuiteResult is the outcome of running a whole suite. Total counts every
+// entry. Passed counts entries that passed, flaky ones included. Failed
+// counts failures that are not quarantined, and QuarantinedFailures counts
+// the rest, so the three add up to Total. Ok is true when Failed is zero.
 type SuiteResult struct {
-	SuiteName  *string            `json:"suiteName,omitempty"`
-	Ok         bool               `json:"ok"`
-	Entries    []SuiteEntryResult `json:"entries"`
-	Total      int                `json:"total"`
-	Passed     int                `json:"passed"`
-	Failed     int                `json:"failed"`
-	DurationMs int64              `json:"durationMs"`
+	SuiteName           *string            `json:"suiteName,omitempty"`
+	Ok                  bool               `json:"ok"`
+	Entries             []SuiteEntryResult `json:"entries"`
+	Total               int                `json:"total"`
+	Passed              int                `json:"passed"`
+	Failed              int                `json:"failed"`
+	Flaky               int                `json:"flaky,omitempty"`
+	QuarantinedFailures int                `json:"quarantinedFailures,omitempty"`
+	DurationMs          int64              `json:"durationMs"`
 }
 
 // SuiteRunner runs an ordered set of independent script or scenario
@@ -196,10 +237,18 @@ func (r *SuiteRunner) Run(ctx context.Context, entries []SuiteEntry, options *Su
 		results = append(results, r.runEntry(ctx, index, entry, options))
 	}
 
-	passed := 0
+	var passed, failed, flaky, quarantinedFailures int
 	for _, e := range results {
-		if e.Status == EntryPassed {
+		switch {
+		case e.Status == EntryPassed:
 			passed++
+		case e.QuarantinedFailure():
+			quarantinedFailures++
+		default:
+			failed++
+		}
+		if e.Flaky {
+			flaky++
 		}
 	}
 
@@ -212,7 +261,7 @@ func (r *SuiteRunner) Run(ctx context.Context, entries []SuiteEntry, options *Su
 		name = *suiteName
 	}
 
-	ok := passed == len(results)
+	ok := failed == 0
 	durationMs := r.deps.Clock.NowMs() - startedAt
 
 	r.runLog.Info("suite.run", logging.LogContext{
@@ -222,33 +271,74 @@ func (r *SuiteRunner) Run(ctx context.Context, entries []SuiteEntry, options *Su
 	})
 
 	return SuiteResult{
-		SuiteName:  suiteName,
-		Ok:         ok,
-		Entries:    results,
-		Total:      len(results),
-		Passed:     passed,
-		Failed:     len(results) - passed,
-		DurationMs: durationMs,
+		SuiteName:           suiteName,
+		Ok:                  ok,
+		Entries:             results,
+		Total:               len(results),
+		Passed:              passed,
+		Failed:              failed,
+		Flaky:               flaky,
+		QuarantinedFailures: quarantinedFailures,
+		DurationMs:          durationMs,
 	}, nil
 }
 
-// runEntry dispatches entry to a script or scenario run by
-// script.IsScenarioYaml(entry.Content), resetting the injected
-// NetworkCapture first. There is one capture session for the whole
-// suite run, not one per entry, so each entry otherwise starts with
-// whatever the previous entry's traffic left behind. A load, parse,
-// or dispatch failure is reported as a "failed" entry with Error set,
-// never propagated to Run.
+// runEntry runs one entry and, while its attempt failed with a test
+// failure and retries remain, runs it again. Before each retry it clears
+// the launchApp dedup exactly as Run does before every entry, so the
+// entry's own launchApp runs again. A retry clears no app data, and the
+// entry's preconditions follow their own policy.
 func (r *SuiteRunner) runEntry(ctx context.Context, index int, entry SuiteEntry, options *SuiteRunOptions) SuiteEntryResult {
 	entryStart := r.deps.Clock.NowMs()
 	kind := KindScript
 	if script.IsScenarioYaml(entry.Content) {
 		kind = KindScenario
 	}
+	maxAttempts := 1
+	quarantined := false
+	if options != nil {
+		maxAttempts += clampRetries(options.Retries)
+		quarantined = options.Quarantined != nil && options.Quarantined(entry.Path)
+	}
+
+	var attempts []SuiteAttempt
+	for number := 1; ; number++ {
+		if number > 1 {
+			r.deps.Orchestra.ResetLaunchedApps()
+		}
+		attempt := r.runAttempt(ctx, index, number, entry, kind, options)
+		attempts = append(attempts, attempt)
+		if attempt.Status == EntryPassed || number >= maxAttempts || !retryable(ctx.Err(), attempt) {
+			break
+		}
+	}
+
+	last := attempts[len(attempts)-1]
+	return SuiteEntryResult{
+		Path:        entry.Path,
+		Kind:        kind,
+		Status:      last.Status,
+		Result:      last.Result,
+		Error:       last.Error,
+		DurationMs:  r.deps.Clock.NowMs() - entryStart,
+		Attempts:    attempts,
+		Flaky:       last.Status == EntryPassed && len(attempts) > 1,
+		Quarantined: quarantined,
+	}
+}
+
+// runAttempt runs one attempt of entry, resetting the injected
+// NetworkCapture first. There is one capture session for the whole suite
+// run, not one per attempt, so each attempt otherwise starts with
+// whatever the previous attempt's traffic left behind. A load, parse, or
+// dispatch failure is reported as a "failed" attempt with Error set,
+// never propagated to Run.
+func (r *SuiteRunner) runAttempt(ctx context.Context, index, number int, entry SuiteEntry, kind SuiteEntryKind, options *SuiteRunOptions) SuiteAttempt {
+	attemptStart := r.deps.Clock.NowMs()
 
 	var entryEnd EntryEnd
 	if r.deps.OnEntryStart != nil {
-		entryEnd = r.deps.OnEntryStart(ctx, EntryTarget{EntryIndex: index, EntryPath: entry.Path})
+		entryEnd = r.deps.OnEntryStart(ctx, EntryTarget{EntryIndex: index, EntryPath: entry.Path, Attempt: number})
 	}
 
 	if r.deps.NetworkCapture != nil {
@@ -260,7 +350,7 @@ func (r *SuiteRunner) runEntry(ctx context.Context, index int, entry SuiteEntry,
 	var errMsg *string
 
 	if kind == KindScenario {
-		result, err := r.runScenarioEntry(ctx, index, entry, options)
+		result, err := r.runScenarioEntry(ctx, index, number, entry, options)
 		if err != nil {
 			msg := err.Error()
 			errMsg = &msg
@@ -269,7 +359,7 @@ func (r *SuiteRunner) runEntry(ctx context.Context, index int, entry SuiteEntry,
 			status = statusFor(result.Ok)
 		}
 	} else {
-		result, err := r.runScriptEntry(ctx, index, entry, options)
+		result, err := r.runScriptEntry(ctx, index, number, entry, options)
 		if err != nil {
 			msg := err.Error()
 			errMsg = &msg
@@ -279,22 +369,39 @@ func (r *SuiteRunner) runEntry(ctx context.Context, index int, entry SuiteEntry,
 		}
 	}
 
-	res := SuiteEntryResult{
-		Path:       entry.Path,
-		Kind:       kind,
-		DurationMs: r.deps.Clock.NowMs() - entryStart,
-	}
+	attempt := SuiteAttempt{Number: number, DurationMs: r.deps.Clock.NowMs() - attemptStart}
 	if errMsg != nil {
-		res.Status = EntryFailed
-		res.Error = errMsg
+		attempt.Status = EntryFailed
+		attempt.Error = errMsg
 	} else {
-		res.Status = status
-		res.Result = &outcome
+		attempt.Status = status
+		attempt.Result = &outcome
 	}
 	if entryEnd != nil {
-		entryEnd(res)
+		attempt.Videos = entryEnd(SuiteEntryResult{
+			Path:       entry.Path,
+			Kind:       kind,
+			Status:     attempt.Status,
+			Result:     attempt.Result,
+			Error:      attempt.Error,
+			DurationMs: attempt.DurationMs,
+		})
 	}
-	return res
+	return attempt
+}
+
+// stepHook returns the step hook of one attempt. A retried attempt stamps
+// its number on every event, so the step stream tells attempts apart. The
+// first attempt forwards events unchanged.
+func (r *SuiteRunner) stepHook(number int) func(runner.StepEvent) {
+	hook := r.deps.OnStep
+	if hook == nil || number < 2 {
+		return hook
+	}
+	return func(event runner.StepEvent) {
+		event.Attempt = number
+		hook(event)
+	}
 }
 
 func statusFor(ok bool) SuiteEntryStatus {
@@ -304,7 +411,7 @@ func statusFor(ok bool) SuiteEntryStatus {
 	return EntryFailed
 }
 
-func (r *SuiteRunner) runScriptEntry(ctx context.Context, index int, entry SuiteEntry, options *SuiteRunOptions) (runner.ScriptResult, error) {
+func (r *SuiteRunner) runScriptEntry(ctx context.Context, index, attempt int, entry SuiteEntry, options *SuiteRunOptions) (runner.ScriptResult, error) {
 	def, err := script.ParseScript(entry.Content, r.deps.ExternalEnv)
 	if err != nil {
 		return runner.ScriptResult{}, err
@@ -316,7 +423,7 @@ func (r *SuiteRunner) runScriptEntry(ctx context.Context, index int, entry Suite
 	}
 
 	artifacts, failureCapture := r.deps.ChildArtifacts.childEvidence(
-		ChildTarget{EntryIndex: index, EntryPath: entry.Path, ScriptIndex: NoPosition},
+		ChildTarget{EntryIndex: index, EntryPath: entry.Path, Attempt: attempt, ScriptIndex: NoPosition},
 		r.deps.Orchestra, r.deps.Clock, r.deps.Logger)
 	childRunner := runner.NewScriptRunner(runner.ScriptRunnerDeps{
 		Orchestra:             r.deps.Orchestra,
@@ -329,14 +436,14 @@ func (r *SuiteRunner) runScriptEntry(ctx context.Context, index int, entry Suite
 		ClearDataOnFresh:      r.deps.ClearDataOnFresh,
 		AppArtifact:           r.deps.AppArtifact,
 		PreconditionsOverride: override,
-		OnStep:                r.deps.OnStep,
+		OnStep:                r.stepHook(attempt),
 		Artifacts:             artifacts,
 		FailureCapture:        failureCapture,
 	})
 	return childRunner.Run(ctx, def)
 }
 
-func (r *SuiteRunner) runScenarioEntry(ctx context.Context, index int, entry SuiteEntry, options *SuiteRunOptions) (ScenarioResult, error) {
+func (r *SuiteRunner) runScenarioEntry(ctx context.Context, index, attempt int, entry SuiteEntry, options *SuiteRunOptions) (ScenarioResult, error) {
 	if r.deps.CreateLoadScript == nil {
 		return ScenarioResult{}, fmt.Errorf(
 			"entry %q is a scenario, but no createLoadScript was configured to resolve its child scripts", entry.Path)
@@ -365,8 +472,8 @@ func (r *SuiteRunner) runScenarioEntry(ctx context.Context, index int, entry Sui
 		ClearDataOnFresh:      r.deps.ClearDataOnFresh,
 		AppArtifact:           r.deps.AppArtifact,
 		PreconditionsOverride: override,
-		OnStep:                r.deps.OnStep,
-		ChildArtifacts:        r.deps.ChildArtifacts.forEntry(index, entry.Path),
+		OnStep:                r.stepHook(attempt),
+		ChildArtifacts:        r.deps.ChildArtifacts.forAttempt(index, entry.Path, attempt),
 	})
 	return scenarioRunner.Run(ctx, def)
 }

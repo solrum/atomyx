@@ -178,8 +178,9 @@ func TestSuiteRunner_Run_CallsEntryHookAroundEveryEntryInOrder(t *testing.T) {
 		Commands:  runner.DefaultCommands(),
 		OnEntryStart: func(_ context.Context, target EntryTarget) EntryEnd {
 			events = append(events, fmt.Sprintf("start %d %s", target.EntryIndex, target.EntryPath))
-			return func(res SuiteEntryResult) {
+			return func(res SuiteEntryResult) []string {
 				events = append(events, fmt.Sprintf("end %s %s", res.Path, res.Status))
+				return nil
 			}
 		},
 	})

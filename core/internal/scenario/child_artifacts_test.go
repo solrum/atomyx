@@ -103,8 +103,8 @@ func TestSuiteRunner_ChildTargetsCarryTheEntryPosition(t *testing.T) {
 	}
 
 	want := []ChildTarget{
-		{EntryIndex: 0, EntryPath: "suite/a.yml", ScriptIndex: NoPosition},
-		{EntryIndex: 1, EntryPath: "suite/s.yml", ScriptIndex: 0, ScriptPath: "c.yml"},
+		{EntryIndex: 0, EntryPath: "suite/a.yml", Attempt: 1, ScriptIndex: NoPosition},
+		{EntryIndex: 1, EntryPath: "suite/s.yml", Attempt: 1, ScriptIndex: 0, ScriptPath: "c.yml"},
 	}
 	if len(recorder.targets) != 2 || recorder.targets[0] != want[0] || recorder.targets[1] != want[1] {
 		t.Fatalf("targets = %+v, want %+v", recorder.targets, want)
