@@ -97,6 +97,8 @@ components:
     in: internal/recording
   shard:
     in: internal/shard
+  setup:
+    in: internal/setup
   cmd:
     in: cmd/**
   scripttools:
@@ -255,6 +257,7 @@ deps:
       - debugrun
       - recording
       - shard
+      - setup
   skills:
     anyVendorDeps: true
   storage:
@@ -360,6 +363,10 @@ deps:
     mayDependOn:
       - process
       - shard
+  setup:
+    mayDependOn:
+      - diag
+      - setup
   inspector:
     mayDependOn:
       - wire
