@@ -254,6 +254,7 @@ deps:
       - stepstream
       - debugrun
       - recording
+      - shard
   skills:
     anyVendorDeps: true
   storage:

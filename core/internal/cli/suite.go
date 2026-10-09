@@ -37,6 +37,9 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 	stdout := deps.stdout()
 	stderr := deps.stderr()
 
+	if flagBool(flags, "--worker") {
+		return runSuiteWorker(ctx, deps, flags, positional)
+	}
 	jsonOutput := flagBool(flags, "--json")
 	humanOut := stdout
 	if jsonOutput {
