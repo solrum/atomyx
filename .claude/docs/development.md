@@ -89,6 +89,26 @@ Three files carry the number and change together:
 fails unless each file declares the number exactly once and all three
 are equal.
 
+## Commit size hook
+
+Install the hook once per clone with `make hooks`, which sets
+`core.hooksPath` to `scripts/hooks`. The `commit-msg` hook counts the
+lines added and removed in the staged change and rejects a commit
+above 400 changed lines. Binary files and the four generated JSON
+Schema files are not counted, and a merge commit is skipped.
+
+A commit that cannot be split carries a trailer line in its message
+stating why:
+
+```
+Large-Commit: <reason this change cannot be split>
+```
+
+An amend counts only the staged delta, not the lines already in the
+commit. `git commit --no-verify` bypasses the hook.
+`bash scripts/check-commit-size-hook.sh`, run by the root `make check`,
+tests the hook against a temporary repository.
+
 ## Regenerating the JSON Schema files
 
 Run after any change to a field or schema-generation type in

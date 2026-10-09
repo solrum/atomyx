@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+#
+# commit-msg hook: keeps each commit small enough to review. It counts
+# the lines the staged change adds and removes, and rejects the commit
+# above the limit unless the message carries a Large-Commit trailer
+# that states the reason. A commit-msg hook is used instead of a
+# pre-commit hook because only commit-msg can read the message.
+#
+# Not counted:
+#   - binary files, which git reports with "-" instead of a line count
+#   - the generated JSON Schema files that `make gen-schema` rewrites
+#
+# Skipped entirely while a merge is in progress. An amend is measured
+# by the staged delta only, and `git commit --no-verify` bypasses the
+# hook.
+set -euo pipefail
+
+readonly MAX_CHANGED_LINES=400
+
+readonly GENERATED_FILES=(
+  "core/internal/script/atomyx-script.schema.json"
+  "core/internal/config/atomyx-config.schema.json"
+  "core/internal/runfolder/atomyx-run.schema.json"
+  "core/internal/runfolder/atomyx-run-index.schema.json"
+)
+
+message_file="${1:?commit-msg hook requires the commit message file path}"
+
+if [ -e "$(git rev-parse --git-path MERGE_HEAD)" ]; then
+  exit 0
+fi
+
+is_generated() {
+  local path="$1" generated
+  for generated in "${GENERATED_FILES[@]}"; do
+    if [ "$path" = "$generated" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+total=0
+while IFS=$'\t' read -r added removed path; do
+  if [ "$added" = "-" ] || [ "$removed" = "-" ]; then
+    continue
+  fi
+  if is_generated "$path"; then
+    continue
+  fi
+  total=$((total + added + removed))
+done < <(git diff --cached --numstat)
+
+if [ "$total" -le "$MAX_CHANGED_LINES" ]; then
+  exit 0
+fi
+
+if grep -Eq '^Large-Commit:[[:space:]]*[^[:space:]]' "$message_file"; then
+  exit 0
+fi
+
+echo "commit size hook FAILED: this commit changes $total lines, above the limit of $MAX_CHANGED_LINES." >&2
+echo "  Split it into smaller commits, or add a trailer line to the message:" >&2
+echo "    Large-Commit: <reason this change cannot be split>" >&2
+exit 1

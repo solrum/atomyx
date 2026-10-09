@@ -56,7 +56,7 @@ GO_RELEASE_BINARIES := atomyx atomyx-mcp atomyx-runtime
 # access for code signing verification (OCSP, provisioning).
 APPLE_BYPASS := '(.*\.apple\.com|.*\.mzstatic\.com|.*\.icloud\.com)'
 
-.PHONY: help build build-core release-core check ready-android ready-ios ready-ios-sim \
+.PHONY: help build build-core release-core check hooks ready-android ready-ios ready-ios-sim \
         ready-ios-capture ready-android-capture \
         stop serve-ios serve-android mitm
 
@@ -70,6 +70,7 @@ help:
 	@echo "  make build-core                 Build core binaries (CLI, MCP, runtime)"
 	@echo "  make release-core               Build reproducible, checksummed core release binaries"
 	@echo "  make check                      Run every local gate: core + repo-wide lints"
+	@echo "  make hooks                      Install the commit size hook (core.hooksPath)"
 	@echo ""
 	@echo "READY (start driver, ready to run scripts):"
 	@echo "  make ready-android              Android device/emulator"
@@ -134,8 +135,15 @@ check:
 	bash scripts/check-style-symbols.sh
 	bash scripts/check-ios-launcher-identifiers.sh
 	bash scripts/check-agent-protocol.sh
+	bash scripts/check-commit-size-hook.sh
 	node scripts/lint-banned-phrases.mjs
 	node scripts/lint-doc-paths.mjs
+
+# Point git at the versioned hooks in scripts/hooks (the commit size
+# check). Run once per clone.
+hooks:
+	@git config core.hooksPath scripts/hooks
+	@echo "OK: git hooks now read from scripts/hooks"
 
 # --- Android ---------------------------------------------------
 
