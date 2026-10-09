@@ -110,6 +110,12 @@ type SuiteRunOptions struct {
 	// quarantined. A quarantined entry still runs and is still retried,
 	// but its failure does not fail the suite.
 	Quarantined func(entryPath string) bool
+	// EntryOffset is the position of the first entry of this call in the
+	// host's whole entry list. A host that feeds a suite one entry at a
+	// time sets it to the number of entries already run, so artifact and
+	// video names, which derive from the entry position, stay unique
+	// across calls.
+	EntryOffset int
 }
 
 // SuiteEntryOutcome holds the outcome of one suite entry that
@@ -238,7 +244,7 @@ func (r *SuiteRunner) Run(ctx context.Context, entries []SuiteEntry, options *Su
 		// own scripts, so it must launch its own app rather than
 		// inherit whatever the previous entry already launched.
 		r.deps.Orchestra.ResetLaunchedApps()
-		results = append(results, r.runEntry(ctx, index, entry, options))
+		results = append(results, r.runEntry(ctx, index+entryOffset(options), entry, options))
 	}
 
 	result := r.summarize(results, options, startedAt)
@@ -254,8 +260,26 @@ func (r *SuiteRunner) Run(ctx context.Context, entries []SuiteEntry, options *Su
 	return result, nil
 }
 
+func entryOffset(options *SuiteRunOptions) int {
+	if options == nil || options.EntryOffset < 0 {
+		return 0
+	}
+	return options.EntryOffset
+}
+
 // summarize counts the finished entries into a SuiteResult.
 func (r *SuiteRunner) summarize(results []SuiteEntryResult, options *SuiteRunOptions, startedAt int64) SuiteResult {
+	var suiteName *string
+	if options != nil {
+		suiteName = options.SuiteName
+	}
+	return Summarize(results, suiteName, r.deps.Clock.NowMs()-startedAt)
+}
+
+// Summarize counts finished entries into a SuiteResult, the same way a
+// SuiteRunner does. A host that gathers entries from several runs uses it
+// to build one result.
+func Summarize(results []SuiteEntryResult, suiteName *string, durationMs int64) SuiteResult {
 	var passed, failed, flaky, quarantinedFailures int
 	for _, e := range results {
 		switch {
@@ -270,10 +294,6 @@ func (r *SuiteRunner) summarize(results []SuiteEntryResult, options *SuiteRunOpt
 			flaky++
 		}
 	}
-	var suiteName *string
-	if options != nil {
-		suiteName = options.SuiteName
-	}
 	return SuiteResult{
 		SuiteName:           suiteName,
 		Ok:                  failed == 0,
@@ -283,7 +303,7 @@ func (r *SuiteRunner) summarize(results []SuiteEntryResult, options *SuiteRunOpt
 		Failed:              failed,
 		Flaky:               flaky,
 		QuarantinedFailures: quarantinedFailures,
-		DurationMs:          r.deps.Clock.NowMs() - startedAt,
+		DurationMs:          durationMs,
 	}
 }
 

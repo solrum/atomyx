@@ -50,6 +50,9 @@ type runIdentity struct {
 	Label      string
 	ScriptPath string
 	Device     device.Descriptor
+	// ParentRunID is the sharding run that started this run as a worker,
+	// empty for a run nothing started.
+	ParentRunID string
 }
 
 // startRunRecord creates the run folder under out.Root. The folder id
@@ -57,10 +60,11 @@ type runIdentity struct {
 // host version, and the script.
 func startRunRecord(out runOutput, identity runIdentity) (*runRecord, error) {
 	base := runfolder.Meta{
-		Kind:       identity.Kind,
-		ScriptPath: identity.ScriptPath,
-		ScriptName: identity.Label,
-		DeviceID:   identity.Device.ID,
+		Kind:        identity.Kind,
+		ScriptPath:  identity.ScriptPath,
+		ScriptName:  identity.Label,
+		ParentRunID: identity.ParentRunID,
+		DeviceID:    identity.Device.ID,
 		Device: &runfolder.Device{
 			Platform:   string(identity.Device.Platform),
 			Kind:       string(identity.Device.Kind),

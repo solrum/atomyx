@@ -11,12 +11,9 @@ import (
 	"time"
 
 	"dev.atomyx/internal/config"
-	"dev.atomyx/internal/netcapture"
 	"dev.atomyx/internal/report"
 	"dev.atomyx/internal/runfolder"
-	"dev.atomyx/internal/runner"
 	"dev.atomyx/internal/scenario"
-	"dev.atomyx/internal/stepstream"
 	"dev.atomyx/internal/suite"
 )
 
@@ -46,42 +43,12 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 		humanOut = stderr
 	}
 
-	loaded, resolvedEnvironment, err := resolveEnvironment(flags)
+	cfg, err := resolveSuiteSettings(flags, positional)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "error: %s\n", err)
 		return 2
 	}
-
-	cliPreconditionsFlag, err := resolveCliPreconditionsFlag(flags)
-	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "error: %s\n", err)
-		return 2
-	}
-	fromConfigPreconditions := configPreconditionsOverride(loaded)
-
-	selector, err := resolveSuiteSelector(positional, flags, loaded)
-	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "error: %s\n", err)
-		return 2
-	}
-
-	policy, err := resolveSuitePolicy(positional, flags, loaded)
-	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "error: %s\n", err)
-		return 2
-	}
-
-	var configReport *config.Report
-	if loaded != nil {
-		configReport = loaded.Config.Report
-	}
-	output, err := resolveReportOptions(flags, configReport)
-	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "error: %s\n", err)
-		return 2
-	}
-
-	externalEnv, err := buildExternalEnv(flags, resolvedEnvironment)
+	selector, err := resolveSuiteSelector(positional, flags, cfg.loaded)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "error: %s\n", err)
 		return 2
@@ -91,11 +58,8 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
-	var testRoots []string
-	if loaded != nil && loaded.Config.TestRoots != nil {
-		testRoots = *loaded.Config.TestRoots
-	}
-	resolvedFlows, err := suite.Resolve(ctx, selector, suite.DiscoveryOptions{Cwd: cwd, TestRoots: testRoots})
+	cfg.cwd = cwd
+	resolvedFlows, err := suite.Resolve(ctx, selector, suite.DiscoveryOptions{Cwd: cwd, TestRoots: cfg.testRoots})
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "error: %s\n", err)
 		return 2
@@ -114,84 +78,29 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 		entries[i] = scenario.SuiteEntry{Path: flow.Path, Content: string(content)}
 	}
 
-	platform := resolvePlatform(flags, resolvedEnvironment)
-	deviceID := resolveDeviceID(flags, resolvedEnvironment)
-	proxyFlag := resolveProxyFlag(flags, resolvedEnvironment)
+	platform := resolvePlatform(flags, cfg.environment)
+	deviceID := resolveDeviceID(flags, cfg.environment)
 
 	desc, err := resolveDescriptor(ctx, deps.Probe, deps.Runners, platform, deviceID)
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
-	opened, err := borrowDevice(ctx, deps, "atomyx suite", "atomyx suite", desc)
+	host, err := startSuiteHost(ctx, deps, cfg, resolveProxyFlag(flags, cfg.environment), "", desc, videoEnabled(flags, cfg.loaded))
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
-	defer opened.Close() //nolint:contextcheck // teardown is bounded by its own grace timer, not by a call context
-	built := opened.Built()
-	runCtx, cancelRun := context.WithCancelCause(ctx)
-	defer cancelRun(nil)
-	opened.cancelOnLost(cancelRun)
-
-	captureConfig := parseCaptureFlag(proxyFlag)
-	networkCapture, err := netcapture.New(captureConfig)
-	if err != nil {
-		return reportUncaught(ctx, stderr, deps.Debug, err)
-	}
+	defer host.close(ctx, stderr)
+	opened, record := host.opened, host.record
 
 	var envName *string
-	if resolvedEnvironment != nil {
-		name := resolvedEnvironment.Name
+	if cfg.environment != nil {
+		name := cfg.environment.Name
 		envName = &name
 	}
-
-	resolvePreconditions := func(flowLevel *string) runner.PreconditionsOverride {
-		scenarioOverride := runner.PreconditionsNoOverride
-		if flowLevel != nil {
-			scenarioOverride = runner.PreconditionsOverride(*flowLevel)
-		}
-		return resolvePreconditionsOverride(cliPreconditionsFlag, scenarioOverride, fromConfigPreconditions)
-	}
+	suiteLabel := cfg.label
 
 	runStartedAt := time.Now()
-	suiteLabel := "suite"
-	if positional != nil {
-		suiteLabel = *positional
-	}
-	// The run folder is created before the suite runs. Its id
-	// correlates every entry's live step trace and names the folder
-	// holding the suite's report.
-	record, err := startRunRecord(output, runIdentity{
-		Kind:   runfolder.KindSuite,
-		Label:  suiteLabel,
-		Device: desc,
-	})
-	if err != nil {
-		return reportUncaught(ctx, stderr, deps.Debug, err)
-	}
-	defer record.end(ctx, stderr)
-	opened.recordRun(record)
-
-	videos := newSuiteVideos(deps.videoLifecycle(videoEnabled(flags, loaded)), desc, record.writer)
-	suiteRunner := scenario.NewSuiteRunner(scenario.SuiteRunnerDeps{
-		Orchestra:        built.Orchestra,
-		Clock:            deps.clock(),
-		Logger:           deps.logger(),
-		RunID:            record.ID(),
-		NetworkCapture:   networkCapture,
-		Commands:         runner.DefaultCommands(),
-		CreateLoadScript: fsScenarioScriptLoader,
-		ExternalEnv:      externalEnv,
-		ChildArtifacts:   newArtifactSequence(runfolder.ArtifactsDir(record.Dir())).forTarget,
-		OnStep:           stepstream.NewSink(record.writer, deps.logger(), stepstream.WithPublisher(opened.PublishStep)),
-		OnEntryStart:     videos.start,
-	})
-
-	result, err := suiteRunner.Run(runCtx, entries, &scenario.SuiteRunOptions{
-		SuiteName:            positional,
-		ResolvePreconditions: resolvePreconditions,
-		Retries:              policy.Retries,
-		Quarantined:          quarantineMatcher(policy.Quarantine, cwd, testRoots),
-	})
+	result, err := host.runner.Run(host.runCtx, entries, host.runOptions(positional, 0)) //nolint:contextcheck // the host's run context is derived from ctx
 	finishedAt := time.Now()
 	indexEntries := suiteIndexEntries(result)
 	indexErr := record.writer.WriteIndex(indexEntries)

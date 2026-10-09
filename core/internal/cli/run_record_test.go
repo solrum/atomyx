@@ -335,3 +335,16 @@ func TestScriptScreenshotLandsInArtifactsBeforeTheRunEnds(t *testing.T) {
 	cancel(shutdown.InterruptCause(syscall.SIGINT))
 	<-codes
 }
+
+func TestStartRunRecordWritesTheParentRunIDOfAWorker(t *testing.T) {
+	root := t.TempDir()
+	record, err := startRunRecord(runOutput{Root: root}, runIdentity{Kind: runfolder.KindSuite, Label: "shard", ParentRunID: "parent-run"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer record.end(context.Background(), &bytes.Buffer{})
+
+	if meta := readMeta(t, record.Dir()); meta.ParentRunID != "parent-run" {
+		t.Fatalf("meta = %+v, want parentRunId parent-run", meta)
+	}
+}
