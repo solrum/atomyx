@@ -3,6 +3,7 @@ package recording
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -138,11 +139,15 @@ func (c *Capture) discard(ctx context.Context) {
 	}
 }
 
+// adopt moves the stopped segments to their final names. When one fails,
+// the segments already moved are removed, so a failed keep never leaves
+// video files that the run meta does not list.
 func (c *Capture) adopt(paths []string) ([]string, error) {
 	files := make([]string, 0, len(paths))
 	for i, tmp := range paths {
 		name := fmt.Sprintf("%s%s-%d%s", runfolder.VideoNamePrefix, c.base, i+1, filepath.Ext(tmp))
 		if _, err := c.artifacts.AdoptArtifact(tmp, name); err != nil {
+			c.removeAdopted(files)
 			return nil, err
 		}
 		files = append(files, name)
@@ -159,4 +164,16 @@ func (l *Lifecycle) failure(err error, msg string) *runfolder.Recording {
 	}
 	l.logger.Error(msg, err, logging.LogContext{"code": code})
 	return &runfolder.Recording{State: runfolder.RecordingError, Code: code}
+}
+
+func (c *Capture) removeAdopted(names []string) {
+	dir, err := c.artifacts.ArtifactsDir()
+	if err != nil {
+		return
+	}
+	for _, name := range names {
+		if err := os.Remove(filepath.Join(dir, name)); err != nil {
+			c.lifecycle.logger.Error("removing a partly kept screen recording file failed", err, logging.LogContext{"file": name})
+		}
+	}
 }

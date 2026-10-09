@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -299,5 +300,34 @@ func TestFinishAfterADiscardStaysDiscarded(t *testing.T) {
 	}
 	if rec.stops != 0 || rec.discards != 1 {
 		t.Fatalf("stops = %d, discards = %d", rec.stops, rec.discards)
+	}
+}
+
+func TestPartialAdoptFailureLeavesNoUnlistedVideoFiles(t *testing.T) {
+	w := newRun(t)
+	rec := &fakeRecorder{segments: []string{".video-login-a.mp4", ".video-login-b.mp4"}}
+	capture := begin(t, rec, logging.NoopLogger{}, w)
+	dir := runfolder.ArtifactsDir(w.Dir())
+	if err := os.WriteFile(filepath.Join(dir, "video-login-2.mp4"), []byte("existing"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got := capture.Finish(runfolder.ResultFailed)
+
+	if got == nil || got.State != runfolder.RecordingError || got.Files != nil {
+		t.Fatalf("Finish = %+v, want an error state listing no files", got)
+	}
+	var kept []string
+	for _, name := range artifactNames(t, w) {
+		// The recorder's own Discard removes the dot-named leftovers.
+		if !strings.HasPrefix(name, ".") {
+			kept = append(kept, name)
+		}
+	}
+	if names := kept; !reflect.DeepEqual(names, []string{"video-login-2.mp4"}) {
+		t.Fatalf("artifacts = %v, want only the file that was already there", names)
+	}
+	if rec.discards != 1 {
+		t.Fatalf("discards = %d, want 1", rec.discards)
 	}
 }
