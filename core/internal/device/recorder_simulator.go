@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/process"
@@ -25,6 +26,9 @@ const simulatorRecordingCodec = "hevc"
 type simulatorRecorder struct {
 	deps RecorderDeps
 	wait rotationWaiter
+	// orphanGrace overrides recordingFinalizeTimeout as the time a
+	// leftover recorder gets to exit when positive.
+	orphanGrace time.Duration
 }
 
 func (r simulatorRecorder) Start(ctx context.Context, desc Descriptor, dir, name string) (Recording, error) {
@@ -38,11 +42,26 @@ func (r simulatorRecorder) Start(ctx context.Context, desc Descriptor, dir, name
 		dir:     dir,
 		name:    name,
 	}
+	if err := r.reapOrphans(ctx, desc.ID); err != nil {
+		return nil, err
+	}
 	if err := rec.startSegment(); err != nil {
 		return nil, err
 	}
 	rec.rotation = startRotation(runCtx, r.wait, rec.rotate, rec.logRotationFailure)
 	return rec, nil
+}
+
+// reapOrphans clears recorders a dead atomyx process left on the
+// simulator, within the bound of the Start context.
+func (r simulatorRecorder) reapOrphans(ctx context.Context, udid string) error {
+	grace := recordingFinalizeTimeout
+	if r.orphanGrace > 0 {
+		grace = r.orphanGrace
+	}
+	ctx, cancel := context.WithTimeout(ctx, recordingControlTimeout+2*grace)
+	defer cancel()
+	return simulatorOrphanReaper{runner: r.deps.Runner, grace: grace}.reap(ctx, udid)
 }
 
 type simulatorSegment struct {
