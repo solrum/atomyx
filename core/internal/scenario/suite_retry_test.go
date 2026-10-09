@@ -2,6 +2,7 @@ package scenario
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -302,5 +303,54 @@ func TestSuiteRunner_RetriedAttemptsGetTheirOwnArtifactTargetsAndStepEvents(t *t
 	}
 	if first == 0 || second == 0 {
 		t.Errorf("step events: %d for the first attempt, %d for the second, want both", first, second)
+	}
+}
+
+func TestSuiteRunner_CanceledSuiteReturnsTheEntriesThatRan(t *testing.T) {
+	orch, _ := newEmptyScreenFixture(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	rec := &attemptRecorder{onStart: func(target EntryTarget) {
+		if target.EntryIndex == 1 {
+			cancel()
+		}
+	}}
+	r := newRetrySuite(orch, rec.start, nil)
+	entries := []SuiteEntry{
+		{Path: "a.yml", Content: passYaml},
+		{Path: "b.yml", Content: passYaml},
+		{Path: "c.yml", Content: passYaml},
+	}
+
+	result, err := r.Run(ctx, entries, nil)
+
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want the cancellation", err)
+	}
+	if result.Ok || result.Total != 2 || len(result.Entries) != 2 || result.Entries[1].Path != "b.yml" {
+		t.Errorf("result ok=%v total=%d entries=%d, want the two entries that started and Ok false", result.Ok, result.Total, len(result.Entries))
+	}
+}
+
+func TestSuiteRunner_CanceledSuiteIsNotOkEvenWhenEveryEntryThatRanPassed(t *testing.T) {
+	orch := newFixture(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	hook := func(_ context.Context, target EntryTarget) EntryEnd {
+		return func(SuiteEntryResult) []string {
+			if target.EntryIndex == 0 {
+				cancel()
+			}
+			return nil
+		}
+	}
+	r := newRetrySuite(orch, hook, nil)
+	entries := []SuiteEntry{{Path: "a.yml", Content: passYaml}, {Path: "b.yml", Content: passYaml}}
+
+	result, err := r.Run(ctx, entries, nil)
+
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want the cancellation", err)
+	}
+	if result.Ok || result.Passed != 1 || result.Total != 1 {
+		t.Errorf("ok=%v passed=%d total=%d, want one passed entry and Ok false", result.Ok, result.Passed, result.Total)
 	}
 }

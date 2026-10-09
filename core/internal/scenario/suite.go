@@ -221,14 +221,18 @@ func NewSuiteRunner(deps SuiteRunnerDeps) *SuiteRunner {
 // Run executes every entry in order. It returns a non-nil error only
 // when ctx is canceled between entries; every other failure is
 // reported through the returned SuiteResult's per-entry "failed"
-// status, never through the error.
+// status, never through the error. A canceled suite still returns the
+// result of the entries that ran, with Ok false, so a host can record
+// them.
 func (r *SuiteRunner) Run(ctx context.Context, entries []SuiteEntry, options *SuiteRunOptions) (SuiteResult, error) {
 	startedAt := r.deps.Clock.NowMs()
 	results := make([]SuiteEntryResult, 0, len(entries))
 
 	for index, entry := range entries {
 		if err := ctx.Err(); err != nil {
-			return SuiteResult{}, err
+			partial := r.summarize(results, options, startedAt)
+			partial.Ok = false
+			return partial, err
 		}
 		// Each entry is an independent test case, unlike a scenario's
 		// own scripts, so it must launch its own app rather than
@@ -237,6 +241,21 @@ func (r *SuiteRunner) Run(ctx context.Context, entries []SuiteEntry, options *Su
 		results = append(results, r.runEntry(ctx, index, entry, options))
 	}
 
+	result := r.summarize(results, options, startedAt)
+	name := "suite"
+	if result.SuiteName != nil {
+		name = *result.SuiteName
+	}
+	r.runLog.Info("suite.run", logging.LogContext{
+		"name":       name,
+		"ok":         result.Ok,
+		"durationMs": result.DurationMs,
+	})
+	return result, nil
+}
+
+// summarize counts the finished entries into a SuiteResult.
+func (r *SuiteRunner) summarize(results []SuiteEntryResult, options *SuiteRunOptions, startedAt int64) SuiteResult {
 	var passed, failed, flaky, quarantinedFailures int
 	for _, e := range results {
 		switch {
@@ -251,36 +270,21 @@ func (r *SuiteRunner) Run(ctx context.Context, entries []SuiteEntry, options *Su
 			flaky++
 		}
 	}
-
 	var suiteName *string
 	if options != nil {
 		suiteName = options.SuiteName
 	}
-	name := "suite"
-	if suiteName != nil {
-		name = *suiteName
-	}
-
-	ok := failed == 0
-	durationMs := r.deps.Clock.NowMs() - startedAt
-
-	r.runLog.Info("suite.run", logging.LogContext{
-		"name":       name,
-		"ok":         ok,
-		"durationMs": durationMs,
-	})
-
 	return SuiteResult{
 		SuiteName:           suiteName,
-		Ok:                  ok,
+		Ok:                  failed == 0,
 		Entries:             results,
 		Total:               len(results),
 		Passed:              passed,
 		Failed:              failed,
 		Flaky:               flaky,
 		QuarantinedFailures: quarantinedFailures,
-		DurationMs:          durationMs,
-	}, nil
+		DurationMs:          r.deps.Clock.NowMs() - startedAt,
+	}
 }
 
 // runEntry runs one entry and, while its attempt failed with a test
