@@ -64,15 +64,14 @@ type rotation struct {
 	cancelWait context.CancelFunc
 	abort      context.CancelFunc
 	done       chan struct{}
-	err        error
 }
 
 // startRotation calls rotate each time wait reports an interval has
-// elapsed, until stop is called or rotate fails. The context handed to
-// rotate derives from parent and is cancelled only when stop gives up
-// waiting for a rotate in flight, so parent must outlive the recording. A
-// failed rotate ends the loop and its error is reported by stop.
-func startRotation(parent context.Context, wait rotationWaiter, rotate func(context.Context) error) *rotation {
+// elapsed, until stop is called. The context handed to rotate derives from
+// parent and is cancelled only when stop gives up waiting for a rotate in
+// flight, so parent must outlive the recording. A failed rotate is passed
+// to onError and the loop carries on, so the next interval retries it.
+func startRotation(parent context.Context, wait rotationWaiter, rotate func(context.Context) error, onError func(error)) *rotation {
 	waitCtx, cancelWait := context.WithCancel(parent)
 	rotateCtx, abort := context.WithCancel(parent)
 	r := &rotation{cancelWait: cancelWait, abort: abort, done: make(chan struct{})}
@@ -80,19 +79,17 @@ func startRotation(parent context.Context, wait rotationWaiter, rotate func(cont
 		defer close(r.done)
 		for wait(waitCtx) {
 			if err := rotate(rotateCtx); err != nil {
-				r.err = err
-				return
+				onError(err)
 			}
 		}
 	}()
 	return r
 }
 
-// stop ends the loop and reports the error that ended it, if any. It
-// lets a rotate in flight finish until ctx ends, then aborts that rotate
-// and waits for it to return, so a caller's time bound holds. It is safe
-// to call more than once.
-func (r *rotation) stop(ctx context.Context) error {
+// stop ends the loop. It lets a rotate in flight finish until ctx ends,
+// then aborts that rotate and waits for it to return, so a caller's time
+// bound holds. It is safe to call more than once.
+func (r *rotation) stop(ctx context.Context) {
 	r.cancelWait()
 	select {
 	case <-r.done:
@@ -101,12 +98,12 @@ func (r *rotation) stop(ctx context.Context) error {
 		<-r.done
 	}
 	r.abort()
-	return r.err
 }
 
 var (
 	errRecordingStopped   = errors.New("the recording has already been stopped")
 	errRecordingDiscarded = errors.New("the recording has been discarded")
+	errNoPlayableSegment  = errors.New("no recorded segment is playable")
 )
 
 type recordingState int

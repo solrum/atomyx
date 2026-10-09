@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/process"
 )
 
@@ -40,7 +41,7 @@ func (r simulatorRecorder) Start(ctx context.Context, desc Descriptor, dir, name
 	if err := rec.startSegment(); err != nil {
 		return nil, err
 	}
-	rec.rotation = startRotation(runCtx, r.wait, rec.rotate)
+	rec.rotation = startRotation(runCtx, r.wait, rec.rotate, rec.logRotationFailure)
 	return rec, nil
 }
 
@@ -50,6 +51,9 @@ type simulatorSegment struct {
 	done    chan struct{}
 	result  process.BackgroundResult
 	stopped bool
+	// err is why the segment did not finish cleanly, or nil when its file
+	// is playable.
+	err error
 }
 
 // simulatorRecording is one running simulator recording.
@@ -120,36 +124,58 @@ func (r *simulatorRecording) stopSegment(ctx context.Context, seg *simulatorSegm
 	}
 }
 
+// stopSegments ends every segment, records on each why it failed if it
+// did, and returns the failures.
 func (r *simulatorRecording) stopSegments(ctx context.Context, kill bool) error {
-	var first error
+	var failures []error
 	for _, seg := range r.segments {
-		if err := r.stopSegment(ctx, seg, kill); err != nil && first == nil {
-			first = err
+		if err := r.stopSegment(ctx, seg, kill); err != nil {
+			seg.err = err
+			failures = append(failures, err)
 		}
 	}
-	return first
+	return errors.Join(failures...)
+}
+
+func (r *simulatorRecording) logRotationFailure(err error) {
+	r.deps.logger().Warn("rotating the screen recording segment failed, retrying at the next interval", logging.LogContext{"error": err.Error()})
+}
+
+// dropSegment forgets seg and removes its file.
+func (r *simulatorRecording) dropSegment(seg *simulatorSegment) {
+	for i, s := range r.segments {
+		if s == seg {
+			r.segments = append(r.segments[:i], r.segments[i+1:]...)
+			break
+		}
+	}
+	_ = os.Remove(seg.file)
 }
 
 // rotate stops the current segment and then starts the next one, because
 // the simulator refuses a second recording while one is running. The seam
-// loses a fraction of a second of video.
+// loses a fraction of a second of video. A current segment that does not
+// finish cleanly is dropped. A failure leaves the segments that finished
+// cleanly in place, and the next rotation starts a new segment again.
 func (r *simulatorRecording) rotate(ctx context.Context) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.state != recordingRunning {
 		return nil
 	}
-	if err := r.stopSegment(ctx, r.segments[len(r.segments)-1], false); err != nil {
-		return err
+	var stopErr error
+	if n := len(r.segments); n > 0 && !r.segments[n-1].stopped {
+		current := r.segments[n-1]
+		if stopErr = r.stopSegment(ctx, current, false); stopErr != nil {
+			r.dropSegment(current)
+		}
 	}
-	if err := r.startSegment(); err != nil {
-		return err
-	}
+	startErr := r.startSegment()
 	for len(r.segments) > recordingKeptSegments {
 		_ = os.Remove(r.segments[0].file)
 		r.segments = r.segments[1:]
 	}
-	return nil
+	return errors.Join(stopErr, startErr)
 }
 
 func (r *simulatorRecording) segmentFiles() []string {
@@ -161,7 +187,7 @@ func (r *simulatorRecording) segmentFiles() []string {
 }
 
 func (r *simulatorRecording) Stop(ctx context.Context) ([]string, error) {
-	rotateErr := r.rotation.stop(ctx)
+	r.rotation.stop(ctx)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	switch r.state {
@@ -172,19 +198,27 @@ func (r *simulatorRecording) Stop(ctx context.Context) ([]string, error) {
 	}
 	r.state = recordingStopped
 	cancelled := ctx.Err() != nil
-	failure := errors.Join(rotateErr, r.stopSegments(ctx, cancelled))
+	stopErr := r.stopSegments(ctx, cancelled)
 	if cancelled {
-		failure = errors.Join(ctx.Err(), failure)
+		removeAll(r.segmentFiles())
+		return nil, errors.Join(ctx.Err(), stopErr)
 	}
-	files := r.segmentFiles()
-	for _, file := range files {
-		if _, err := os.Stat(file); err != nil && failure == nil {
-			failure = fmt.Errorf("the simulator recorder left no file: %w", err)
+	var files []string
+	failures := []error{errNoPlayableSegment}
+	for _, seg := range r.segments {
+		if seg.err != nil {
+			_ = os.Remove(seg.file)
+			failures = append(failures, seg.err)
+			continue
 		}
+		if _, err := os.Stat(seg.file); err != nil {
+			failures = append(failures, fmt.Errorf("the simulator recorder left no file: %w", err))
+			continue
+		}
+		files = append(files, seg.file)
 	}
-	if failure != nil {
-		removeAll(files)
-		return nil, failure
+	if len(files) == 0 {
+		return nil, errors.Join(failures...)
 	}
 	r.files = files
 	return files, nil
@@ -193,7 +227,7 @@ func (r *simulatorRecording) Stop(ctx context.Context) ([]string, error) {
 // Discard ends a running recording by killing it without waiting for the
 // recorder to finalize its file, because every file is deleted anyway.
 func (r *simulatorRecording) Discard(ctx context.Context) error {
-	_ = r.rotation.stop(ctx)
+	r.rotation.stop(ctx)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.state == recordingRunning {

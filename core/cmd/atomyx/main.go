@@ -41,7 +41,7 @@ func main() {
 	)
 	provisioner, keeper := runnerprovision.New(procRunner, background, clock, logger)
 	factory := device.NewDriverFactory(device.DriverFactoryDeps{Runner: procRunner, Background: background, Clock: clock, Logger: logger, Provisioner: provisioner, OwnAndroidForwards: true})
-	recorder := device.NewScreenRecorder(device.RecorderDeps{Runner: procRunner, Background: background})
+	recorder := device.NewScreenRecorder(device.RecorderDeps{Runner: procRunner, Background: background, Logger: logger})
 
 	sessionDeps, err := sessionwire.Deps(procRunner, clock, logger, "", "cli")
 	if err != nil {

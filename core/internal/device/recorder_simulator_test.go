@@ -2,9 +2,14 @@ package device
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
+
+	"dev.atomyx/internal/logging"
+	"dev.atomyx/internal/process"
 )
 
 var simulatorDesc = Descriptor{ID: "UDID-1", Platform: PlatformIOS, Kind: KindSimulator, State: StateOnline}
@@ -180,4 +185,82 @@ func TestScreenRecorder_AndroidUsesAdb(t *testing.T) {
 	defer func() { _ = rec.Discard(context.Background()) }()
 
 	h.indexOf("start adb -s SER1 shell")
+}
+
+func TestSimulatorRecorder_SegmentThatIgnoredTheInterruptIsDroppedAtRotation(t *testing.T) {
+	h := newRecorderHarness(t)
+	rec, dir := startSimulator(t, h, 2)
+	h.procs[0].IgnoreInterrupt()
+	h.rotateOnce()
+
+	files, err := rec.Stop(context.Background())
+
+	want := []string{filepath.Join(dir, ".video-1-001.mp4")}
+	if err != nil || len(files) != 1 || files[0] != want[0] {
+		t.Fatalf("Stop = %v, %v, want %v", files, err, want)
+	}
+	if entries, _ := os.ReadDir(dir); len(entries) != 1 {
+		t.Fatalf("directory holds %d files, want 1: %v", len(entries), entries)
+	}
+}
+
+func TestSimulatorRecorder_StopFailsWhenTheOnlySegmentIgnoredTheInterrupt(t *testing.T) {
+	h := newRecorderHarness(t)
+	rec, dir := startSimulator(t, h, 1)
+	h.procs[0].IgnoreInterrupt()
+
+	files, err := rec.Stop(context.Background())
+
+	if !errors.Is(err, process.ErrInterruptEscalated) || files != nil {
+		t.Fatalf("Stop = %v, %v, want an escalated interrupt error", files, err)
+	}
+	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
+		t.Fatalf("files left behind: %v", entries)
+	}
+}
+
+func TestSimulatorRecorder_FailedRotationKeepsTheSegmentAndRetriesNextInterval(t *testing.T) {
+	h := newRecorderHarness(t)
+	rec, dir := startSimulator(t, h, 1)
+	h.bg.DefaultErr = errPull
+	h.rotateOnce()
+	h.bg.DefaultErr = nil
+	h.stageSimulator(1)
+	h.rotateOnce()
+
+	files, err := rec.Stop(context.Background())
+
+	if err != nil || len(files) != 2 {
+		t.Fatalf("Stop = %v, %v, want both segments", files, err)
+	}
+	if entries, _ := os.ReadDir(dir); len(entries) != 2 {
+		t.Fatalf("directory holds %d files, want 2: %v", len(entries), entries)
+	}
+}
+
+type warnCountingLogger struct {
+	logging.NoopLogger
+	warnings atomic.Int32
+}
+
+func (l *warnCountingLogger) Warn(string, logging.LogContext) { l.warnings.Add(1) }
+
+func TestSimulatorRecorder_LogsAFailedRotation(t *testing.T) {
+	h := newRecorderHarness(t)
+	logger := &warnCountingLogger{}
+	h.stageSimulator(1)
+	deps := h.deps()
+	deps.Logger = logger
+	rec, err := simulatorRecorder{deps: deps, wait: h.wait}.Start(context.Background(), simulatorDesc, t.TempDir(), "video-1")
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	defer func() { _ = rec.Discard(context.Background()) }()
+	h.awaitIdle()
+	h.bg.DefaultErr = errPull
+	h.rotateOnce()
+
+	if logger.warnings.Load() != 1 {
+		t.Fatalf("logged %d warnings, want 1", logger.warnings.Load())
+	}
 }

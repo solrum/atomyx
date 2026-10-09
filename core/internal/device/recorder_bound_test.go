@@ -3,6 +3,7 @@ package device
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -124,18 +125,28 @@ func TestSimulatorRecorder_StopAndDiscardHonourTheDeadlineWhenTheRecorderHangs(t
 
 func TestRotation_StopAbortsARotateInFlightWhenItsDeadlineEnds(t *testing.T) {
 	entered := make(chan struct{})
-	rot := startRotation(context.Background(), func(context.Context) bool { return true }, func(ctx context.Context) error {
+	rot := startRotation(context.Background(), onceWaiter(), func(ctx context.Context) error {
 		close(entered)
 		<-ctx.Done()
 		return ctx.Err()
-	})
+	}, func(error) {})
 	<-entered
 	ctx, cancel := context.WithTimeout(context.Background(), boundTestDeadline)
 	defer cancel()
 
 	withinBound(t, "stop", func() {
-		if err := rot.stop(ctx); err == nil {
-			t.Error("stop reported no error for an aborted rotate")
-		}
+		rot.stop(ctx)
 	})
+}
+
+// onceWaiter reports one due rotation, then waits for its context to end.
+func onceWaiter() rotationWaiter {
+	var fired atomic.Bool
+	return func(ctx context.Context) bool {
+		if fired.CompareAndSwap(false, true) {
+			return true
+		}
+		<-ctx.Done()
+		return false
+	}
 }

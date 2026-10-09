@@ -6,12 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/process"
 )
 
@@ -36,6 +38,8 @@ type adbRecorder struct {
 	wait rotationWaiter
 	// controlTimeout overrides recordingControlTimeout when positive.
 	controlTimeout time.Duration
+	// finalizeTimeout overrides recordingFinalizeTimeout when positive.
+	finalizeTimeout time.Duration
 }
 
 func (r adbRecorder) Start(ctx context.Context, desc Descriptor, dir, name string) (Recording, error) {
@@ -53,6 +57,10 @@ func (r adbRecorder) Start(ctx context.Context, desc Descriptor, dir, name strin
 	if r.controlTimeout > 0 {
 		rec.controlTimeout = r.controlTimeout
 	}
+	rec.finalizeTimeout = recordingFinalizeTimeout
+	if r.finalizeTimeout > 0 {
+		rec.finalizeTimeout = r.finalizeTimeout
+	}
 	prepare := fmt.Sprintf("rm -rf %[1]s && mkdir -p %[1]s", adbRecordingDir)
 	if err := rec.control(ctx, prepare); err != nil {
 		return nil, fmt.Errorf("prepare the device recording directory: %w", err)
@@ -61,7 +69,7 @@ func (r adbRecorder) Start(ctx context.Context, desc Descriptor, dir, name strin
 		_ = rec.clearDevice(runCtx)
 		return nil, err
 	}
-	rec.rotation = startRotation(runCtx, r.wait, rec.rotate)
+	rec.rotation = startRotation(runCtx, r.wait, rec.rotate, rec.logRotationFailure)
 	return rec, nil
 }
 
@@ -72,6 +80,9 @@ type adbSegment struct {
 	proc    process.BackgroundProcess
 	done    chan struct{}
 	stopped bool
+	// err is why the segment did not finish cleanly, or nil when its file
+	// is playable.
+	err error
 }
 
 // adbRecording is one running Android recording.
@@ -86,6 +97,9 @@ type adbRecording struct {
 	rotation *rotation
 	// controlTimeout bounds one short device command.
 	controlTimeout time.Duration
+	// finalizeTimeout bounds how long a stopped segment may take to
+	// finish its file.
+	finalizeTimeout time.Duration
 
 	mu       sync.Mutex
 	state    recordingState
@@ -190,7 +204,7 @@ func (r *adbRecording) stopSegment(ctx context.Context, seg *adbSegment, kill bo
 	if kill {
 		return seg.proc.Kill()
 	}
-	wait, cancel := context.WithTimeout(ctx, recordingFinalizeTimeout)
+	wait, cancel := context.WithTimeout(ctx, r.finalizeTimeout)
 	defer cancel()
 	select {
 	case <-seg.done:
@@ -201,19 +215,39 @@ func (r *adbRecording) stopSegment(ctx context.Context, seg *adbSegment, kill bo
 	}
 }
 
+// stopSegments ends every segment, records on each why it failed if it
+// did, and returns the failures.
 func (r *adbRecording) stopSegments(ctx context.Context, kill bool) error {
-	var first error
+	var failures []error
 	for _, seg := range r.segments {
-		if err := r.stopSegment(ctx, seg, kill); err != nil && first == nil {
-			first = err
+		if err := r.stopSegment(ctx, seg, kill); err != nil {
+			seg.err = err
+			failures = append(failures, err)
 		}
 	}
-	return first
+	return errors.Join(failures...)
+}
+
+func (r *adbRecording) logRotationFailure(err error) {
+	r.deps.logger().Warn("rotating the screen recording segment failed, retrying at the next interval", logging.LogContext{"error": err.Error()})
+}
+
+// dropSegment forgets seg and removes its device file.
+func (r *adbRecording) dropSegment(ctx context.Context, seg *adbSegment) {
+	for i, s := range r.segments {
+		if s == seg {
+			r.segments = append(r.segments[:i], r.segments[i+1:]...)
+			break
+		}
+	}
+	_ = r.control(ctx, "rm -f "+seg.file)
 }
 
 // rotate starts the next segment before it stops the current one, because
-// the device records two at once and no frame is lost at the seam. It then
-// drops segments older than the kept ones.
+// the device records two at once and no frame is lost at the seam. A
+// current segment that does not finish cleanly is dropped, and segments
+// older than the kept ones are dropped as well. A failure leaves the live
+// segment running, so the next rotation can try again.
 func (r *adbRecording) rotate(ctx context.Context) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -225,6 +259,7 @@ func (r *adbRecording) rotate(ctx context.Context) error {
 		return err
 	}
 	if err := r.stopSegment(ctx, current, false); err != nil {
+		r.dropSegment(ctx, current)
 		return err
 	}
 	for len(r.segments) > recordingKeptSegments {
@@ -234,22 +269,34 @@ func (r *adbRecording) rotate(ctx context.Context) error {
 	return nil
 }
 
+// pull copies the segments that finished cleanly to dir. A segment that
+// cannot be pulled is skipped and reported, so one bad file does not take
+// the playable ones with it.
 func (r *adbRecording) pull(ctx context.Context) ([]string, error) {
 	var files []string
+	var failures []error
 	for _, seg := range r.segments {
+		if seg.err != nil {
+			failures = append(failures, seg.err)
+			continue
+		}
 		local := filepath.Join(r.dir, segmentTempName(r.name, seg.index))
 		res, err := r.deps.Runner.Run(ctx, "adb", r.adb("pull", seg.file, local)...)
 		if err != nil {
-			removeAll(append(files, local))
-			return nil, fmt.Errorf("pull a recorded segment: %w: %s", err, strings.TrimSpace(res.Stderr))
+			_ = os.Remove(local)
+			failures = append(failures, fmt.Errorf("pull a recorded segment: %w: %s", err, strings.TrimSpace(res.Stderr)))
+			continue
 		}
 		files = append(files, local)
+	}
+	if len(files) == 0 {
+		return nil, errors.Join(append([]error{errNoPlayableSegment}, failures...)...)
 	}
 	return files, nil
 }
 
 func (r *adbRecording) Stop(ctx context.Context) ([]string, error) {
-	rotateErr := r.rotation.stop(ctx)
+	r.rotation.stop(ctx)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	switch r.state {
@@ -267,13 +314,9 @@ func (r *adbRecording) Stop(ctx context.Context) ([]string, error) {
 		stopCtx = cleanup
 	}
 	stopErr := r.stopSegments(stopCtx, cancelled)
-	failure := errors.Join(rotateErr, stopErr)
 	if cancelled {
-		failure = errors.Join(ctx.Err(), failure)
-	}
-	if failure != nil {
 		_ = r.clearDevice(cleanup)
-		return nil, failure
+		return nil, errors.Join(ctx.Err(), stopErr)
 	}
 	files, err := r.pull(ctx)
 	_ = r.clearDevice(cleanup)
@@ -287,7 +330,7 @@ func (r *adbRecording) Stop(ctx context.Context) ([]string, error) {
 // Discard ends a running recording by killing it without waiting for the
 // recorder to finalize its file, because every file is deleted anyway.
 func (r *adbRecording) Discard(ctx context.Context) error {
-	_ = r.rotation.stop(ctx)
+	r.rotation.stop(ctx)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	cleanup, release := cleanupContext(ctx)

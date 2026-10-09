@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"dev.atomyx/internal/diag"
+	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/process"
 )
 
@@ -19,6 +20,8 @@ import (
 // The recorder owns segmenting. A long recording is split into segments
 // and only the most recent ones are kept, so the caller never sees a
 // segment boundary and disk use stays bounded however long the run lasts.
+// A segment that did not finish cleanly, or that failed to rotate in,
+// is dropped and never returned, so every returned file plays.
 type ScreenRecorder interface {
 	Start(ctx context.Context, desc Descriptor, dir, name string) (Recording, error)
 }
@@ -27,7 +30,7 @@ type ScreenRecorder interface {
 //
 // Stop ends the recording and returns the paths of the kept segment
 // files in dir, oldest first, and cleans everything the recording left on
-// the device. A cancelled ctx still ends the recording and cleans the
+// the device. It fails only when no playable segment remains. A cancelled ctx still ends the recording and cleans the
 // device, but it then fails and returns no files. Discard ends the
 // recording if it is still running and removes every file it produced, on
 // the device and in dir, including files an earlier Stop returned, so a
@@ -44,6 +47,17 @@ type RecorderDeps struct {
 	Runner process.Runner
 	// Background starts the long-running recorder processes.
 	Background process.BackgroundRunner
+	// Logger receives recording problems that do not end the recording,
+	// such as a segment rotation that failed and will be retried. Nil
+	// discards them.
+	Logger logging.Logger
+}
+
+func (d RecorderDeps) logger() logging.Logger {
+	if d.Logger == nil {
+		return logging.NoopLogger{}
+	}
+	return d.Logger
 }
 
 // NewScreenRecorder returns the ScreenRecorder that picks an

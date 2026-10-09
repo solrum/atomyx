@@ -209,16 +209,59 @@ func TestAndroidRecorder_StartFailsWhenTheSegmentReportsNoPid(t *testing.T) {
 	h.indexOf("shell rm -rf " + adbRecordingDir)
 }
 
-func TestAndroidRecorder_RotationFailureSurfacesAtStop(t *testing.T) {
+func TestAndroidRecorder_FailedRotationKeepsTheLiveSegmentAndRetriesNextInterval(t *testing.T) {
 	h := newRecorderHarness(t)
 	rec, dir := startAndroid(t, h, 111)
 	h.bg.DefaultErr = errPull
-	h.tick <- struct{}{}
+	h.rotateOnce()
+	h.bg.DefaultErr = nil
+	h.stageAndroid(222)
+	h.rotateOnce()
 
 	files, err := rec.Stop(context.Background())
 
+	if err != nil || len(files) != 2 {
+		t.Fatalf("Stop = %v, %v, want both segments", files, err)
+	}
+	h.indexOf("start", "segment-001.mp4")
+	if entries, _ := os.ReadDir(dir); len(entries) != 2 {
+		t.Fatalf("directory holds %d files, want 2: %v", len(entries), entries)
+	}
+}
+
+func TestAndroidRecorder_SegmentThatNeverFinalizesIsDroppedAndTheRestIsKept(t *testing.T) {
+	h := newRecorderHarness(t)
+	h.stageAndroid(111, 222)
+	rec, err := adbRecorder{deps: h.deps(), wait: h.wait, finalizeTimeout: boundTestDeadline}.Start(context.Background(), androidDesc, t.TempDir(), "video-1")
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	h.awaitIdle()
+	h.noFinalize.Store(true)
+	h.rotateOnce()
+	h.noFinalize.Store(false)
+
+	files, err := rec.Stop(context.Background())
+
+	if err != nil || len(files) != 1 {
+		t.Fatalf("Stop = %v, %v, want the second segment only", files, err)
+	}
+	if h.count("pull", "segment-000.mp4") != 0 {
+		t.Fatal("the unfinished segment was pulled")
+	}
+}
+
+func TestAndroidRecorder_StopFailsWhenNoSegmentFinalized(t *testing.T) {
+	h := newRecorderHarness(t)
+	rec, dir := startAndroid(t, h, 111)
+	h.noFinalize.Store(true)
+	ctx, cancel := context.WithTimeout(context.Background(), boundTestDeadline)
+	defer cancel()
+
+	files, err := rec.Stop(ctx)
+
 	if err == nil || files != nil {
-		t.Fatalf("Stop = %v, %v, want the rotation error", files, err)
+		t.Fatalf("Stop = %v, %v, want an error", files, err)
 	}
 	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
 		t.Fatalf("local files left behind: %v", entries)
