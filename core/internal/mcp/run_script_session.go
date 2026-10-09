@@ -58,14 +58,15 @@ type scriptTarget struct {
 func (s *runSession) RunScript(
 	ctx context.Context, name string, dev *device.Descriptor,
 	exec func(scriptTarget) (runner.ScriptResult, error),
-) (runner.ScriptResult, error) {
+) (scriptRun, error) {
 	s.mu.Lock()
 	if open := s.writer; open != nil {
 		counter := s.artifacts
 		runCtx, end := s.flight.begin(ctx)
 		s.mu.Unlock()
 		defer end()
-		return s.runInOpenRun(runCtx, open, counter, exec)
+		result, err := s.runInOpenRun(runCtx, open, counter, exec)
+		return scriptRun{ScriptResult: result}, err
 	}
 	runCtx, end := s.bare.begin(ctx)
 	s.mu.Unlock()
@@ -92,34 +93,38 @@ func (s *runSession) runInOpenRun(
 func (s *runSession) runAsOwnRun(
 	ctx context.Context, name string, dev *device.Descriptor,
 	exec func(scriptTarget) (runner.ScriptResult, error),
-) (runner.ScriptResult, error) {
+) (scriptRun, error) {
 	meta := mcpRunMeta(name, nil, dev)
 	meta.ScriptName = name
 	meta.MCP.Source = scriptRunSource
 	w, err := s.starter.Start(name, meta)
 	if err != nil {
-		return runner.ScriptResult{}, err
+		return scriptRun{}, err
 	}
 	defer func() { _ = w.Close() }()
 	dir, err := w.ArtifactsDir()
 	if err != nil {
-		return runner.ScriptResult{}, err
+		return scriptRun{}, err
 	}
 	artifacts := newScriptArtifacts(dir, &artifactCounter{}, s.logger)
 	s.route(w, false)
+	capture := s.beginScriptRecording(ctx, dev, w)
 	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: w.ID(), Artifacts: artifacts, Evidence: artifacts, OnStep: stepstream.NewSink(w, s.logger, stepstream.WithPublisher(s.publishStep))})
 	s.unroute(w)
-	finalizeErr := w.Finalize(scriptOutcome(ctx, result, execErr), func(m *runfolder.Meta) {
+	outcome := scriptOutcome(ctx, result, execErr)
+	kept := finishScriptRecording(capture, outcome) //nolint:contextcheck // cleanup runs under its own bounded context so a canceled call still stops the device recording
+	finalizeErr := w.Finalize(outcome, func(m *runfolder.Meta) {
 		m.TotalSteps = result.TotalSteps
 		m.FailedAtStep = result.FailedAtStep
 		info := *m.MCP
 		info.DurationMs = result.DurationMs
 		m.MCP = &info
+		m.Recording = kept
 	})
 	if finalizeErr != nil {
 		s.logger.Warn("run.finalize_failed", logging.LogContext{"id": w.ID(), "error": finalizeErr.Error()})
 	}
-	return result, execErr
+	return scriptRun{ScriptResult: result, Recording: kept, ArtifactsDir: dir}, execErr
 }
 
 func scriptOutcome(ctx context.Context, result runner.ScriptResult, execErr error) runfolder.Outcome {

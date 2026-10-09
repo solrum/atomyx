@@ -75,6 +75,12 @@ type scriptResultWire struct {
 	// HumanActionsOmittedCount is how many steps people ran after the
 	// list reached its cap. Omitted when none were left out.
 	HumanActionsOmittedCount int `json:"humanActionsOmittedCount,omitempty"`
+	// Recording is present only when the call was its own run and screen
+	// recording was on. State is kept, unsupported, or error. Files are the
+	// absolute paths of the kept video files, oldest first, and are present
+	// only when State is kept. A passed or interrupted run keeps no video
+	// and omits the field.
+	Recording *recordingWire `json:"recording,omitempty"`
 }
 
 // abortWire is the run_script result's shape for runner.RunAbort.
@@ -164,7 +170,7 @@ func registerRunScriptTool(server *mcp.Server, tc *ToolContext) {
 		}
 
 		var actions humanActionLog
-		result, err := tc.RunSession.RunScript(ctx, def.Name, tc.Session.SelectedDescriptor(),
+		run, err := tc.RunSession.RunScript(ctx, def.Name, tc.Session.SelectedDescriptor(),
 			func(target scriptTarget) (runner.ScriptResult, error) {
 				var gate runner.StepGate
 				dbg, endDebug := tc.Session.beginScriptDebug(target.Ctx, orch, def, target.Artifacts)
@@ -195,7 +201,8 @@ func registerRunScriptTool(server *mcp.Server, tc *ToolContext) {
 		if err != nil {
 			return errorResult(err), nil
 		}
-		wire := toScriptResultWire(result)
+		wire := toScriptResultWire(run.ScriptResult)
+		wire.Recording = toRecordingWire(run.Recording, run.ArtifactsDir)
 		wire.HumanActions, wire.HumanActionsOmittedCount = actions.Entries, actions.Omitted
 		return jsonToolResult(wire)
 	})

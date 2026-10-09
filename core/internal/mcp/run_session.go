@@ -11,6 +11,7 @@ import (
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
+	"dev.atomyx/internal/recording"
 	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/runner"
 	"dev.atomyx/internal/session"
@@ -82,6 +83,9 @@ type runSession struct {
 	bare                    *scriptFlight
 	publishStep             func(runfolder.StepLine)
 	setInterventionRecorder func(session.InterventionRecorder)
+	// recordings records the screen of a script that is its own run. Nil
+	// means recording is off.
+	recordings *recording.Lifecycle
 
 	routeMu sync.Mutex
 	routed  *runfolder.Writer
@@ -105,13 +109,17 @@ type runSessionDeps struct {
 	// should keep interventions, and nil when that run ends. Nil routes
 	// nothing.
 	SetInterventionRecorder func(session.InterventionRecorder)
+	// Recordings, when non-nil, records the screen of every script that is
+	// its own run and keeps the video of the ones that fail. Nil records
+	// nothing.
+	Recordings *recording.Lifecycle
 }
 
 func newRunSession(deps runSessionDeps) *runSession {
 	return &runSession{
 		store: deps.Store, catalog: deps.Catalog, starter: deps.Starter,
 		clock: deps.Clock, logger: deps.Logger, artifacts: &artifactCounter{},
-		drainTimeout: runDrainTimeout, bare: newScriptFlight(), flight: newScriptFlight(), publishStep: deps.PublishStep, setInterventionRecorder: deps.SetInterventionRecorder,
+		drainTimeout: runDrainTimeout, bare: newScriptFlight(), flight: newScriptFlight(), publishStep: deps.PublishStep, setInterventionRecorder: deps.SetInterventionRecorder, recordings: deps.Recordings,
 	}
 }
 

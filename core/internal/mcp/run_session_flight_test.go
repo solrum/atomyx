@@ -67,7 +67,7 @@ func runScript(t *testing.T, session *runSession, name string, p *scriptProbe, w
 	out := make(chan scriptOutput, 1)
 	go func() {
 		result, err := session.RunScript(context.Background(), name, nil, p.exec(watchCancel))
-		out <- scriptOutput{result, err}
+		out <- scriptOutput{result.ScriptResult, err}
 	}()
 	<-p.started
 	return out

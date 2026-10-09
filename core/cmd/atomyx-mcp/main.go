@@ -155,18 +155,21 @@ func run(opts options) int {
 	}
 	sessionDeps.Preparer = provisioner
 
+	projectConfig := sessionwire.LoadConfigBestEffort(logger)
+
 	server, err := mcp.NewServer(mcp.Info{Name: serverName, Version: serverVersion}, mcp.ServerDeps{
-		Probe:      probe,
-		Runners:    device.PingRunnerIdentifier{},
-		Factory:    factory,
-		Storage:    store,
-		RunStarter: runStarter,
-		Clock:      clock,
-		Logger:     logger,
-		Session:    sessionDeps,
-		Pinned:     opts.pinned,
-		Recorder:   recorder,
-		Timeouts:   sessionwire.ResolveTimeouts(sessionwire.LoadConfigBestEffort(logger), os.Getenv, logger),
+		Probe:          probe,
+		Runners:        device.PingRunnerIdentifier{},
+		Factory:        factory,
+		Storage:        store,
+		RunStarter:     runStarter,
+		Clock:          clock,
+		Logger:         logger,
+		Session:        sessionDeps,
+		Pinned:         opts.pinned,
+		Recorder:       recorder,
+		VideoOnFailure: projectConfig.VideoOnFailure(),
+		Timeouts:       sessionwire.ResolveTimeouts(projectConfig, os.Getenv, logger),
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "atomyx-mcp: %v\n", err)

@@ -8,6 +8,7 @@ import (
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
+	"dev.atomyx/internal/recording"
 	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/session"
 	"dev.atomyx/internal/storage"
@@ -62,6 +63,10 @@ type ServerDeps struct {
 	// Recorder records the device screen of a run. A nil value means no
 	// recording is ever started.
 	Recorder device.ScreenRecorder
+	// VideoOnFailure turns on the screen recording of every run_script call
+	// that is its own run, keeping the video of the ones that fail. It has
+	// no effect without a Recorder.
+	VideoOnFailure bool
 }
 
 // NewServer constructs the Atomyx MCP server and registers its tool
@@ -100,11 +105,16 @@ func NewServer(info Info, deps ServerDeps) (*Server, error) {
 	}
 	runs := storage.NewRunCatalog(deps.Storage, runRoot, liveness)
 
+	var recordings *recording.Lifecycle
+	if deps.VideoOnFailure && deps.Recorder != nil {
+		recordings = recording.NewLifecycle(deps.Recorder, logger)
+	}
 	var devices *DeviceSession
 	runSession := newRunSession(runSessionDeps{
 		Store: runStore, Catalog: runs, Starter: deps.RunStarter, Clock: clk, Logger: logger,
 		PublishStep:             func(line runfolder.StepLine) { devices.PublishStep(line) },
 		SetInterventionRecorder: func(r session.InterventionRecorder) { devices.SetInterventionRecorder(r) },
+		Recordings:              recordings,
 	})
 	devices = NewDeviceSession(DeviceSessionDeps{
 		Factory: deps.Factory, Probe: deps.Probe, Runners: deps.Runners, Clock: clk, TimerClock: timers, Logger: logger,

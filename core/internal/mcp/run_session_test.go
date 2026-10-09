@@ -21,18 +21,29 @@ type runServer struct {
 
 func newRunServer(t *testing.T) runServer {
 	t.Helper()
+	return newRunServerWith(t, nil)
+}
+
+// newRunServerWith builds a run server whose ServerDeps the caller may
+// adjust before the server starts.
+func newRunServerWith(t *testing.T, adjust func(*ServerDeps)) runServer {
+	t.Helper()
 	root := t.TempDir()
 	store := storage.NewInMemoryStorage()
 	runStore := storage.NewRunStore()
 	drv := mockdriver.New()
 	drv.StageHierarchy(sampleTree())
-	cs, ctx := testServer(t, ServerDeps{
+	deps := ServerDeps{
 		Probe:      device.NewStaticProbe(),
 		Factory:    singleMockDriverFactory{driver: drv},
 		Storage:    store,
 		RunStore:   runStore,
 		RunStarter: testRunStarter(root),
-	})
+	}
+	if adjust != nil {
+		adjust(&deps)
+	}
+	cs, ctx := testServer(t, deps)
 	return runServer{root: root, store: store, cs: cs, call: func(name string, args map[string]any) map[string]any {
 		_, decoded := callTool(t, cs, ctx, name, args)
 		return decoded
