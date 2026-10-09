@@ -427,18 +427,8 @@ func TestResubscribingMarksTheEndOfTheReplacedSubscriptionsNotices(t *testing.T)
 	srv := observeServer(t, h, ServerConfig{})
 	c := dialClient(t, srv, ClientConfig{})
 	ctx := context.Background()
-	if err := c.Call(ctx, TypeSubscribe, Subscribe{}, nil); err != nil {
-		t.Fatal(err)
-	}
-	first := h.nextSubscription(t)
-	first.notices <- Notice{Type: NoticeTree, Data: TreeNotice{Revision: 1}}
-	if err := c.Call(ctx, TypeSubscribe, Subscribe{RunID: "run-7", SinceSeq: 3}, nil); err != nil {
-		t.Fatal(err)
-	}
-	second := h.nextSubscription(t)
-	second.notices <- Notice{Type: NoticeScreenshot, Data: ScreenshotNotice{Revision: 2}}
-
-	for _, want := range []string{NoticeSubscribed, NoticeTree, NoticeSubscribed, NoticeScreenshot} {
+	expect := func(want string) {
+		t.Helper()
 		select {
 		case n := <-c.Notices():
 			if n.Type != want {
@@ -448,6 +438,23 @@ func TestResubscribingMarksTheEndOfTheReplacedSubscriptionsNotices(t *testing.T)
 			t.Fatalf("notice %s never arrived", want)
 		}
 	}
+	if err := c.Call(ctx, TypeSubscribe, Subscribe{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	first := h.nextSubscription(t)
+	first.notices <- Notice{Type: NoticeTree, Data: TreeNotice{Revision: 1}}
+	// A notice still queued when the next subscribe ends the stream is
+	// discarded, so the first notice is read before resubscribing.
+	expect(NoticeSubscribed)
+	expect(NoticeTree)
+
+	if err := c.Call(ctx, TypeSubscribe, Subscribe{RunID: "run-7", SinceSeq: 3}, nil); err != nil {
+		t.Fatal(err)
+	}
+	second := h.nextSubscription(t)
+	second.notices <- Notice{Type: NoticeScreenshot, Data: ScreenshotNotice{Revision: 2}}
+	expect(NoticeSubscribed)
+	expect(NoticeScreenshot)
 }
 
 func TestInboxKeepsOnlyTheNewestStateNotice(t *testing.T) {
