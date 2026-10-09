@@ -67,3 +67,14 @@ func TestSuiteHelpDocumentsRetries(t *testing.T) {
 		t.Error("the suite help does not document --retries")
 	}
 }
+
+// TestPrintCommandHelpSuiteDocumentsJUnitReports guards against the suite
+// command accepting the junit report format while its help omits it.
+func TestPrintCommandHelpSuiteDocumentsJUnitReports(t *testing.T) {
+	var buf bytes.Buffer
+	PrintCommandHelp(CommandSuite, &buf)
+
+	if text := buf.String(); !strings.Contains(text, "junit") {
+		t.Errorf("suite help: got %q, want it to document the junit report format", text)
+	}
+}

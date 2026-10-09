@@ -201,8 +201,8 @@ func validateReportFormats(obj map[string]any, path []any, c *issueCollector) []
 	formats := make([]string, len(list))
 	for i, item := range list {
 		s, isStr := item.(string)
-		if !isStr || (s != ReportFormatHTML && s != ReportFormatJSON) {
-			c.add(withSegment(fieldPath, i), "expected 'html' or 'json'")
+		if !isStr || (s != ReportFormatHTML && s != ReportFormatJSON && s != ReportFormatJUnit) {
+			c.add(withSegment(fieldPath, i), "expected 'html', 'json', or 'junit'")
 			failed = true
 			continue
 		}

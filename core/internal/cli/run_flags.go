@@ -291,7 +291,7 @@ func resolveReportOptions(flags map[string]FlagValue, configReport *config.Repor
 
 // parseReportFormats parses the raw --report flag value (e.g.
 // "html,json") into a deduped, first-seen-order list of report
-// formats, rejecting anything other than "html" or "json". value is
+// formats, rejecting anything other than "html", "json", or "junit". value is
 // untyped because a flag map entry can hold any FlagValue; only the
 // string case is a valid --report value.
 func parseReportFormats(value FlagValue) ([]string, error) {
@@ -310,14 +310,14 @@ func parseReportFormats(value FlagValue) ([]string, error) {
 		trimmed = append(trimmed, p)
 	}
 	if len(trimmed) == 0 {
-		return nil, fmt.Errorf("--report requires at least one format: html or json")
+		return nil, fmt.Errorf("--report requires at least one format: html, json, or junit")
 	}
 
 	seen := make(map[string]bool, len(trimmed))
 	formats := make([]string, 0, len(trimmed))
 	for _, part := range trimmed {
-		if part != report.FormatHTML && part != report.FormatJSON {
-			return nil, fmt.Errorf("--report format %q is not recognized: use html, json, or both, separated by a comma", part)
+		if part != report.FormatHTML && part != report.FormatJSON && part != report.FormatJUnit {
+			return nil, fmt.Errorf("--report format %q is not recognized: use html, json, junit, or a comma-separated combination", part)
 		}
 		if !seen[part] {
 			seen[part] = true

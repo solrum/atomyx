@@ -176,7 +176,8 @@
           "items": {
             "enum": [
               "html",
-              "json"
+              "json",
+              "junit"
             ],
             "type": "string"
           },

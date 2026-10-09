@@ -1,0 +1,6 @@
+{
+  "name": "valid-report-junit",
+  "description": "A report may list the junit format next to html and json.",
+  "yaml": "project: Demo\napps:\n  - id: main\n    platform: android\n    appId: com.example.app\nenvironments:\n  staging:\n    app: main\nreport:\n  formats: [html, json, junit]\n  outDir: reports\n",
+  "envName": "staging"
+}

@@ -1,0 +1,15 @@
+{
+  "config": null,
+  "envRefError": null,
+  "found": true,
+  "issuePaths": [
+    [
+      "report",
+      "formats",
+      0
+    ]
+  ],
+  "resolved": null,
+  "schemaValid": false,
+  "selectError": null
+}

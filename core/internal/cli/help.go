@@ -92,8 +92,8 @@ FLAGS
                            for every entry in this suite.
   --skip-preconditions     Shorthand for --preconditions skip.
   --report <formats>       Write a report bundle in the given
-                           comma-separated formats: html, json, or
-                           both.
+                           comma-separated formats: html, json,
+                           junit, or any combination.
   --report-dir <path>      Run root. The run folder is written under
                            <path>/runs/v1/<id>/, and alone this flag
                            implies an html report. Defaults to the

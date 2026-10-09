@@ -422,6 +422,17 @@ func TestParseReportFormatsDedupesPreservingFirstSeenOrder(t *testing.T) {
 	}
 }
 
+func TestParseReportFormatsAcceptsJUnit(t *testing.T) {
+	got, err := parseReportFormats("junit,html")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []string{"junit", "html"}
+	if len(got) != 2 || got[0] != want[0] || got[1] != want[1] {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
 func TestParseReportFormatsErrors(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -429,8 +440,8 @@ func TestParseReportFormatsErrors(t *testing.T) {
 		wantErr string
 	}{
 		{"not a string", true, `--report expects a comma-separated list of formats, got "true"`},
-		{"empty after trim", "  , ,", "--report requires at least one format: html or json"},
-		{"unrecognized format", "html,xml", `--report format "xml" is not recognized: use html, json, or both, separated by a comma`},
+		{"empty after trim", "  , ,", "--report requires at least one format: html, json, or junit"},
+		{"unrecognized format", "html,xml", `--report format "xml" is not recognized: use html, json, junit, or a comma-separated combination`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

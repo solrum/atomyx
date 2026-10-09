@@ -84,7 +84,7 @@ func reportSchema() map[string]any {
 	return objectSchema(
 		map[string]any{
 			"formats": arraySchema(
-				stringEnum([]string{ReportFormatHTML, ReportFormatJSON}, ""), 1,
+				stringEnum([]string{ReportFormatHTML, ReportFormatJSON, ReportFormatJUnit}, ""), 1,
 				"Output formats to produce for a run report.",
 			),
 			"outDir": stringMinLen(1, "Directory to write reports into."),
