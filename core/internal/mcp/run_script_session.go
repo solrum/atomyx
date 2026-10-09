@@ -112,7 +112,7 @@ func (s *runSession) runAsOwnRun(
 	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: w.ID(), Artifacts: artifacts, Evidence: artifacts, OnStep: stepstream.NewSink(w, s.logger, stepstream.WithPublisher(s.publishStep))})
 	s.unroute(w)
 	outcome := scriptOutcome(ctx, result, execErr)
-	kept := finishScriptRecording(capture, outcome) //nolint:contextcheck // cleanup runs under its own bounded context so a canceled call still stops the device recording
+	kept := finishScriptRecording(ctx, capture, outcome, result)
 	finalizeErr := w.Finalize(outcome, func(m *runfolder.Meta) {
 		m.TotalSteps = result.TotalSteps
 		m.FailedAtStep = result.FailedAtStep

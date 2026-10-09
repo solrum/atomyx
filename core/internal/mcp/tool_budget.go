@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -150,6 +151,15 @@ func (b *budgetContext) pause(keepRemaining bool) (resume func()) {
 		b.paused = false
 		b.armLocked(restartForMs)
 	}
+}
+
+// toolBudgetExpired reports whether the time budget of the tool call ctx
+// belongs to elapsed. A call that ended because its caller canceled it,
+// the session closed, or the device was lost reports false, and so does a
+// ctx outside any tool call.
+func toolBudgetExpired(ctx context.Context) bool {
+	b, ok := ctx.Value(budgetContextKey{}).(*budgetContext)
+	return ok && errors.Is(b.Err(), context.DeadlineExceeded)
 }
 
 // pauseToolBudget pauses the time budget of the tool call ctx belongs

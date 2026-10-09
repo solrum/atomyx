@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
@@ -183,5 +184,88 @@ func TestOwnRunCanceledByTheCallDiscardsUnderAnUncanceledBoundedContext(t *testi
 	}
 	if rec.discardCtxErr != nil || !rec.discardHadDead {
 		t.Errorf("cleanup context err=%v bounded=%v, want live and bounded", rec.discardCtxErr, rec.discardHadDead)
+	}
+}
+
+func budgetRecordingSession(rec *fakeScreenRecorder, root string) *runSession {
+	return newRunSession(runSessionDeps{
+		Store:      storage.NewRunStore(),
+		Catalog:    testRunCatalog(storage.NewInMemoryStorage(), root),
+		Starter:    testRunStarter(root),
+		Clock:      orchestra.NewFakeClock(0),
+		Logger:     logging.NoopLogger{},
+		Recordings: recording.NewLifecycle(rec, logging.NoopLogger{}, recording.WithStopBound(time.Minute)),
+	})
+}
+
+func TestOwnRunCanceledByTheToolBudgetKeepsTheVideoAndTheCancelledOutcome(t *testing.T) {
+	rec := &fakeScreenRecorder{segments: []string{".tmp-a.mp4"}}
+	root := t.TempDir()
+	clk := clock.NewManualClock(0)
+	budget, stop := newBudgetContext(context.Background(), clk, 30_000)
+	defer stop()
+	clk.AwaitSleepers(1)
+
+	run, err := budgetRecordingSession(rec, root).RunScript(budget, "hang", &device.Descriptor{ID: "emulator-5554"}, func(target scriptTarget) (runner.ScriptResult, error) {
+		clk.Advance(30_000)
+		<-target.Ctx.Done()
+		return runner.ScriptResult{}, nil
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.Recording == nil || run.Recording.State != runfolder.RecordingKept || rec.stops != 1 || rec.discards != 0 {
+		t.Errorf("recording=%+v stops=%d discards=%d, want kept, 1, 0", run.Recording, rec.stops, rec.discards)
+	}
+	metas, _, readErr := runfolder.NewReader(root).List()
+	if readErr != nil || len(metas) != 1 {
+		t.Fatalf("run folders = %d (%v)", len(metas), readErr)
+	}
+	if metas[0].Outcome != runfolder.OutcomeCancelled || metas[0].Result != runfolder.ResultCancelled {
+		t.Errorf("meta = %s/%s, want cancelled", metas[0].Result, metas[0].Outcome)
+	}
+}
+
+func TestOwnRunCanceledByTheCallerWithinABudgetDiscardsTheVideo(t *testing.T) {
+	rec := &fakeScreenRecorder{segments: []string{".tmp-a.mp4"}}
+	clk := clock.NewManualClock(0)
+	caller, cancelCaller := context.WithCancel(context.Background())
+	budget, stop := newBudgetContext(caller, clk, 30_000)
+	defer stop()
+	clk.AwaitSleepers(1)
+
+	run, err := budgetRecordingSession(rec, t.TempDir()).RunScript(budget, "slow", &device.Descriptor{ID: "emulator-5554"}, func(target scriptTarget) (runner.ScriptResult, error) {
+		cancelCaller()
+		<-target.Ctx.Done()
+		return runner.ScriptResult{}, nil
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.Recording != nil || rec.stops != 0 || rec.discards != 1 {
+		t.Errorf("recording=%+v stops=%d discards=%d, want none, 0, 1", run.Recording, rec.stops, rec.discards)
+	}
+}
+
+func TestOwnRunThatLostItsDeviceWhenTheBudgetElapsedDiscardsTheVideo(t *testing.T) {
+	rec := &fakeScreenRecorder{segments: []string{".tmp-a.mp4"}}
+	clk := clock.NewManualClock(0)
+	budget, stop := newBudgetContext(context.Background(), clk, 30_000)
+	defer stop()
+	clk.AwaitSleepers(1)
+
+	run, err := budgetRecordingSession(rec, t.TempDir()).RunScript(budget, "lost", &device.Descriptor{ID: "emulator-5554"}, func(target scriptTarget) (runner.ScriptResult, error) {
+		clk.Advance(30_000)
+		<-target.Ctx.Done()
+		return runner.ScriptResult{Abort: &runner.RunAbort{Reason: runner.RunAbortDeviceLost}}, nil
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.Recording != nil || rec.stops != 0 || rec.discards != 1 {
+		t.Errorf("recording=%+v stops=%d discards=%d, want none, 0, 1", run.Recording, rec.stops, rec.discards)
 	}
 }

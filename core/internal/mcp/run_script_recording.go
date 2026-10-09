@@ -37,16 +37,27 @@ func (s *runSession) beginScriptRecording(ctx context.Context, dev *device.Descr
 }
 
 // finishScriptRecording ends capture for a run that ended with outcome. A
-// failed run keeps its video. A passed, cancelled, or device-lost run
-// discards it. Cleanup runs under its own bounded context, so a call
-// whose context the tool budget already canceled still stops the device
-// recording.
-func finishScriptRecording(capture *recording.Capture, outcome runfolder.Outcome) *runfolder.Recording {
+// failed run keeps its video. A passed, device-lost, or cancelled run
+// discards it, except that a run cancelled because the tool call's time
+// budget elapsed keeps it, since a hang is when a video helps most. A run
+// the caller canceled, the session closed, or the device lost never
+// keeps one. Cleanup runs under its own bounded context, so a call whose
+// context was already canceled still stops the device recording.
+func finishScriptRecording(ctx context.Context, capture *recording.Capture, outcome runfolder.Outcome, result runner.ScriptResult) *runfolder.Recording {
 	if capture == nil {
 		return nil
 	}
-	result, _ := runfolder.ResultOf(outcome)
-	return capture.Finish(result)
+	res, _ := runfolder.ResultOf(outcome)
+	if outcome == runfolder.OutcomeCancelled && toolBudgetExpired(ctx) && !scriptLostDevice(result) {
+		res = runfolder.ResultFailed
+	}
+	return capture.Finish(res) //nolint:contextcheck // cleanup runs under its own bounded context so a canceled call still stops the device recording
+}
+
+// scriptLostDevice reports whether the script aborted because the device
+// was lost, which leaves nothing to pull a video from.
+func scriptLostDevice(result runner.ScriptResult) bool {
+	return result.Abort != nil && result.Abort.Reason == runner.RunAbortDeviceLost
 }
 
 // recordingWire is the run_script result's shape for a screen recording.
