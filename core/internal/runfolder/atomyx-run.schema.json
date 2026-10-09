@@ -180,6 +180,35 @@
       ],
       "type": "object"
     },
+    "Recording": {
+      "additionalProperties": true,
+      "properties": {
+        "code": {
+          "description": "Stable error code. Present when state is unsupported or error.",
+          "type": "string"
+        },
+        "files": {
+          "description": "Video file names relative to the artifacts directory, oldest first. Present when state is kept.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "state": {
+          "description": "How the screen recording ended.",
+          "enum": [
+            "kept",
+            "unsupported",
+            "error"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "state"
+      ],
+      "type": "object"
+    },
     "RunMeta": {
       "additionalProperties": true,
       "properties": {
@@ -233,6 +262,9 @@
             "interrupted"
           ],
           "type": "string"
+        },
+        "recording": {
+          "$ref": "#/definitions/Recording"
         },
         "result": {
           "description": "Coarse verdict.",

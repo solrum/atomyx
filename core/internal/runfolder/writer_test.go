@@ -397,3 +397,85 @@ func TestLockLivenessSeesAWriterOfTheSameProcess(t *testing.T) {
 		t.Fatal("closed writer still reported live")
 	}
 }
+
+func writeTemp(t *testing.T, dir, name string) string {
+	t.Helper()
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, []byte(name), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestAdoptArtifactMovesATemporaryFileToItsFinalName(t *testing.T) {
+	w := startOne(t, t.TempDir())
+	dir, err := w.ArtifactsDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmp := writeTemp(t, dir, ".video-a-1.mp4")
+
+	final, err := w.AdoptArtifact(tmp, "video-a-1.mp4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if final != filepath.Join(dir, "video-a-1.mp4") {
+		t.Fatalf("final = %q", final)
+	}
+	if got, err := os.ReadFile(final); err != nil || string(got) != ".video-a-1.mp4" {
+		t.Fatalf("final content = %q, %v", got, err)
+	}
+	if _, err := os.Stat(tmp); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("temporary file still present: %v", err)
+	}
+}
+
+func TestAdoptArtifactNeverReplacesAnExistingFile(t *testing.T) {
+	w := startOne(t, t.TempDir())
+	dir, _ := w.ArtifactsDir()
+	tmp := writeTemp(t, dir, ".video-a-1.mp4")
+	existing := writeTemp(t, dir, "video-a-1.mp4")
+
+	_, err := w.AdoptArtifact(tmp, "video-a-1.mp4")
+	if !errors.Is(err, os.ErrExist) {
+		t.Fatalf("err = %v, want ErrExist", err)
+	}
+	if got, _ := os.ReadFile(existing); string(got) != "video-a-1.mp4" {
+		t.Fatalf("existing file replaced: %q", got)
+	}
+	if _, err := os.Stat(tmp); err != nil {
+		t.Fatalf("temporary file lost: %v", err)
+	}
+}
+
+func TestAdoptArtifactRefusesWhatIsNotATemporaryArtifact(t *testing.T) {
+	w := startOne(t, t.TempDir())
+	dir, _ := w.ArtifactsDir()
+	outside := writeTemp(t, w.Dir(), ".video-a-1.mp4")
+	nested := filepath.Join(dir, "sub")
+	if err := os.Mkdir(nested, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	inNested := writeTemp(t, nested, ".video-a-1.mp4")
+	visible := writeTemp(t, dir, "video-b.mp4")
+	valid := writeTemp(t, dir, ".video-c.mp4")
+
+	cases := []struct{ name, tmp, final string }{
+		{"outside the artifacts directory", outside, "video-a.mp4"},
+		{"nested directory", inNested, "video-a.mp4"},
+		{"source without a dot prefix", visible, "video-d.mp4"},
+		{"final name with a separator", valid, "sub/video-c.mp4"},
+		{"final name that is hidden", valid, ".video-c.mp4"},
+		{"empty final name", valid, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := w.AdoptArtifact(tc.tmp, tc.final); !errors.Is(err, ErrNotArtifact) {
+				t.Fatalf("err = %v, want ErrNotArtifact", err)
+			}
+			if _, err := os.Stat(tc.tmp); err != nil {
+				t.Fatalf("source moved: %v", err)
+			}
+		})
+	}
+}

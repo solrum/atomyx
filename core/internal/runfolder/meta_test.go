@@ -223,6 +223,7 @@ func TestSchemaMatchesJSONTags(t *testing.T) {
 		"Host":                   reflect.TypeOf(Host{}),
 		"MCPInfo":                reflect.TypeOf(MCPInfo{}),
 		"Finding":                reflect.TypeOf(Finding{}),
+		"Recording":              reflect.TypeOf(Recording{}),
 		"Intervention":           reflect.TypeOf(InterventionLine{}),
 		"InterventionsTruncated": reflect.TypeOf(InterventionsTruncated{}),
 	}
@@ -249,5 +250,33 @@ func TestSchemaMatchesJSONTags(t *testing.T) {
 		if !reflect.DeepEqual(req, wantReq) {
 			t.Errorf("%s required = %v, tags without omitempty = %v", name, req, wantReq)
 		}
+	}
+}
+
+func TestMetaRecordingRoundTripsAndIsOmittedWhenAbsent(t *testing.T) {
+	bare, err := json.Marshal(Meta{SchemaVersion: 1, RunID: "r", Kind: KindScript})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(bare, []byte(`"recording"`)) {
+		t.Fatalf("absent recording encoded: %s", bare)
+	}
+	var old Meta
+	if err := json.Unmarshal(bare, &old); err != nil || old.Recording != nil {
+		t.Fatalf("meta without recording = %+v, %v", old, err)
+	}
+
+	kept := Meta{Recording: &Recording{State: RecordingKept, Files: []string{"video-a-1.mp4"}}}
+	data, err := json.Marshal(kept)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(data, []byte(`"recording":{"state":"kept","files":["video-a-1.mp4"]}`)) {
+		t.Fatalf("encoding = %s", data)
+	}
+	failed := Meta{Recording: &Recording{State: RecordingError, Code: "X"}}
+	data, _ = json.Marshal(failed)
+	if !bytes.Contains(data, []byte(`"recording":{"state":"error","code":"X"}`)) {
+		t.Fatalf("encoding = %s", data)
 	}
 }

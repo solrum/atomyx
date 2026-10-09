@@ -10,6 +10,7 @@ func GenerateJSONSchema() map[string]any {
 		"definitions": map[string]any{
 			"Device":                 deviceSchema(),
 			"Finding":                findingSchema(),
+			"Recording":              recordingSchema(),
 			"Host":                   hostSchema(),
 			"Intervention":           interventionSchema(),
 			"InterventionEntry":      interventionEntrySchema(),
@@ -76,6 +77,14 @@ func findingSchema() map[string]any {
 	}, []string{"id", "title", "description", "timestamp"})
 }
 
+func recordingSchema() map[string]any {
+	return object(map[string]any{
+		"state": map[string]any{"type": "string", "enum": []string{string(RecordingKept), string(RecordingUnsupported), string(RecordingError)}, "description": "How the screen recording ended."},
+		"files": map[string]any{"type": "array", "items": str(), "description": "Video file names relative to the artifacts directory, oldest first. Present when state is kept."},
+		"code":  map[string]any{"type": "string", "description": "Stable error code. Present when state is unsupported or error."},
+	}, []string{"state"})
+}
+
 func mcpInfoSchema() map[string]any {
 	return object(map[string]any{
 		"name":        str(),
@@ -108,6 +117,7 @@ func metaSchema() map[string]any {
 		"mcp":                  ref("MCPInfo"),
 		"importedFrom":         map[string]any{"type": "string", "description": "Id of the record of another store this folder was imported from. Absent for a run written natively."},
 		"interventionsDropped": map[string]any{"type": "integer", "minimum": 1, "description": "How many intervention lines did not fit in interventions.jsonl. Absent when none were dropped."},
+		"recording":            ref("Recording"),
 	}, []string{"schemaVersion", "runId", "kind", "startedAt"})
 }
 

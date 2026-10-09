@@ -130,6 +130,31 @@ type Meta struct {
 	// InterventionsDropped counts the intervention lines that did not fit in
 	// interventions.jsonl. Absent when none were dropped.
 	InterventionsDropped int `json:"interventionsDropped,omitempty"`
+	// Recording describes the screen recording of the run. Absent when
+	// recording was off or the video was discarded.
+	Recording *Recording `json:"recording,omitempty"`
+}
+
+// RecordingState is how a run's screen recording ended.
+type RecordingState string
+
+const (
+	// RecordingKept means the video files are in the artifacts directory.
+	RecordingKept RecordingState = "kept"
+	// RecordingUnsupported means the device cannot record its screen.
+	RecordingUnsupported RecordingState = "unsupported"
+	// RecordingError means recording or keeping the video failed.
+	RecordingError RecordingState = "error"
+)
+
+// Recording is the recording object of meta.json. Files are names
+// relative to the artifacts directory, oldest first, and are present
+// only when State is kept. Code is the stable error code and is present
+// only when State is unsupported or error.
+type Recording struct {
+	State RecordingState `json:"state"`
+	Files []string       `json:"files,omitempty"`
+	Code  string         `json:"code,omitempty"`
 }
 
 // ResultOf returns the Result an Outcome belongs to, and false for a

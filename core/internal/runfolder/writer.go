@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -207,6 +208,33 @@ func (w *Writer) ArtifactsDir() (string, error) {
 		return "", fmt.Errorf("creating artifacts directory: %w", err)
 	}
 	return dir, nil
+}
+
+// ErrNotArtifact reports an AdoptArtifact call whose source is not a
+// dot-prefixed file directly inside the run's artifacts directory, or
+// whose final name is not a plain visible file name.
+var ErrNotArtifact = errors.New("not a temporary artifact of this run")
+
+// AdoptArtifact moves tmp, a dot-prefixed file directly inside the run's
+// artifacts directory, to its final name in the same directory and
+// returns the final path. It never replaces an existing file: an
+// existing target fails with an error matching fs.ErrExist and leaves
+// tmp in place. A tmp outside the artifacts directory, a tmp without a
+// dot prefix, and a name that is empty, hidden, or holds a path
+// separator fail with ErrNotArtifact.
+func (w *Writer) AdoptArtifact(tmp, name string) (string, error) {
+	dir := ArtifactsDir(w.dir)
+	if filepath.Dir(filepath.Clean(tmp)) != dir || !strings.HasPrefix(filepath.Base(tmp), ".") {
+		return "", fmt.Errorf("%w: source %q", ErrNotArtifact, tmp)
+	}
+	if name == "" || strings.HasPrefix(name, ".") || name != filepath.Base(name) {
+		return "", fmt.Errorf("%w: name %q", ErrNotArtifact, name)
+	}
+	final := filepath.Join(dir, name)
+	if err := renameNoReplace(tmp, final); err != nil {
+		return "", fmt.Errorf("adopting artifact %q: %w", name, err)
+	}
+	return final, nil
 }
 
 // Finalize records the end of the run. The end time is the Starter clock. The result derives from outcome
