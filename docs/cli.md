@@ -303,7 +303,10 @@ Flags:
 | `--skip-preconditions` | Shorthand for `--preconditions skip`. | off | no |
 | `--report <formats>` | Enables report generation and selects its output formats: `html`, `json`, `junit`, or any combination separated by commas. Same precedence rule as `atomyx driver run`. | the project config's `report.formats`, or `html` when reporting is enabled by `--report-dir` alone | no |
 | `--report-dir <path>` | Root directory the run folder is written under. Same rule as `atomyx driver run`. | the project config's `report.outDir`, or the storage root | no |
-| `--device <id>` | Runs the whole suite on this device, as reported by `atomyx driver list-devices`. The suite runs in this process on that one device and is not split across devices. Resolved like `atomyx driver run --device`. | the project config environment's device, then the platform default | no |
+| `--device <id>` | Runs the whole suite on this device, as reported by `atomyx driver list-devices`. The suite runs in this process on that one device. Resolved like `atomyx driver run --device`. Cannot be combined with `--devices` or `--shard`. | the project config environment's device, then the platform default | no |
+| `--devices <ids>` | Spreads the suite over these devices, given as comma-separated ids as `atomyx driver list-devices` reports them. The ids may name devices of both platforms. See "Sharding a suite" below. | none | no |
+| `--shard auto` | Spreads the suite over every connected, ready device of the resolved platform. `auto` is the only accepted value. See "Sharding a suite" below. | none | no |
+| `--platform <ios\|android>` | Platform of the devices `--shard auto` looks for, and of a `--devices` id that the device scan does not list. | the project config environment's platform, then `android` | no |
 | `--video` | Records the device screen once per flow and keeps the video of each failed flow. See "Screen recording" below. | the project config's `video` setting, which defaults to `off` | no |
 | `--retries <n>` | Runs a failed flow again up to `n` more times, from 0 to 3. Overrides the config suite's `retries`. See "Retries and quarantine" below. | the config suite's `retries`, or `0` | no |
 | `--json` | Prints one JSON object to stdout with `ok`, `runFolder` and `entries`, and moves the text summary to stderr. See "Suite JSON output" below. | off | no |
@@ -325,7 +328,8 @@ Exit codes: `0` when every flow passed, `1` when the suite ran and at
 least one flow failed, `2` when the selector matched no flows or the
 command was misused, `130` when SIGINT interrupted the suite, and `143`
 when SIGTERM did. An interrupted suite prints `interrupted` and finalizes its run
-folder as cancelled before it exits.
+folder as cancelled before it exits. A sharded suite has the exit codes
+listed under "Sharding a suite".
 
 ### Retries and quarantine
 
@@ -385,6 +389,84 @@ How the outcomes are reported:
   as a skipped test case with the message `quarantined`. See "JUnit
   report" below.
 
+### Sharding a suite
+
+`--devices a,b` and `--shard auto` run one suite on several devices at
+the same time. They cannot be combined with each other or with
+`--device`, and either combination is a usage error with exit code `2`.
+
+Choosing devices:
+
+- `--devices` uses the listed devices, in the given order, each once.
+  An id the device scan lists keeps the platform it was found on, so one
+  list can hold an Android serial and an iOS simulator udid. An id the
+  scan does not list, such as an Android device reached over the
+  network, gets the platform of `--platform`.
+- `--shard auto` uses every connected and ready device of the resolved
+  platform, whether or not another process currently holds it. Zero
+  devices is a usage error with exit code `2`.
+
+How the suite runs:
+
+- The command takes no lease of its own. It starts one worker process
+  per device, each in its own process group, and each worker acquires
+  its device the normal way, so a worker can borrow a device from an
+  idle `atomyx inspect` or MCP session.
+- All flows wait in one queue. A worker gets its next flow when it has
+  finished the previous one, so a fast device runs more flows than a
+  slow one, and every flow runs exactly once.
+- A worker runs its flows with the suite's own retries and quarantine
+  list, and keeps its own run folder.
+- A worker that fails to start, or cannot acquire its device because
+  another process holds it, is dropped with a warning on stderr, and
+  the other workers carry on.
+- A worker that reports its device lost stops. The flow it was running
+  goes back to the queue once for another worker. If that flow also
+  loses its device, it ends as failed.
+- A flow that no worker ran because every worker stopped is listed as
+  failed with no attempts.
+
+Exit codes:
+
+| Code | Meaning |
+|---|---|
+| `0` | Every flow ran, and every flow that is not quarantined passed. |
+| `1` | A flow failed, or flows were left unrun because every worker stopped. |
+| `2` | The command was misused, including `--shard auto` with no ready device. |
+| `130` | SIGINT interrupted the suite. |
+
+On SIGINT the command asks every worker to stop, ends the ones that do
+not, and finalizes its run folder as cancelled. Its exit budget is
+longer than a single command's, so it can wait for its workers.
+
+Run folders:
+
+```
+<root>/runs/v1/
+  <suite-run-id>/            the sharded suite
+    meta.json
+    index.json
+    report/                  merged report and junit.xml
+  <worker-run-id-1>/         one folder per worker, a suite run
+    meta.json                parentRunId names <suite-run-id>
+    index.json
+    artifacts/               screenshots, failure evidence and videos
+  <worker-run-id-2>/
+```
+
+The sharded suite's `meta.json` carries the same counts as any suite,
+and records no single device. Each worker's `meta.json` carries
+`parentRunId`, the id of the sharded suite. The sharded suite's
+`index.json` has the shape described in "Suite index", and each attempt
+names the device it ran on in `deviceId` and the worker run folder that
+holds its artifacts in `workerRunId`. A flow that was requeued lists its
+attempts in two worker run folders, numbered in order. The command never
+copies artifacts, so screenshots, failure evidence and videos stay in
+the worker run folder, and the merged report does not link videos.
+
+`--json` prints the same object as an unsharded suite. The merged
+`junit.xml` and report are built from the same data as `index.json`.
+
 ### Suite index
 
 Every suite run folder holds `index.json`, the per-entry record of the
@@ -411,9 +493,9 @@ Fields of an entry:
   `result` (`passed` or `failed`).
 
 An attempt also carries `videos`, the kept video file names relative to
-the run folder's `artifacts` directory, when it kept any. The fields
-`deviceId` and `workerRunId` are reserved for a suite that runs on
-several devices and are absent otherwise.
+the `artifacts` directory of the run folder that holds them, when it
+kept any. A sharded suite adds `deviceId` and `workerRunId` to each
+attempt, see "Sharding a suite". An unsharded suite omits both.
 
 The suite's `meta.json` carries `flakyEntries` and `quarantinedFailures`
 counts, each absent when zero. The suite report lists the same attempts,

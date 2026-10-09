@@ -97,6 +97,7 @@ atomyx/
 | `runfolder` | Defines the run folder contract: the layout names, the `meta.json` record with its result and outcome enums, the suite `index.json` record, the legacy status mapping, and the generated JSON Schemas. It also writes run folders with an exclusive create and a live lock. Depends on the standard library and `flock`. |
 | `runner` | Defines the command execution contract and the ScriptRunner that dispatches a parsed script's steps. |
 | `scenario` | Runs ordered groups of scripts and ordered sets of scripts or scenarios against a shared Orchestra. |
+| `shard` | Spreads a suite over several devices. A coordinator feeds one worker per device from a single queue, requeues the entry of a lost device once, and returns the merged entries. Workers are processes started through a `Launcher` port and speak a versioned line protocol. It depends only on `process`. |
 | `stepstream` | Turns the step events of a script run into the lines of a run folder's `steps.jsonl`. Depends on `runner` and `runfolder`. |
 | `script` | Owns the test-script schema, parser, and expression engine. |
 | `core/internal/script/expression` | Implements the test-script expression language: tokenizing, parsing, and evaluating. |

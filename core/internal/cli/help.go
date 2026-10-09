@@ -82,8 +82,17 @@ FLAGS
   --device <id>            Run the whole suite on this device, as
                            reported by atomyx driver list-devices.
                            The suite runs in this process on that
-                           one device and is not split across
-                           devices.
+                           one device.
+  --devices <ids>          Spread the suite over these devices,
+                           comma-separated, one worker process per
+                           device. Cannot be combined with --device
+                           or --shard.
+  --shard auto             Spread the suite over every connected,
+                           ready device of the platform. Zero
+                           devices is a usage error.
+  --platform <ios|android> Platform of the devices --shard auto looks
+                           for. Defaults to the environment's
+                           platform, then android.
   --config <path>          Path to the project config file.
   --env <name>             Named environment to resolve platform,
                            device, proxy, and variables from.
@@ -125,13 +134,17 @@ EXAMPLES
   atomyx driver suite smoke
   atomyx driver suite --tag smoke
   atomyx driver suite smoke --device <UDID> --json
+  atomyx driver suite smoke --devices <SERIAL>,<UDID> --json
+  atomyx driver suite --glob "flows/**/*.yml" --shard auto
   atomyx driver suite --glob "flows/**/*.yml" --tag critical
 
 EXIT CODES
   0    every entry in the suite passed, or failed only while
        quarantined
-  1    the suite ran and at least one entry failed
+  1    the suite ran and at least one entry failed, or a sharded
+       suite left entries unrun because every worker stopped
   2    the command was misused, or no flow matched the selector
+  130  interrupted by SIGINT
 `)
 	case CommandListDevices:
 		_, _ = io.WriteString(w, `atomyx driver list-devices
