@@ -234,6 +234,20 @@
           },
           "type": "array"
         },
+        "quarantine": {
+          "description": "Globs, matched like globs, of tests whose failure does not fail the suite.",
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "retries": {
+          "description": "How many more times a failed test runs after its first attempt. Only a test failure is retried. The default is 0.",
+          "maximum": 3,
+          "minimum": 0,
+          "type": "integer"
+        },
         "tags": {
           "description": "Select tests whose tags include any of these values.",
           "items": {

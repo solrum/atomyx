@@ -324,3 +324,35 @@ func TestVideoOnFailure_IsTrueOnlyForTheOnFailureValue(t *testing.T) {
 		}
 	}
 }
+
+func TestParseAndValidate_ReadsSuiteRetriesAndQuarantine(t *testing.T) {
+	cfg := mustValidate(t, baseConfig+"suites:\n  smoke:\n    globs: [x]\n    retries: 2\n    quarantine: [flaky/**]\n  plain:\n    tags: [a]\n")
+	smoke := (*cfg.Suites)["smoke"]
+	if smoke.Retries == nil || *smoke.Retries != 2 {
+		t.Errorf("Retries = %v, want 2", smoke.Retries)
+	}
+	if smoke.Quarantine == nil || len(*smoke.Quarantine) != 1 || (*smoke.Quarantine)[0] != "flaky/**" {
+		t.Errorf("Quarantine = %v, want [flaky/**]", smoke.Quarantine)
+	}
+	plain := (*cfg.Suites)["plain"]
+	if plain.Retries != nil || plain.Quarantine != nil {
+		t.Errorf("an unset suite carries retries %v and quarantine %v", plain.Retries, plain.Quarantine)
+	}
+}
+
+func TestParseAndValidate_RejectsSuiteRetriesOutsideZeroToThree(t *testing.T) {
+	for _, value := range []string{"-1", "4", "1.5", "\"two\""} {
+		issues := mustReject(t, baseConfig+"suites:\n  smoke:\n    tags: [a]\n    retries: "+value+"\n")
+		if len(issues) != 1 || pathString(issues[0].Path) != "suites.smoke.retries" {
+			t.Errorf("retries %s: issues = %v, want one at suites.smoke.retries", value, issues)
+		}
+	}
+}
+
+func TestParseAndValidate_AcceptsZeroAndMaximumSuiteRetries(t *testing.T) {
+	mustValidate(t, baseConfig+"suites:\n  a:\n    tags: [a]\n    retries: 0\n  b:\n    tags: [a]\n    retries: 3\n")
+}
+
+func TestParseAndValidate_QuarantineAloneDoesNotSelectTests(t *testing.T) {
+	mustReject(t, baseConfig+"suites:\n  smoke:\n    quarantine: [x]\n")
+}

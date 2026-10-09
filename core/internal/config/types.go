@@ -22,6 +22,9 @@ const (
 	// ReportFormatHTML and ReportFormatJSON are the two values a Report.Formats entry accepts.
 	ReportFormatHTML = "html"
 	ReportFormatJSON = "json"
+
+	// MaxSuiteRetries is the most retries a suite entry may declare.
+	MaxSuiteRetries = 3
 )
 
 // AppEntry is one app variant a project can run, matching
@@ -80,6 +83,12 @@ type Session struct {
 type SuiteEntry struct {
 	Tags  *[]string `json:"tags,omitempty"`
 	Globs *[]string `json:"globs,omitempty"`
+	// Retries is how many more times a failed entry of the suite runs
+	// after its first attempt, from 0 to MaxSuiteRetries. Absent means 0.
+	Retries *int64 `json:"retries,omitempty"`
+	// Quarantine lists globs, matched like Globs against an entry path,
+	// of entries whose failure does not fail the suite.
+	Quarantine *[]string `json:"quarantine,omitempty"`
 }
 
 // AtomyxConfig is the top-level Atomyx project config, matching

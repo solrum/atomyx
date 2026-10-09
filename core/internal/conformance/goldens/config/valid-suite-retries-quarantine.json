@@ -1,0 +1,45 @@
+{
+  "config": {
+    "apps": [
+      {
+        "appId": "com.example.app",
+        "id": "main",
+        "platform": "android"
+      }
+    ],
+    "environments": {
+      "staging": {
+        "app": "main"
+      }
+    },
+    "project": "Demo",
+    "suites": {
+      "regression": {
+        "globs": [
+          "tests/**"
+        ],
+        "quarantine": [
+          "tests/flaky/**"
+        ],
+        "retries": 2
+      },
+      "smoke": {
+        "retries": 0,
+        "tags": [
+          "smoke"
+        ]
+      }
+    }
+  },
+  "envRefError": null,
+  "found": true,
+  "issuePaths": [],
+  "resolved": {
+    "appId": "com.example.app",
+    "name": "staging",
+    "platform": "android",
+    "vars": {}
+  },
+  "schemaValid": true,
+  "selectError": null
+}

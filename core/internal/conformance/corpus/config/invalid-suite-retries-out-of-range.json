@@ -1,0 +1,5 @@
+{
+  "name": "invalid-suite-retries-out-of-range",
+  "description": "A suite retry count above 3 is rejected.",
+  "yaml": "project: Demo\napps:\n  - id: main\n    platform: android\n    appId: com.example.app\nenvironments:\n  staging:\n    app: main\nsuites:\n  regression:\n    globs: [\"tests/**\"]\n    retries: 4\n"
+}

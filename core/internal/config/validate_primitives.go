@@ -219,3 +219,39 @@ func contains(values []string, s string) bool {
 	}
 	return false
 }
+
+// optionalIntInRange reads an optional integer field that must lie in
+// [lo, hi]. A YAML number with a fractional part is rejected.
+func optionalIntInRange(obj map[string]any, key string, lo, hi int64, path []any, c *issueCollector) (*int64, bool) {
+	raw, present := obj[key]
+	if !present || raw == nil {
+		return nil, true
+	}
+	var n int64
+	switch v := raw.(type) {
+	case int:
+		n = int64(v)
+	case int64:
+		n = v
+	case uint64:
+		if v > math.MaxInt64 {
+			c.add(withSegment(path, key), "expected an integer from %d to %d", lo, hi)
+			return nil, false
+		}
+		n = int64(v)
+	case float64:
+		if v != math.Trunc(v) || math.IsInf(v, 0) || v > math.MaxInt64 {
+			c.add(withSegment(path, key), "expected an integer")
+			return nil, false
+		}
+		n = int64(v)
+	default:
+		c.add(withSegment(path, key), "expected an integer")
+		return nil, false
+	}
+	if n < lo || n > hi {
+		c.add(withSegment(path, key), "expected an integer from %d to %d", lo, hi)
+		return nil, false
+	}
+	return &n, true
+}

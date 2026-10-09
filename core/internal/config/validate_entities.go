@@ -270,7 +270,7 @@ func validateSuites(root map[string]any, path []any, c *issueCollector) *map[str
 	return &entries
 }
 
-var suiteEntryKeys = map[string]bool{"tags": true, "globs": true}
+var suiteEntryKeys = map[string]bool{"tags": true, "globs": true, "retries": true, "quarantine": true}
 
 func validateSuiteEntry(raw any, path []any, c *issueCollector) (*SuiteEntry, bool) {
 	obj, ok := asObject(raw, path, c)
@@ -284,6 +284,8 @@ func validateSuiteEntry(raw any, path []any, c *issueCollector) (*SuiteEntry, bo
 
 	tags := optionalStringArray(obj, "tags", 1, path, c)
 	globs := optionalStringArray(obj, "globs", 1, path, c)
+	quarantine := optionalStringArray(obj, "quarantine", 1, path, c)
+	retries, retriesOk := optionalIntInRange(obj, "retries", 0, MaxSuiteRetries, path, c)
 
 	// zod's nested `.refine()` on SuiteEntrySchema reads tags/globs
 	// from the object schema's own parse result, not from a second
@@ -294,14 +296,14 @@ func validateSuiteEntry(raw any, path []any, c *issueCollector) (*SuiteEntry, bo
 	// (not an array at all) aborts the object schema outright, which
 	// skips the refine entirely - so a lone "expected an array" issue
 	// must not be joined by this one.
-	if tagsAborted || globsAborted {
+	if tagsAborted || globsAborted || !retriesOk {
 		return nil, false
 	}
 	if tagsLen == 0 && globsLen == 0 {
 		c.add(path, "a suite requires at least one of `tags` or `globs`")
 		return nil, false
 	}
-	return &SuiteEntry{Tags: tags, Globs: globs}, true
+	return &SuiteEntry{Tags: tags, Globs: globs, Retries: retries, Quarantine: quarantine}, true
 }
 
 // rawArrayPresence reports the length of obj[key] as originally

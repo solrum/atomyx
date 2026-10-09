@@ -1,0 +1,5 @@
+{
+  "name": "invalid-suite-quarantine-empty-glob",
+  "description": "A quarantine glob must not be empty.",
+  "yaml": "project: Demo\napps:\n  - id: main\n    platform: android\n    appId: com.example.app\nenvironments:\n  staging:\n    app: main\nsuites:\n  regression:\n    globs: [\"tests/**\"]\n    quarantine: [\"\"]\n"
+}

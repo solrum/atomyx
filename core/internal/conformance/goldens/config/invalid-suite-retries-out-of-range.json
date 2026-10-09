@@ -1,0 +1,15 @@
+{
+  "config": null,
+  "envRefError": null,
+  "found": true,
+  "issuePaths": [
+    [
+      "suites",
+      "regression",
+      "retries"
+    ]
+  ],
+  "resolved": null,
+  "schemaValid": false,
+  "selectError": null
+}

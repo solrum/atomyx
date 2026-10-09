@@ -1,0 +1,6 @@
+{
+  "name": "valid-suite-retries-quarantine",
+  "description": "A suite may declare a retry count from 0 to 3 and a quarantine list of globs.",
+  "yaml": "project: Demo\napps:\n  - id: main\n    platform: android\n    appId: com.example.app\nenvironments:\n  staging:\n    app: main\nsuites:\n  regression:\n    globs: [\"tests/**\"]\n    retries: 2\n    quarantine: [\"tests/flaky/**\"]\n  smoke:\n    tags: [smoke]\n    retries: 0\n",
+  "envName": "staging"
+}

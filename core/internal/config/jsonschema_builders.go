@@ -37,6 +37,10 @@ func integerMin(minimum int, description string) map[string]any {
 	return withDescription(map[string]any{"type": "integer", "minimum": minimum}, description)
 }
 
+func integerRange(minimum, maximum int, description string) map[string]any {
+	return withDescription(map[string]any{"type": "integer", "minimum": minimum, "maximum": maximum}, description)
+}
+
 func arraySchema(items any, minItems int, description string) map[string]any {
 	m := withDescription(map[string]any{"type": "array", "items": items}, description)
 	if minItems > 0 {

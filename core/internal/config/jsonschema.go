@@ -110,8 +110,10 @@ func sessionSchema() map[string]any {
 func suiteEntrySchema() map[string]any {
 	return objectSchema(
 		map[string]any{
-			"tags":  arraySchema(stringMinLen(1, ""), 0, "Select tests whose tags include any of these values."),
-			"globs": arraySchema(stringMinLen(1, ""), 0, "Select tests whose file path matches any of these globs."),
+			"tags":       arraySchema(stringMinLen(1, ""), 0, "Select tests whose tags include any of these values."),
+			"globs":      arraySchema(stringMinLen(1, ""), 0, "Select tests whose file path matches any of these globs."),
+			"retries":    integerRange(0, MaxSuiteRetries, "How many more times a failed test runs after its first attempt. Only a test failure is retried. The default is 0."),
+			"quarantine": arraySchema(stringMinLen(1, ""), 0, "Globs, matched like globs, of tests whose failure does not fail the suite."),
 		},
 		nil,
 		"One named test selector.",
