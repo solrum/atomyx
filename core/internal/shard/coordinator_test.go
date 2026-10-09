@@ -19,6 +19,9 @@ type scripted struct {
 	readyAfter <-chan struct{}
 	// handle answers one path. It may block to model a slow device.
 	handle func(path string) Line
+	// vanish, when set, makes the worker call it and exit on its first
+	// path without answering, like a crashed process.
+	vanish func()
 }
 
 type fakeLauncher struct {
@@ -81,6 +84,10 @@ func (w *fakeWorker) run() {
 			w.launcher.mu.Lock()
 			w.launcher.seen[w.id] = append(w.launcher.seen[w.id], path)
 			w.launcher.mu.Unlock()
+			if w.behavior.vanish != nil {
+				w.behavior.vanish()
+				return
+			}
 			answer := make(chan Line, 1)
 			go func() { answer <- w.behavior.handle(path) }()
 			var line Line
@@ -209,6 +216,72 @@ func TestRunGivesTheNextEntryToWhicheverWorkerIsFree(t *testing.T) {
 	}
 }
 
+// losing answers every path as a failed entry whose device was lost, and
+// closes lost so a later worker can start only after the loss happened.
+func losing(lost chan struct{}) func(string) Line {
+	var once sync.Once
+	return func(path string) Line {
+		line := entryLine(path, "failed")
+		line.DeviceLost = true
+		once.Do(func() { close(lost) })
+		return line
+	}
+}
+
+func TestRunRequeuesTheEntryOfALostDeviceOnceToAnotherWorker(t *testing.T) {
+	aLost := make(chan struct{})
+	lose := losing(aLost)
+	launcher := newFakeLauncher(map[string]*scripted{
+		"a": {handle: func(p string) Line {
+			if strings.HasSuffix(p, "01.yml") {
+				return lose(p)
+			}
+			return passing(p)
+		}},
+		"b": {readyAfter: aLost, handle: passing},
+	})
+
+	outcome, warnings := runShard(t, launcher, []string{"a", "b"}, paths(4))
+
+	if len(outcome.Unrun) != 0 || len(outcome.Entries) != 4 {
+		t.Fatalf("entries %d, unrun %v", len(outcome.Entries), outcome.Unrun)
+	}
+	var lostEntry *Entry
+	for i := range outcome.Entries {
+		if strings.HasSuffix(outcome.Entries[i].Path, "01.yml") {
+			lostEntry = &outcome.Entries[i]
+		}
+	}
+	if lostEntry == nil || lostEntry.Status != "passed" || len(lostEntry.Attempts) != 2 {
+		t.Fatalf("lost entry = %+v, want a pass after two attempts", lostEntry)
+	}
+	first, second := lostEntry.Attempts[0], lostEntry.Attempts[1]
+	if first.DeviceID != "a" || first.Status != "failed" || first.Number != 1 || second.DeviceID != "b" || second.Status != "passed" || second.Number != 2 || first.WorkerRunID == second.WorkerRunID {
+		t.Errorf("attempts = %+v, want a failed attempt on a then a passed attempt on b in another worker run", lostEntry.Attempts)
+	}
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "device a was lost") {
+		t.Errorf("warnings = %v", warnings)
+	}
+}
+
+func TestRunRequeuesALostEntryOnlyOnce(t *testing.T) {
+	aLost, bLost := make(chan struct{}), make(chan struct{})
+	launcher := newFakeLauncher(map[string]*scripted{
+		"a": {handle: losing(aLost)},
+		"b": {readyAfter: aLost, handle: losing(bLost)},
+		"c": {readyAfter: bLost, handle: passing},
+	})
+
+	outcome, _ := runShard(t, launcher, []string{"a", "b", "c"}, paths(1))
+
+	if len(outcome.Entries) != 1 || outcome.Entries[0].Status != "failed" || len(outcome.Entries[0].Attempts) != 2 {
+		t.Fatalf("entries = %+v, want one failed entry with two attempts", outcome.Entries)
+	}
+	if got := launcher.handled("c"); len(got) != 0 {
+		t.Errorf("worker c ran %v, want the entry not to be requeued a second time", got)
+	}
+}
+
 func TestRunDropsAWorkerThatReportsDeviceHeld(t *testing.T) {
 	held := Line{Kind: LineError, Code: "DEVICE_HELD", Message: "held by atomyx inspect"}
 	launcher := newFakeLauncher(map[string]*scripted{
@@ -268,5 +341,38 @@ func TestRunStopsEveryWorkerWhenTheContextEnds(t *testing.T) {
 
 	if !outcome.Interrupted || !launcher.stopped["a"] || !launcher.stopped["b"] {
 		t.Errorf("interrupted %v, stopped %v, want both workers stopped", outcome.Interrupted, launcher.stopped)
+	}
+}
+
+func TestRunDoesNotRequeueAnEntryThatPassedBeforeTheDeviceWasLost(t *testing.T) {
+	aDone := make(chan struct{})
+	launcher := newFakeLauncher(map[string]*scripted{
+		"a": {handle: func(p string) Line { l := passing(p); l.DeviceLost = true; close(aDone); return l }},
+		"b": {readyAfter: aDone, handle: passing},
+	})
+
+	outcome, _ := runShard(t, launcher, []string{"a", "b"}, paths(1))
+
+	if len(outcome.Entries) != 1 || outcome.Entries[0].Status != "passed" || len(outcome.Entries[0].Attempts) != 1 {
+		t.Errorf("entries = %+v, want the passed entry kept as it is", outcome.Entries)
+	}
+}
+
+func TestRunRequeuesTheEntryOfAWorkerThatVanishedWithoutReporting(t *testing.T) {
+	gone := make(chan struct{})
+	launcher := newFakeLauncher(map[string]*scripted{
+		"a": {vanish: func() { close(gone) }},
+		"b": {readyAfter: gone, handle: passing},
+	})
+
+	outcome, _ := runShard(t, launcher, []string{"a", "b"}, paths(2))
+
+	if len(outcome.Unrun) != 0 || len(outcome.Entries) != 2 {
+		t.Fatalf("entries %d, unrun %v", len(outcome.Entries), outcome.Unrun)
+	}
+	for _, entry := range outcome.Entries {
+		if entry.Status != "passed" || entry.Attempts[0].DeviceID != "b" {
+			t.Errorf("entry %s = %+v, want it run by the surviving worker", entry.Path, entry)
+		}
 	}
 }

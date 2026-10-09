@@ -38,10 +38,16 @@ type Outcome struct {
 	Interrupted bool
 }
 
+// requeueLimit is how many times an entry whose worker lost its device goes
+// back to the queue for another worker.
+const requeueLimit = 1
+
 type job struct {
 	index    int
 	path     string
+	kind     string
 	attempts []Attempt
+	requeues int
 }
 
 type slot struct {
@@ -63,7 +69,8 @@ type event struct {
 // Run feeds paths to one worker per device and collects their reports.
 // Each worker gets its next path when it reported the previous one, so a
 // fast device takes more entries than a slow one. A worker that cannot
-// start or reports an error before it is ready is dropped. Run returns
+// start or reports an error before it is ready is dropped, and an entry
+// whose worker lost its device goes back to the queue once. Run returns
 // when every worker has ended.
 func Run(ctx context.Context, opts Options) Outcome {
 	c := &coordinator{opts: opts, results: make([]*Entry, len(opts.Paths))}
@@ -146,8 +153,9 @@ func (c *coordinator) handle(s *slot, line Line) {
 	}
 }
 
-// finishEntry records the entry a worker reported. A worker that reports a
-// lost device is finished, and the rest of the queue goes to the others.
+// finishEntry records the entry a worker reported. An entry that failed
+// because its worker lost the device goes back to the front of the queue
+// the first time, so another worker runs it.
 func (c *coordinator) finishEntry(s *slot, line Line) {
 	j := s.current
 	if j == nil {
@@ -163,6 +171,13 @@ func (c *coordinator) finishEntry(s *slot, line Line) {
 		s.lost = true
 		_ = s.worker.CloseInput()
 		c.warn("device %s was lost, its worker stopped", s.device.ID)
+		if line.Entry.Status != "passed" && j.requeues < requeueLimit {
+			j.requeues++
+			j.kind = line.Entry.Kind
+			j.attempts = append(j.attempts, attempts...)
+			c.queue = append([]*job{j}, c.queue...)
+			return
+		}
 	}
 	c.record(j, *line.Entry, attempts)
 }
@@ -187,13 +202,18 @@ func (c *coordinator) record(j *job, final Entry, attempts []Attempt) {
 }
 
 // end settles a worker whose output ended. An entry it held but never
-// reported is recorded as failed.
+// reported goes back to the queue the first time.
 func (c *coordinator) end(s *slot) {
 	s.ended = true
 	exit := s.worker.Wait()
 	if j := s.current; j != nil {
 		s.current = nil
-		c.abandon(j)
+		if j.requeues < requeueLimit && !c.interrupted {
+			j.requeues++
+			c.queue = append([]*job{j}, c.queue...)
+		} else {
+			c.abandon(j)
+		}
 	}
 	if !s.ready && !c.interrupted {
 		reason := s.dropReason
@@ -212,12 +232,16 @@ func (c *coordinator) abandon(j *job) {
 	if len(attempts) == 0 {
 		attempts = []Attempt{{Number: 1, Status: "failed", Error: &message}}
 	}
+	kind := j.kind
+	if kind == "" {
+		kind = "script"
+	}
 	last := attempts[len(attempts)-1]
 	var total int64
 	for _, a := range attempts {
 		total += a.DurationMs
 	}
-	c.results[j.index] = &Entry{Path: j.path, Kind: "script", Status: last.Status, Error: last.Error, DurationMs: total, Attempts: attempts}
+	c.results[j.index] = &Entry{Path: j.path, Kind: kind, Status: last.Status, Error: last.Error, DurationMs: total, Attempts: attempts}
 }
 
 // dispatch hands the next path to every idle worker, or closes the input
@@ -256,6 +280,11 @@ func (c *coordinator) dispatch() {
 
 func (c *coordinator) outcome() Outcome {
 	out := Outcome{Interrupted: c.interrupted}
+	for _, j := range c.queue {
+		if len(j.attempts) > 0 {
+			c.abandon(j)
+		}
+	}
 	for i, result := range c.results {
 		if result != nil {
 			out.Entries = append(out.Entries, *result)
