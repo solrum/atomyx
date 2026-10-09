@@ -95,6 +95,8 @@ components:
     in: internal/debugrun
   recording:
     in: internal/recording
+  shard:
+    in: internal/shard
   cmd:
     in: cmd/**
   scripttools:
@@ -353,6 +355,10 @@ deps:
       - runfolder
       - diag
       - recording
+  shard:
+    mayDependOn:
+      - process
+      - shard
   inspector:
     mayDependOn:
       - wire
