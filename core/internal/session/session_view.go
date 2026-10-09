@@ -110,21 +110,32 @@ func (s *Session) freshTree(ctx context.Context, admit func(underDebugLock bool)
 		return Snapshot{}, err
 	}
 
-	o := s.built.Orchestra
-	if _, err := o.Hierarchy(ctx); err != nil {
+	if err := s.captureDevice(ctx); err != nil {
 		return Snapshot{}, err
 	}
+	return s.hub.Latest(), nil
+}
+
+// captureDevice reads the tree, the screenshot and, once per action epoch,
+// the screen size through the observing driver, so the hub holds the
+// screen as it is now. The caller owns the right to drive the device: the
+// activity gate or, while the run is paused, the debug lock.
+func (s *Session) captureDevice(ctx context.Context) error {
+	o := s.built.Orchestra
+	if _, err := o.Hierarchy(ctx); err != nil {
+		return err
+	}
 	if _, err := o.Screenshot(ctx); err != nil {
-		return Snapshot{}, err
+		return err
 	}
 	// The screen size only changes with the screen, so one reading per
 	// action epoch serves every later capture in it.
 	if !s.hub.sizeCurrent() {
 		if _, err := o.ScreenSize(ctx); err != nil {
-			return Snapshot{}, err
+			return err
 		}
 	}
-	return s.hub.Latest(), nil
+	return nil
 }
 
 // PublishStep hands a stamped step line to the session's viewers.

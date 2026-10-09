@@ -13,9 +13,16 @@ func (s *Session) Paused() (PauseLocation, bool) {
 
 // EnterPause marks the run as stopped at loc and tells the viewers. The
 // host's step gate calls it when the runner blocks, and calls it again
-// with the new location for each later stop. SetRunning, SetIdle and the
+// with the new location for each later stop. It then refreshes the capture
+// hub, so a viewer that attaches to the paused run sees the current screen
+// and a screenshot. SetRunning, SetIdle and the
 // host's own activity bookkeeping cannot clear the mark.
 func (s *Session) EnterPause(loc PauseLocation) {
+	s.publishPause(loc)
+	s.captureOnPause()
+}
+
+func (s *Session) publishPause(loc PauseLocation) {
 	s.publishMu.Lock()
 	defer s.publishMu.Unlock()
 	s.mu.Lock()

@@ -185,12 +185,19 @@ func TestResume_ARunThatStopsAtItsNextStepStaysPaused(t *testing.T) {
 	next := session.PauseLocation{Source: testPause.Source, Line: 8, Command: "type"}
 	dbg := &fakeDebugger{resumeOut: session.ResumeResult{Resumed: true}}
 	s, _, _ := debuggableHolder(t, dbg)
-	dbg.onResume = func() { s.EnterPause(next) }
+	entered := make(chan struct{})
+	dbg.onResume = func() {
+		go func() {
+			s.EnterPause(next)
+			close(entered)
+		}()
+	}
 	s.EnterPause(testPause)
 
 	if _, err := s.Resume(context.Background(), session.ResumeOptions{Step: true}); err != nil {
 		t.Fatal(err)
 	}
+	<-entered
 	if loc, paused := s.Paused(); !paused || loc != next {
 		t.Fatalf("pause after a step = %+v, %v, want the new stop at %+v", loc, paused, next)
 	}

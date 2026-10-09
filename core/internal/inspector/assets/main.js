@@ -160,7 +160,7 @@ async function start() {
   createYamlPanel(panels, { operate, notify: showNotice, readSelector: tester.readSelector });
   createDebugPanel(panels, { operate });
   createVariablesPanel(panels);
-  createActPanel(panels, { operate, readSelector: tester.readSelector, onActed: refreshCapture });
+  createActPanel(panels, { operate, readSelector: tester.readSelector });
   steps = createStepsPanel(panels);
   createHighlight({
     img: byId('screenshot'),

@@ -27,16 +27,17 @@ type blockingDriver struct {
 	once    sync.Once
 	entered chan struct{}
 	release chan struct{}
-	// holdSecond, when set, makes the second screenshot wait until its
-	// context ends and close secondEntered when it starts waiting.
-	holdSecond    bool
-	secondEntered chan struct{}
-	calls         atomic.Int32
+	// holdAt, when not 0, makes the screenshot with that call number wait
+	// until its context ends and close heldEntered when it starts waiting.
+	// The capture a pause takes is a screenshot call too.
+	holdAt      int32
+	heldEntered chan struct{}
+	calls       atomic.Int32
 }
 
 func (b *blockingDriver) Screenshot(ctx context.Context) ([]byte, error) {
-	if b.calls.Add(1) == 2 && b.holdSecond {
-		close(b.secondEntered)
+	if b.calls.Add(1) == b.holdAt {
+		close(b.heldEntered)
 		<-ctx.Done()
 		return nil, ctx.Err()
 	}
@@ -102,7 +103,7 @@ func newDebugHarnessWithPause(t *testing.T, pauseMs int64) *debugHarness {
 	}
 	h := &debugHarness{
 		t: t, ctx: context.Background(), clk: clock.NewManualClock(0),
-		drv:      &blockingDriver{Driver: mockdriver.New(), entered: make(chan struct{}), release: make(chan struct{}), secondEntered: make(chan struct{})},
+		drv:      &blockingDriver{Driver: mockdriver.New(), entered: make(chan struct{}), release: make(chan struct{}), heldEntered: make(chan struct{})},
 		progress: make(chan recordedPhase, 32), result: make(chan map[string]any, 1),
 		lost: make(chan error, 1),
 	}
@@ -285,6 +286,7 @@ func TestScriptDebug_APendingBreakpointOnALineWithNoStepIsNotAnErrorAndNeverStop
 
 func TestScriptDebug_APauseRequestedBeforeRunScriptStopsBeforeTheFirstStep(t *testing.T) {
 	h := newDebugHarness(t)
+	h.drv.once.Do(func() {})
 	if err := h.held().Pause(); err != nil {
 		t.Fatalf("pause between scripts: %v", err)
 	}
@@ -298,10 +300,10 @@ func TestScriptDebug_APauseRequestedBeforeRunScriptStopsBeforeTheFirstStep(t *te
 	if loc.Line != 4 || loc.Command != "screenshot" {
 		t.Fatalf("paused at %+v, want before the screenshot on line 4", loc)
 	}
-	select {
-	case <-h.drv.entered:
-		t.Fatal("the first step ran before the pause")
-	default:
+	const captureOnly = 1
+	eventually(t, "the pause to capture the screen", func() bool { return h.drv.calls.Load() >= captureOnly })
+	if got := h.drv.calls.Load(); got != captureOnly {
+		t.Fatalf("%d screenshots before the pause, want only the pause's own capture", got)
 	}
 	if _, err := h.held().Resume(h.ctx, session.ResumeOptions{Force: true}); err != nil {
 		t.Fatal(err)
@@ -673,7 +675,8 @@ func TestScriptDebug_ACallKeepsWhatWasLeftOfItsBudgetAcrossAPause(t *testing.T) 
 		pausedMs      = 5_000
 	)
 	h := newDebugHarness(t)
-	h.drv.holdSecond = true
+	const secondStepCall = 3
+	h.drv.holdAt = secondStepCall
 	t.Cleanup(func() { h.clk.Advance(2 * defaultToolTimeoutMs) })
 	h.startScript(debugScript)
 	h.awaitEntered()
@@ -691,7 +694,7 @@ func TestScriptDebug_ACallKeepsWhatWasLeftOfItsBudgetAcrossAPause(t *testing.T) 
 		t.Fatal(err)
 	}
 	select {
-	case <-h.drv.secondEntered:
+	case <-h.drv.heldEntered:
 	case <-time.After(yieldWait):
 		t.Fatal("the second step never started")
 	}

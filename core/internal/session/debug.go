@@ -58,7 +58,9 @@ func notPaused() error { return diag.NewHolderBusy("the run is not paused") }
 
 // Act runs one step on the device while the run is paused. It waits for
 // the debug lock, so it never overlaps a fresh capture or another act.
-// It fails with diag.CodeUnsupported when the session has no Debugger and
+// When the step ran, it then refreshes the capture hub so every viewer
+// sees the screen the step left. A failed capture is logged and does not
+// change the result. It fails with diag.CodeUnsupported when the session has no Debugger and
 // with diag.CodeHolderBusy when the run is not paused.
 func (s *Session) Act(ctx context.Context, stepYAML string) (ActResult, error) {
 	if s.debugger == nil {
@@ -76,6 +78,7 @@ func (s *Session) Act(ctx context.Context, stepYAML string) (ActResult, error) {
 	if err != nil {
 		return ActResult{}, err
 	}
+	s.captureHeld(ctx)
 	s.recordEntry(Intervention{
 		Kind: InterventionHumanAction, Client: attach.ClientFromContext(ctx),
 		Step: result.Step, Command: result.Command, Outcome: result.Outcome,
