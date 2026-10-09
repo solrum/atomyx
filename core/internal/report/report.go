@@ -45,6 +45,20 @@ type ReportMetadata struct {
 	// reason beyond an ordinary step failure, such as the device or
 	// agent going unreachable mid-run.
 	Abort *ReportAbort `json:"abort,omitempty"`
+	// Recording is the screen recording of the run, nil when recording was
+	// off or the video was discarded.
+	Recording *ReportRecording `json:"recording,omitempty"`
+}
+
+// ReportRecording describes the screen recording of a run. State is kept,
+// unsupported, or error. Files are names relative to the artifacts
+// directory, oldest first, and are present only when State is kept. Code
+// is the stable error code and is present only when State is unsupported
+// or error.
+type ReportRecording struct {
+	State string   `json:"state"`
+	Files []string `json:"files,omitempty"`
+	Code  string   `json:"code,omitempty"`
 }
 
 // ReportAbort carries why a run stopped early for a reason beyond an
@@ -115,6 +129,11 @@ type SuiteReportInput struct {
 	Metadata    ReportMetadata
 	Result      scenario.SuiteResult
 	Screenshots []ReportScreenshot
+	// EntryVideos lists the kept video files of each entry, indexed like
+	// Result.Entries and relative to the artifacts directory. It may be
+	// shorter than the entry list, and an entry with no video has a nil
+	// or empty element.
+	EntryVideos [][]string
 }
 
 func (i SuiteReportInput) ReportKind() ReportKind                { return ReportKindSuite }

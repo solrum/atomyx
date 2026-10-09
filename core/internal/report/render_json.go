@@ -71,6 +71,9 @@ type ReportJsonSuiteEntry struct {
 	Error      *string                   `json:"error,omitempty"`
 	DurationMs int64                     `json:"durationMs"`
 	Result     any                       `json:"result,omitempty"`
+	// Videos are the kept video files of the entry, relative to the
+	// artifacts directory. Omitted when none were kept.
+	Videos []string `json:"videos,omitempty"`
 }
 
 // ReportJsonSuiteResult is the "suite" kind of ReportJson.Result.
@@ -125,7 +128,7 @@ func RenderJSON(input ReportInput, byScope ScreenshotsByScope) (ReportJson, erro
 			ReportVersion: reportVersion,
 			Kind:          ReportKindSuite,
 			Metadata:      v.Metadata,
-			Result:        toJSONSuite(v.Result, byScope),
+			Result:        toJSONSuite(v.Result, v.EntryVideos, byScope),
 		}, nil
 	default:
 		return ReportJson{}, fmt.Errorf("report: renderJson does not support report kind %q yet", input.ReportKind())
@@ -191,7 +194,7 @@ func toJSONScenario(result scenario.ScenarioResult, byScope ScreenshotsByScope, 
 	}
 }
 
-func toJSONSuite(result scenario.SuiteResult, byScope ScreenshotsByScope) ReportJsonSuiteResult {
+func toJSONSuite(result scenario.SuiteResult, entryVideos [][]string, byScope ScreenshotsByScope) ReportJsonSuiteResult {
 	entries := make([]ReportJsonSuiteEntry, len(result.Entries))
 	for i, entry := range result.Entries {
 		scope := SuiteEntryScope(i, entry.Path)
@@ -211,6 +214,7 @@ func toJSONSuite(result scenario.SuiteResult, byScope ScreenshotsByScope) Report
 			Error:      entry.Error,
 			DurationMs: entry.DurationMs,
 			Result:     jsonResult,
+			Videos:     videosOf(entryVideos, i),
 		}
 	}
 	return ReportJsonSuiteResult{
@@ -222,4 +226,11 @@ func toJSONSuite(result scenario.SuiteResult, byScope ScreenshotsByScope) Report
 		DurationMs: result.DurationMs,
 		Entries:    entries,
 	}
+}
+
+func videosOf(entryVideos [][]string, index int) []string {
+	if index >= len(entryVideos) || len(entryVideos[index]) == 0 {
+		return nil
+	}
+	return entryVideos[index]
 }

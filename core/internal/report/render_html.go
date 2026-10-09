@@ -32,13 +32,13 @@ func RenderHTML(input ReportInput, byScope ScreenshotsByScope, imageBase string)
 		body = renderScenarioSection(v.Result, byScope, imageBase)
 	case SuiteReportInput:
 		summary = summarizeSuite(v.Result)
-		body = renderSuiteSection(v.Result, byScope, imageBase)
+		body = renderSuiteSection(v.Result, v.EntryVideos, byScope, imageBase)
 	default:
 		return "", fmt.Errorf("report: renderHtml does not support report kind %q yet", input.ReportKind())
 	}
 
 	metadata := input.ReportMetadata()
-	header := renderHeader(metadata, summary)
+	header := renderHeader(metadata, summary, imageBase)
 
 	return fmt.Sprintf(
 		"<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Atomyx report: %s</title>\n<style>%s</style>\n</head>\n<body>\n%s\n%s\n</body>\n</html>\n",
@@ -72,7 +72,7 @@ func summarizeSuite(result scenario.SuiteResult) htmlSummary {
 	}
 }
 
-func renderHeader(metadata ReportMetadata, summary htmlSummary) string {
+func renderHeader(metadata ReportMetadata, summary htmlSummary, imageBase string) string {
 	status, statusClass := "FAIL", "status-fail"
 	if summary.ok {
 		status, statusClass = "PASS", "status-pass"
@@ -99,6 +99,9 @@ func renderHeader(metadata ReportMetadata, summary htmlSummary) string {
 	)
 	if metadata.Abort != nil {
 		rows = append(rows, metaRow("Aborted", fmt.Sprintf("%s (%s)", metadata.Abort.Message, metadata.Abort.Code)))
+	}
+	if metadata.Recording != nil {
+		rows = append(rows, recordingRow(*metadata.Recording, imageBase))
 	}
 
 	return fmt.Sprintf(
@@ -205,14 +208,14 @@ func scenarioChildStatusClass(status scenario.ScriptRunStatus) string {
 	}
 }
 
-func renderSuiteSection(result scenario.SuiteResult, byScope ScreenshotsByScope, imageBase string) string {
+func renderSuiteSection(result scenario.SuiteResult, entryVideos [][]string, byScope ScreenshotsByScope, imageBase string) string {
 	status, statusClass := "FAIL", "status-fail"
 	if result.Ok {
 		status, statusClass = "PASS", "status-pass"
 	}
 	entries := make([]string, len(result.Entries))
 	for i, entry := range result.Entries {
-		entries[i] = renderSuiteEntry(entry, i, byScope, imageBase)
+		entries[i] = renderSuiteEntry(entry, i, videosOf(entryVideos, i), byScope, imageBase)
 	}
 	suiteName := "suite"
 	if result.SuiteName != nil {
@@ -226,7 +229,7 @@ func renderSuiteSection(result scenario.SuiteResult, byScope ScreenshotsByScope,
 	)
 }
 
-func renderSuiteEntry(entry scenario.SuiteEntryResult, entryIndex int, byScope ScreenshotsByScope, imageBase string) string {
+func renderSuiteEntry(entry scenario.SuiteEntryResult, entryIndex int, videos []string, byScope ScreenshotsByScope, imageBase string) string {
 	scope := SuiteEntryScope(entryIndex, entry.Path)
 	statusClass := "status-fail"
 	if entry.Status == scenario.EntryPassed {
@@ -236,6 +239,7 @@ func renderSuiteEntry(entry scenario.SuiteEntryResult, entryIndex int, byScope S
 		"<h3><span class=\"%s\">%s</span> [%s] %s</h3>",
 		statusClass, escapeHTML(string(entry.Status)), escapeHTML(string(entry.Kind)), escapeHTML(entry.Path),
 	)
+	header += videoLinks(videos, imageBase)
 	if entry.Error != nil {
 		return fmt.Sprintf(
 			"<article class=\"suite-entry\">\n  %s\n  <p class=\"error\">%s</p>\n</article>",
@@ -374,3 +378,34 @@ p.error { color: #b3261e; }
 .screenshots img { max-width: 100%; border-radius: 4px; border: 1px solid #dddddd; }
 .screenshots figcaption { font-size: 12px; color: #555555; margin-top: 4px; word-break: break-word; }
 `
+
+// recordingRow renders the header row of a run's screen recording: a link
+// per kept video file, or the reason no video was kept.
+func recordingRow(recording ReportRecording, imageBase string) string {
+	if recording.State == "kept" && len(recording.Files) > 0 {
+		return fmt.Sprintf("<div><dt>Video</dt><dd>%s</dd></div>", videoAnchors(recording.Files, imageBase))
+	}
+	value := recording.State
+	if recording.Code != "" {
+		value = fmt.Sprintf("%s (%s)", recording.State, recording.Code)
+	}
+	return metaRow("Video", value)
+}
+
+// videoLinks renders the video paragraph of a suite entry, or nothing
+// when the entry kept no video.
+func videoLinks(files []string, imageBase string) string {
+	if len(files) == 0 {
+		return ""
+	}
+	return "\n  <p class=\"videos\">Video: " + videoAnchors(files, imageBase) + "</p>"
+}
+
+// videoAnchors renders one link per video file, oldest first.
+func videoAnchors(files []string, imageBase string) string {
+	links := make([]string, len(files))
+	for i, file := range files {
+		links[i] = fmt.Sprintf("<a href=\"%s%s\">%s</a>", imageBase, encodeURIComponent(file), escapeHTML(file))
+	}
+	return strings.Join(links, ", ")
+}
