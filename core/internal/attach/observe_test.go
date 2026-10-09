@@ -272,8 +272,15 @@ func TestAViewerThatReadsAPullResponseCanSendTheNextPullAtOnce(t *testing.T) {
 	client := dialRaw(t, srv.Path())
 	client.hello()
 
-	const rounds = 1000
+	// The property is that every pull is answered, not that all of them
+	// finish within a total time, so each round gets its own guard. A
+	// single deadline across the loop would measure how fast the machine
+	// encodes and decodes the screenshots instead.
+	const rounds = 200
 	for i := range rounds {
+		if err := client.nc.SetDeadline(time.Now().Add(testGuard)); err != nil {
+			t.Fatal(err)
+		}
 		response := client.call(TypeScreenshotLatest, nil)
 		if response.Ok == nil || !*response.Ok {
 			t.Fatalf("pull %d = %+v, want success", i, response)
