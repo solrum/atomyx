@@ -59,8 +59,11 @@ type platformRecorder struct {
 
 func (r platformRecorder) Start(ctx context.Context, desc Descriptor, dir, name string) (Recording, error) {
 	var recorder ScreenRecorder = unsupportedRecorder{}
-	if desc.Platform == PlatformAndroid {
+	switch {
+	case desc.Platform == PlatformAndroid:
 		recorder = adbRecorder{deps: r.deps, wait: waitRotationInterval}
+	case desc.Platform == PlatformIOS && desc.Kind == KindSimulator:
+		recorder = simulatorRecorder{deps: r.deps, wait: waitRotationInterval}
 	}
 	return recorder.Start(ctx, desc, dir, name)
 }

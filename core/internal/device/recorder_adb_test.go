@@ -2,12 +2,17 @@ package device
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"dev.atomyx/internal/process"
 )
 
 var androidDesc = Descriptor{ID: "SER1", Platform: PlatformAndroid, Kind: KindDevice, State: StateOnline}
+
+var errPull = errors.New("device offline")
 
 func startAndroid(t *testing.T, h *recorderHarness, pids ...int) (Recording, string) {
 	t.Helper()
@@ -98,5 +103,124 @@ func TestAndroidRecorder_StopInterruptsPullsThenClearsTheDevice(t *testing.T) {
 	clear := h.find(pull, "shell rm -rf "+adbRecordingDir)
 	if interrupt > pull || clear < 0 {
 		t.Fatalf("expected interrupt, then pull, then clear, got %q", h.snapshot())
+	}
+}
+
+func TestAndroidRecorder_DiscardClearsTheDeviceAndRemovesPulledFiles(t *testing.T) {
+	h := newRecorderHarness(t)
+	rec, _ := startAndroid(t, h, 111)
+	files, err := rec.Stop(context.Background())
+	if err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
+
+	if err := rec.Discard(context.Background()); err != nil {
+		t.Fatalf("Discard: %v", err)
+	}
+
+	if _, err := os.Stat(files[0]); !os.IsNotExist(err) {
+		t.Fatalf("the pulled file survived Discard: %v", err)
+	}
+	if _, err := rec.Stop(context.Background()); err == nil {
+		t.Fatal("Stop after Discard succeeded")
+	}
+}
+
+func TestAndroidRecorder_DiscardOfARunningRecordingPullsNothing(t *testing.T) {
+	h := newRecorderHarness(t)
+	rec, _ := startAndroid(t, h, 111)
+
+	if err := rec.Discard(context.Background()); err != nil {
+		t.Fatalf("Discard: %v", err)
+	}
+
+	if h.count("pull") != 0 {
+		t.Fatal("Discard pulled a segment")
+	}
+	h.indexOf("shell kill -INT 111")
+	h.indexOf("shell rm -rf " + adbRecordingDir)
+}
+
+func TestAndroidRecorder_CancelledStopKillsAndStillCleansTheDevice(t *testing.T) {
+	h := newRecorderHarness(t)
+	rec, dir := startAndroid(t, h, 111)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	files, err := rec.Stop(ctx)
+
+	if err == nil || files != nil {
+		t.Fatalf("Stop = %v, %v, want an error and no files", files, err)
+	}
+	if !h.procs[0].Killed() {
+		t.Fatal("the host adb process was not killed")
+	}
+	if h.count("pull") != 0 {
+		t.Fatal("a cancelled Stop pulled a segment")
+	}
+	h.indexOf("shell rm -rf " + adbRecordingDir)
+	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
+		t.Fatalf("local files left behind: %v", entries)
+	}
+}
+
+func TestAndroidRecorder_PullFailureRemovesPartialFilesAndCleansTheDevice(t *testing.T) {
+	h := newRecorderHarness(t)
+	rec, dir := startAndroid(t, h, 111, 222)
+	h.rotateOnce()
+	h.pullErr = errPull
+
+	files, err := rec.Stop(context.Background())
+
+	if err == nil || files != nil {
+		t.Fatalf("Stop = %v, %v, want an error and no files", files, err)
+	}
+	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
+		t.Fatalf("local files left behind: %v", entries)
+	}
+	if h.find(h.indexOf("pull"), "shell rm -rf "+adbRecordingDir) < 0 {
+		t.Fatal("the device directory was not cleared after the failed pull")
+	}
+}
+
+func TestAndroidRecorder_StopTwiceFails(t *testing.T) {
+	h := newRecorderHarness(t)
+	rec, _ := startAndroid(t, h, 111)
+	if _, err := rec.Stop(context.Background()); err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
+
+	if _, err := rec.Stop(context.Background()); err == nil {
+		t.Fatal("second Stop succeeded")
+	}
+}
+
+func TestAndroidRecorder_StartFailsWhenTheSegmentReportsNoPid(t *testing.T) {
+	h := newRecorderHarness(t)
+	proc := process.NewFakeBackgroundProcess()
+	proc.Exit(1)
+	h.bg.Stub(proc)
+
+	rec, err := adbRecorder{deps: h.deps(), wait: h.wait}.Start(context.Background(), androidDesc, t.TempDir(), "video-1")
+
+	if err == nil || rec != nil {
+		t.Fatalf("Start = %v, %v, want an error", rec, err)
+	}
+	h.indexOf("shell rm -rf " + adbRecordingDir)
+}
+
+func TestAndroidRecorder_RotationFailureSurfacesAtStop(t *testing.T) {
+	h := newRecorderHarness(t)
+	rec, dir := startAndroid(t, h, 111)
+	h.bg.DefaultErr = errPull
+	h.tick <- struct{}{}
+
+	files, err := rec.Stop(context.Background())
+
+	if err == nil || files != nil {
+		t.Fatalf("Stop = %v, %v, want the rotation error", files, err)
+	}
+	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
+		t.Fatalf("local files left behind: %v", entries)
 	}
 }
