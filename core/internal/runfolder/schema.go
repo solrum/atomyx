@@ -119,6 +119,7 @@ func metaSchema() map[string]any {
 		"importedFrom":         map[string]any{"type": "string", "description": "Id of the record of another store this folder was imported from. Absent for a run written natively."},
 		"interventionsDropped": map[string]any{"type": "integer", "minimum": 1, "description": "How many intervention lines did not fit in interventions.jsonl. Absent when none were dropped."},
 		"recording":            ref("Recording"),
+		"parentRunId":          map[string]any{"type": "string", "description": "Id of the sharding run that started this run as one of its workers. Absent on a run no sharding run started."},
 		"flakyEntries":         map[string]any{"type": "integer", "minimum": 1, "description": "How many suite entries failed and then passed on a retry. Absent when none did."},
 		"quarantinedFailures":  map[string]any{"type": "integer", "minimum": 1, "description": "How many quarantined suite entries failed. Absent when none did."},
 	}, []string{"schemaVersion", "runId", "kind", "startedAt"})

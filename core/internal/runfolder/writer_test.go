@@ -479,3 +479,16 @@ func TestAdoptArtifactRefusesWhatIsNotATemporaryArtifact(t *testing.T) {
 		})
 	}
 }
+
+func TestStartKeepsTheParentRunIDOfTheBaseMeta(t *testing.T) {
+	root := t.TempDir()
+	w, err := newTestStarter(root, 1, 2).Start("worker", Meta{Kind: KindSuite, ParentRunID: "parent-run"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = w.Close() }()
+	meta, _, _ := NewReader(root).Get(w.ID())
+	if meta.ParentRunID != "parent-run" {
+		t.Fatalf("meta = %+v, want the parent run id kept", meta)
+	}
+}

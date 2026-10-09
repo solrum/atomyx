@@ -268,6 +268,10 @@
           ],
           "type": "string"
         },
+        "parentRunId": {
+          "description": "Id of the sharding run that started this run as one of its workers. Absent on a run no sharding run started.",
+          "type": "string"
+        },
         "quarantinedFailures": {
           "description": "How many quarantined suite entries failed. Absent when none did.",
           "minimum": 1,

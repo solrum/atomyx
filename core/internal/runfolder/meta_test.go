@@ -309,3 +309,21 @@ func TestMetaSuiteCountsAreOmittedWhenZeroAndEncodedWhenSet(t *testing.T) {
 		t.Fatalf("meta without counts = %+v, %v", old, err)
 	}
 }
+
+func TestMetaParentRunIDIsOmittedWhenEmptyAndRoundTripsWhenSet(t *testing.T) {
+	bare, err := json.Marshal(Meta{SchemaVersion: 1, RunID: "r", Kind: KindSuite})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(bare, []byte(`"parentRunId"`)) {
+		t.Errorf("an empty parent id encoded: %s", bare)
+	}
+	data, err := json.Marshal(Meta{ParentRunID: "20261009-101500-shard-ab12"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var back Meta
+	if err := json.Unmarshal(data, &back); err != nil || back.ParentRunID != "20261009-101500-shard-ab12" {
+		t.Fatalf("round trip = %+v, %v", back, err)
+	}
+}
