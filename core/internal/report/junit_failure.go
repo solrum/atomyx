@@ -58,10 +58,13 @@ func scenarioFailureText(result scenario.ScenarioResult) string {
 	return unknownFailureText
 }
 
-// attemptFailureText describes why an attempt failed. ran reports whether
+// AttemptFailureText describes why an attempt failed. ran reports whether
 // the entry produced a result at all, which separates a failed test from
 // an entry that could not run, such as one that fails to load.
-func attemptFailureText(attempt scenario.SuiteAttempt) (text string, ran bool) {
+func AttemptFailureText(attempt scenario.SuiteAttempt) (text string, ran bool) {
+	if attempt.Failure != "" {
+		return attempt.Failure, true
+	}
 	if attempt.Result != nil {
 		switch {
 		case attempt.Result.Script != nil:

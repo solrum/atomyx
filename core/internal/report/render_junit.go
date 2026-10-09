@@ -125,14 +125,14 @@ func suiteSuite(metadata ReportMetadata, result scenario.SuiteResult) junitSuite
 				if attempt.Status == scenario.EntryPassed {
 					continue
 				}
-				text, _ := attemptFailureText(attempt)
+				text, _ := AttemptFailureText(attempt)
 				testCase.Flaky = append(testCase.Flaky, junitFlakyRun{Message: text, Time: junitSeconds(attempt.DurationMs), Body: text})
 			}
 		case entry.QuarantinedFailure():
 			testCase.Skipped = &junitSkipped{Message: quarantinedMessage}
 			suite.Skipped++
 		default:
-			text, ran := attemptFailureText(last)
+			text, ran := AttemptFailureText(last)
 			problem := &junitProblem{Message: text, Body: text}
 			if ran {
 				testCase.Failure = problem

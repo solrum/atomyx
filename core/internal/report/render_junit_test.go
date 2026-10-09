@@ -228,3 +228,24 @@ func TestFsReporter_WritesJUnitOnlyWhenRequested(t *testing.T) {
 		t.Error("report.html written without being requested")
 	}
 }
+
+func TestRenderJUnit_AnAttemptWithAKeptFailureTextReadsAsAFailedTest(t *testing.T) {
+	name := "shard"
+	got := mustJUnit(t, SuiteReportInput{
+		Metadata: ReportMetadata{StartedAt: "2026-10-09T10:00:00Z"},
+		Result: scenario.SuiteResult{
+			SuiteName: &name, Total: 2, Failed: 2,
+			Entries: []scenario.SuiteEntryResult{
+				{Path: "ran.yml", Status: scenario.EntryFailed, Attempts: []scenario.SuiteAttempt{{Number: 1, Status: scenario.EntryFailed, Failure: "step 2 (tap) failed: gone"}}},
+				{Path: "load.yml", Status: scenario.EntryFailed, Attempts: []scenario.SuiteAttempt{{Number: 1, Status: scenario.EntryFailed, Error: junitStr("parse error")}}},
+			},
+		},
+	})
+
+	if !strings.Contains(got, `<failure message="step 2 (tap) failed: gone">`) || !strings.Contains(got, `<error message="parse error">`) {
+		t.Errorf("junit =\n%s\nwant a failure for the test that ran and an error for the entry that did not", got)
+	}
+	if !strings.Contains(got, `failures="1" errors="1"`) {
+		t.Errorf("junit =\n%s\nwant one failure and one error", got)
+	}
+}

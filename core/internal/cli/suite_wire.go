@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"dev.atomyx/internal/report"
 	"dev.atomyx/internal/scenario"
 	"dev.atomyx/internal/shard"
 )
@@ -28,9 +29,22 @@ func wireEntry(entry scenario.SuiteEntryResult) shard.Entry {
 			Number:     attempt.Number,
 			Status:     string(attempt.Status),
 			Error:      attempt.Error,
+			Failure:    failedTestText(attempt),
 			DurationMs: attempt.DurationMs,
 			Videos:     attempt.Videos,
 		}
 	}
 	return wire
+}
+
+// failedTestText returns the failure text of an attempt that ran its test
+// and failed, and an empty string for any other attempt.
+func failedTestText(attempt scenario.SuiteAttempt) string {
+	if attempt.Status != scenario.EntryFailed {
+		return ""
+	}
+	if text, ran := report.AttemptFailureText(attempt); ran {
+		return text
+	}
+	return ""
 }

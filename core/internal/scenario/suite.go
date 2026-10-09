@@ -149,6 +149,11 @@ type SuiteAttempt struct {
 	DurationMs int64              `json:"durationMs"`
 	Videos     []string           `json:"videos,omitempty"`
 	Result     *SuiteEntryOutcome `json:"-"`
+	// Failure describes a failed test for an attempt whose Result the host
+	// did not keep, such as an attempt a sharding worker reported. It makes
+	// the attempt read as a test that ran and failed, not as an entry that
+	// could not run.
+	Failure string `json:"-"`
 }
 
 // SuiteEntryResult is one suite entry's outcome. Status, Result and

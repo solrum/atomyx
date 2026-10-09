@@ -75,13 +75,16 @@ type Entry struct {
 }
 
 // Attempt is one run of an entry. Videos are the kept file names relative
-// to the artifacts directory of the worker run folder. A worker leaves
+// to the artifacts directory of the worker run folder. Failure describes a
+// failed attempt that ran its test, and is empty for an attempt that passed
+// or could not run, in which case Error says why. A worker leaves
 // DeviceID and WorkerRunID empty, and the coordinator fills them in to say
 // where the attempt ran.
 type Attempt struct {
 	Number      int      `json:"number"`
 	Status      string   `json:"status"`
 	Error       *string  `json:"error,omitempty"`
+	Failure     string   `json:"failure,omitempty"`
 	DurationMs  int64    `json:"durationMs"`
 	Videos      []string `json:"videos,omitempty"`
 	DeviceID    string   `json:"deviceId,omitempty"`

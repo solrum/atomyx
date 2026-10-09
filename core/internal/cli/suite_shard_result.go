@@ -44,6 +44,7 @@ func suiteEntryFromWire(entry shard.Entry) scenario.SuiteEntryResult {
 			Number:     attempt.Number,
 			Status:     scenario.SuiteEntryStatus(attempt.Status),
 			Error:      attempt.Error,
+			Failure:    attempt.Failure,
 			DurationMs: attempt.DurationMs,
 			Videos:     attempt.Videos,
 		}
