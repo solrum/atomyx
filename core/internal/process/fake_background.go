@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 )
 
 // FakeBackgroundInvocation records one call made to a
@@ -32,11 +33,13 @@ type FakeBackgroundProcess struct {
 	buf    bytes.Buffer
 	closed bool
 
-	pid      int
-	killed   bool
-	exited   bool
-	exitCode int
-	stderr   string
+	pid              int
+	killed           bool
+	interrupted      bool
+	ignoresInterrupt bool
+	exited           bool
+	exitCode         int
+	stderr           string
 }
 
 // NewFakeBackgroundProcess constructs a FakeBackgroundProcess with
@@ -142,6 +145,48 @@ func (p *FakeBackgroundProcess) Kill() error {
 		p.exited = true
 		p.exitCode = -1
 	}
+	p.mu.Unlock()
+	p.cond.Broadcast()
+	return nil
+}
+
+// FakeInterruptExitCode is the exit code a FakeBackgroundProcess reports
+// after an Interrupt it did not ignore, matching a shell's status for a
+// process ended by SIGINT.
+const FakeInterruptExitCode = 130
+
+// IgnoreInterrupt makes the process behave like one that ignores
+// SIGINT, so Interrupt falls back to Kill.
+func (p *FakeBackgroundProcess) IgnoreInterrupt() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.ignoresInterrupt = true
+}
+
+// Interrupted reports whether Interrupt has been called.
+func (p *FakeBackgroundProcess) Interrupted() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.interrupted
+}
+
+// Interrupt marks the process interrupted. A running process exits with
+// FakeInterruptExitCode unless IgnoreInterrupt was called, in which case
+// the call falls back to Kill. The grace period is not waited on.
+func (p *FakeBackgroundProcess) Interrupt(_ time.Duration) error {
+	p.mu.Lock()
+	p.interrupted = true
+	if p.exited {
+		p.mu.Unlock()
+		return nil
+	}
+	if p.ignoresInterrupt {
+		p.mu.Unlock()
+		return p.Kill()
+	}
+	p.closed = true
+	p.exited = true
+	p.exitCode = FakeInterruptExitCode
 	p.mu.Unlock()
 	p.cond.Broadcast()
 	return nil

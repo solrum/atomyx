@@ -148,6 +148,29 @@ func (p *execBackgroundProcess) Kill() error {
 	return nil
 }
 
+// Interrupt sends SIGINT to the process group, waits up to grace for
+// the process to exit, and escalates to Kill when it has not. Tools
+// such as a screen recorder finalize their output on SIGINT but not on
+// SIGKILL, so the escalation is the last resort.
+func (p *execBackgroundProcess) Interrupt(grace time.Duration) error {
+	if p.cmd.Process == nil {
+		return nil
+	}
+	reaped := make(chan struct{})
+	go func() {
+		_, _ = p.Wait()
+		close(reaped)
+	}()
+
+	_ = syscall.Kill(-p.cmd.Process.Pid, syscall.SIGINT)
+	select {
+	case <-reaped:
+		return nil
+	case <-time.After(grace):
+	}
+	return p.Kill()
+}
+
 // cappedBuffer retains the last limit bytes written to it and
 // silently discards everything before them, so a background process's
 // stderr can be captured for diagnostics without an unbounded buffer

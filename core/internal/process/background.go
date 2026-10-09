@@ -3,6 +3,7 @@ package process
 import (
 	"context"
 	"io"
+	"time"
 )
 
 // BackgroundResult carries a BackgroundProcess's outcome once it has
@@ -35,6 +36,11 @@ type BackgroundProcess interface {
 	// Kill terminates the process if it is still running. Killing an
 	// already-exited process is a no-op.
 	Kill() error
+	// Interrupt asks the process to stop on its own by sending SIGINT to
+	// its process group, waits up to grace for it to exit, and falls
+	// back to Kill when it has not. It always reaps the process before
+	// returning. Interrupting an already-exited process is a no-op.
+	Interrupt(grace time.Duration) error
 	// Pid reports the operating system process id of the started
 	// process. A BackgroundRunner starts every process as the leader of
 	// its own process group, so the process group id equals Pid.

@@ -325,6 +325,8 @@ func (p *tunnelProcess) Kill() error {
 	return nil
 }
 
+func (p *tunnelProcess) Interrupt(time.Duration) error { return p.Kill() }
+
 // freeTCPPort returns a host port with no listener bound at test
 // start, for a test that wants to hand iosdriver.Options a port
 // number without yet occupying it.
