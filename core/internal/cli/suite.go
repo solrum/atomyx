@@ -121,34 +121,19 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 		return reportUncaught(ctx, stderr, deps.Debug, indexErr)
 	}
 
-	printSuiteResult(humanOut, result)
-	if jsonOutput {
-		payload := suiteJSONResult{Ok: result.Ok, RunFolder: record.Dir(), Entries: indexEntries}
-		if err := encodeJSON(stdout, payload); err != nil {
-			return reportUncaught(ctx, stderr, deps.Debug, err)
-		}
-		record.reportedInJSON = true
-	}
-
-	metadata := buildReportMetadata(record.ID(), suiteLabel, runStartedAt, finishedAt, result.DurationMs, platform, deviceID, envName, nil)
-	metadata.Command = report.ReportCommandSuite
-	input := report.SuiteReportInput{
-		Metadata:    metadata,
-		Result:      result,
-		Screenshots: suiteReportScreenshots(result),
-		EntryVideos: indexEntryVideos(indexEntries),
-	}
-	bundle, genErr := report.NewFsReporter().Generate(input, record.reportOptions())
-	if genErr != nil {
-		return reportUncaught(ctx, stderr, deps.Debug, genErr)
-	}
-	printReportLocation(stderr, record, bundle)
-	printVideoLocations(stderr, record.Dir(), input.EntryVideos)
-
-	if result.Ok {
-		return 0
-	}
-	return 1
+	return emitSuiteOutputs(ctx, deps, suiteOutputs{
+		stdout:     stdout,
+		humanOut:   humanOut,
+		stderr:     stderr,
+		jsonOutput: jsonOutput,
+		record:     record,
+		label:      suiteLabel,
+		startedAt:  runStartedAt,
+		finishedAt: finishedAt,
+		platform:   platform,
+		deviceID:   deviceID,
+		envName:    envName,
+	}, result, indexEntries)
 }
 
 // resolveSuiteSelector builds the suite.Selector from a named config
