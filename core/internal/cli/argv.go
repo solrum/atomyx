@@ -110,6 +110,7 @@ var commandFlags = map[Command][]flagDef{
 		{"--report", flagValue},
 		{"--report-dir", flagValue},
 		{"--video", flagBoolean},
+		{"--retries", flagValue},
 		{"--help", flagBoolean},
 		{"-h", flagBoolean},
 	},

@@ -55,6 +55,12 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 		return 2
 	}
 
+	policy, err := resolveSuitePolicy(positional, flags, loaded)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "error: %s\n", err)
+		return 2
+	}
+
 	var configReport *config.Report
 	if loaded != nil {
 		configReport = loaded.Config.Report
@@ -173,6 +179,8 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 	result, err := suiteRunner.Run(runCtx, entries, &scenario.SuiteRunOptions{
 		SuiteName:            positional,
 		ResolvePreconditions: resolvePreconditions,
+		Retries:              policy.Retries,
+		Quarantined:          quarantineMatcher(policy.Quarantine, cwd, testRoots),
 	})
 	finishedAt := time.Now()
 	if opened.reportLost(stderr) {

@@ -345,3 +345,13 @@ func TestVideoEnabledFlagOverridesConfig(t *testing.T) {
 		}
 	}
 }
+
+func TestParseArgvRetriesIsASuiteFlagOnly(t *testing.T) {
+	result := mustParseArgv(t, []string{"suite", "smoke", "--retries", "2"})
+	if result.Flags["--retries"] != "2" {
+		t.Errorf("--retries: got %#v", result.Flags["--retries"])
+	}
+	if _, err := ParseArgv([]string{"run", "--file", "x.yml", "--retries", "2"}); !isArgvError(err) {
+		t.Errorf("run accepted --retries: %v", err)
+	}
+}

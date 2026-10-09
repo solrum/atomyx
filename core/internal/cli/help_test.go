@@ -59,3 +59,11 @@ func TestPrintCommandHelpRunAndSuiteDocumentVideo(t *testing.T) {
 		}
 	}
 }
+
+func TestSuiteHelpDocumentsRetries(t *testing.T) {
+	var out bytes.Buffer
+	PrintCommandHelp(CommandSuite, &out)
+	if !strings.Contains(out.String(), "--retries <n>") {
+		t.Error("the suite help does not document --retries")
+	}
+}

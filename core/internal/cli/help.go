@@ -102,6 +102,13 @@ FLAGS
   --video                  Record the device screen and keep the video
                            of each failed entry in the run folder,
                            whatever the config video setting says.
+  --retries <n>            Run a failed entry again up to n more times,
+                           from 0 to 3. Only a test failure is retried,
+                           never a canceled run, a lost device or an
+                           entry that cannot be loaded. An entry that
+                           fails and then passes is reported as flaky
+                           and counts as passed. Overrides the config
+                           suite's retries.
   --help, -h               Show this message.
 
 EXAMPLES
@@ -110,7 +117,8 @@ EXAMPLES
   atomyx driver suite --glob "flows/**/*.yml" --tag critical
 
 EXIT CODES
-  0    every entry in the suite passed
+  0    every entry in the suite passed, or failed only while
+       quarantined
   1    the suite ran and at least one entry failed
   2    the command was misused, or no flow matched the selector
 `)
