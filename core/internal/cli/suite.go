@@ -155,6 +155,7 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 	defer record.end(ctx, stderr)
 	opened.recordRun(record)
 
+	videos := newSuiteVideos(deps.videoLifecycle(videoEnabled(flags, loaded)), desc, record.writer)
 	suiteRunner := scenario.NewSuiteRunner(scenario.SuiteRunnerDeps{
 		Orchestra:        built.Orchestra,
 		Clock:            deps.clock(),
@@ -166,6 +167,7 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 		ExternalEnv:      externalEnv,
 		ChildArtifacts:   newArtifactSequence(runfolder.ArtifactsDir(record.Dir())).forTarget,
 		OnStep:           stepstream.NewSink(record.writer, deps.logger(), stepstream.WithPublisher(opened.PublishStep)),
+		OnEntryStart:     videos.start,
 	})
 
 	result, err := suiteRunner.Run(runCtx, entries, &scenario.SuiteRunOptions{
@@ -190,12 +192,14 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 		Metadata:    metadata,
 		Result:      result,
 		Screenshots: suiteReportScreenshots(result),
+		EntryVideos: videos.entryFiles(len(result.Entries)),
 	}
 	bundle, genErr := report.NewFsReporter().Generate(input, record.reportOptions())
 	if genErr != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, genErr)
 	}
 	printReportLocation(stderr, record, bundle)
+	videos.printVideoLocations(stderr, record.Dir(), len(result.Entries))
 
 	if result.Ok {
 		return 0

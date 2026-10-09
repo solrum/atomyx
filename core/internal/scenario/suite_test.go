@@ -2,6 +2,8 @@ package scenario
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 
 	"dev.atomyx/internal/driver"
@@ -161,3 +163,57 @@ func TestSuiteRunner_Run_EmitsStepTraceAndOutcomeLogCarryingRunID(t *testing.T) 
 }
 
 func strPtr(s string) *string { return &s }
+
+func TestSuiteRunner_Run_CallsEntryHookAroundEveryEntryInOrder(t *testing.T) {
+	var events []string
+	entries := []SuiteEntry{
+		{Path: "scripts/a.yml", Content: passYaml},
+		{Path: "scripts/b.yml", Content: failYaml},
+		{Path: "scripts/c.yml", Content: "not: [valid"},
+	}
+	r := NewSuiteRunner(SuiteRunnerDeps{
+		Orchestra: newFixture(t),
+		Clock:     orchestra.NewFakeClock(0),
+		Logger:    noopLogger{},
+		Commands:  runner.DefaultCommands(),
+		OnEntryStart: func(_ context.Context, target EntryTarget) EntryEnd {
+			events = append(events, fmt.Sprintf("start %d %s", target.EntryIndex, target.EntryPath))
+			return func(res SuiteEntryResult) {
+				events = append(events, fmt.Sprintf("end %s %s", res.Path, res.Status))
+			}
+		},
+	})
+
+	if _, err := r.Run(context.Background(), entries, nil); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	want := []string{
+		"start 0 scripts/a.yml", "end scripts/a.yml passed",
+		"start 1 scripts/b.yml", "end scripts/b.yml failed",
+		"start 2 scripts/c.yml", "end scripts/c.yml failed",
+	}
+	if strings.Join(events, "|") != strings.Join(want, "|") {
+		t.Errorf("events = %v, want %v", events, want)
+	}
+}
+
+func TestSuiteRunner_Run_AcceptsAHookWithNoEndFunction(t *testing.T) {
+	starts := 0
+	r := NewSuiteRunner(SuiteRunnerDeps{
+		Orchestra: newFixture(t),
+		Clock:     orchestra.NewFakeClock(0),
+		Logger:    noopLogger{},
+		Commands:  runner.DefaultCommands(),
+		OnEntryStart: func(context.Context, EntryTarget) EntryEnd {
+			starts++
+			return nil
+		},
+	})
+	if _, err := r.Run(context.Background(), []SuiteEntry{{Path: "a.yml", Content: passYaml}}, nil); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if starts != 1 {
+		t.Errorf("starts = %d, want 1", starts)
+	}
+}

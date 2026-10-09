@@ -89,6 +89,9 @@ type SuiteRunnerDeps struct {
 	// script the suite runs, directly or through a scenario entry, and
 	// enables failure evidence capture for them.
 	ChildArtifacts ArtifactsFactory
+	// OnEntryStart, when non-nil, is called before every entry. A host
+	// uses it to scope work such as a screen recording to one entry.
+	OnEntryStart EntryStart
 }
 
 // SuiteRunOptions configures one SuiteRunner.Run call.
@@ -243,6 +246,11 @@ func (r *SuiteRunner) runEntry(ctx context.Context, index int, entry SuiteEntry,
 		kind = KindScenario
 	}
 
+	var entryEnd EntryEnd
+	if r.deps.OnEntryStart != nil {
+		entryEnd = r.deps.OnEntryStart(ctx, EntryTarget{EntryIndex: index, EntryPath: entry.Path})
+	}
+
 	if r.deps.NetworkCapture != nil {
 		r.deps.NetworkCapture.Reset()
 	}
@@ -282,6 +290,9 @@ func (r *SuiteRunner) runEntry(ctx context.Context, index int, entry SuiteEntry,
 	} else {
 		res.Status = status
 		res.Result = &outcome
+	}
+	if entryEnd != nil {
+		entryEnd(res)
 	}
 	return res
 }
