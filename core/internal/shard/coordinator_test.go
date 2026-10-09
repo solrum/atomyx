@@ -11,127 +11,6 @@ import (
 	"time"
 )
 
-// scripted describes how the fake worker of one device behaves.
-type scripted struct {
-	startErr  error
-	readyLine *Line
-	// readyAfter, when set, holds the ready line back until it is closed.
-	readyAfter <-chan struct{}
-	// handle answers one path. It may block to model a slow device.
-	handle func(path string) Line
-	// vanish, when set, makes the worker call it and exit on its first
-	// path without answering, like a crashed process.
-	vanish func()
-}
-
-type fakeLauncher struct {
-	mu      sync.Mutex
-	devices map[string]*scripted
-	seen    map[string][]string
-	stopped map[string]bool
-}
-
-func newFakeLauncher(devices map[string]*scripted) *fakeLauncher {
-	return &fakeLauncher{devices: devices, seen: map[string][]string{}, stopped: map[string]bool{}}
-}
-
-func (l *fakeLauncher) Launch(_ context.Context, spec WorkerSpec) (Worker, error) {
-	behavior := l.devices[spec.Device.ID]
-	if behavior.startErr != nil {
-		return nil, behavior.startErr
-	}
-	w := &fakeWorker{id: spec.Device.ID, launcher: l, behavior: behavior, lines: make(chan Line), in: make(chan string), quit: make(chan struct{})}
-	go w.run()
-	return w, nil
-}
-
-func (l *fakeLauncher) handled(id string) []string {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return slices.Clone(l.seen[id])
-}
-
-type fakeWorker struct {
-	id       string
-	launcher *fakeLauncher
-	behavior *scripted
-	lines    chan Line
-	in       chan string
-	quit     chan struct{}
-	once     sync.Once
-}
-
-func (w *fakeWorker) run() {
-	defer close(w.lines)
-	if w.behavior.readyAfter != nil {
-		select {
-		case <-w.behavior.readyAfter:
-		case <-w.quit:
-			return
-		}
-	}
-	if w.behavior.readyLine != nil {
-		w.lines <- *w.behavior.readyLine
-		return
-	}
-	w.lines <- Line{Kind: LineReady, RunID: "run-" + w.id}
-	for {
-		select {
-		case path, ok := <-w.in:
-			if !ok {
-				return
-			}
-			w.launcher.mu.Lock()
-			w.launcher.seen[w.id] = append(w.launcher.seen[w.id], path)
-			w.launcher.mu.Unlock()
-			if w.behavior.vanish != nil {
-				w.behavior.vanish()
-				return
-			}
-			answer := make(chan Line, 1)
-			go func() { answer <- w.behavior.handle(path) }()
-			var line Line
-			select {
-			case line = <-answer:
-			case <-w.quit:
-				return
-			}
-			line.RunID = "run-" + w.id
-			select {
-			case w.lines <- line:
-			case <-w.quit:
-				return
-			}
-			if line.DeviceLost {
-				return
-			}
-		case <-w.quit:
-			return
-		}
-	}
-}
-
-func (w *fakeWorker) Lines() <-chan Line { return w.lines }
-func (w *fakeWorker) Send(path string) error {
-	select {
-	case w.in <- path:
-		return nil
-	case <-w.quit:
-		return errors.New("worker gone")
-	}
-}
-func (w *fakeWorker) CloseInput() error {
-	w.once.Do(func() { close(w.in) })
-	return nil
-}
-func (w *fakeWorker) Stop(time.Duration) {
-	w.launcher.mu.Lock()
-	w.launcher.stopped[w.id] = true
-	w.launcher.mu.Unlock()
-	close(w.quit)
-}
-func (w *fakeWorker) Wait() Exit { return Exit{Stderr: "worker stderr"} }
-
 func entryLine(path, status string) Line {
 	return Line{Kind: LineEntry, Entry: &Entry{Path: path, Kind: "script", Status: status, DurationMs: 10, Attempts: []Attempt{{Number: 1, Status: status, DurationMs: 10}}}}
 }
@@ -162,8 +41,8 @@ func runShard(t *testing.T, launcher Launcher, devices []string, entries []strin
 }
 
 func TestRunGivesEveryEntryToExactlyOneWorkerAndKeepsSuiteOrder(t *testing.T) {
-	launcher := newFakeLauncher(map[string]*scripted{
-		"a": {handle: passing}, "b": {handle: passing}, "c": {handle: passing},
+	launcher := NewFakeLauncher(map[string]*FakeScript{
+		"a": {Handle: passing}, "b": {Handle: passing}, "c": {Handle: passing},
 	})
 	entries := paths(9)
 
@@ -184,7 +63,7 @@ func TestRunGivesEveryEntryToExactlyOneWorkerAndKeepsSuiteOrder(t *testing.T) {
 	}
 	var ran []string
 	for _, id := range []string{"a", "b", "c"} {
-		ran = append(ran, launcher.handled(id)...)
+		ran = append(ran, launcher.Handled(id)...)
 	}
 	slices.Sort(ran)
 	if !slices.Equal(ran, entries) {
@@ -199,20 +78,20 @@ func TestRunGivesTheNextEntryToWhicheverWorkerIsFree(t *testing.T) {
 	fastDone.Add(len(entries) - 1)
 	slowStarted := make(chan struct{})
 	var startOnce sync.Once
-	launcher := newFakeLauncher(map[string]*scripted{
-		"slow": {handle: func(path string) Line {
+	launcher := NewFakeLauncher(map[string]*FakeScript{
+		"slow": {Handle: func(path string) Line {
 			startOnce.Do(func() { close(slowStarted) })
 			<-release
 			return passing(path)
 		}},
-		"fast": {readyAfter: slowStarted, handle: func(path string) Line { defer fastDone.Done(); return passing(path) }},
+		"fast": {ReadyAfter: slowStarted, Handle: func(path string) Line { defer fastDone.Done(); return passing(path) }},
 	})
 	go func() { fastDone.Wait(); close(release) }()
 
 	outcome, _ := runShard(t, launcher, []string{"slow", "fast"}, entries)
 
-	if len(outcome.Entries) != len(entries) || len(launcher.handled("slow")) != 1 || len(launcher.handled("fast")) != len(entries)-1 {
-		t.Errorf("slow ran %v, fast ran %v, want the fast worker to take the rest", launcher.handled("slow"), launcher.handled("fast"))
+	if len(outcome.Entries) != len(entries) || len(launcher.Handled("slow")) != 1 || len(launcher.Handled("fast")) != len(entries)-1 {
+		t.Errorf("slow ran %v, fast ran %v, want the fast worker to take the rest", launcher.Handled("slow"), launcher.Handled("fast"))
 	}
 }
 
@@ -231,14 +110,14 @@ func losing(lost chan struct{}) func(string) Line {
 func TestRunRequeuesTheEntryOfALostDeviceOnceToAnotherWorker(t *testing.T) {
 	aLost := make(chan struct{})
 	lose := losing(aLost)
-	launcher := newFakeLauncher(map[string]*scripted{
-		"a": {handle: func(p string) Line {
+	launcher := NewFakeLauncher(map[string]*FakeScript{
+		"a": {Handle: func(p string) Line {
 			if strings.HasSuffix(p, "01.yml") {
 				return lose(p)
 			}
 			return passing(p)
 		}},
-		"b": {readyAfter: aLost, handle: passing},
+		"b": {ReadyAfter: aLost, Handle: passing},
 	})
 
 	outcome, warnings := runShard(t, launcher, []string{"a", "b"}, paths(4))
@@ -266,10 +145,10 @@ func TestRunRequeuesTheEntryOfALostDeviceOnceToAnotherWorker(t *testing.T) {
 
 func TestRunRequeuesALostEntryOnlyOnce(t *testing.T) {
 	aLost, bLost := make(chan struct{}), make(chan struct{})
-	launcher := newFakeLauncher(map[string]*scripted{
-		"a": {handle: losing(aLost)},
-		"b": {readyAfter: aLost, handle: losing(bLost)},
-		"c": {readyAfter: bLost, handle: passing},
+	launcher := NewFakeLauncher(map[string]*FakeScript{
+		"a": {Handle: losing(aLost)},
+		"b": {ReadyAfter: aLost, Handle: losing(bLost)},
+		"c": {ReadyAfter: bLost, Handle: passing},
 	})
 
 	outcome, _ := runShard(t, launcher, []string{"a", "b", "c"}, paths(1))
@@ -277,21 +156,21 @@ func TestRunRequeuesALostEntryOnlyOnce(t *testing.T) {
 	if len(outcome.Entries) != 1 || outcome.Entries[0].Status != "failed" || len(outcome.Entries[0].Attempts) != 2 {
 		t.Fatalf("entries = %+v, want one failed entry with two attempts", outcome.Entries)
 	}
-	if got := launcher.handled("c"); len(got) != 0 {
+	if got := launcher.Handled("c"); len(got) != 0 {
 		t.Errorf("worker c ran %v, want the entry not to be requeued a second time", got)
 	}
 }
 
 func TestRunDropsAWorkerThatReportsDeviceHeld(t *testing.T) {
 	held := Line{Kind: LineError, Code: "DEVICE_HELD", Message: "held by atomyx inspect"}
-	launcher := newFakeLauncher(map[string]*scripted{
-		"a": {readyLine: &held}, "b": {handle: passing},
+	launcher := NewFakeLauncher(map[string]*FakeScript{
+		"a": {ReadyLine: &held}, "b": {Handle: passing},
 	})
 
 	outcome, warnings := runShard(t, launcher, []string{"a", "b"}, paths(3))
 
-	if len(outcome.Entries) != 3 || len(launcher.handled("a")) != 0 || len(launcher.handled("b")) != 3 {
-		t.Errorf("entries %d, a ran %v, b ran %v", len(outcome.Entries), launcher.handled("a"), launcher.handled("b"))
+	if len(outcome.Entries) != 3 || len(launcher.Handled("a")) != 0 || len(launcher.Handled("b")) != 3 {
+		t.Errorf("entries %d, a ran %v, b ran %v", len(outcome.Entries), launcher.Handled("a"), launcher.Handled("b"))
 	}
 	if len(warnings) != 1 || !strings.Contains(warnings[0], "device a dropped") || !strings.Contains(warnings[0], "DEVICE_HELD") {
 		t.Errorf("warnings = %v, want one naming device a and DEVICE_HELD", warnings)
@@ -299,8 +178,8 @@ func TestRunDropsAWorkerThatReportsDeviceHeld(t *testing.T) {
 }
 
 func TestRunLeavesEntriesUnrunWhenEveryWorkerIsGone(t *testing.T) {
-	launcher := newFakeLauncher(map[string]*scripted{
-		"a": {startErr: errors.New("no such file")}, "b": {readyLine: &Line{Kind: LineError, Code: "DEVICE_HELD"}},
+	launcher := NewFakeLauncher(map[string]*FakeScript{
+		"a": {StartErr: errors.New("no such file")}, "b": {ReadyLine: &Line{Kind: LineError, Code: "DEVICE_HELD"}},
 	})
 
 	outcome, warnings := runShard(t, launcher, []string{"a", "b"}, paths(3))
@@ -314,8 +193,8 @@ func TestRunLeavesEntriesUnrunWhenEveryWorkerIsGone(t *testing.T) {
 }
 
 func TestRunLeavesTheRestUnrunWhenTheOnlyWorkerLosesItsDevice(t *testing.T) {
-	launcher := newFakeLauncher(map[string]*scripted{
-		"a": {handle: func(p string) Line { l := entryLine(p, "failed"); l.DeviceLost = true; return l }},
+	launcher := NewFakeLauncher(map[string]*FakeScript{
+		"a": {Handle: func(p string) Line { l := entryLine(p, "failed"); l.DeviceLost = true; return l }},
 	})
 
 	outcome, _ := runShard(t, launcher, []string{"a"}, paths(3))
@@ -330,7 +209,7 @@ func TestRunStopsEveryWorkerWhenTheContextEnds(t *testing.T) {
 	gate := make(chan struct{})
 	t.Cleanup(func() { close(gate) })
 	block := func(path string) Line { started <- struct{}{}; <-gate; return passing(path) }
-	launcher := newFakeLauncher(map[string]*scripted{"a": {handle: block}, "b": {handle: block}})
+	launcher := NewFakeLauncher(map[string]*FakeScript{"a": {Handle: block}, "b": {Handle: block}})
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() { <-started; <-started; cancel() }()
 
@@ -339,16 +218,16 @@ func TestRunStopsEveryWorkerWhenTheContextEnds(t *testing.T) {
 		Args: func(Device) []string { return nil }, StopGrace: time.Second,
 	})
 
-	if !outcome.Interrupted || !launcher.stopped["a"] || !launcher.stopped["b"] {
-		t.Errorf("interrupted %v, stopped %v, want both workers stopped", outcome.Interrupted, launcher.stopped)
+	if !outcome.Interrupted || !launcher.Stopped("a") || !launcher.Stopped("b") {
+		t.Errorf("interrupted %v, stopped a=%v b=%v, want both workers stopped", outcome.Interrupted, launcher.Stopped("a"), launcher.Stopped("b"))
 	}
 }
 
 func TestRunDoesNotRequeueAnEntryThatPassedBeforeTheDeviceWasLost(t *testing.T) {
 	aDone := make(chan struct{})
-	launcher := newFakeLauncher(map[string]*scripted{
-		"a": {handle: func(p string) Line { l := passing(p); l.DeviceLost = true; close(aDone); return l }},
-		"b": {readyAfter: aDone, handle: passing},
+	launcher := NewFakeLauncher(map[string]*FakeScript{
+		"a": {Handle: func(p string) Line { l := passing(p); l.DeviceLost = true; close(aDone); return l }},
+		"b": {ReadyAfter: aDone, Handle: passing},
 	})
 
 	outcome, _ := runShard(t, launcher, []string{"a", "b"}, paths(1))
@@ -360,9 +239,9 @@ func TestRunDoesNotRequeueAnEntryThatPassedBeforeTheDeviceWasLost(t *testing.T) 
 
 func TestRunRequeuesTheEntryOfAWorkerThatVanishedWithoutReporting(t *testing.T) {
 	gone := make(chan struct{})
-	launcher := newFakeLauncher(map[string]*scripted{
-		"a": {vanish: func() { close(gone) }},
-		"b": {readyAfter: gone, handle: passing},
+	launcher := NewFakeLauncher(map[string]*FakeScript{
+		"a": {Vanish: func() { close(gone) }},
+		"b": {ReadyAfter: gone, Handle: passing},
 	})
 
 	outcome, _ := runShard(t, launcher, []string{"a", "b"}, paths(2))
