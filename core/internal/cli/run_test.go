@@ -888,7 +888,7 @@ func TestWriteReport_DeviceLostAbort_CarriedIntoReportMetadata(t *testing.T) {
 	}
 
 	runDir := t.TempDir()
-	if _, err := writeReport("run-abort-1", result, time.Now(), time.Now(), "android", "mock-1", nil, report.ReportOptions{
+	if _, err := writeReport("run-abort-1", result, time.Now(), time.Now(), "android", "mock-1", nil, nil, report.ReportOptions{
 		Formats:      []string{report.FormatJSON},
 		ReportDir:    runfolder.ReportDir(runDir),
 		ArtifactsDir: runfolder.ArtifactsDir(runDir),

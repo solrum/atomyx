@@ -125,6 +125,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	dbg.attach(runCtx, opened.Session, built.Orchestra)
 	defer dbg.stop()
 
+	videoLifecycle := deps.videoLifecycle(videoEnabled(flags, loaded))
 	captureConfig := parseCaptureFlag(proxyFlag)
 	networkCapture, err := netcapture.New(captureConfig)
 	if err != nil {
@@ -159,6 +160,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		}
 		defer record.end(ctx, stderr)
 		opened.recordRun(record)
+		record.beginVideo(runCtx, videoLifecycle, desc)
 
 		fromScenarioPreconditions := runner.PreconditionsNoOverride
 		if scenarioDef.Preconditions != nil {
@@ -196,10 +198,12 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 			return reportUncaught(ctx, stderr, deps.Debug, err)
 		}
 		record.setOutcome(outcomeForResult(result.Ok), nil)
+		kept := record.finishVideo(ctx)
 
 		if jsonOutput {
 			payload := toJSONScenarioResult(result)
 			payload.RunFolder = record.Dir()
+			payload.Recording = toJSONRecording(kept)
 			if err := encodeJSON(stdout, payload); err != nil {
 				return reportUncaught(ctx, stderr, deps.Debug, err)
 			}
@@ -208,11 +212,12 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 			printScenarioResult(stdout, result)
 		}
 
-		bundle, genErr := writeScenarioReport(record.ID(), result, runStartedAt, finishedAt, platform, deviceID, envName, record.reportOptions())
+		bundle, genErr := writeScenarioReport(record.ID(), result, runStartedAt, finishedAt, platform, deviceID, envName, kept, record.reportOptions())
 		if genErr != nil {
 			return reportUncaught(ctx, stderr, deps.Debug, genErr)
 		}
 		printReportLocation(stderr, record, bundle)
+		printVideoLocation(stderr, record, kept)
 
 		if result.Ok {
 			return 0
@@ -237,6 +242,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	}
 	defer record.end(ctx, stderr)
 	opened.recordRun(record)
+	record.beginVideo(runCtx, videoLifecycle, desc)
 
 	artifacts := newLiveArtifacts(runfolder.ArtifactsDir(record.Dir()))
 	artifacts.seq.onFile = dbg.noteFile
@@ -270,10 +276,12 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
 	record.setOutcome(outcomeForScript(result), scriptMeta(result.TotalSteps, result.FailedAtStep))
+	kept := record.finishVideo(ctx)
 
 	if jsonOutput {
 		payload := toJSONScriptResult(result)
 		payload.RunFolder = record.Dir()
+		payload.Recording = toJSONRecording(kept)
 		if err := encodeJSON(stdout, payload); err != nil {
 			return reportUncaught(ctx, stderr, deps.Debug, err)
 		}
@@ -282,11 +290,12 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		printTextResult(stdout, result)
 	}
 
-	bundle, genErr := writeReport(record.ID(), result, runStartedAt, finishedAt, platform, deviceID, envName, record.reportOptions())
+	bundle, genErr := writeReport(record.ID(), result, runStartedAt, finishedAt, platform, deviceID, envName, kept, record.reportOptions())
 	if genErr != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, genErr)
 	}
 	printReportLocation(stderr, record, bundle)
+	printVideoLocation(stderr, record, kept)
 
 	if result.Ok {
 		return 0

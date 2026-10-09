@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"dev.atomyx/internal/device"
+	"dev.atomyx/internal/recording"
 	"dev.atomyx/internal/report"
 	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/runner"
-	"dev.atomyx/internal/shutdown"
 	"dev.atomyx/internal/version"
 )
 
@@ -36,6 +36,11 @@ type runRecord struct {
 	// onEnd, when set, runs before the run folder is finalized, so a host
 	// stops writing into it first.
 	onEnd func()
+	// capture is the screen recording of the run, nil until beginVideo.
+	capture *recording.Capture
+	// recording is the answer of the finished capture, nil when recording
+	// was off or the video was discarded.
+	recording *runfolder.Recording
 }
 
 // runIdentity describes what a run drives, for the meta of its run
@@ -121,10 +126,17 @@ func (r *runRecord) end(ctx context.Context, stderr io.Writer) {
 	if r.onEnd != nil {
 		r.onEnd()
 	}
-	if _, interrupted := shutdown.InterruptExitCode(ctx); interrupted && r.outcome != runfolder.OutcomePassed {
-		r.outcome = runfolder.OutcomeCancelled
+	r.settleOutcome(ctx)
+	mutate := r.mutate
+	if rec := r.finishVideo(ctx); rec != nil {
+		mutate = func(m *runfolder.Meta) {
+			if r.mutate != nil {
+				r.mutate(m)
+			}
+			m.Recording = rec
+		}
 	}
-	if err := r.writer.Finalize(r.outcome, r.mutate); err != nil {
+	if err := r.writer.Finalize(r.outcome, mutate); err != nil {
 		_, _ = fmt.Fprintf(stderr, "warning: could not finalize the run folder: %s\n", err)
 		_ = r.writer.Close()
 	}

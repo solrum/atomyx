@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"dev.atomyx/internal/report"
+	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/runner"
 	"dev.atomyx/internal/scenario"
 )
@@ -56,6 +57,10 @@ type jsonScriptResult struct {
 	// set only on the top-level result of a run, never on a scenario's
 	// child results.
 	RunFolder string `json:"runFolder,omitempty"`
+	// Recording is present only when the run recorded its screen and the
+	// video was kept or could not be. Files are names relative to the
+	// artifacts directory of the run folder.
+	Recording *jsonRecording `json:"recording,omitempty"`
 }
 
 // jsonAbort is the --json run output's shape for runner.RunAbort.
@@ -127,6 +132,7 @@ type jsonScenarioResult struct {
 	PassedScripts int                        `json:"passedScripts"`
 	DurationMs    int64                      `json:"durationMs"`
 	RunFolder     string                     `json:"runFolder,omitempty"`
+	Recording     *jsonRecording             `json:"recording,omitempty"`
 }
 
 func toJSONScenarioResult(result scenario.ScenarioResult) jsonScenarioResult {
@@ -282,9 +288,11 @@ func writeReport(
 	startedAt, finishedAt time.Time,
 	platform, deviceID string,
 	envName *string,
+	recording *runfolder.Recording,
 	options report.ReportOptions,
 ) (report.ReportBundle, error) {
 	metadata := buildReportMetadata(runID, result.ScriptName, startedAt, finishedAt, result.DurationMs, platform, deviceID, envName, result.Abort)
+	metadata.Recording = toReportRecording(recording)
 	input := report.ScriptReportInput{
 		Metadata:    metadata,
 		Result:      result,
@@ -303,9 +311,11 @@ func writeScenarioReport(
 	startedAt, finishedAt time.Time,
 	platform, deviceID string,
 	envName *string,
+	recording *runfolder.Recording,
 	options report.ReportOptions,
 ) (report.ReportBundle, error) {
 	metadata := buildReportMetadata(runID, result.ScenarioName, startedAt, finishedAt, result.DurationMs, platform, deviceID, envName, nil)
+	metadata.Recording = toReportRecording(recording)
 	input := report.ScenarioReportInput{
 		Metadata:    metadata,
 		Result:      result,
