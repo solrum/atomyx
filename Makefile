@@ -133,6 +133,7 @@ check:
 	@$(MAKE) -C $(GO_DIR) check
 	bash scripts/check-style-symbols.sh
 	bash scripts/check-ios-launcher-identifiers.sh
+	bash scripts/check-agent-protocol.sh
 	node scripts/lint-banned-phrases.mjs
 	node scripts/lint-doc-paths.mjs
 

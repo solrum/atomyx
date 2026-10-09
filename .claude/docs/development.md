@@ -71,6 +71,24 @@ connecting word. The run folder layout gate rejects run folder layout names spel
 gate confirms the committed JSON Schema files still match the Go structs that generate
 them.
 
+## The agent protocol version
+
+The host accepts an agent only when it reports exactly the protocol
+version the host declares. Raise the number whenever the wire contract
+between the host and an agent changes incompatibly, for example a
+removed or renamed field, a changed meaning, or a new required request.
+Additive changes the older side ignores do not need a bump.
+
+Three files carry the number and change together:
+
+- `core/internal/version/protocol.go` (`AgentProtocolVersion`)
+- `platforms/android-agent/app/src/main/java/dev/atomyx/agent/control/AgentProtocol.kt` (`AGENT_PROTOCOL_VERSION`)
+- `platforms/ios-agent/Tests/AgentProtocol.swift` (`AgentProtocol.version`)
+
+`bash scripts/check-agent-protocol.sh`, run by the root `make check`,
+fails unless each file declares the number exactly once and all three
+are equal.
+
 ## Regenerating the JSON Schema files
 
 Run after any change to a field or schema-generation type in
