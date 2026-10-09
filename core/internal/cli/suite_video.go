@@ -9,6 +9,7 @@ import (
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/recording"
 	"dev.atomyx/internal/runfolder"
+	"dev.atomyx/internal/runner"
 	"dev.atomyx/internal/scenario"
 )
 
@@ -40,16 +41,17 @@ func entryVideoBase(target scenario.EntryTarget) string {
 
 // start begins the recording of one entry attempt and returns the
 // function that settles it with the attempt's result and reports the kept
-// files. A failed attempt keeps its video. A passed attempt, or an
-// attempt cut short because the suite context ended (a stop signal or a
-// lost device), discards it.
+// files. A failed attempt keeps its video. A passed attempt, an attempt
+// cut short because the suite context ended (a stop signal), and an
+// attempt that ended because the device was lost all discard it, since a
+// lost device cannot be pulled from.
 func (s *suiteVideos) start(ctx context.Context, target scenario.EntryTarget) scenario.EntryEnd {
 	capture := s.lifecycle.Begin(ctx, s.desc, s.art, entryVideoBase(target))
 	return func(res scenario.SuiteEntryResult) []string {
 		result := runfolder.ResultPassed
 		if res.Status != scenario.EntryPassed {
 			result = runfolder.ResultFailed
-			if ctx.Err() != nil {
+			if ctx.Err() != nil || outcomeDeviceLost(res.Result) {
 				result = runfolder.ResultCancelled
 			}
 		}
@@ -59,6 +61,29 @@ func (s *suiteVideos) start(ctx context.Context, target scenario.EntryTarget) sc
 		}
 		return rec.Files
 	}
+}
+
+// outcomeDeviceLost reports whether a script, or any script of a
+// scenario, aborted because the device was lost.
+func outcomeDeviceLost(outcome *scenario.SuiteEntryOutcome) bool {
+	if outcome == nil {
+		return false
+	}
+	if outcome.Script != nil {
+		return scriptDeviceLost(outcome.Script)
+	}
+	if outcome.Scenario != nil {
+		for _, child := range outcome.Scenario.Scripts {
+			if scriptDeviceLost(child.Result) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func scriptDeviceLost(result *runner.ScriptResult) bool {
+	return result != nil && result.Abort != nil && result.Abort.Reason == runner.RunAbortDeviceLost
 }
 
 // entryVideoFiles returns the kept video files of each entry of result,
