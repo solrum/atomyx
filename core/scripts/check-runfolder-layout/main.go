@@ -1,7 +1,8 @@
 // Command check-runfolder-layout fails when production Go code outside
 // internal/runfolder spells a run folder layout name.
 //
-// The names are runs, v1, artifacts, report, and screenshots. They are
+// The names are runs, v1, artifacts, report, screenshots, index.json,
+// junit.xml, and the video file name prefix. They are
 // the on-disk contract of a run folder, so one package owns them and
 // every other package asks it for a path.
 //
@@ -15,6 +16,11 @@
 //     formats such as screenshots/%s
 //   - it is exactly v1 or report and is a direct argument of a path or
 //     file call such as filepath.Join, path.Join, or os.MkdirAll
+//
+// The file names index.json and junit.xml are flagged as a whole literal
+// or as a whole segment of a slashed path. The video name prefix is
+// flagged when a literal, or a segment of a slashed path, begins with
+// it and holds no whitespace.
 //
 // A two-segment literal that ends in v1, such as atomyx/v1, is a format
 // identifier and is not flagged. The bare words v1 and report are
@@ -52,6 +58,14 @@ var alwaysNames = map[string]bool{
 	"runs": true, "artifacts": true, "screenshots": true,
 }
 
+// fileNames are run folder files that only internal/runfolder may name.
+var fileNames = map[string]bool{
+	"index.json": true, "junit.xml": true,
+}
+
+// videoPrefix begins the name of every recorded video file.
+const videoPrefix = "video-"
+
 var pathOnlyNames = map[string]bool{
 	"v1": true, "report": true,
 }
@@ -88,7 +102,7 @@ func main() {
 		}
 		fmt.Println()
 		fmt.Println("Use the path helpers in core/internal/runfolder instead of spelling runs, v1,")
-		fmt.Println("artifacts, report, or screenshots in another package.")
+		fmt.Println("artifacts, report, screenshots, index.json, junit.xml, or the video name prefix in another package.")
 		os.Exit(1)
 	}
 	fmt.Println("PASS: run folder layout names are spelled only in core/" + ownDir)
@@ -198,6 +212,9 @@ func spellsLayoutName(value string, pathCallArg bool) bool {
 	if alwaysNames[value] {
 		return true
 	}
+	if fileNames[value] || spellsVideoPrefix(value) {
+		return true
+	}
 	if pathCallArg && pathOnlyNames[value] {
 		return true
 	}
@@ -212,6 +229,9 @@ func spellsLayoutName(value string, pathCallArg bool) bool {
 		if alwaysNames[seg] {
 			return true
 		}
+		if fileNames[seg] || spellsVideoPrefix(seg) {
+			return true
+		}
 		if !pathOnlyNames[seg] {
 			continue
 		}
@@ -221,4 +241,8 @@ func spellsLayoutName(value string, pathCallArg bool) bool {
 		}
 	}
 	return false
+}
+
+func spellsVideoPrefix(value string) bool {
+	return strings.HasPrefix(value, videoPrefix) && !strings.ContainsAny(value, " \t\r\n")
 }

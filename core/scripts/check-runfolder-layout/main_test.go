@@ -29,6 +29,16 @@ func TestCheck(t *testing.T) {
 		{"prose with a slash", "package p\nvar m = \"see runs/v1 for details\"\n", 0},
 		{"url", "package p\nvar u = \"https://example.com/runs\"\n", 0},
 		{"http api route", "package p\nvar r = \"/api/v1/auth\"\n", 0},
+		{"index file name", "package p\nvar n = \"index.json\"\n", 1},
+		{"junit file name", "package p\nvar n = \"junit.xml\"\n", 1},
+		{"index file in a path", "package p\nvar n = \"x/index.json\"\n", 1},
+		{"junit file in a path", "package p\nvar n = \"report/junit.xml\"\n", 1},
+		{"video prefix alone", "package p\nvar n = \"video-\"\n", 1},
+		{"video prefix format", "package p\nvar n = \"video-%s.mp4\"\n", 1},
+		{"video prefix in a path", "package p\nvar n = \"a/video-1.mp4\"\n", 1},
+		{"file name inside an extension", "package p\nvar n = \"my-index.json.bak\"\n", 0},
+		{"prose beginning with the prefix", "package p\nvar n = \"video-based checks run later\"\n", 0},
+		{"word video alone", "package p\nvar n = \"video\"\n", 0},
 		{"unrelated path", "package p\nvar p = \"a/b/c\"\n", 0},
 	}
 	for _, c := range cases {

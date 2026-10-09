@@ -29,6 +29,16 @@ const (
 	// LockFileName is the file a live writer holds an exclusive lock on
 	// for the whole life of its run.
 	LockFileName = "run.lock"
+
+	// IndexFileName is the per-entry record a suite run folder holds.
+	IndexFileName = "index.json"
+
+	// JUnitFileName is the JUnit XML report file name.
+	JUnitFileName = "junit.xml"
+
+	// VideoNamePrefix begins the name of every recorded video file in
+	// a run folder artifacts directory.
+	VideoNamePrefix = "video-"
 )
 
 // LegacyRecordKeyPrefix is the storage key prefix of the flat run
