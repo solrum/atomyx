@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"dev.atomyx/internal/logging"
@@ -131,12 +132,16 @@ func (b *FailureBundle) CaptureFailure(ctx context.Context, failure StepFailure)
 
 	shotCh := make(chan captured, 1)
 	treeCh := make(chan captured, 1)
+	var calls sync.WaitGroup
+	calls.Add(2)
 	go func() {
+		defer calls.Done()
 		defer recoverInto(shotCh)
 		data, err := b.orchestra.Screenshot(boundCtx)
 		shotCh <- captured{data: data, err: err}
 	}()
 	go func() {
+		defer calls.Done()
 		defer recoverInto(treeCh)
 		tree, err := b.orchestra.Hierarchy(boundCtx)
 		if err != nil {
@@ -166,6 +171,12 @@ await:
 			break await
 		}
 	}
+	// The driver serves one caller at a time, so no capture call may
+	// outlive this method and overlap the next step. Cancelling the
+	// context makes each call return, and the bound reaches the driver
+	// through that context.
+	cancel()
+	calls.Wait()
 	if !shotDone {
 		shot, shotDone = drain(shotCh)
 	}

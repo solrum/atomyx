@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"dev.atomyx/internal/clock"
@@ -234,5 +235,76 @@ func TestFailureBundle_TreeFileMasksSecureNodeValues(t *testing.T) {
 	pw := tree.Children[0].Attributes
 	if pw["text"] != orchestra.SecureMask || pw["value"] != orchestra.SecureMask || pw["label"] != "Password" {
 		t.Fatalf("secure node attributes = %v, want masked text and value with the label kept", pw)
+	}
+}
+
+// gatedDriver counts the Screenshot and Hierarchy calls still inside
+// the driver. Each call waits for cancellation, announces it, and then
+// stays inside the driver until the test releases it.
+type gatedDriver struct {
+	*mock.Driver
+	inFlight atomic.Int32
+	canceled chan struct{}
+	release  chan struct{}
+}
+
+func (g *gatedDriver) hold(ctx context.Context) error {
+	g.inFlight.Add(1)
+	defer g.inFlight.Add(-1)
+	<-ctx.Done()
+	g.canceled <- struct{}{}
+	<-g.release
+	return ctx.Err()
+}
+
+func (g *gatedDriver) Screenshot(ctx context.Context) ([]byte, error) {
+	return nil, g.hold(ctx)
+}
+
+func (g *gatedDriver) Hierarchy(ctx context.Context) (wire.TreeNodeWire, error) {
+	return wire.TreeNodeWire{}, g.hold(ctx)
+}
+
+// inFlightProbe records how many driver calls are still running when
+// the bundle first writes evidence, which happens after the bundle has
+// stopped waiting for its capture calls.
+type inFlightProbe struct {
+	EvidenceWriter
+	driver *gatedDriver
+	once   sync.Once
+	seen   int32
+}
+
+func (p *inFlightProbe) WriteEvidence(name string, data []byte) error {
+	p.once.Do(func() { p.seen = p.driver.inFlight.Load() })
+	return p.EvidenceWriter.WriteEvidence(name, data)
+}
+
+func TestFailureBundle_StopsUsingTheDriverBeforeItWritesEvidence(t *testing.T) {
+	g := &gatedDriver{Driver: mock.New(), canceled: make(chan struct{}, 2), release: make(chan struct{})}
+	bundleClock := clock.NewManualClock(0)
+	probe := &inFlightProbe{EvidenceWriter: newMemoryEvidence(), driver: g}
+	bundle := NewFailureBundle(FailureBundleDeps{
+		Orchestra: orchestra.New(orchestra.OrchestraDeps{Driver: g, Clock: orchestra.NewFakeClock(0)}),
+		Clock:     bundleClock, Logger: noopLogger{}, Sink: probe,
+	})
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		bundle.CaptureFailure(context.Background(), StepFailure{StepNumber: 1})
+	}()
+	bundleClock.AwaitSleepers(1)
+	bundleClock.Advance(FailureCaptureBoundMs)
+	<-g.canceled
+	<-g.canceled
+	close(g.release)
+	<-done
+
+	if probe.seen != 0 {
+		t.Fatalf("%d driver call(s) were still running when the bundle wrote evidence", probe.seen)
+	}
+	if left := g.inFlight.Load(); left != 0 {
+		t.Fatalf("%d driver call(s) were still running after CaptureFailure returned", left)
 	}
 }
