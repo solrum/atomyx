@@ -109,13 +109,15 @@ func (s *scriptService) Run(ctx context.Context, yaml string) (runScriptResultWi
 	s.session.SetActiveRunID(&runID)
 	defer cancel()
 
+	secrets := runner.NewRunSecrets()
 	sr := runner.NewScriptRunner(runner.ScriptRunnerDeps{
-		Orchestra: selection.Orchestra,
-		Clock:     orchestra.SystemClock{},
-		Logger:    s.logger,
-		Commands:  runner.DefaultCommands(),
+		Orchestra:  selection.Orchestra,
+		Clock:      orchestra.SystemClock{},
+		Logger:     logging.Masked(s.logger, secrets.String),
+		Commands:   runner.DefaultCommands(),
+		SecretSink: secrets,
 		OnStep: func(event runner.StepEvent) {
-			s.events.Emit(Event{Event: string(event.Type), Payload: toStepEventWire(runID, event)})
+			s.events.Emit(Event{Event: string(event.Type), Payload: toStepEventWire(runID, event.Masked(secrets.String))})
 		},
 	})
 
@@ -130,11 +132,12 @@ func (s *scriptService) Run(ctx context.Context, yaml string) (runScriptResultWi
 
 	result, runErr := sr.Run(runCtx, def)
 	s.clearCurrent()
+	result = result.Masked(secrets.String)
 
 	if runErr != nil {
 		s.events.Emit(Event{
 			Event:   "runErrored",
-			Payload: runErroredPayload{RunID: runID, Message: runErr.Error()},
+			Payload: runErroredPayload{RunID: runID, Message: secrets.String(runErr.Error())},
 		})
 		return runScriptResultWire{}, runErr
 	}
@@ -184,11 +187,13 @@ func (s *scriptService) RunScenario(ctx context.Context, yaml string, cwd string
 	s.session.SetActiveRunID(&runID)
 	defer cancel()
 
+	secrets := runner.NewRunSecrets()
 	sr := scenario.NewScenarioRunner(scenario.ScenarioRunnerDeps{
-		Orchestra: selection.Orchestra,
-		Clock:     orchestra.SystemClock{},
-		Logger:    s.logger,
-		Commands:  runner.DefaultCommands(),
+		Orchestra:  selection.Orchestra,
+		Clock:      orchestra.SystemClock{},
+		Logger:     logging.Masked(s.logger, secrets.String),
+		Commands:   runner.DefaultCommands(),
+		SecretSink: secrets,
 		LoadScript: func(relPath string) (string, error) {
 			data, err := os.ReadFile(resolveScriptPath(cwd, relPath))
 			if err != nil {
@@ -197,7 +202,7 @@ func (s *scriptService) RunScenario(ctx context.Context, yaml string, cwd string
 			return string(data), nil
 		},
 		OnStep: func(event runner.StepEvent) {
-			s.events.Emit(Event{Event: string(event.Type), Payload: toStepEventWire(runID, event)})
+			s.events.Emit(Event{Event: string(event.Type), Payload: toStepEventWire(runID, event.Masked(secrets.String))})
 		},
 		OnScenarioEvent: func(event scenario.ScenarioEvent) {
 			s.events.Emit(Event{Event: string(event.Type), Payload: toScenarioEventWire(runID, event)})
@@ -216,11 +221,12 @@ func (s *scriptService) RunScenario(ctx context.Context, yaml string, cwd string
 
 	result, runErr := sr.Run(runCtx, def)
 	s.clearCurrent()
+	result = result.Masked(secrets.String)
 
 	if runErr != nil {
 		s.events.Emit(Event{
 			Event:   "runErrored",
-			Payload: runErroredPayload{RunID: runID, Message: runErr.Error()},
+			Payload: runErroredPayload{RunID: runID, Message: secrets.String(runErr.Error())},
 		})
 		return runScenarioResultWire{}, runErr
 	}
