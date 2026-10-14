@@ -6,6 +6,7 @@ type RunsCommand string
 const (
 	RunsCommandList  RunsCommand = "list"
 	RunsCommandStats RunsCommand = "stats"
+	RunsCommandPrune RunsCommand = "prune"
 )
 
 // runsCommandFlags lists every flag each runs command accepts, in the
@@ -22,6 +23,14 @@ var runsCommandFlags = map[RunsCommand][]flagDef{
 		{"--test", flagValue},
 		{"--last", flagValue},
 		{"--since", flagValue},
+		{"--json", flagBoolean},
+		{"--help", flagBoolean},
+		{"-h", flagBoolean},
+	},
+	RunsCommandPrune: {
+		{"--keep", flagValue},
+		{"--older-than", flagValue},
+		{"--dry-run", flagBoolean},
 		{"--json", flagBoolean},
 		{"--help", flagBoolean},
 		{"-h", flagBoolean},

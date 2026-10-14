@@ -75,8 +75,8 @@ MODULES
                   devices, check device health.
   skills          Install and update the bundled Claude skill and
                   agent files.
-  runs            Inspect recorded runs: list them and report outcome
-                  statistics.
+  runs            Inspect and prune recorded runs: list them, report
+                  outcome statistics, and delete old ones.
 
 SHORTCUTS
   atomyx run ...             is shorthand for atomyx driver run ...

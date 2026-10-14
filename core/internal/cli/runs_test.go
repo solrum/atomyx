@@ -185,7 +185,7 @@ func TestRunsMisuseExitsTwo(t *testing.T) {
 }
 
 func TestRunsHelp(t *testing.T) {
-	for _, args := range [][]string{nil, {"help"}, {"list", "--help"}, {"stats", "--help"}} {
+	for _, args := range [][]string{nil, {"help"}, {"list", "--help"}, {"stats", "--help"}, {"prune", "--help"}} {
 		code, stdout, stderr := execRuns(t, args...)
 		if code != 0 || stderr != "" || !strings.Contains(stdout, "atomyx runs") {
 			t.Errorf("args %v: code = %d, stdout = %q, stderr = %q", args, code, stdout, stderr)
@@ -348,5 +348,28 @@ func TestRunsStatsMisuseExitsTwo(t *testing.T) {
 				t.Errorf("code = %d, stdout = %q, stderr = %q", code, stdout, stderr)
 			}
 		})
+	}
+}
+
+// rewriteParent makes the run runID a worker of parentID by rewriting its
+// stored meta.
+func rewriteParent(t *testing.T, root, runID, parentID string) {
+	t.Helper()
+	path := filepath.Join(runfolder.RunDir(root, runID), runfolder.MetaFileName)
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var meta runfolder.Meta
+	if err := json.Unmarshal(body, &meta); err != nil {
+		t.Fatal(err)
+	}
+	meta.ParentRunID = parentID
+	body, err = json.Marshal(meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, body, 0o644); err != nil {
+		t.Fatal(err)
 	}
 }

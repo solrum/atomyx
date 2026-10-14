@@ -73,3 +73,25 @@ func TestParseRunsArgvStatsFlags(t *testing.T) {
 		t.Errorf("--keep on stats: error = %v, want an *ArgvError", err)
 	}
 }
+
+func TestParseRunsArgvPruneFlags(t *testing.T) {
+	argv, err := ParseRunsArgv([]string{"--keep", "5", "--older-than=30", "--dry-run", "--json"}, RunsCommandPrune)
+	if err != nil {
+		t.Fatalf("ParseRunsArgv: %v", err)
+	}
+	for flag, want := range map[string]string{"--keep": "5", "--older-than": "30"} {
+		if got, _ := flagString(argv.Flags, flag); got != want {
+			t.Errorf("%s = %q, want %q", flag, got, want)
+		}
+	}
+	if !flagBool(argv.Flags, "--dry-run") || !flagBool(argv.Flags, "--json") {
+		t.Errorf("flags = %v, want --dry-run and --json set", argv.Flags)
+	}
+
+	for _, bad := range [][]string{{"--keep"}, {"--keep", "--dry-run"}, {"--test", "a"}, {"--dry-run", "--dry-run"}} {
+		var argvErr *ArgvError
+		if _, err := ParseRunsArgv(bad, RunsCommandPrune); !errors.As(err, &argvErr) {
+			t.Errorf("args %v: error = %v, want an *ArgvError", bad, err)
+		}
+	}
+}

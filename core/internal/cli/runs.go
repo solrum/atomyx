@@ -14,7 +14,7 @@ import (
 	"dev.atomyx/internal/storageroot"
 )
 
-// ExecuteRuns dispatches one runs-module command: list, stats, or help.
+// ExecuteRuns dispatches one runs-module command: list, stats, prune, or help.
 func ExecuteRuns(ctx context.Context, deps Deps, args []string) int {
 	var command string
 	if len(args) > 0 {
@@ -26,6 +26,8 @@ func ExecuteRuns(ctx context.Context, deps Deps, args []string) int {
 		return dispatchRunsCommand(ctx, deps, args[1:], RunsCommandList, runsList)
 	case string(RunsCommandStats):
 		return dispatchRunsCommand(ctx, deps, args[1:], RunsCommandStats, runsStats)
+	case string(RunsCommandPrune):
+		return dispatchRunsCommand(ctx, deps, args[1:], RunsCommandPrune, runsPrune)
 	case "help", "":
 		PrintRunsModuleHelp(deps.stdout())
 		return 0

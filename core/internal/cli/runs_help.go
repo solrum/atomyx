@@ -40,6 +40,25 @@ func PrintRunsCommandHelp(command RunsCommand, w io.Writer) {
   LAST lists up to 10 outcomes, most recent first: P passed, F failed,
   K flaky (failed, then passed on a retry).
 `)
+	case RunsCommandPrune:
+		_, _ = io.WriteString(w, `atomyx runs prune [--keep <n>] [--older-than <days>] [--dry-run] [--json]
+  Delete old runs. At least one of --keep and --older-than is required.
+  When both are given, a run is deleted only if both select it.
+
+  A sharded suite run and its worker runs are kept or deleted together,
+  and count once toward --keep. A run that is still being written is
+  never deleted, and neither is any group that contains one. Run
+  records that cannot be read are left untouched and counted in a footer.
+
+  --keep <n>          Keep the newest n runs and delete the rest
+  --older-than <days> Delete runs that started more than this many days ago
+  --dry-run           Report what would be deleted and delete nothing
+  --json              Print one JSON document instead of a table
+  --help, -h          Show this message
+
+  Exit code 0 when every selected group was deleted or --dry-run was
+  given, 1 when a deletion failed or was refused, 2 on misuse.
+`)
 	}
 }
 
@@ -55,6 +74,7 @@ USAGE
 COMMANDS
   list             List recorded runs, newest first
   stats            Report pass, fail, and flaky statistics per test
+  prune            Delete old runs and their worker runs
   help             Print this usage and exit
 
 FLAGS (list)
@@ -69,6 +89,13 @@ FLAGS (stats)
   --since <date>   Count only runs started at or after this time
   --json           Print JSON instead of a table
   --help, -h       Show command help
+
+FLAGS (prune)
+  --keep <n>           Keep the newest n runs
+  --older-than <days>  Delete runs older than this many days
+  --dry-run            Report without deleting
+  --json               Print JSON instead of a table
+  --help, -h           Show command help
 
 The runs are read from the storage directory, which is
 ATOMYX_STORAGE_DIR when set and ~/.atomyx otherwise.
