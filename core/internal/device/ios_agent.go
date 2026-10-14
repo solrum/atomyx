@@ -10,6 +10,9 @@ type IOSAgent struct {
 	// Adopted reports that the runner was already running, left by an
 	// earlier holder of the device, instead of launched by this call.
 	Adopted bool
+	// BuildProductPath is the compiled runner app the runner was started
+	// from. It is empty when the provisioner does not report one.
+	BuildProductPath string
 	// Kill stops the runner, along with its tunnel and record. It is never
 	// nil and runs its work once however many times it is called.
 	Kill func() error

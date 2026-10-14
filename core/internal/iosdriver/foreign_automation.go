@@ -14,10 +14,6 @@ import (
 )
 
 const (
-	// RunnerAppName is the product name of the Atomyx XCUITest runner
-	// app, without the .app suffix.
-	RunnerAppName = "AtomyxDriverAgent-Runner"
-
 	foreignKindXCUITest = "XCUITest runner"
 	foreignKindWDA      = "WebDriverAgent"
 

@@ -90,7 +90,7 @@ func TestDriverProvisioner_EnsureIOSAgent_StopEndsTheSimulatorRunnerAppThatOutli
 	p := fx.provisioner(nil)
 	signals := &recordingSignaler{inspector: fx.inspector, exitOn: map[syscall.Signal]bool{syscall.SIGTERM: true}}
 	var runnerID string
-	fx.runner.Stub(process.ExactMatch("xcrun", "simctl", "terminate", "SIM-1", DefaultRunnerBundleID), process.Result{}, nil)
+	fx.runner.Stub(process.ExactMatch("xcrun", "simctl", "terminate", "SIM-1", iosdriver.DefaultRunnerBundleID), process.Result{}, nil)
 	p.deps.Reaper = NewRunnerReaper(RunnerReaperDeps{
 		Inspector: fx.inspector, Runner: fx.runner, Clock: clock.NewFakeClock(0), Signals: signals,
 		Prober: func(context.Context, int) (iosdriver.RunnerIdentity, bool) {

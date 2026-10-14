@@ -52,7 +52,7 @@ func TestReapState_AStateWhosePidNowBelongsToAnotherProcessIsNotSignaled(t *test
 
 func TestReapState_ASimulatorRunnerAppOutsideTheGroupIsTerminatedThroughSimctl(t *testing.T) {
 	f := newReapFixture(t, IosAgentKindSimulator)
-	f.runner.Stub(process.ExactMatch("xcrun", "simctl", "terminate", reapTestUDID, DefaultRunnerBundleID), process.Result{}, nil)
+	f.runner.Stub(process.ExactMatch("xcrun", "simctl", "terminate", reapTestUDID, iosdriver.DefaultRunnerBundleID), process.Result{}, nil)
 	f.answering = func() (iosdriver.RunnerIdentity, bool) {
 		if len(f.runner.Invocations()) > 0 {
 			return iosdriver.RunnerIdentity{}, false

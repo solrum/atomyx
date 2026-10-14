@@ -286,5 +286,5 @@ func (p *DriverProvisioner) adoptedAgent(ctx context.Context, a adoption, held l
 	if onLost != nil {
 		go p.watchAdopted(watchCtx, a, onLost, onTunnelLost)
 	}
-	return IOSAgent{Port: state.HostPort, RunnerID: state.RunnerID, Adopted: true, Kill: stop}
+	return IOSAgent{Port: state.HostPort, RunnerID: state.RunnerID, Adopted: true, BuildProductPath: state.BuildProductPath, Kill: stop}
 }

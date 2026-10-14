@@ -282,7 +282,7 @@ func TestReap_ADeadProcessIsNotSignaledAndTheRecordIsRemoved(t *testing.T) {
 func TestReap_ASimulatorRunnerOutsideTheGroupIsTerminatedThroughSimctl(t *testing.T) {
 	f := newReapFixture(t, IosAgentKindSimulator)
 	terminated := false
-	f.runner.Stub(process.ExactMatch("xcrun", "simctl", "terminate", reapTestUDID, DefaultRunnerBundleID), process.Result{}, nil)
+	f.runner.Stub(process.ExactMatch("xcrun", "simctl", "terminate", reapTestUDID, iosdriver.DefaultRunnerBundleID), process.Result{}, nil)
 	f.answering = func() (iosdriver.RunnerIdentity, bool) {
 		if len(f.runner.Invocations()) > 0 {
 			terminated = true

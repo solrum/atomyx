@@ -422,7 +422,7 @@ func (p *DriverProvisioner) ProvisionIOSAgent(ctx context.Context, udid string, 
 	if p.deps.Keeper != nil {
 		kept = p.deps.Keeper.keep(held, stop)
 	}
-	return IOSAgent{Port: port, RunnerID: cfg.RunnerID, Kill: stop}, nil
+	return IOSAgent{Port: port, RunnerID: cfg.RunnerID, BuildProductPath: held.state.BuildProductPath, Kill: stop}, nil
 }
 
 // reapLaunched ends what outlives the kill of a launched runner, which is
@@ -705,6 +705,7 @@ type FakeProvisioner struct {
 	iosKills        map[string]func() error
 	iosPorts        map[string]int
 	iosAdopted      map[string]bool
+	iosProducts     map[string]string
 	iosOptions      []ProvisionOptions
 	keeper          *RunnerKeeper
 
@@ -728,6 +729,7 @@ func NewFakeProvisioner() *FakeProvisioner {
 		iosKills:        make(map[string]func() error),
 		iosPorts:        make(map[string]int),
 		iosAdopted:      make(map[string]bool),
+		iosProducts:     make(map[string]string),
 	}
 }
 
@@ -739,6 +741,14 @@ func (f *FakeProvisioner) SetIOSAdopted(udid string, adopted bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.iosAdopted[udid] = adopted
+}
+
+// SetIOSBuildProduct makes every later ProvisionIOSAgent call for udid
+// report path as the compiled runner app the runner was started from.
+func (f *FakeProvisioner) SetIOSBuildProduct(udid, path string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.iosProducts[udid] = path
 }
 
 // IOSOptions returns the ProvisionOptions of every call received so far.
@@ -848,6 +858,7 @@ func (f *FakeProvisioner) ProvisionIOSAgent(ctx context.Context, udid string, ki
 	adopted := f.iosAdopted[udid] && !opts.Fresh
 	gate := f.gate
 	err := f.iosResult[udid]
+	product := f.iosProducts[udid]
 	port, ok := f.iosPorts[udid]
 	if !ok {
 		port = iosControlPort
@@ -877,7 +888,7 @@ func (f *FakeProvisioner) ProvisionIOSAgent(ctx context.Context, udid string, ki
 	if keeper != nil && err == nil {
 		keeper.keep(launchRecord{udid: udid, runnerID: udid}, kill)
 	}
-	return IOSAgent{Port: port, RunnerID: "fake-runner-" + udid, Adopted: adopted && err == nil, Kill: kill}, err
+	return IOSAgent{Port: port, RunnerID: "fake-runner-" + udid, Adopted: adopted && err == nil, BuildProductPath: product, Kill: kill}, err
 }
 
 // FireLost simulates the provisioned runner of udid exiting on its own.

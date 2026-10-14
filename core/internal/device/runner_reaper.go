@@ -40,11 +40,6 @@ const (
 	// reapTunnelCommand is the only other process name the reaper signals,
 	// because the record names the iproxy tunnel of a physical device.
 	reapTunnelCommand = "iproxy"
-
-	// DefaultRunnerBundleID is the bundle id of the XCUITest runner app
-	// the launcher installs on a simulator, which survives its
-	// xcodebuild process.
-	DefaultRunnerBundleID = "dev.atomyx.driver.host.xctrunner"
 )
 
 // ReapOutcome describes what a reap did with the record it found.
@@ -108,7 +103,8 @@ type RunnerReaperDeps struct {
 	// running process.
 	OwnPGID int
 	OwnUID  int
-	// RunnerBundleID overrides DefaultRunnerBundleID.
+	// RunnerBundleID is the bundle id terminated when the recorded
+	// runner product names none. Empty means iosdriver.DefaultRunnerBundleID.
 	RunnerBundleID string
 }
 
@@ -151,7 +147,7 @@ func NewRunnerReaper(deps RunnerReaperDeps) *RunnerReaper {
 		deps.OwnUID = process.OwnUID()
 	}
 	if deps.RunnerBundleID == "" {
-		deps.RunnerBundleID = DefaultRunnerBundleID
+		deps.RunnerBundleID = iosdriver.DefaultRunnerBundleID
 	}
 	return &RunnerReaper{deps: deps}
 }
@@ -440,7 +436,8 @@ func (r *RunnerReaper) endSurvivingSimulatorRunner(ctx context.Context, state Ru
 	if !r.stillAnswers(ctx, state) {
 		return false, nil
 	}
-	if _, err := r.deps.Runner.Run(ctx, "xcrun", "simctl", "terminate", state.UDID, r.deps.RunnerBundleID); err != nil {
+	bundleID := iosdriver.ResolveRunnerBundleID(ctx, r.deps.Runner, state.BuildProductPath, r.deps.RunnerBundleID)
+	if _, err := r.deps.Runner.Run(ctx, "xcrun", "simctl", "terminate", state.UDID, bundleID); err != nil {
 		return true, fmt.Errorf("terminate the orphaned simulator runner on %s: %w", state.UDID, err)
 	}
 	deadline := r.deps.Clock.NowMs() + r.deps.GracePeriod.Milliseconds()

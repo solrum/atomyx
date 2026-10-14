@@ -307,7 +307,7 @@ func (f *DriverFactory) createDriverWatched(ctx context.Context, desc Descriptor
 	}
 	iosOpts := iosdriver.Options{
 		UDID: desc.ID, Kind: kind, Port: port, Background: f.background,
-		OwnRunnerBundleID: DefaultRunnerBundleID,
+		OwnRunnerBundleID: iosdriver.DefaultRunnerBundleID,
 		OwnRunnerAppName:  iosdriver.RunnerAppName,
 	}
 
@@ -330,6 +330,7 @@ func (f *DriverFactory) createDriverWatched(ctx context.Context, desc Descriptor
 		stopRunner = func() { _ = agent.Kill() }
 		iosOpts.Port = port
 		iosOpts.RunnerID = agent.RunnerID
+		iosOpts.OwnRunnerBundleID = iosdriver.ResolveRunnerBundleID(ctx, f.runner, agent.BuildProductPath, iosdriver.DefaultRunnerBundleID)
 		iosOpts.ExternalTunnel = kind == iosdriver.KindDevice
 	}
 	conn := transport.NewTCPClient("127.0.0.1", port, transport.WithTCPLogger(f.logger))

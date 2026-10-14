@@ -492,8 +492,9 @@ The group receives `SIGTERM`, then `SIGKILL` after the shutdown grace
 period. A simulator runner app runs under the simulator's own launchd, so
 it sits outside the `xcodebuild` group. After the group is gone the
 reaper pings the recorded `hostPort`, and a runner that still answers
-with the recorded `runnerId` is ended with `xcrun simctl terminate`. A
-runner that survives that is reported in the log and the record stays for
+with the recorded `runnerId` is ended with `xcrun simctl terminate`,
+naming the bundle id read from the recorded runner product (see "Runner
+bundle id" below). A runner that survives that is reported in the log and the record stays for
 the next acquirer. A physical device runner has no such survivor. Its
 `iproxy` tunnel is recorded as `tunnelPid` and `tunnelStartTime` once the
 tunnel is up. The reaper ends it the same way under the same checks,
@@ -601,9 +602,23 @@ physical device the listing is `xcrun devicectl device info processes`,
 and an executable counts when it lives in a `*-Runner.app` bundle or is
 a WebDriverAgent binary, because devicectl reports paths and not bundle
 ids. Atomyx's own runner is excluded by the bundle id and app name the
-device factory passes in `iosdriver.Options`. Each listing has its own
+device factory passes in `iosdriver.Options`. The bundle id comes from
+the runner product (see "Runner bundle id" below). Each listing has its own
 short timeout, and a failure reports nothing. The warning appears in
 `atomyx doctor` and `check_health`.
+
+**Runner bundle id.** The host reads `CFBundleIdentifier` from the
+`Info.plist` of the compiled runner app it launched or adopted, through
+`plutil -convert json`, which handles XML and binary plists. A runner
+built with the default `BUNDLE_ID` reports
+`dev.atomyx.driver.host.xctrunner`, and a custom `BUNDLE_ID` changes it
+accordingly. A value without the `.xctrunner` suffix gets the suffix
+appended. The id feeds the foreign automation exclusion and the bundle
+the reaper terminates through `xcrun simctl terminate`. When the product
+path is unknown or its plist cannot be read, the host uses the default
+id. A runner served by hand on a fixed port has no known product, so a
+custom bundle id on such a runner is not recognised and is reported as
+foreign automation. `iosdriver.ResolveRunnerBundleID` owns the lookup.
 
 **A secure text field carries the `secure` attribute and keeps the
 role `secure-text-field`.** The runner reports the element type
