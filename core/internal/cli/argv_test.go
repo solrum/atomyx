@@ -355,3 +355,13 @@ func TestParseArgvRetriesIsASuiteFlagOnly(t *testing.T) {
 		t.Errorf("run accepted --retries: %v", err)
 	}
 }
+
+func TestParseArgvSetupAcceptsItsFlagsAndRejectsOthers(t *testing.T) {
+	result := mustParseArgv(t, []string{"setup", "--platform", "ios", "--device", "UDID", "--check", "--json"})
+	if result.Command != CommandSetup || !isTruthy(result.Flags["--check"]) || !isTruthy(result.Flags["--json"]) || result.Flags["--device"] != "UDID" {
+		t.Fatalf("parsed = %+v", result)
+	}
+	if _, err := ParseArgv([]string{"setup", "--file", "x.yml"}); err == nil {
+		t.Fatal("setup accepted --file")
+	}
+}

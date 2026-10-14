@@ -78,3 +78,14 @@ func TestPrintCommandHelpSuiteDocumentsJUnitReports(t *testing.T) {
 		t.Errorf("suite help: got %q, want it to document the junit report format", text)
 	}
 }
+
+func TestPrintCommandHelpSetupDocumentsFlagsAndExitCodes(t *testing.T) {
+	var buf bytes.Buffer
+	PrintCommandHelp(CommandSetup, &buf)
+	text := buf.String()
+	for _, want := range []string{"--platform", "--device", "--check", "--json", "EXIT CODES", "130"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("setup help missing %q", want)
+		}
+	}
+}

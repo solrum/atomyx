@@ -89,3 +89,11 @@ func TestShortcutInspectRoutesToTheDriverInspectCommand(t *testing.T) {
 	}
 	assertStrings(t, args, []string{"inspect", "--platform", "ios", "--no-open"})
 }
+
+func TestShortcutSetupRoutesToTheDriverSetupCommand(t *testing.T) {
+	module, args := Shortcuts["setup"]([]string{"--platform", "ios", "--check"})
+	if module != "driver" {
+		t.Fatalf("module = %q, want driver", module)
+	}
+	assertStrings(t, args, []string{"setup", "--platform", "ios", "--check"})
+}
