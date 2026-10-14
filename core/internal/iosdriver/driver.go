@@ -213,6 +213,8 @@ func (d *IosDriver) Connect(ctx context.Context) error {
 		return d.fail(err)
 	}
 	if pong.ProtocolVersion != version.AgentProtocolVersion {
+		_ = d.conn.Close()
+		d.stopIproxy()
 		return connectProtocolMismatchError(pong.ProtocolVersion)
 	}
 	d.agentInfo = driver.AgentInfo{ProtocolVersion: pong.ProtocolVersion, AgentVersion: pong.AgentVersion}

@@ -161,3 +161,29 @@ func TestIosDriver_Connect_ProtocolMismatch_FailsWithoutTouchingTheRunner(t *tes
 		})
 	}
 }
+
+func TestIosDriver_Connect_ProtocolMismatch_ClosesTheConnectionAndStopsTheTunnel(t *testing.T) {
+	port := freeTCPPort(t)
+	stopped := make(chan struct{})
+	conn := newFakeConn()
+	conn.Respond("ping", func(map[string]any) (map[string]any, error) {
+		return map[string]any{"protocolVersion": otherProtocolVersion, "capabilities": map[string]any{}}, nil
+	})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{
+		UDID: "DEV-1", Kind: iosdriver.KindDevice, Port: port, Background: &tunnelBackground{stopped: stopped},
+	})
+
+	err := d.Connect(context.Background())
+
+	if code, _, _ := diag.Describe(err); code != diag.CodeAgentVersionMismatch {
+		t.Fatalf("Connect() error = %v, want code %s", err, diag.CodeAgentVersionMismatch)
+	}
+	if d.IsConnected() {
+		t.Fatal("IsConnected() = true after a protocol mismatch, want the connection closed")
+	}
+	select {
+	case <-stopped:
+	default:
+		t.Fatal("the iproxy tunnel is still running after a protocol mismatch")
+	}
+}
