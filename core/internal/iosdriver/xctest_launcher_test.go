@@ -99,6 +99,9 @@ type fakeXcodebuildRunner struct {
 	// until it is closed, modeling a runner that only becomes reachable
 	// once something else, such as a tunnel, is up.
 	spawnGate <-chan struct{}
+
+	// xcodeVersion is what the fake reports as the selected Xcode version.
+	xcodeVersion string
 }
 
 // defaultIdentityFields is the identity a fake runner reports when a
@@ -145,6 +148,9 @@ func (r *fakeXcodebuildRunner) replyData(env []string) string {
 }
 
 func (r *fakeXcodebuildRunner) Run(_ context.Context, name string, args ...string) (process.Result, error) {
+	if out, ok := r.selectedXcodeOutput(name, args); ok {
+		return process.Result{Stdout: out}, nil
+	}
 	r.record(name, args)
 	if len(args) > 0 && args[0] == "test-without-building" {
 		r.mu.Lock()
@@ -994,4 +1000,19 @@ func TestXctestLauncher_EnsureRunning_CanceledDuringReadinessWait_KillsSpawnedXc
 	case <-time.After(2 * time.Second):
 		t.Fatal("the spawned xcodebuild process was still running after the launch was canceled")
 	}
+}
+
+// selectedXcodeOutput answers the commands that read the selected Xcode.
+// They are not recorded, so a test counting invocations sees only the
+// build and spawn commands.
+func (r *fakeXcodebuildRunner) selectedXcodeOutput(name string, args []string) (string, bool) {
+	switch {
+	case name == "xcode-select" && len(args) == 1 && args[0] == "-p":
+		return "/Applications/Xcode.app/Contents/Developer\n", true
+	case name == "xcodebuild" && len(args) == 1 && args[0] == "-version":
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		return "Xcode " + r.xcodeVersion + "\n", true
+	}
+	return "", false
 }

@@ -1,6 +1,7 @@
 package iosdriver_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -28,7 +29,7 @@ func TestXctestLauncher_CurrentBuildProduct_FreshProductReportsItsPathAndStamp(t
 	stamp := time.Now().Add(-time.Hour).Truncate(time.Second)
 	l, projectDir, _ := newProductLauncher(t, stamp)
 
-	product, ok := l.CurrentBuildProduct()
+	product, ok := l.CurrentBuildProduct(context.Background())
 
 	if !ok {
 		t.Fatal("CurrentBuildProduct() ok = false, want a fresh product reported")
@@ -48,7 +49,7 @@ func TestXctestLauncher_CurrentBuildProduct_StaleProductReportsNothing(t *testin
 		t.Fatal(err)
 	}
 
-	if product, ok := l.CurrentBuildProduct(); ok {
+	if product, ok := l.CurrentBuildProduct(context.Background()); ok {
 		t.Fatalf("CurrentBuildProduct() = %+v, want nothing for a product older than the project file", product)
 	}
 }
@@ -60,7 +61,7 @@ func TestXctestLauncher_CurrentBuildProduct_MissingProductReportsNothing(t *test
 		ProjectDir: projectDir, Kind: iosdriver.KindSimulator, UDID: "SIM-1",
 	})
 
-	if product, ok := l.CurrentBuildProduct(); ok {
+	if product, ok := l.CurrentBuildProduct(context.Background()); ok {
 		t.Fatalf("CurrentBuildProduct() = %+v, want nothing when no product was built", product)
 	}
 }

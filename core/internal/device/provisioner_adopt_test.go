@@ -257,6 +257,11 @@ func TestDriverProvisioner_ProvisionIOSAgent_EndsAndReplacesARunnerThatFailsAnAd
 				t.Fatal(err)
 			}
 		}},
+		{"product digest no longer matches its inputs", "different build", func(t *testing.T, f *launchFixture, _ RunnerState) {
+			if err := os.WriteFile(f.runnerApp()+".digest", []byte("built-from-other-inputs\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

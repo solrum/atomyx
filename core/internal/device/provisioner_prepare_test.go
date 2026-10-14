@@ -51,9 +51,14 @@ func TestPrepareBuildsAnIosRunnerWithoutStartingIt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Prepare() error = %v", err)
 	}
-	calls := f.runner.Invocations()
-	if len(calls) != 1 || calls[0].Name != "xcodebuild" {
-		t.Fatalf("process invocations = %+v, want exactly one xcodebuild build", calls)
+	builds := 0
+	for _, call := range f.runner.Invocations() {
+		if call.Name == "xcodebuild" && len(call.Args) > 0 && call.Args[0] == "build-for-testing" {
+			builds++
+		}
+	}
+	if builds != 1 {
+		t.Fatalf("process invocations = %+v, want exactly one xcodebuild build", f.runner.Invocations())
 	}
 	if got := f.background.Invocations(); len(got) != 0 {
 		t.Fatalf("background starts = %+v, want no runner started by Prepare", got)

@@ -774,3 +774,28 @@ func TestDriverProvisioner_EnsureIOSAgent_Simulator_RecordsTheBuildProductItWasS
 		t.Errorf("BuildProductModTime = %v, want %v", state.BuildProductModTime, info.ModTime())
 	}
 }
+
+func TestDriverProvisioner_EnsureIOSAgent_Simulator_RecordsTheDigestOfTheProductItWasBuiltFrom(t *testing.T) {
+	fx := newLaunchFixture(t)
+	if err := os.WriteFile(fx.runnerApp()+".digest", []byte("built-from-other-inputs\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	p := fx.provisioner(nil)
+	_, kill, err := p.EnsureIOSAgent(context.Background(), "SIM-1", IosAgentKindSimulator)
+	if err != nil {
+		t.Fatalf("EnsureIOSAgent() error = %v", err)
+	}
+	defer func() { _ = kill() }()
+
+	state, err := ReadRunnerState(fx.statePath("SIM-1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	onDisk, err := os.ReadFile(fx.runnerApp() + ".digest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.BuildProductDigest == "" || state.BuildProductDigest == "built-from-other-inputs" || state.BuildProductDigest+"\n" != string(onDisk) {
+		t.Fatalf("BuildProductDigest = %q, want the digest of the rebuilt product (%q)", state.BuildProductDigest, onDisk)
+	}
+}

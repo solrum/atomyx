@@ -420,11 +420,10 @@ func (l *XctestLauncher) EnsureRunning(ctx context.Context) (kill func() error, 
 	return l.launchWithRetry(ctx, xctestrun, filepath.Join(buildDir, xctestRunDirPrefix+l.cfg.UDID))
 }
 
-// EnsureBuilt makes sure the compiled test runner exists and is newer
-// than the project file and every Swift source, building it when it is
-// missing or stale. It does not start the runner. The build is
-// serialized across launches and processes by a lock on the shared
-// build directory, so a call that waits for another process's build
+// EnsureBuilt makes sure the compiled test runner exists and matches its
+// current inputs, building it when it is missing or stale. It does not start the
+// runner. The build is serialized across launches and processes by a
+// lock on the shared build directory, so a call that waits for another process's build
 // returns once that build finishes, and builds nothing when the
 // product is then fresh. It returns an *XctestLauncherError for a
 // missing project, a signing problem or a failed build, and ctx's
@@ -453,7 +452,7 @@ func (l *XctestLauncher) ensureBuilt(ctx context.Context, alwaysLock bool) error
 	}
 	buildDir := l.buildDir()
 	runnerApp := l.runnerAppPath()
-	if !alwaysLock && !l.needsBuild(runnerApp) {
+	if !alwaysLock && !l.needsBuild(ctx, runnerApp) {
 		return nil
 	}
 	return l.buildLocked(ctx, xcodeprojPath, buildDir, runnerApp)
@@ -471,12 +470,15 @@ func (l *XctestLauncher) runnerAppPath() string {
 }
 
 // CurrentBuildProduct identifies the compiled runner product when it
-// exists and is not older than the project file or a Swift source. It
-// builds nothing. ok is false for a missing or stale product, because
-// a runner started from such a product does not run the current source.
-func (l *XctestLauncher) CurrentBuildProduct() (product BuildProduct, ok bool) {
+// exists and is current. A product with a recorded digest is current
+// when the digest of its inputs is unchanged, and a product with none is
+// current when it is not older than the project file or a Swift source.
+// It builds nothing. ok is false for a missing or stale product, because
+// a runner started from such a product does not run the current source. ctx
+// bounds the commands that read the selected Xcode.
+func (l *XctestLauncher) CurrentBuildProduct(ctx context.Context) (product BuildProduct, ok bool) {
 	product, ok = l.statProduct()
-	if !ok || l.needsBuild(product.Path) {
+	if !ok || l.needsBuild(ctx, product.Path) {
 		return BuildProduct{}, false
 	}
 	return product, true
@@ -512,9 +514,15 @@ func (l *XctestLauncher) buildLocked(ctx context.Context, xcodeprojPath, buildDi
 		return err
 	}
 	defer release()
-	if !l.needsBuild(runnerApp) {
+	if !l.needsBuild(ctx, runnerApp) {
 		return nil
 	}
+	// The digest is taken before the build, so a source edited while the
+	// build runs changes the next digest and forces another build. The
+	// old digest goes first, so a build that fails or is interrupted
+	// leaves a product that claims no inputs.
+	digest, digestErr := l.buildDigest(ctx)
+	removeDigest(runnerApp)
 	l.progress(XctestProgressBuilding)
 	buildStarted := time.Now()
 	if err := l.build(ctx, xcodeprojPath, buildDir); err != nil {
@@ -530,6 +538,11 @@ func (l *XctestLauncher) buildLocked(ctx context.Context, xcodeprojPath, buildDi
 	// failure to stamp only costs one redundant build on the next launch,
 	// so it is not reported.
 	_ = os.Chtimes(runnerApp, buildStarted, buildStarted)
+	// A digest that cannot be computed or recorded leaves the product
+	// without one, which falls back to the modification time check.
+	if digestErr == nil {
+		_ = writeDigest(runnerApp, digest)
+	}
 	return nil
 }
 
@@ -634,14 +647,23 @@ func runnerMismatchError(err *RunnerIdentityError) *XctestLauncherError {
 	return &XctestLauncherError{Code: XctestErrRunnerMismatch, Message: err.Error()}
 }
 
-// needsBuild reports whether runnerApp is missing, or older than the
-// project file or a Swift source file under the project directory.
-func (l *XctestLauncher) needsBuild(runnerApp string) bool {
+// needsBuild reports whether runnerApp is missing or stale. A product
+// with a recorded digest is stale when the digest of its inputs differs,
+// or cannot be computed. A product with no recorded digest is stale when
+// it is older than the project file or a Swift source file under the
+// project directory, so a product built before digests were recorded is
+// not rebuilt on that account alone.
+func (l *XctestLauncher) needsBuild(ctx context.Context, runnerApp string) bool {
 	info, err := os.Stat(runnerApp)
 	if err != nil {
 		return true
 	}
-	return l.isSourceNewer(info.ModTime())
+	recorded := readDigest(runnerApp)
+	if recorded == "" {
+		return l.isSourceNewer(info.ModTime())
+	}
+	current, err := l.buildDigest(ctx)
+	return err != nil || current != recorded
 }
 
 // isSourceNewer reports whether project.pbxproj or any .swift file
