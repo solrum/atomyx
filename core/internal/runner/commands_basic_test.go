@@ -592,7 +592,7 @@ func TestTypeCommand_SecretValueStepDetailHasNoCount(t *testing.T) {
 	tr := newTestRunner()
 	tr.driver.StageHierarchy(rootTree(focusedButton("email", "", "0,200,100,250")))
 
-	result := run(t, tr, "appId: com.test\nenv:\n  PASSWORD: hunter2hunter2\n---\n- type: ${PASSWORD}\n")
+	result := runWithEnv(t, tr, "appId: com.test\n---\n- type: ${PASSWORD}\n", map[string]string{"PASSWORD": "hunter2hunter2"})
 
 	if !result.Ok {
 		t.Fatalf("got Ok=false: %s", debugSteps(result.Steps))
@@ -600,6 +600,17 @@ func TestTypeCommand_SecretValueStepDetailHasNoCount(t *testing.T) {
 	got := detail(lastStep(t, result))
 	if got != "Typed a secret value into focused field" {
 		t.Fatalf("got detail %q, want no character count", got)
+	}
+}
+
+func TestTypeCommand_ScriptLiteralStepDetailHasTheCount(t *testing.T) {
+	tr := newTestRunner()
+	tr.driver.StageHierarchy(rootTree(focusedButton("email", "", "0,200,100,250")))
+
+	result := run(t, tr, "appId: com.test\nenv:\n  PASSWORD: hunter2hunter2\n---\n- type: ${PASSWORD}\n")
+
+	if got := detail(lastStep(t, result)); got != "Typed 14 characters into focused field" {
+		t.Fatalf("got detail %q, want the character count", got)
 	}
 }
 

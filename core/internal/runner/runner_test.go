@@ -218,7 +218,17 @@ func mustParse(t *testing.T, yaml string) *script.ScriptDefinition {
 
 func run(t *testing.T, tr *testRunner, yaml string) ScriptResult {
 	t.Helper()
-	def := mustParse(t, yaml)
+	return runWithEnv(t, tr, yaml, nil)
+}
+
+// runWithEnv runs yaml with env as the external variables, which are
+// secret, unlike the literals the script's own env block declares.
+func runWithEnv(t *testing.T, tr *testRunner, yaml string, env map[string]string) ScriptResult {
+	t.Helper()
+	def, err := script.ParseScript(yaml, env)
+	if err != nil {
+		t.Fatalf("ParseScript: %v", err)
+	}
 	result, err := tr.runner.Run(context.Background(), def)
 	if err != nil {
 		t.Fatalf("Run: %v", err)

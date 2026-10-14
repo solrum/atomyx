@@ -292,7 +292,7 @@ func (r *ScriptRunner) Run(ctx context.Context, def *script.ScriptDefinition) (S
 	rs := &runState{
 		def:                         def,
 		variables:                   variablesFromEnv(def.Env),
-		secrets:                     secretsFromEnv(def.Env),
+		secrets:                     secretsFromDefinition(def),
 		captures:                    make(map[string]CapturedRequest),
 		artifacts:                   artifacts,
 		completedPreconditionSetups: make(map[string]struct{}),

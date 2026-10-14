@@ -184,7 +184,8 @@ func TestVariablesAreRedactedAndRefusedWhenNotPaused(t *testing.T) {
 		t.Fatal("Variables succeeded while not paused")
 	}
 	h := newHarness(t, breakAt(5))
-	h.start("appId: com.test\nenv:\n  PASSWORD: hunter2hunter2\n---\n- screenshot: a\n- screenshot: b\n")
+	h.startWithEnv("appId: com.test\nenv:\n  LITERAL: written-in-script\n---\n- screenshot: a\n- screenshot: b\n",
+		map[string]string{"PASSWORD": "hunter2hunter2"})
 	h.awaitPause()
 	view, err := h.adapter.Variables()
 	if err != nil {
@@ -192,6 +193,9 @@ func TestVariablesAreRedactedAndRefusedWhenNotPaused(t *testing.T) {
 	}
 	if view.Variables["PASSWORD"] != orchestra.SecureMask {
 		t.Fatalf("variables = %v, want PASSWORD masked", view.Variables)
+	}
+	if view.Variables["LITERAL"] != "written-in-script" {
+		t.Fatalf("variables = %v, want the script literal shown", view.Variables)
 	}
 	h.resume(session.ResumeOptions{})
 	h.awaitDone()

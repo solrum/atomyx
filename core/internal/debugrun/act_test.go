@@ -310,7 +310,7 @@ func TestPausedRunTypeStepNeverReportsTheLengthOfASecret(t *testing.T) {
 	tree := goButtonTree()
 	tree.Children[0].Focused = &focused
 	h.driver.StageHierarchy(tree)
-	h.start("appId: com.test\nenv:\n  PASSWORD: hunter2hunter2\n---\n- screenshot: a\n- screenshot: b\n")
+	h.startWithEnv("appId: com.test\nenv:\n  LITERAL: x\n---\n- screenshot: a\n- screenshot: b\n", map[string]string{"PASSWORD": "hunter2hunter2"})
 	h.awaitPause()
 	run := h.adapter.current().run
 	typed := func(text string) string {

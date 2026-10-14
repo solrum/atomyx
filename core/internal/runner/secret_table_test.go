@@ -11,6 +11,11 @@ import (
 // seen before the final step.
 func snapshotAtLastStep(t *testing.T, tr *testRunner, yaml string, lastIndex int) VariableSnapshot {
 	t.Helper()
+	return snapshotAtLastStepWithEnv(t, tr, yaml, nil, lastIndex)
+}
+
+func snapshotAtLastStepWithEnv(t *testing.T, tr *testRunner, yaml string, env map[string]string, lastIndex int) VariableSnapshot {
+	t.Helper()
 	var snap VariableSnapshot
 	gate := &funcGate{fn: func(s GateStep, run PausedRun) error {
 		if s.StepIndex == lastIndex {
@@ -21,7 +26,7 @@ func snapshotAtLastStep(t *testing.T, tr *testRunner, yaml string, lastIndex int
 	deps := tr.runner.deps
 	deps.StepGate = gate
 	tr.runner = NewScriptRunner(deps)
-	result := run(t, tr, yaml)
+	result := runWithEnv(t, tr, yaml, env)
 	if !result.Ok {
 		t.Fatalf("got Ok=false: %s", debugSteps(result.Steps))
 	}
@@ -34,11 +39,16 @@ func secureField(id, value string) wire.TreeNodeWire {
 	}}
 }
 
-func TestSecretTable_EnvEntriesAreSecret(t *testing.T) {
+func TestSecretTable_ExternalEntriesAreSecretAndScriptLiteralsAreNot(t *testing.T) {
 	tr := newTestRunner()
-	snap := snapshotAtLastStep(t, tr, "appId: com.test\nenv:\n  PASSWORD: hunter2hunter2\n---\n- screenshot: a\n- screenshot: b\n", 1)
+	snap := snapshotAtLastStepWithEnv(t, tr,
+		"appId: com.test\nenv:\n  LITERAL: written-in-script\n---\n- screenshot: a\n- screenshot: b\n",
+		map[string]string{"PASSWORD": "hunter2hunter2"}, 1)
 	if !snap.Secret["PASSWORD"] {
-		t.Fatalf("env entry not tagged: %+v", snap.Secret)
+		t.Fatalf("external entry not tagged: %+v", snap.Secret)
+	}
+	if snap.Secret["LITERAL"] {
+		t.Fatalf("script literal tagged: %+v", snap.Secret)
 	}
 }
 
@@ -103,7 +113,7 @@ func TestSecretTable_ChildScopeCopiesTableAndKeepsRunClean(t *testing.T) {
 	}}
 	tr := gatedRunner(gate, "")
 	tr.driver.StageHierarchy(rootTree(secureField("pw", "topsecret")))
-	run(t, tr, "appId: com.test\nenv:\n  seed: one\n---\n- screenshot: a\n- screenshot: b\n")
+	runWithEnv(t, tr, "appId: com.test\n---\n- screenshot: a\n- screenshot: b\n", map[string]string{"seed": "one"})
 	childTagged = before.Secret["seed"]
 	if !childTagged {
 		t.Fatalf("snapshot lost the seeded tag: %+v", before.Secret)

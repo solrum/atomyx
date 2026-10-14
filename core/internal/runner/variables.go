@@ -1,6 +1,9 @@
 package runner
 
-import "dev.atomyx/internal/script/expression"
+import (
+	"dev.atomyx/internal/script"
+	"dev.atomyx/internal/script/expression"
+)
 
 // ScriptValue is a runtime script variable value: a number, a string,
 // or a boolean. It is a direct alias for the expression package's
@@ -51,15 +54,17 @@ func variablesFromEnv(env map[string]string) map[string]ScriptValue {
 	return variables
 }
 
-// secretsFromEnv tags every env entry as secret. The env map merges the
-// script's own env block, the config environment's vars (including
-// resolved ${ENV:...} references) and the caller's external env, and
-// the merge no longer says which entry came from where, so the whole
-// map is treated as secret rather than risking a leak.
-func secretsFromEnv(env map[string]string) map[string]bool {
-	secrets := make(map[string]bool, len(env))
-	for k := range env {
-		secrets[k] = true
+// secretsFromDefinition tags the env entries whose value came from
+// outside the committed files: an environment reference, a caller
+// variable, or the env argument of a tool call. A literal written in the
+// script or in the project config is already in the repository, so it is
+// not secret.
+func secretsFromDefinition(def *script.ScriptDefinition) map[string]bool {
+	secrets := make(map[string]bool, len(def.SecretEnv))
+	for k := range def.Env {
+		if def.SecretEnv[k] {
+			secrets[k] = true
+		}
 	}
 	return secrets
 }

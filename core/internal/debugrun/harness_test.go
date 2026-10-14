@@ -87,7 +87,14 @@ func newHarnessWith(t *testing.T, opts Options, commands []runner.CommandDefinit
 // start runs yaml on a goroutine and returns at once.
 func (h *harness) start(yaml string) {
 	h.t.Helper()
-	def, err := script.ParseScript(yaml, nil)
+	h.startWithEnv(yaml, nil)
+}
+
+// startWithEnv starts the run with env as the external variables, which
+// are secret, unlike the literals the script's own env block declares.
+func (h *harness) startWithEnv(yaml string, env map[string]string) {
+	h.t.Helper()
+	def, err := script.ParseScript(yaml, env)
 	if err != nil {
 		h.t.Fatalf("ParseScript: %v", err)
 	}
