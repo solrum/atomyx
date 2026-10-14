@@ -131,6 +131,7 @@ func TestGetTestStatsRejectsBadArguments(t *testing.T) {
 		{"since": "last tuesday"},
 		{"since": float64(5)},
 		{"test": float64(5)},
+		{"test": ""},
 	}
 	for i, args := range bad {
 		t.Run(fmt.Sprint(i), func(t *testing.T) {

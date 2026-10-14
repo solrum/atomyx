@@ -23,6 +23,7 @@ func registerCheckHealthTool(server *mcp.Server, tc *ToolContext) {
 			"when one is, whether it answers a quick liveness check. Returns " +
 			"selected and healthy booleans, a state (unselected, idle, running, released, borrowed or lost), plus a code and remedy when unhealthy. " +
 			"When the agent reports them, it also returns agentVersion (the agent build) and protocolVersion (the wire protocol version). " +
+			"The result may carry `warnings`, advisory notes that never change `healthy`. " +
 			"Does not run a flow or change app state. Call this to diagnose a " +
 			"stalled session before retrying an action, instead of guessing from " +
 			"a timed-out call.",

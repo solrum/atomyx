@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"dev.atomyx/internal/diag"
+	"dev.atomyx/internal/history"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/storage"
@@ -30,6 +31,10 @@ type ToolContext struct {
 	Storage storage.Storage
 	// Runs reads persisted runs from every stored form and deletes them.
 	Runs *storage.RunCatalog
+	// History is the read port get_test_stats aggregates over. The
+	// composition root binds it to the same catalog as Runs, so handlers
+	// depend on the contract and not on the storage type.
+	History history.Source
 	// RunSession creates, finalizes, and edits the MCP runs written to
 	// run folders.
 	RunSession *runSession

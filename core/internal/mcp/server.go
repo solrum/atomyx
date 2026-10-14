@@ -134,6 +134,7 @@ func NewServer(info Info, deps ServerDeps) (*Server, error) {
 		Logger:     logger,
 		Storage:    deps.Storage,
 		Runs:       runs,
+		History:    runs,
 		RunSession: runSession,
 		RunStore:   runStore,
 		Clock:      clk,

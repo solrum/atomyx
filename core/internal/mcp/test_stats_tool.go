@@ -93,10 +93,7 @@ func registerGetTestStatsTool(server *mcp.Server, tc *ToolContext) {
 			filter.Window.SinceMs = ms
 		}
 
-		// The catalog is handed over as the port so the query depends on the
-		// contract, not on the storage type.
-		var source history.Source = tc.Runs
-		report, err := history.Query(source, filter)
+		report, err := history.Query(tc.History, filter)
 		if err != nil {
 			tc.Logger.Warn("run.stats_failed", logging.LogContext{"error": err.Error()})
 			return errorResult(err), nil
