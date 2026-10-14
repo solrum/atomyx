@@ -19,8 +19,10 @@ const MCPTestKeyPrefix = "mcp:"
 // config file, and holdsGitRoot whether it directly contains a .git entry.
 // Both are injected so the derivation does no I/O of its own.
 //
-// path must be absolute. A relative path has no ancestors to walk, so its
-// cleaned form with forward slashes is returned.
+// path must be absolute, and the caller should resolve symbolic links in it
+// first so every alias of a file derives the same key. A relative path has
+// no ancestors to walk, so its cleaned form with forward slashes is
+// returned.
 func DeriveTestKey(holdsConfig, holdsGitRoot func(dir string) bool, path string) string {
 	clean := filepath.Clean(path)
 	if !filepath.IsAbs(clean) {

@@ -1283,6 +1283,15 @@ config file (`atomyx.config.yaml` or `atomyx.config.yml`). When no
 ancestor holds one, it is the nearest ancestor that holds a `.git`
 entry. When there is none, it is the file's own directory.
 
+A script outside any config root and any git root is keyed by its file
+name alone, so two such files with the same name share one key and their
+runs merge in `runs list` and `runs stats`. Keep scripts under a project
+config or a git checkout to keep their keys distinct.
+
+When the file exists, symbolic links in its path are resolved before the
+key is derived. A link to a script therefore gets the key of the script
+itself, whichever path the run was started with.
+
 A run driven through the MCP server has no script file, so its key is
 `mcp:` followed by the run name. A run recorded without a key is listed
 and filtered under its script path.
@@ -1297,7 +1306,7 @@ Lists recorded runs, newest first.
 
 | Flag | Meaning | Default | Required |
 |---|---|---|---|
-| `--test <key>` | Only runs of this test key. | all runs | no |
+| `--test <key>` | Only runs whose own key matches. A suite run is matched by its own key and its entries are not searched. Use `runs stats` to filter by the key of a suite entry. | all runs | no |
 | `--since <date>` | Only runs started at or after this time. | no limit | no |
 | `--json` | Prints one JSON document instead of a table. | off | no |
 | `--help`, `-h` | Prints this command's usage and exits. | off | no |
@@ -1329,7 +1338,7 @@ Reports outcome statistics per test key.
 
 | Flag | Meaning | Default | Required |
 |---|---|---|---|
-| `--test <key>` | Only this test key. | all keys | no |
+| `--test <key>` | Only this test key, including the key of an entry inside a suite run. | all keys | no |
 | `--last <n>` | Counts only the most recent `n` runs of each test. A whole number of at least 1. | all runs | no |
 | `--since <date>` | Counts only runs started at or after this time. | no limit | no |
 | `--json` | Prints one JSON document instead of a table. | off | no |
@@ -1342,7 +1351,8 @@ A suite run counts through its index entries, one outcome per entry
 under the entry's test key, and the suite run itself is not counted. An
 entry that passed after a retry counts as flaky, and a flaky entry also
 counts as passed. A run that is unfinished, cancelled, or interrupted is
-left out.
+left out, and so are the entries of such a suite. An entry that was never
+run, such as one a shard worker did not reach, is left out too.
 
 The table has one row per test key, sorted by flaky rate, then by
 failures, both highest first, then by key:
