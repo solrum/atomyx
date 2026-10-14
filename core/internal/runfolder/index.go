@@ -1,7 +1,10 @@
 package runfolder
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 )
 
 // IndexSchemaVersion is the index.json schema version this package
@@ -70,4 +73,27 @@ func (w *Writer) WriteIndex(entries []IndexEntry) error {
 		return fmt.Errorf("writing %s: %w", IndexFileName, err)
 	}
 	return nil
+}
+
+// ReadIndex reads index.json from the run folder at dir. A folder with no
+// index.json yields an error that satisfies errors.Is(err, fs.ErrNotExist),
+// which is how a run that is not a suite looks. An index whose schemaVersion
+// is outside 1 to IndexSchemaVersion is rejected, and a null entries list
+// reads as empty.
+func ReadIndex(dir string) (Index, error) {
+	body, err := os.ReadFile(filepath.Join(dir, IndexFileName))
+	if err != nil {
+		return Index{}, fmt.Errorf("reading %s: %w", IndexFileName, err)
+	}
+	var index Index
+	if err := json.Unmarshal(body, &index); err != nil {
+		return Index{}, fmt.Errorf("decoding %s: %w", IndexFileName, err)
+	}
+	if index.SchemaVersion < 1 || index.SchemaVersion > IndexSchemaVersion {
+		return Index{}, fmt.Errorf("%s schemaVersion %d is outside 1 to %d", IndexFileName, index.SchemaVersion, IndexSchemaVersion)
+	}
+	if index.Entries == nil {
+		index.Entries = []IndexEntry{}
+	}
+	return index, nil
 }
