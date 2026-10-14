@@ -53,6 +53,11 @@ type EnvironmentEntry struct {
 	// EnvRefVars names the Vars entries whose value came from a
 	// `${ENV:NAME}` reference. It is empty until ResolveEnvRefs runs.
 	EnvRefVars map[string]bool `json:"-"`
+	// EnvRefValues holds the process environment values the `${ENV:NAME}`
+	// references of Vars resolved to. A var that mixes a literal with a
+	// reference holds the whole string, so the value alone is listed here
+	// for a host that masks secrets by value.
+	EnvRefValues []string `json:"-"`
 }
 
 // LaunchPolicy is the project-wide default launch policy, matching
@@ -151,10 +156,13 @@ type ResolvedEnvironment struct {
 	// `${ENV:NAME}` reference. Every other entry is a literal written in
 	// the config file.
 	EnvRefVars map[string]bool `json:"-"`
-	Platform   string          `json:"platform"`
-	DeviceID   *string         `json:"deviceId,omitempty"`
-	Proxy      *string         `json:"proxy,omitempty"`
-	Artifact   *string         `json:"artifact,omitempty"`
+	// EnvRefValues holds the process environment values the references
+	// of Vars resolved to, apart from the strings they sit in.
+	EnvRefValues []string `json:"-"`
+	Platform     string   `json:"platform"`
+	DeviceID     *string  `json:"deviceId,omitempty"`
+	Proxy        *string  `json:"proxy,omitempty"`
+	Artifact     *string  `json:"artifact,omitempty"`
 }
 
 // VideoOnFailure reports whether the config asks for the screen

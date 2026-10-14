@@ -82,15 +82,23 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		return 2
 	}
 
+	// The external values are secret from here on, so an error that quotes
+	// one while the script parses is masked before it reaches stderr.
+	seed := runner.NewRunSecrets()
+	seed.AddExternal(externalEnv, committedEnv)
+	addEnvRefValues(seed, resolvedEnvironment)
+	mask := seed.String
+	fail := func(err error) int { return reportUncaughtMasked(ctx, stderr, deps.Debug, mask, err) }
+
 	jsonOutput := flagBool(flags, "--json")
 
 	absPath, err := filepath.Abs(filePath)
 	if err != nil {
-		return reportUncaught(ctx, stderr, deps.Debug, err)
+		return fail(err)
 	}
 	content, err := os.ReadFile(absPath)
 	if err != nil {
-		return reportUncaught(ctx, stderr, deps.Debug, err)
+		return fail(err)
 	}
 
 	dbg, err := newRunDebug(deps, flags, func() ([]runner.BreakScript, error) {
@@ -102,7 +110,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 			_, _ = fmt.Fprintf(stderr, "error: %s\n", usage.message)
 			return 2
 		}
-		return reportUncaught(ctx, stderr, deps.Debug, err)
+		return fail(err)
 	}
 
 	// The device connects before the script or scenario is parsed.
@@ -111,11 +119,11 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	// never runs until the connection succeeds.
 	desc, err := resolveDescriptor(ctx, deps.Probe, deps.Runners, platform, deviceID)
 	if err != nil {
-		return reportUncaught(ctx, stderr, deps.Debug, err)
+		return fail(err)
 	}
 	opened, err := borrowDebuggable(ctx, deps, "atomyx run", "atomyx run "+filepath.Base(absPath), desc, dbg.debugger())
 	if err != nil {
-		return reportUncaught(ctx, stderr, deps.Debug, err)
+		return fail(err)
 	}
 	defer opened.Close() //nolint:contextcheck // teardown is bounded by its own grace timer, not by a call context
 	built := opened.Built()
@@ -129,7 +137,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	captureConfig := parseCaptureFlag(proxyFlag)
 	networkCapture, err := netcapture.New(captureConfig)
 	if err != nil {
-		return reportUncaught(ctx, stderr, deps.Debug, err)
+		return fail(err)
 	}
 
 	var envName *string
@@ -143,7 +151,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	if script.IsScenarioYaml(string(content)) {
 		scenarioDef, err := script.ParseScenario(string(content))
 		if err != nil {
-			return reportUncaught(ctx, stderr, deps.Debug, err)
+			return fail(err)
 		}
 
 		// The run folder is created after the file parses and before
@@ -156,10 +164,12 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 			Device:     desc,
 		})
 		if err != nil {
-			return reportUncaught(ctx, stderr, deps.Debug, err)
+			return fail(err)
 		}
 		defer record.end(ctx, stderr)
 		record.secrets.AddExternal(externalEnv, committedEnv)
+		addEnvRefValues(record.secrets, resolvedEnvironment)
+		mask = record.secrets.String
 		runLog := record.maskedLogger(deps.logger())
 		opened.recordRun(record)
 		record.beginVideo(runCtx, videoLifecycle, desc)
@@ -199,26 +209,26 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 			return 1
 		}
 		if err != nil {
-			return reportUncaught(ctx, stderr, deps.Debug, err)
+			return fail(err)
 		}
 		record.setOutcome(outcomeForResult(result.Ok), nil)
 		kept := record.finishVideo(ctx)
 
 		if jsonOutput {
-			payload := toJSONScenarioResult(result)
+			payload := toJSONScenarioResult(result.Masked(mask))
 			payload.RunFolder = record.Dir()
 			payload.Recording = toJSONRecording(kept)
 			if err := encodeJSON(stdout, payload); err != nil {
-				return reportUncaught(ctx, stderr, deps.Debug, err)
+				return fail(err)
 			}
 			record.reportedInJSON = true
 		} else {
-			printScenarioResult(stdout, result)
+			printScenarioResult(stdout, result.Masked(mask))
 		}
 
 		bundle, genErr := writeScenarioReport(record.ID(), result, runStartedAt, finishedAt, platform, deviceID, envName, kept, record.reportOptions())
 		if genErr != nil {
-			return reportUncaught(ctx, stderr, deps.Debug, genErr)
+			return fail(genErr)
 		}
 		printReportLocation(stderr, record, bundle)
 		printVideoLocation(stderr, record, kept)
@@ -231,7 +241,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 
 	def, err := script.ParseScript(string(content), externalEnv, script.WithCommittedNames(committedEnv))
 	if err != nil {
-		return reportUncaught(ctx, stderr, deps.Debug, err)
+		return fail(err)
 	}
 	preconditionsOverride := resolvePreconditionsOverride(cliPreconditionsFlag, runner.PreconditionsNoOverride, fromConfigPreconditions)
 
@@ -242,10 +252,12 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		Device:     desc,
 	})
 	if err != nil {
-		return reportUncaught(ctx, stderr, deps.Debug, err)
+		return fail(err)
 	}
 	defer record.end(ctx, stderr)
 	record.secrets.AddExternal(externalEnv, committedEnv)
+	addEnvRefValues(record.secrets, resolvedEnvironment)
+	mask = record.secrets.String
 	runLog := record.maskedLogger(deps.logger())
 	opened.recordRun(record)
 	record.beginVideo(runCtx, videoLifecycle, desc)
@@ -280,26 +292,26 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		return 1
 	}
 	if err != nil {
-		return reportUncaught(ctx, stderr, deps.Debug, err)
+		return fail(err)
 	}
 	record.setOutcome(outcomeForScript(result), scriptMeta(result.TotalSteps, result.FailedAtStep))
 	kept := record.finishVideo(ctx)
 
 	if jsonOutput {
-		payload := toJSONScriptResult(result)
+		payload := toJSONScriptResult(result.Masked(mask))
 		payload.RunFolder = record.Dir()
 		payload.Recording = toJSONRecording(kept)
 		if err := encodeJSON(stdout, payload); err != nil {
-			return reportUncaught(ctx, stderr, deps.Debug, err)
+			return fail(err)
 		}
 		record.reportedInJSON = true
 	} else {
-		printTextResult(stdout, result)
+		printTextResult(stdout, result.Masked(mask))
 	}
 
 	bundle, genErr := writeReport(record.ID(), result, runStartedAt, finishedAt, platform, deviceID, envName, kept, record.reportOptions())
 	if genErr != nil {
-		return reportUncaught(ctx, stderr, deps.Debug, genErr)
+		return fail(genErr)
 	}
 	printReportLocation(stderr, record, bundle)
 	printVideoLocation(stderr, record, kept)
@@ -318,11 +330,21 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 // then it prints a single "interrupted" line and returns the
 // signal's conventional exit code.
 func reportUncaught(ctx context.Context, stderr io.Writer, debugEnabled bool, err error) int {
+	return reportUncaughtMasked(ctx, stderr, debugEnabled, nil, err)
+}
+
+// reportUncaughtMasked is reportUncaught with the message and remedy
+// passed through mask first, so an error that quotes a secret value never
+// reaches the terminal. A nil mask leaves the text as it is.
+func reportUncaughtMasked(ctx context.Context, stderr io.Writer, debugEnabled bool, mask func(string) string, err error) int {
 	if code, ok := shutdown.InterruptExitCode(ctx); ok {
 		_, _ = fmt.Fprintln(stderr, "interrupted")
 		return code
 	}
 	code, message, remedy := diag.Describe(err)
+	if mask != nil {
+		message, remedy = mask(message), mask(remedy)
+	}
 	_, _ = fmt.Fprintf(stderr, "error [%s]: %s\n", code, message)
 	if remedy != "" {
 		_, _ = fmt.Fprintln(stderr, remedy)

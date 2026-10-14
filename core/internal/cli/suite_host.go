@@ -128,6 +128,7 @@ func startSuiteHost(ctx context.Context, deps Deps, cfg suiteSettings, proxyFlag
 	}
 	opened.recordRun(record)
 	record.secrets.AddExternal(cfg.externalEnv, cfg.committedEnv)
+	addEnvRefValues(record.secrets, cfg.environment)
 	runLog := record.maskedLogger(deps.logger())
 
 	videos := newSuiteVideos(deps.videoLifecycle(videoOn), desc, record.writer)

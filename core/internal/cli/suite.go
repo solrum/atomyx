@@ -128,7 +128,8 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 	suiteLabel := cfg.label
 
 	runStartedAt := time.Now()
-	result, err := host.runner.Run(host.runCtx, entries, host.runOptions(positional, 0)) //nolint:contextcheck // the host's run context is derived from ctx
+	rawResult, err := host.runner.Run(host.runCtx, entries, host.runOptions(positional, 0)) //nolint:contextcheck // the host's run context is derived from ctx
+	result := rawResult.Masked(record.secrets.String)
 	finishedAt := time.Now()
 	indexEntries := suiteIndexEntries(result)
 	indexErr := record.writer.WriteIndex(indexEntries)
@@ -139,11 +140,11 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 	}
 	if err != nil {
 		record.setOutcome(runfolder.OutcomeError, counts)
-		return reportUncaught(ctx, stderr, deps.Debug, err)
+		return reportUncaughtMasked(ctx, stderr, deps.Debug, record.secrets.String, err)
 	}
 	record.setOutcome(outcomeForResult(result.Ok), counts)
 	if indexErr != nil {
-		return reportUncaught(ctx, stderr, deps.Debug, indexErr)
+		return reportUncaughtMasked(ctx, stderr, deps.Debug, record.secrets.String, indexErr)
 	}
 
 	return emitSuiteOutputs(ctx, deps, suiteOutputs{

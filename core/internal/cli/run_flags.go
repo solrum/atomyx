@@ -230,6 +230,19 @@ func buildExternalEnv(flags map[string]FlagValue, env *config.ResolvedEnvironmen
 	return out, committed, nil
 }
 
+// addEnvRefValues records the process environment values the selected
+// environment's `${ENV:NAME}` references resolved to. A var that mixes a
+// literal with a reference, such as "Bearer ${ENV:TOKEN}", enters the set
+// as the whole string, but a report can quote the environment value alone.
+func addEnvRefValues(secrets *runner.RunSecrets, env *config.ResolvedEnvironment) {
+	if env == nil {
+		return
+	}
+	for _, value := range env.EnvRefValues {
+		secrets.Add(value)
+	}
+}
+
 func readVarFile(path string) (map[string]string, error) {
 	absPath, err := filepath.Abs(path)
 	if err != nil {

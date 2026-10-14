@@ -33,7 +33,7 @@ func emitSuiteOutputs(ctx context.Context, deps Deps, o suiteOutputs, result sce
 	if o.jsonOutput {
 		payload := suiteJSONResult{Ok: result.Ok, RunFolder: o.record.Dir(), Entries: index}
 		if err := encodeJSON(o.stdout, payload); err != nil {
-			return reportUncaught(ctx, o.stderr, deps.Debug, err)
+			return reportUncaughtMasked(ctx, o.stderr, deps.Debug, o.record.secrets.String, err)
 		}
 		o.record.reportedInJSON = true
 	}
@@ -48,7 +48,7 @@ func emitSuiteOutputs(ctx context.Context, deps Deps, o suiteOutputs, result sce
 	}
 	bundle, genErr := report.NewFsReporter().Generate(input, o.record.reportOptions())
 	if genErr != nil {
-		return reportUncaught(ctx, o.stderr, deps.Debug, genErr)
+		return reportUncaughtMasked(ctx, o.stderr, deps.Debug, o.record.secrets.String, genErr)
 	}
 	printReportLocation(o.stderr, o.record, bundle)
 	printVideoLocations(o.stderr, o.record.Dir(), input.EntryVideos)

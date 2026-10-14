@@ -29,12 +29,13 @@ func ResolveEnvRefs(cfg AtomyxConfig, path string) (AtomyxConfig, error) {
 			environments[name] = environment
 			continue
 		}
-		resolved, fromEnv, err := resolveVars(*environment.Vars, name, path)
+		resolved, fromEnv, values, err := resolveVars(*environment.Vars, name, path)
 		if err != nil {
 			return AtomyxConfig{}, err
 		}
 		environment.Vars = &resolved
 		environment.EnvRefVars = fromEnv
+		environment.EnvRefValues = values
 		environments[name] = environment
 	}
 
@@ -45,10 +46,12 @@ func ResolveEnvRefs(cfg AtomyxConfig, path string) (AtomyxConfig, error) {
 
 // resolveVars substitutes every reference in vars. It also returns the
 // names of the variables that held at least one reference, because their
-// value comes from the process environment and not from the config file.
-func resolveVars(vars map[string]string, environmentName, path string) (map[string]string, map[string]bool, error) {
+// value comes from the process environment and not from the config file,
+// and the environment values the references resolved to.
+func resolveVars(vars map[string]string, environmentName, path string) (map[string]string, map[string]bool, []string, error) {
 	resolved := make(map[string]string, len(vars))
 	fromEnv := make(map[string]bool)
+	var values []string
 	keys := make([]string, 0, len(vars))
 	for key := range vars {
 		keys = append(keys, key)
@@ -63,7 +66,7 @@ func resolveVars(vars map[string]string, environmentName, path string) (map[stri
 			}
 			fromEnv[key] = true
 			varName := envRefPattern.FindStringSubmatch(match)[1]
-			fromEnv, ok := os.LookupEnv(varName)
+			envValue, ok := os.LookupEnv(varName)
 			if !ok {
 				//nolint:staticcheck // text matched verbatim by the differential test comparing this message against the reference config oracle's output; punctuation here is part of that parity contract, not a style choice
 				substitutionErr = fmt.Errorf(
@@ -72,12 +75,13 @@ func resolveVars(vars map[string]string, environmentName, path string) (map[stri
 				)
 				return match
 			}
-			return fromEnv
+			values = append(values, envValue)
+			return envValue
 		})
 		if substitutionErr != nil {
-			return nil, nil, substitutionErr
+			return nil, nil, nil, substitutionErr
 		}
 		resolved[key] = replaced
 	}
-	return resolved, fromEnv, nil
+	return resolved, fromEnv, values, nil
 }
