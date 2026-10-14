@@ -55,7 +55,10 @@ func TestCheck(t *testing.T) {
 }
 
 func TestCheckModuleRouterMapKey(t *testing.T) {
-	const keyed = "package p\nvar m = map[string]int{\"runs\": 1}\n"
+	const keyed = "package p\nvar Modules = map[string]int{\"runs\": 1}\n"
+	const otherMap = "package p\nvar Other = map[string]int{\"runs\": 1}\n"
+	const structKey = "package p\nvar Modules = T{\"runs\": 1}\n"
+	const otherKey = "package p\nvar Modules = map[string]int{\"runs\": 1, \"index.json\": 2}\n"
 	const valued = "package p\nvar m = map[string]string{\"a\": \"runs\"}\n"
 	cases := []struct {
 		name     string
@@ -65,6 +68,9 @@ func TestCheckModuleRouterMapKey(t *testing.T) {
 	}{
 		{"map key in the router file", moduleRouterFile, keyed, 0},
 		{"map key in another file", "internal/cli/other.go", keyed, 1},
+		{"map key of another variable in the router file", moduleRouterFile, otherMap, 1},
+		{"struct literal key in the router file", moduleRouterFile, structKey, 1},
+		{"another key of the module map", moduleRouterFile, otherKey, 1},
 		{"map value in the router file", moduleRouterFile, valued, 1},
 	}
 	for _, c := range cases {

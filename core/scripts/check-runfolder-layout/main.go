@@ -54,8 +54,15 @@ const (
 	selfDir = "scripts/check-runfolder-layout/"
 	// moduleRouterFile registers the top-level CLI modules by name. One of
 	// them is called runs, which only coincides with the run folder
-	// directory name, so a map key in this file is not a layout name.
+	// directory name, so that one key of the module map is not a layout
+	// name. Every other literal in the file is still checked.
 	moduleRouterFile = "internal/cli/router.go"
+	// moduleMapVar is the package variable in moduleRouterFile that holds
+	// the module map.
+	moduleMapVar = "Modules"
+	// moduleRunsKey is the module name that spells the run folder
+	// directory name.
+	moduleRunsKey = "runs"
 )
 
 var alwaysNames = map[string]bool{
@@ -153,6 +160,30 @@ func scan(root string) ([]string, error) {
 	return out, err
 }
 
+// skipModuleRunsKey marks the "runs" key of the module map literal in spec
+// as exempt, and nothing else in it.
+func skipModuleRunsKey(spec *ast.ValueSpec, skip map[*ast.BasicLit]bool) {
+	if len(spec.Names) != 1 || spec.Names[0].Name != moduleMapVar || len(spec.Values) != 1 {
+		return
+	}
+	lit, ok := spec.Values[0].(*ast.CompositeLit)
+	if !ok {
+		return
+	}
+	if _, isMap := lit.Type.(*ast.MapType); !isMap {
+		return
+	}
+	for _, elt := range lit.Elts {
+		kv, ok := elt.(*ast.KeyValueExpr)
+		if !ok {
+			continue
+		}
+		if key, ok := kv.Key.(*ast.BasicLit); ok && key.Kind == token.STRING && key.Value == strconv.Quote(moduleRunsKey) {
+			skip[key] = true
+		}
+	}
+}
+
 // check parses one file and returns every literal that spells a layout
 // name. filename is the slash-separated path relative to the module root.
 func check(filename string, src []byte) ([]finding, error) {
@@ -171,11 +202,9 @@ func check(filename string, src []byte) ([]finding, error) {
 			if x.Tag != nil {
 				skip[x.Tag] = true
 			}
-		case *ast.KeyValueExpr:
+		case *ast.ValueSpec:
 			if filename == moduleRouterFile {
-				if key, ok := x.Key.(*ast.BasicLit); ok {
-					skip[key] = true
-				}
+				skipModuleRunsKey(x, skip)
 			}
 		case *ast.CallExpr:
 			if isPathCall(x.Fun) {
