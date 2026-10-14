@@ -258,3 +258,25 @@ func TestPathLocatorFindsOnlyToolsOnThePath(t *testing.T) {
 		t.Errorf("Locate = %q, %v, want %q, true", path, found, tool)
 	}
 }
+
+func TestAndroidSetupFixModeWithoutAPKPointsAtTheAPKStep(t *testing.T) {
+	host := &fakeAndroidHost{hostProto: 1}
+	code, report := runAndroidSetup(t, host, fakeTools{"adb": "/sdk/adb"}, map[string]FlagValue{"--platform": "android", "--device": "emulator-5554"})
+
+	if code != 1 || len(host.calls) != 0 {
+		t.Fatalf("code = %d, repairs = %v, want 1 and none", code, host.calls)
+	}
+	installed := report.Steps[3]
+	if installed.ID != "android-agent-installed" || installed.Status != "manual" || !strings.Contains(installed.Remedy, "android-apk") {
+		t.Errorf("installed step = %+v", installed)
+	}
+}
+
+func TestAndroidSetupFixModeNamesTheServicesTheInstallDisabled(t *testing.T) {
+	host := &fakeAndroidHost{apkFound: true, others: []string{"com.a/.One"}, agentProto: 1, hostProto: 1}
+	_, report := runAndroidSetup(t, host, fakeTools{"adb": "/sdk/adb"}, map[string]FlagValue{"--platform": "android", "--device": "emulator-5554"})
+
+	if !strings.Contains(report.Steps[3].Message, "now disabled: com.a/.One") {
+		t.Errorf("install message = %q", report.Steps[3].Message)
+	}
+}

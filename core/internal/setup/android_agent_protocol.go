@@ -29,13 +29,15 @@ type androidAgentProtocolStep struct {
 	serial      string
 	probe       AgentProtocolProbe
 	reinstaller AgentReinstaller
+	services    AccessibilityReader
 }
 
 // NewAndroidAgentProtocolStep returns the step that requires the
 // agent to speak the protocol version this host supports. Its fix
-// reinstalls the agent once and checks again.
-func NewAndroidAgentProtocolStep(serial string, probe AgentProtocolProbe, reinstaller AgentReinstaller) Fixer {
-	return androidAgentProtocolStep{serial: serial, probe: probe, reinstaller: reinstaller}
+// reinstalls the agent once, checks again, and states which
+// accessibility services the reinstall disabled.
+func NewAndroidAgentProtocolStep(serial string, probe AgentProtocolProbe, reinstaller AgentReinstaller, services AccessibilityReader) Fixer {
+	return androidAgentProtocolStep{serial: serial, probe: probe, reinstaller: reinstaller, services: services}
 }
 
 func (androidAgentProtocolStep) ID() string { return AndroidAgentProtocolStepID }
@@ -56,6 +58,11 @@ func (s androidAgentProtocolStep) Check(ctx context.Context) Result {
 }
 
 func (s androidAgentProtocolStep) Fix(ctx context.Context) Result {
+	_, before, err := s.services.AccessibilityServices(ctx, s.serial)
+	if err != nil {
+		return failedFrom("could not read the enabled accessibility services", err,
+			"Check that the device is connected and unlocked, then run atomyx setup again.")
+	}
 	if err := s.reinstaller.ReinstallAgent(ctx, s.serial); err != nil {
 		return failedFrom("could not reinstall the agent", err, protocolRemedy)
 	}
@@ -70,7 +77,8 @@ func (s androidAgentProtocolStep) Fix(ctx context.Context) Result {
 			Remedy:  protocolRemedy,
 		}
 	}
-	return Result{Status: StatusFixed, Message: fmt.Sprintf("reinstalled the agent, which now speaks protocol version %d", agent)}
+	message := fmt.Sprintf("reinstalled the agent, which now speaks protocol version %d", agent)
+	return Result{Status: StatusFixed, Message: withDisabledServices(message, before)}
 }
 
 func mismatchMessage(agent, host int) string {

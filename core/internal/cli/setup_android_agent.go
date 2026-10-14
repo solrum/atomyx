@@ -107,8 +107,9 @@ func androidAPKEntry(t setupTarget) setup.Entry {
 }
 
 func androidAgentInstalledEntry(t setupTarget) setup.Entry {
+	host := t.Deps.androidAgent()
 	return setup.Entry{
-		Step:     setup.NewAndroidAgentInstalledStep(t.DeviceID, t.Deps.androidAgent()),
+		Step:     setup.NewAndroidAgentInstalledStep(t.DeviceID, host, host, host),
 		Requires: []string{setup.AndroidDeviceStepID},
 	}
 }
@@ -130,7 +131,7 @@ func androidAgentHealthEntry(t setupTarget) setup.Entry {
 func androidAgentProtocolEntry(t setupTarget) setup.Entry {
 	host := t.Deps.androidAgent()
 	return setup.Entry{
-		Step:     setup.NewAndroidAgentProtocolStep(t.DeviceID, host, host),
+		Step:     setup.NewAndroidAgentProtocolStep(t.DeviceID, host, host, host),
 		Requires: []string{setup.AndroidAgentHealthStepID},
 	}
 }

@@ -67,12 +67,12 @@ func TestAndroidAgentHealthStep(t *testing.T) {
 func TestAndroidAgentProtocolCheck(t *testing.T) {
 	ctx := context.Background()
 	match := &fakeProtocol{replies: []protocolReply{{agent: 1, host: 1}}}
-	if got := NewAndroidAgentProtocolStep("s1", match, &fakeReinstaller{}).Check(ctx); got.Status != StatusOK {
+	if got := NewAndroidAgentProtocolStep("s1", match, &fakeReinstaller{}, &fakeAccessibility{}).Check(ctx); got.Status != StatusOK {
 		t.Errorf("match: %+v", got)
 	}
 	old := &fakeProtocol{replies: []protocolReply{{agent: 0, host: 1}}}
 	reinstaller := &fakeReinstaller{}
-	got := NewAndroidAgentProtocolStep("s1", old, reinstaller).Check(ctx)
+	got := NewAndroidAgentProtocolStep("s1", old, reinstaller, &fakeAccessibility{}).Check(ctx)
 	if got.Status != StatusManual || !strings.Contains(got.Message, "version 0 but this host requires version 1") || !strings.Contains(got.Remedy, "assembleDebug") {
 		t.Errorf("mismatch: %+v", got)
 	}
@@ -80,7 +80,7 @@ func TestAndroidAgentProtocolCheck(t *testing.T) {
 		t.Error("Check must never reinstall")
 	}
 	failed := &fakeProtocol{replies: []protocolReply{{err: errors.New("no route")}}}
-	if got := NewAndroidAgentProtocolStep("s1", failed, reinstaller).Check(ctx); got.Status != StatusFailed {
+	if got := NewAndroidAgentProtocolStep("s1", failed, reinstaller, &fakeAccessibility{}).Check(ctx); got.Status != StatusFailed {
 		t.Errorf("unreachable: %+v", got)
 	}
 }
@@ -89,7 +89,7 @@ func TestAndroidAgentProtocolFixReinstallsOnceAndChecksAgain(t *testing.T) {
 	ctx := context.Background()
 	probe := &fakeProtocol{replies: []protocolReply{{agent: 1, host: 1}}}
 	reinstaller := &fakeReinstaller{}
-	got := NewAndroidAgentProtocolStep("s1", probe, reinstaller).Fix(ctx)
+	got := NewAndroidAgentProtocolStep("s1", probe, reinstaller, &fakeAccessibility{}).Fix(ctx)
 	if got.Status != StatusFixed || reinstaller.calls != 1 || probe.calls != 1 {
 		t.Errorf("fix: %+v reinstalls=%d probes=%d", got, reinstaller.calls, probe.calls)
 	}
@@ -101,18 +101,33 @@ func TestAndroidAgentProtocolFixFailures(t *testing.T) {
 
 	probe := &fakeProtocol{replies: []protocolReply{stale}}
 	reinstaller := &fakeReinstaller{}
-	got := NewAndroidAgentProtocolStep("s1", probe, reinstaller).Fix(ctx)
+	got := NewAndroidAgentProtocolStep("s1", probe, reinstaller, &fakeAccessibility{}).Fix(ctx)
 	if got.Status != StatusFailed || reinstaller.calls != 1 || !strings.HasPrefix(got.Message, "after a reinstall") {
 		t.Errorf("still stale: %+v reinstalls=%d", got, reinstaller.calls)
 	}
 
-	got = NewAndroidAgentProtocolStep("s1", &fakeProtocol{replies: []protocolReply{stale}}, &fakeReinstaller{err: errors.New("no apk")}).Fix(ctx)
+	got = NewAndroidAgentProtocolStep("s1", &fakeProtocol{replies: []protocolReply{stale}}, &fakeReinstaller{err: errors.New("no apk")}, &fakeAccessibility{}).Fix(ctx)
 	if got.Status != StatusFailed || !strings.Contains(got.Message, "no apk") {
 		t.Errorf("reinstall error: %+v", got)
 	}
 
-	got = NewAndroidAgentProtocolStep("s1", &fakeProtocol{replies: []protocolReply{{err: errors.New("gone")}}}, &fakeReinstaller{}).Fix(ctx)
+	got = NewAndroidAgentProtocolStep("s1", &fakeProtocol{replies: []protocolReply{{err: errors.New("gone")}}}, &fakeReinstaller{}, &fakeAccessibility{}).Fix(ctx)
 	if got.Status != StatusFailed || !strings.Contains(got.Message, "after the reinstall") {
 		t.Errorf("probe error after reinstall: %+v", got)
+	}
+}
+
+func TestAndroidAgentProtocolFixStatesTheServicesTheReinstallDisabled(t *testing.T) {
+	ctx := context.Background()
+	probe := &fakeProtocol{replies: []protocolReply{{agent: 1, host: 1}}}
+	services := &fakeAccessibility{others: []string{"com.a/.One"}}
+	got := NewAndroidAgentProtocolStep("s1", probe, &fakeReinstaller{}, services).Fix(ctx)
+	if got.Status != StatusFixed || !strings.Contains(got.Message, "now disabled: com.a/.One") {
+		t.Errorf("fix must name the disabled services: %+v", got)
+	}
+	reinstaller := &fakeReinstaller{}
+	got = NewAndroidAgentProtocolStep("s1", probe, reinstaller, &fakeAccessibility{readErr: errors.New("no shell")}).Fix(ctx)
+	if got.Status != StatusFailed || reinstaller.calls != 0 {
+		t.Errorf("an unreadable service list must stop before the reinstall: %+v", got)
 	}
 }

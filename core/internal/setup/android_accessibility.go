@@ -5,13 +5,19 @@ import (
 	"strings"
 )
 
-// AccessibilityControl reads and changes the accessibility services
-// enabled on an Android device.
-type AccessibilityControl interface {
+// AccessibilityReader reads the accessibility services enabled on an
+// Android device.
+type AccessibilityReader interface {
 	// AccessibilityServices reports whether the Atomyx accessibility
 	// service is enabled and which other services are, each as the
 	// component Android stores.
 	AccessibilityServices(ctx context.Context, serial string) (agentEnabled bool, others []string, err error)
+}
+
+// AccessibilityControl reads and changes the accessibility services
+// enabled on an Android device.
+type AccessibilityControl interface {
+	AccessibilityReader
 	// EnableAgentAccessibility enables the Atomyx accessibility
 	// service. Android keeps one list of enabled services, so every
 	// other enabled service is disabled by this call.
@@ -61,11 +67,16 @@ func (s androidAccessibilityStep) Fix(ctx context.Context) Result {
 		return failedFrom("could not enable the Atomyx accessibility service", err,
 			"Enable Atomyx in Settings, Accessibility on the device, then run atomyx setup again.")
 	}
-	message := "enabled the Atomyx accessibility service"
-	if len(before) > 0 {
-		message += ". These services were enabled before and are now disabled: " + strings.Join(before, ", ")
+	return Result{Status: StatusFixed, Message: withDisabledServices("enabled the Atomyx accessibility service", before)}
+}
+
+// withDisabledServices appends the services a rebind of the
+// accessibility setting disabled, when there were any.
+func withDisabledServices(message string, before []string) string {
+	if len(before) == 0 {
+		return message
 	}
-	return Result{Status: StatusFixed, Message: message}
+	return message + ". These services were enabled before and are now disabled: " + strings.Join(before, ", ")
 }
 
 func disableWarning(others []string) string {

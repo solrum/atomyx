@@ -44,14 +44,14 @@ func (f *fakeAccessibility) EnableAgentAccessibility(context.Context, string) er
 
 func TestAndroidAgentInstalledCheck(t *testing.T) {
 	ctx := context.Background()
-	if got := NewAndroidAgentInstalledStep("s1", &fakeInstaller{installed: true}).Check(ctx); got.Status != StatusOK {
+	if got := NewAndroidAgentInstalledStep("s1", &fakeInstaller{installed: true}, fakeAPK{found: true}, &fakeAccessibility{}).Check(ctx); got.Status != StatusOK {
 		t.Errorf("installed: %+v", got)
 	}
-	got := NewAndroidAgentInstalledStep("s1", &fakeInstaller{}).Check(ctx)
+	got := NewAndroidAgentInstalledStep("s1", &fakeInstaller{}, fakeAPK{found: true}, &fakeAccessibility{}).Check(ctx)
 	if got.Status != StatusManual || !strings.Contains(got.Remedy, "without --check") {
 		t.Errorf("missing: %+v", got)
 	}
-	got = NewAndroidAgentInstalledStep("s1", &fakeInstaller{checkErr: errors.New("adb died")}).Check(ctx)
+	got = NewAndroidAgentInstalledStep("s1", &fakeInstaller{checkErr: errors.New("adb died")}, fakeAPK{found: true}, &fakeAccessibility{}).Check(ctx)
 	if got.Status != StatusFailed || !strings.Contains(got.Message, "adb died") || got.Remedy == "" {
 		t.Errorf("read error: %+v", got)
 	}
@@ -60,15 +60,15 @@ func TestAndroidAgentInstalledCheck(t *testing.T) {
 func TestAndroidAgentInstalledFix(t *testing.T) {
 	ctx := context.Background()
 	installer := &fakeInstaller{}
-	if got := NewAndroidAgentInstalledStep("s1", installer).Fix(ctx); got.Status != StatusFixed || installer.installs != 1 {
+	if got := NewAndroidAgentInstalledStep("s1", installer, fakeAPK{found: true}, &fakeAccessibility{}).Fix(ctx); got.Status != StatusFixed || installer.installs != 1 {
 		t.Errorf("fix: %+v installs=%d", got, installer.installs)
 	}
 	coded := diag.New("INSTALL", "install refused", "Free some space.", nil)
-	got := NewAndroidAgentInstalledStep("s1", &fakeInstaller{installErr: coded}).Fix(ctx)
+	got := NewAndroidAgentInstalledStep("s1", &fakeInstaller{installErr: coded}, fakeAPK{found: true}, &fakeAccessibility{}).Fix(ctx)
 	if got.Status != StatusFailed || got.Remedy != "Free some space." || !strings.Contains(got.Message, "install refused") {
 		t.Errorf("install error keeps its own remedy: %+v", got)
 	}
-	got = NewAndroidAgentInstalledStep("s1", &fakeInstaller{installErr: errors.New("boom")}).Fix(ctx)
+	got = NewAndroidAgentInstalledStep("s1", &fakeInstaller{installErr: errors.New("boom")}, fakeAPK{found: true}, &fakeAccessibility{}).Fix(ctx)
 	if got.Status != StatusFailed || got.Remedy == "" {
 		t.Errorf("plain error gets the fallback remedy: %+v", got)
 	}
@@ -112,5 +112,32 @@ func TestAndroidAccessibilityFix(t *testing.T) {
 	failed := NewAndroidAccessibilityStep("s1", &fakeAccessibility{enableEr: errors.New("denied")}).Fix(ctx)
 	if failed.Status != StatusFailed || failed.Remedy == "" {
 		t.Errorf("enable error: %+v", failed)
+	}
+}
+
+func TestAndroidAgentInstalledFixStatesTheServicesTheInstallDisabled(t *testing.T) {
+	ctx := context.Background()
+	installer := &fakeInstaller{}
+	services := &fakeAccessibility{others: []string{"com.a/.One", "com.b/.Two"}}
+	got := NewAndroidAgentInstalledStep("s1", installer, fakeAPK{found: true}, services).Fix(ctx)
+	if got.Status != StatusFixed || !strings.Contains(got.Message, "now disabled: com.a/.One, com.b/.Two") {
+		t.Errorf("fix must name the disabled services: %+v", got)
+	}
+	quiet := NewAndroidAgentInstalledStep("s1", &fakeInstaller{}, fakeAPK{found: true}, &fakeAccessibility{}).Fix(ctx)
+	if strings.Contains(quiet.Message, "disabled") {
+		t.Errorf("no previous services means no note: %+v", quiet)
+	}
+	unreadable := &fakeInstaller{}
+	got = NewAndroidAgentInstalledStep("s1", unreadable, fakeAPK{found: true}, &fakeAccessibility{readErr: errors.New("no shell")}).Fix(ctx)
+	if got.Status != StatusFailed || unreadable.installs != 0 {
+		t.Errorf("an unreadable service list must stop before the install: %+v installs=%d", got, unreadable.installs)
+	}
+}
+
+func TestAndroidAgentInstalledFixWithoutAPKPointsAtTheAPKStep(t *testing.T) {
+	installer := &fakeInstaller{}
+	got := NewAndroidAgentInstalledStep("s1", installer, fakeAPK{}, &fakeAccessibility{}).Fix(context.Background())
+	if got.Status != StatusManual || installer.installs != 0 || !strings.Contains(got.Remedy, AndroidAPKStepID) {
+		t.Errorf("missing APK: %+v installs=%d", got, installer.installs)
 	}
 }
