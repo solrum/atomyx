@@ -373,3 +373,20 @@ func rewriteParent(t *testing.T, root, runID, parentID string) {
 		t.Fatal(err)
 	}
 }
+
+func TestRunsReadTheConfiguredReportOutDir(t *testing.T) {
+	runsStorageDir(t)
+	reportDir := t.TempDir()
+	configPath := atomyxConfigFixture(t, reportDir)
+	t.Chdir(filepath.Dir(configPath))
+	seedRecordedRun(t, reportDir, "a", runsEpoch, time.Second, runfolder.OutcomePassed, runfolder.Meta{TestKey: "flows/configured.yml"})
+
+	code, stdout, stderr := execRuns(t, "list")
+
+	if code != 0 || stderr != "" {
+		t.Fatalf("code = %d, stderr = %q", code, stderr)
+	}
+	if !strings.Contains(stdout, "flows/configured.yml") {
+		t.Fatalf("list output does not show the run recorded under the configured outDir:\n%s", stdout)
+	}
+}

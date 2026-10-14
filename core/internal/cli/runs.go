@@ -5,13 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"text/tabwriter"
 	"time"
 
+	"dev.atomyx/internal/config"
 	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/storage"
-	"dev.atomyx/internal/storageroot"
 )
 
 // ExecuteRuns dispatches one runs-module command: list, stats, prune, or help.
@@ -56,7 +57,7 @@ func dispatchRunsCommand(ctx context.Context, deps Deps, rest []string, command 
 		PrintRunsCommandHelp(command, deps.stdout())
 		return 0
 	}
-	root, err := storageroot.Resolve("")
+	root, err := resolveRunsRoot()
 	if err != nil {
 		return reportUncaught(ctx, deps.stderr(), deps.Debug, err)
 	}
@@ -66,6 +67,31 @@ func dispatchRunsCommand(ctx context.Context, deps Deps, rest []string, command 
 	}
 	catalog := storage.NewRunCatalog(store, root, runfolder.NewLockLiveness(root))
 	return run(ctx, deps, catalog, root, argv.Flags)
+}
+
+// resolveRunsRoot returns the storage root the runs commands read, chosen
+// the same way the run command chooses where it writes: the report
+// outDir of the project config discovered from the working directory,
+// then the storage root environment variable, then the default under the
+// home directory.
+func resolveRunsRoot() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	loaded, err := config.Load(config.LoadOptions{Cwd: cwd})
+	if err != nil {
+		return "", err
+	}
+	var configReport *config.Report
+	if loaded != nil {
+		configReport = loaded.Config.Report
+	}
+	output, err := resolveReportOptions(nil, configReport)
+	if err != nil {
+		return "", err
+	}
+	return output.Root, nil
 }
 
 // runsMisuse reports a misuse of a runs command and returns the misuse
