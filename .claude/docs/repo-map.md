@@ -99,6 +99,7 @@ atomyx/
 | `runner` | Defines the command execution contract and the ScriptRunner that dispatches a parsed script's steps. |
 | `scenario` | Runs ordered groups of scripts and ordered sets of scripts or scenarios against a shared Orchestra. |
 | `shard` | Spreads a suite over several devices. A coordinator feeds one worker per device from a single queue, requeues the entry of a lost device once, and returns the merged entries. Workers are processes started through a `Launcher` port and speak a versioned line protocol. It depends only on `process`. |
+| `setup` | Prepares a device to run Atomyx. A `Registry` orders steps, each a `Step` that checks and optionally a `Fixer` that repairs, and `Run` executes them in fix or check mode. In check mode `Fix` is never called. A step whose prerequisite did not pass is skipped. A `Report` renders as text or as JSON. It imports no other internal package, and the step lists live in `cli`. |
 | `stepstream` | Turns the step events of a script run into the lines of a run folder's `steps.jsonl`. Depends on `runner` and `runfolder`. |
 | `script` | Owns the test-script schema, parser, and expression engine. |
 | `core/internal/script/expression` | Implements the test-script expression language: tokenizing, parsing, and evaluating. |

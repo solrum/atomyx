@@ -33,15 +33,16 @@ atomyx <module> <command> [flags]
 | `atomyx driver suite` | Runs a named suite or an ad-hoc selection of flows. |
 | `atomyx driver doctor` | Checks that a device is reachable and healthy, or migrates flat run records into run folders. |
 | `atomyx driver inspect` | Serves a browser inspector for a device: its live UI tree and screenshot, with selector suggestions. |
+| `atomyx driver setup` | Prepares a device to run Atomyx: runs the platform setup steps, fixes what is safe, and prints the exact action for the rest. |
 | `atomyx driver list-devices` | Lists Android, iOS simulator, and iOS physical devices. |
 | `atomyx driver version` | Prints the driver module's version. |
 | `atomyx skills init` | Copies the bundled skill and agent files into a project. |
 | `atomyx skills update-skills` | Updates an existing skills install to the bundled version. |
 
-Five shortcuts skip the `driver` module name: `atomyx run`, `atomyx
-suite`, `atomyx doctor`, `atomyx inspect`, and `atomyx devices` map to
+Six shortcuts skip the `driver` module name: `atomyx run`, `atomyx
+suite`, `atomyx doctor`, `atomyx inspect`, `atomyx setup`, and `atomyx devices` map to
 `atomyx driver run`, `atomyx driver suite`, `atomyx driver doctor`,
-`atomyx driver inspect`, and `atomyx driver list-devices`. Two shortcuts skip
+`atomyx driver inspect`, `atomyx driver setup`, and `atomyx driver list-devices`. Two shortcuts skip
 the `skills` module name: `atomyx init` and `atomyx update-skills`.
 
 The CLI ships exactly two modules: `driver` and `skills`. The MCP
@@ -55,6 +56,7 @@ atomyx driver run [flags]
 atomyx driver suite [name] [flags]
 atomyx driver doctor [flags]
 atomyx driver inspect [flags]
+atomyx driver setup [flags]
 atomyx driver list-devices [flags]
 atomyx driver version
 atomyx driver help
@@ -733,6 +735,7 @@ Usage:
 
 ```
 atomyx driver inspect [flags]
+atomyx driver setup [flags]
 ```
 
 Flags:
@@ -921,9 +924,71 @@ the device could not be reached or held, when its holder cannot be
 watched, or when the server failed, `2` when the command was misused,
 `130` when Ctrl-C stopped it, and `143` when SIGTERM did.
 
+## driver setup
+
+Prepares a device to run Atomyx. It runs the platform's setup steps in
+order, applies the safe fixes it can make from this machine, and prints
+the exact action for everything else. Each step reports a status, a
+message, and, when the operator must act, a remedy.
+
+Usage:
+
+```
+atomyx driver setup [flags]
+```
+
+Flags:
+
+| Flag | Meaning | Default | Repeatable |
+|---|---|---|---|
+| `--platform <ios\|android>` | Target platform. | `android` | no |
+| `--device <id>` | Device identifier, as reported by `atomyx driver list-devices`. | none | no |
+| `--check` | Only observes. Nothing on this machine or the device is changed. | off | no |
+| `--json` | Prints the report as JSON instead of text. | off | no |
+| `--help`, `-h` | Prints this command's usage and exits. | off | no |
+
+Step statuses:
+
+| Status | Meaning |
+|---|---|
+| `ok` | The requirement already holds, or does not apply to this device. |
+| `fixed` | The step changed the machine or device and the requirement now holds. |
+| `manual` | The requirement is unmet and only the operator can satisfy it. The step carries a remedy. |
+| `failed` | The step could not establish or verify the requirement. The step carries a remedy. |
+| `skipped` | The step did not run because a step it depends on did not pass, or the run was interrupted. |
+
+Steps run in a fixed order. A step whose prerequisite is not `ok` or
+`fixed` is skipped, and its message names the prerequisite. With
+`--check` no step is ever asked to change anything, so a requirement a
+fix would repair is reported `manual` with its remedy.
+
+With `--json`, standard output is one object:
+
+```
+{"ok": true, "steps": [{"id": "...", "status": "ok", "message": "...", "remedy": ""}]}
+```
+
+`ok` is `true` when every step is `ok` or `fixed`. `steps` is always an
+array, and `remedy` is an empty string when a step needs no action.
+
+Setup takes the device's lease for the length of the command without
+connecting a driver, so a broken agent cannot fail inside it. When
+another Atomyx process holds the device, setup prints the holder and
+that nothing was changed, runs no step, and exits `1`. The `--json`
+output then carries `ok: false`, an empty `steps` array, `held: true`,
+and a `holder` object with `pid`, `command`, `role`, `state`, and
+`runId` when known. When no device can be resolved, no lease is taken,
+a note goes to stderr, and the steps report what is missing. The lease
+is released when the command ends, including on an interrupt.
+
+Exit codes: `0` when every step is `ok` or `fixed`, `1` when any step is
+`manual`, `failed`, or `skipped` or the device is held, `2` when the
+command was misused, `130` when Ctrl-C stopped it, and `143` when
+SIGTERM did.
+
 ## Device ownership
 
-`run`, `suite`, `doctor`, and `inspect` take exclusive ownership of the device for
+`run`, `suite`, `doctor`, `inspect`, and `setup` take exclusive ownership of the device for
 the length of the command. Only one Atomyx process, whether this CLI or
 an `atomyx-mcp` server, can drive a device at a time.
 
@@ -1109,6 +1174,7 @@ atomyx skills update-skills
 | `atomyx suite [name] [flags]` | `atomyx driver suite [name] [flags]` |
 | `atomyx doctor [flags]` | `atomyx driver doctor [flags]` |
 | `atomyx inspect [flags]` | `atomyx driver inspect [flags]` |
+| `atomyx setup [flags]` | `atomyx driver setup [flags]` |
 | `atomyx devices [flags]` | `atomyx driver list-devices [flags]` |
 | `atomyx init [flags]` | `atomyx skills init [flags]` |
 | `atomyx update-skills [flags]` | `atomyx skills update-skills [flags]` |
