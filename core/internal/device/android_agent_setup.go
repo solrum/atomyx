@@ -48,55 +48,89 @@ func (s *AndroidAgentSetup) ResolveAgentAPK() (string, bool) {
 	return androiddriver.ResolveAgentAPK(s.apkPath)
 }
 
+// agentSession is the launcher and HTTP client of one call, together
+// with the release that removes the adb forward when the call created
+// it. A forward that existed before the call stays.
+type agentSession struct {
+	launcher *androiddriver.AgentLauncher
+	client   *transport.HTTPClient
+	release  func()
+}
+
+// open forwards the agent port of the device with the given serial and
+// returns the session that reaches it. The caller must call release.
+func (s *AndroidAgentSetup) open(ctx context.Context, serial string) (agentSession, error) {
+	hostPort, created, err := androiddriver.EnsureForward(ctx, s.runner, serial, androidControlPort)
+	if err != nil {
+		return agentSession{}, adbFailure(err)
+	}
+	launcher, client := launcherForForward(s.runner, s.clock, serial, s.apkPath, hostPort)
+	release := func() {}
+	if created {
+		release = func() {
+			// A forward left behind is harmless, so a failed removal is
+			// not worth failing the step that already finished.
+			_ = androiddriver.RemoveForward(context.WithoutCancel(ctx), s.runner, serial, hostPort)
+		}
+	}
+	return agentSession{launcher: launcher, client: client, release: release}, nil
+}
+
 // AgentInstalled reports whether the agent package is installed.
 func (s *AndroidAgentSetup) AgentInstalled(ctx context.Context, serial string) (bool, error) {
-	return androiddriver.NewAgentInspector(s.runner, serial).Installed(ctx)
+	installed, err := androiddriver.NewAgentInspector(s.runner, serial).Installed(ctx)
+	return installed, adbFailure(err)
 }
 
 // InstallAgent installs the agent when it is not already answering and
 // brings it up.
 func (s *AndroidAgentSetup) InstallAgent(ctx context.Context, serial string) error {
-	launcher, _, err := newAndroidAgentLauncher(ctx, s.runner, s.clock, serial, s.apkPath)
+	session, err := s.open(ctx, serial)
 	if err != nil {
 		return err
 	}
-	return launcher.EnsureRunning(ctx)
+	defer session.release()
+	return adbFailure(session.launcher.EnsureRunning(ctx))
 }
 
 // ReinstallAgent replaces the agent with the resolved APK even when it
 // is answering.
 func (s *AndroidAgentSetup) ReinstallAgent(ctx context.Context, serial string) error {
-	launcher, _, err := newAndroidAgentLauncher(ctx, s.runner, s.clock, serial, s.apkPath)
+	session, err := s.open(ctx, serial)
 	if err != nil {
 		return err
 	}
-	return launcher.Reinstall(ctx)
+	defer session.release()
+	return adbFailure(session.launcher.Reinstall(ctx))
 }
 
 // StartAgent starts the installed agent and waits for it to answer,
 // without reinstalling it or changing the accessibility setting.
 func (s *AndroidAgentSetup) StartAgent(ctx context.Context, serial string) error {
-	launcher, _, err := newAndroidAgentLauncher(ctx, s.runner, s.clock, serial, s.apkPath)
+	session, err := s.open(ctx, serial)
 	if err != nil {
 		return err
 	}
-	return launcher.Start(ctx)
+	defer session.release()
+	return adbFailure(session.launcher.Start(ctx))
 }
 
 // AccessibilityServices reports whether the Atomyx accessibility
 // service is enabled and which other services are.
 func (s *AndroidAgentSetup) AccessibilityServices(ctx context.Context, serial string) (agentEnabled bool, others []string, err error) {
-	return androiddriver.NewAgentInspector(s.runner, serial).AccessibilityServices(ctx)
+	agentEnabled, others, err = androiddriver.NewAgentInspector(s.runner, serial).AccessibilityServices(ctx)
+	return agentEnabled, others, adbFailure(err)
 }
 
 // EnableAgentAccessibility makes the Atomyx accessibility service the
 // only enabled one.
 func (s *AndroidAgentSetup) EnableAgentAccessibility(ctx context.Context, serial string) error {
-	launcher, _, err := newAndroidAgentLauncher(ctx, s.runner, s.clock, serial, s.apkPath)
+	session, err := s.open(ctx, serial)
 	if err != nil {
 		return err
 	}
-	return launcher.EnableAccessibility(ctx)
+	defer session.release()
+	return adbFailure(session.launcher.EnableAccessibility(ctx))
 }
 
 // AgentHealth asks the agent's health route whether it is ready and
@@ -104,17 +138,18 @@ func (s *AndroidAgentSetup) EnableAgentAccessibility(ctx context.Context, serial
 // error status is reported as not ready. An error is returned only when
 // the agent cannot be reached.
 func (s *AndroidAgentSetup) AgentHealth(ctx context.Context, serial string) (ready, accessibilityConnected bool, err error) {
-	_, client, err := newAndroidAgentLauncher(ctx, s.runner, s.clock, serial, s.apkPath)
+	session, err := s.open(ctx, serial)
 	if err != nil {
 		return false, false, err
 	}
-	health, err := client.Health(ctx)
+	defer session.release()
+	health, err := session.client.Health(ctx)
 	var agentErr *transport.AgentError
 	if errors.As(err, &agentErr) {
 		return false, false, nil
 	}
 	if err != nil {
-		return false, false, err
+		return false, false, agentUnreachable(err)
 	}
 	return health.Ok, health.AccessibilityConnected, nil
 }
@@ -125,14 +160,15 @@ func (s *AndroidAgentSetup) AgentHealth(ctx context.Context, serial string) (rea
 // version 0. An error is returned only when the agent cannot be
 // reached.
 func (s *AndroidAgentSetup) AgentProtocol(ctx context.Context, serial string) (agent, host int, err error) {
-	_, client, err := newAndroidAgentLauncher(ctx, s.runner, s.clock, serial, s.apkPath)
+	session, err := s.open(ctx, serial)
 	if err != nil {
 		return 0, 0, err
 	}
-	pong, pingErr := client.Ping(ctx)
+	defer session.release()
+	pong, pingErr := session.client.Ping(ctx)
 	agentVersion, known := androiddriver.PingedProtocolVersion(pong, pingErr)
 	if !known {
-		return 0, 0, pingErr
+		return 0, 0, agentUnreachable(pingErr)
 	}
 	return agentVersion, version.AgentProtocolVersion, nil
 }

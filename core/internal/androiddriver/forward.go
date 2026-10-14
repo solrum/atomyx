@@ -86,17 +86,36 @@ func parseAllocatedPort(stdout string) (int, error) {
 // is reused, and otherwise adb allocates a fresh host port, so no
 // device is tied to a fixed host port another device could claim.
 func ForwardHostPort(ctx context.Context, proc process.Runner, serial string, devicePort int) (int, error) {
+	port, _, err := EnsureForward(ctx, proc, serial, devicePort)
+	return port, err
+}
+
+// EnsureForward behaves like ForwardHostPort and also reports whether
+// this call created the forward, so a caller that created it can
+// remove it with RemoveForward when it is done.
+func EnsureForward(ctx context.Context, proc process.Runner, serial string, devicePort int) (hostPort int, created bool, err error) {
 	remote := fmt.Sprintf("tcp:%d", devicePort)
 	forwards, err := listAdbForwards(ctx, proc)
 	if err != nil {
-		return 0, fmt.Errorf("androiddriver: adb forward --list: %w", err)
+		return 0, false, fmt.Errorf("androiddriver: adb forward --list: %w", err)
 	}
 	if port, found := findSerialForward(forwards, serial, remote); found {
-		return port, nil
+		return port, false, nil
 	}
 	result, err := proc.Run(ctx, "adb", "-s", serial, "forward", "tcp:0", remote)
 	if err != nil {
-		return 0, fmt.Errorf("androiddriver: adb forward tcp:0: %w", err)
+		return 0, false, fmt.Errorf("androiddriver: adb forward tcp:0: %w", err)
 	}
-	return parseAllocatedPort(result.Stdout)
+	port, err := parseAllocatedPort(result.Stdout)
+	if err != nil {
+		return 0, false, err
+	}
+	return port, true, nil
+}
+
+// RemoveForward removes the forward that maps hostPort on this host to
+// a port on serial.
+func RemoveForward(ctx context.Context, proc process.Runner, serial string, hostPort int) error {
+	_, err := proc.Run(ctx, "adb", "-s", serial, "forward", "--remove", fmt.Sprintf("tcp:%d", hostPort))
+	return err
 }

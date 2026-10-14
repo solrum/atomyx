@@ -656,6 +656,13 @@ func newAndroidAgentLauncher(ctx context.Context, runner process.Runner, clk orc
 	if err != nil {
 		return nil, nil, err
 	}
+	launcher, client := launcherForForward(runner, clk, serial, apkPath, hostPort)
+	return launcher, client, nil
+}
+
+// launcherForForward builds the launcher and HTTP client for an agent
+// reached through the given host port.
+func launcherForForward(runner process.Runner, clk orchestra.Clock, serial, apkPath string, hostPort int) (*androiddriver.AgentLauncher, *transport.HTTPClient) {
 	client := transport.NewHTTPClient("127.0.0.1", hostPort)
 	launcher := androiddriver.NewAgentLauncher(runner, clk, client, androiddriver.AgentLauncherOptions{
 		Serial:     serial,
@@ -663,7 +670,7 @@ func newAndroidAgentLauncher(ctx context.Context, runner process.Runner, clk orc
 		DevicePort: androidControlPort,
 		APKPath:    apkPath,
 	})
-	return launcher, client, nil
+	return launcher, client
 }
 
 // FakeIOSCall records one EnsureIOSAgent invocation FakeProvisioner
