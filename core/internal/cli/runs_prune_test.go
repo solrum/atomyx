@@ -243,3 +243,58 @@ func TestRunsPruneLeavesUnreadableRecordsAlone(t *testing.T) {
 		t.Errorf("output:\n%s", stdout)
 	}
 }
+
+func writeRetentionConfig(t *testing.T, retention string) {
+	t.Helper()
+	dir := t.TempDir()
+	content := "project: Demo\napps:\n  - id: main\n    platform: android\n    appId: com.example.app\nenvironments:\n  staging:\n    app: main\n" + retention
+	if err := os.WriteFile(dir+"/atomyx.config.yaml", []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+}
+
+func TestRunsPruneWithoutFlagsUsesTheConfiguredRetention(t *testing.T) {
+	root, ids := seedPruneStore(t)
+	writeRetentionConfig(t, "retention:\n  keepLast: 1\n")
+
+	code, stdout, stderr := execRunsAt(t, pruneNow, "prune", "--json")
+
+	if code != 0 || stderr != "" {
+		t.Fatalf("code = %d, stderr = %q", code, stderr)
+	}
+	if !strings.Contains(stdout, `"keep": 1`) {
+		t.Errorf("output does not show the configured keep:\n%s", stdout)
+	}
+	if runFolderExists(root, ids["ancient"]) || runFolderExists(root, ids["old"]) || !runFolderExists(root, ids["recent"]) {
+		t.Error("the configured keepLast 1 was not applied")
+	}
+}
+
+func TestRunsPruneFlagsReplaceTheConfiguredRetentionEntirely(t *testing.T) {
+	root, ids := seedPruneStore(t)
+	writeRetentionConfig(t, "retention:\n  keepLast: 1\n  olderThanDays: 1\n")
+
+	code, stdout, stderr := execRunsAt(t, pruneNow, "prune", "--older-than", "60", "--json")
+
+	if code != 0 || stderr != "" {
+		t.Fatalf("code = %d, stderr = %q", code, stderr)
+	}
+	if strings.Contains(stdout, `"keep"`) {
+		t.Errorf("a configured keepLast leaked into a prune that gave only --older-than:\n%s", stdout)
+	}
+	if runFolderExists(root, ids["ancient"]) || !runFolderExists(root, ids["old"]) || !runFolderExists(root, ids["recent"]) {
+		t.Error("only the run older than 60 days should be deleted")
+	}
+}
+
+func TestRunsPruneWithoutFlagsOrRetentionExitsTwo(t *testing.T) {
+	seedPruneStore(t)
+	writeRetentionConfig(t, "")
+
+	code, _, stderr := execRunsAt(t, pruneNow, "prune")
+
+	if code != 2 || !strings.Contains(stderr, "retention policy") {
+		t.Fatalf("code = %d, stderr = %q", code, stderr)
+	}
+}

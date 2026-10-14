@@ -4,20 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"time"
 
+	"dev.atomyx/internal/config"
 	"dev.atomyx/internal/storage"
 )
 
-const hoursPerDay = 24
-
 // Prune actions reported for each unit, in text and in JSON.
 const (
-	pruneActionDeleted     = "deleted"
-	pruneActionWouldDelete = "wouldDelete"
-	pruneActionSkippedLive = "skippedLive"
-	pruneActionFailed      = "failed"
+	pruneActionDeleted     = string(storage.PruneDeleted)
+	pruneActionWouldDelete = string(storage.PruneWouldDelete)
+	pruneActionSkippedLive = string(storage.PruneSkippedLive)
+	pruneActionFailed      = string(storage.PruneFailed)
 )
 
 // runPruneJSON is the --json shape of runs prune. Units is present and
@@ -48,7 +48,11 @@ type pruneRequest struct {
 	json          bool
 }
 
-func parsePruneRequest(flags map[string]FlagValue) (pruneRequest, error) {
+// parsePruneRequest reads the prune flags. When neither --keep nor
+// --older-than is given it falls back to retention, the project config's
+// policy. Any prune flag replaces the configured policy entirely, so a
+// lone --keep never inherits olderThanDays from the config.
+func parsePruneRequest(flags map[string]FlagValue, retention *config.Retention) (pruneRequest, error) {
 	req := pruneRequest{dryRun: flagBool(flags, "--dry-run"), json: flagBool(flags, "--json")}
 	var err error
 	if req.keep, err = positiveIntFlag(flags, "--keep"); err != nil {
@@ -58,7 +62,15 @@ func parsePruneRequest(flags map[string]FlagValue) (pruneRequest, error) {
 		return req, err
 	}
 	if req.keep == 0 && req.olderThanDays == 0 {
-		return req, errors.New("runs prune needs --keep, --older-than, or both, so it never deletes every run by default")
+		if retention == nil {
+			return req, errors.New("runs prune needs --keep, --older-than, or both, or a retention policy in the project config, so it never deletes every run by default")
+		}
+		if retention.KeepLast != nil {
+			req.keep = int(*retention.KeepLast)
+		}
+		if retention.OlderThanDays != nil {
+			req.olderThanDays = int(*retention.OlderThanDays)
+		}
 	}
 	return req, nil
 }
@@ -97,34 +109,26 @@ func (r pruneRequest) reason() string {
 // with --dry-run, 1 when a deletion failed or was refused or the storage
 // cannot be read, and 2 when the command is misused.
 func runsPrune(ctx context.Context, deps Deps, catalog *storage.RunCatalog, _ string, flags map[string]FlagValue) int {
-	req, err := parsePruneRequest(flags)
+	req, err := parsePruneRequest(flags, loadRetention())
 	if err != nil {
 		return runsMisuse(deps, "%s", err)
 	}
-	plan, err := catalog.PlanPrune(storage.PruneCriteria{
-		Keep:      req.keep,
-		OlderThan: time.Duration(req.olderThanDays) * hoursPerDay * time.Hour,
-		Now:       time.UnixMilli(deps.clock().NowMs()),
-	})
+	criteria := storage.NewPruneCriteria(req.keep, req.olderThanDays, time.UnixMilli(deps.clock().NowMs()))
+	result, err := catalog.ApplyPrune(criteria, req.dryRun)
 	if err != nil {
 		return reportUncaught(ctx, deps.stderr(), deps.Debug, err)
 	}
 
-	doc := runPruneJSON{DryRun: req.dryRun, Keep: req.keep, OlderThanDays: req.olderThanDays, Units: []runPruneUnitJSON{}, Skipped: len(plan.Skipped)}
+	doc := runPruneJSON{DryRun: req.dryRun, Keep: req.keep, OlderThanDays: req.olderThanDays, Units: []runPruneUnitJSON{}, Skipped: result.Skipped, RunsDeleted: result.RunsDeleted}
 	failed := false
-	for _, unit := range plan.Units {
+	for _, outcome := range result.Outcomes {
 		entry := runPruneUnitJSON{
-			RunID: unit.Root.RunID, StartedAt: formatTimeMs(unit.Root.StartedAt),
-			Runs: unit.Members, Reason: req.reason(),
+			RunID: outcome.Unit.Root.RunID, StartedAt: formatTimeMs(outcome.Unit.Root.StartedAt),
+			Runs: outcome.Unit.Members, Reason: req.reason(), Action: string(outcome.Action),
 		}
-		action, err := applyPrune(catalog, unit, req.dryRun)
-		entry.Action = action
-		if err != nil {
-			entry.Error = err.Error()
+		if outcome.Err != nil {
+			entry.Error = outcome.Err.Error()
 			failed = failed || !req.dryRun
-		}
-		if action == pruneActionDeleted {
-			doc.RunsDeleted += len(unit.Members)
 		}
 		doc.Units = append(doc.Units, entry)
 	}
@@ -142,27 +146,21 @@ func runsPrune(ctx context.Context, deps Deps, catalog *storage.RunCatalog, _ st
 	return 0
 }
 
-// applyPrune deletes unit, or only classifies it when dryRun is set, and
-// returns the action taken. A unit with a live member returns
-// pruneActionSkippedLive and an error saying why, and a failed deletion
-// returns pruneActionFailed and its error.
-func applyPrune(catalog *storage.RunCatalog, unit storage.PruneUnit, dryRun bool) (string, error) {
-	if unit.Live {
-		return pruneActionSkippedLive, errUnitLive
+// loadRetention returns the retention policy of the project config
+// discovered from the working directory, or nil when there is no config
+// or it has no retention block. A config that cannot be loaded gives nil,
+// because runs prune already resolved its root from the same config.
+func loadRetention() *config.Retention {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil
 	}
-	if dryRun {
-		return pruneActionWouldDelete, nil
+	loaded, err := config.Load(config.LoadOptions{Cwd: cwd})
+	if err != nil || loaded == nil {
+		return nil
 	}
-	if err := catalog.DeletePruneUnit(unit); err != nil {
-		if errors.Is(err, storage.ErrRunLive) {
-			return pruneActionSkippedLive, errUnitLive
-		}
-		return pruneActionFailed, err
-	}
-	return pruneActionDeleted, nil
+	return loaded.Config.Retention
 }
-
-var errUnitLive = errors.New("a run in this group is still being written")
 
 func printPruneReport(deps Deps, doc runPruneJSON) {
 	out := deps.stdout()

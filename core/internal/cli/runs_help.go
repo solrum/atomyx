@@ -42,8 +42,10 @@ func PrintRunsCommandHelp(command RunsCommand, w io.Writer) {
 `)
 	case RunsCommandPrune:
 		_, _ = io.WriteString(w, `atomyx runs prune [--keep <n>] [--older-than <days>] [--dry-run] [--json]
-  Delete old runs. At least one of --keep and --older-than is required.
-  When both are given, a run is deleted only if both select it.
+  Delete old runs. Give --keep, --older-than, or both. With neither, the
+  retention policy of the project config applies, and without one the
+  command is a usage error. Any prune flag replaces the configured policy
+  entirely. When both bounds apply, a run is deleted only if both select it.
 
   A sharded suite run and its worker runs are kept or deleted together,
   and count once toward --keep. A run that is still being written is
