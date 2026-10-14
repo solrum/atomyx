@@ -37,11 +37,30 @@ final class CommandHandlerUnitTests: XCTestCase {
 
     // MARK: - Ping identity and port
 
-    private func ping(_ env: [String: String]) -> [String: Any] {
-        let cmd = PingCommand(synthesizer: CoordinateSynthesizer(), environment: RunnerEnvironment(environment: env))
+    private func ping(_ env: [String: String], agentVersion: String? = nil) -> [String: Any] {
+        let cmd = PingCommand(
+            synthesizer: CoordinateSynthesizer(),
+            environment: RunnerEnvironment(environment: env),
+            agentVersion: agentVersion
+        )
         let resp = cmd.handle(Request(id: 1, type: "ping", args: [:]), bridge: MockXCUIBridge(), state: DriverState())
         XCTAssertTrue(resp.ok)
         return resp.data
+    }
+
+    func testPingReportsProtocolVersionFromAgentProtocol() {
+        let data = ping([:])
+        XCTAssertEqual(data["protocolVersion"] as? Int, AgentProtocol.version)
+    }
+
+    func testPingReportsAgentVersionWhenKnown() {
+        let data = ping([:], agentVersion: "1.2")
+        XCTAssertEqual(data["agentVersion"] as? String, "1.2")
+    }
+
+    func testPingOmitsAgentVersionWhenAbsent() {
+        let data = ping([:], agentVersion: nil)
+        XCTAssertNil(data["agentVersion"])
     }
 
     func testPingReportsLaunchIdentity() {
