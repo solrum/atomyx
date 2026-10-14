@@ -30,7 +30,7 @@ platform="${1:-}"
 case "$platform" in
   iossim)
     required_var="ATOMYX_IOS_SIM_UDID"
-    packages=(./internal/iossimdriver/... ./internal/iosdriver/...)
+    packages=(./internal/iosdriver/...)
     ;;
   android)
     required_var="ATOMYX_ANDROID_SERIAL"
@@ -61,6 +61,18 @@ if [ "$platform" = "iossim" ]; then
   fi
 fi
 
+# The simulator driver tests need the atomyx-sim-hid helper, which is not
+# built by default. That leg runs only when ATOMYX_SIM_HID_BIN names an
+# executable file, and otherwise the skip is recorded in the summary.
+sim_hid_skip_note=""
+if [ "$platform" = "iossim" ]; then
+  if [ -n "${ATOMYX_SIM_HID_BIN:-}" ] && [ -f "$ATOMYX_SIM_HID_BIN" ] && [ -x "$ATOMYX_SIM_HID_BIN" ]; then
+    packages=(./internal/iossimdriver/... "${packages[@]}")
+  else
+    sim_hid_skip_note="simulator HID helper leg skipped: set ATOMYX_SIM_HID_BIN to an executable atomyx-sim-hid binary to run the iossimdriver package"
+  fi
+fi
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 out_dir="${repo_root}/e2e-results/${stamp}-${platform}"
@@ -69,6 +81,9 @@ mkdir -p "$out_dir"
 export ATOMYX_DRIVER_E2E="$platform"
 
 echo "Running the ${platform} end-to-end suite, report in ${out_dir}"
+if [ -n "$sim_hid_skip_note" ]; then
+  echo "$sim_hid_skip_note"
+fi
 
 set +e
 (cd "${repo_root}/core" && go test -tags e2e -count=1 -json "${packages[@]}") | tee "${out_dir}/go-test.json" >/dev/null
@@ -93,6 +108,9 @@ skip_count="$(count_action skip)"
   echo "fail: ${fail_count}"
   echo "skip: ${skip_count}"
   echo "exit: ${test_status}"
+  if [ -n "$sim_hid_skip_note" ]; then
+    echo "$sim_hid_skip_note"
+  fi
 } > "${out_dir}/summary.txt"
 
 cat "${out_dir}/summary.txt"

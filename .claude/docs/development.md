@@ -311,6 +311,12 @@ environment variable per platform:
 | `android` | `ATOMYX_ANDROID_SERIAL` | The Android agent running on the device |
 | `ios` | `ATOMYX_IOS_DEVICE_UDID` | The runner served and tunneled to the device |
 
+The `iossim` platform runs the `iossimdriver` package only when
+`ATOMYX_SIM_HID_BIN` is set to an executable `atomyx-sim-hid` helper
+binary. Without it the script runs only the `iosdriver` package, prints
+a line saying the simulator HID helper leg was skipped, and writes the
+same line to `summary.txt`.
+
 Optional variables unlock extra cases, and those cases skip when the
 variable is unset: `ATOMYX_ANDROID_SERIAL_A` and `ATOMYX_ANDROID_SERIAL_B`
 (two attached Android devices), and `ATOMYX_E2E_IOS_SIM_UDID` with
