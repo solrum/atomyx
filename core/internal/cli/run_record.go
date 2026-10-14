@@ -98,6 +98,7 @@ func (r *runRecord) reportOptions() report.ReportOptions {
 		Formats:      r.formats,
 		ReportDir:    runfolder.ReportDir(r.writer.Dir()),
 		ArtifactsDir: runfolder.ArtifactsDir(r.writer.Dir()),
+		Mask:         r.secrets.String,
 	}
 }
 

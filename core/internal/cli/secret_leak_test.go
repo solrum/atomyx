@@ -234,10 +234,6 @@ func otherRunFolderText(t *testing.T, runDir string) string {
 // without masking, with the reason each check is skipped. A writer leaves
 // the list in the change that masks its fields.
 var unmaskedBoundaries = map[string]string{
-	"step stream":  "the step stream writes step detail without masking it",
-	"html report":  "the HTML report prints step detail without masking it",
-	"json report":  "the JSON report prints step detail without masking it",
-	"junit report": "the JUnit report prints failure text without masking it",
 	"worker lines": "a worker line carries entry errors without masking them",
 }
 

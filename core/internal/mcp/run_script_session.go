@@ -86,7 +86,7 @@ func (s *runSession) runInOpenRun(
 		return runner.ScriptResult{}, err
 	}
 	artifacts := newScriptArtifacts(dir, counter, s.logger)
-	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: open.ID(), Artifacts: artifacts, Evidence: artifacts, Secrets: secrets, OnStep: stepstream.NewSink(open, s.logger, stepstream.WithPublisher(s.publishStep))})
+	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: open.ID(), Artifacts: artifacts, Evidence: artifacts, Secrets: secrets, OnStep: stepstream.NewSink(open, s.logger, stepstream.WithPublisher(s.publishStep), stepstream.WithMask(secrets.String))})
 	if execErr == nil {
 		s.recordScriptTotals(open, result)
 	}
@@ -113,7 +113,7 @@ func (s *runSession) runAsOwnRun(
 	secrets := runner.NewRunSecrets()
 	s.route(w, false)
 	capture := s.beginScriptRecording(ctx, dev, w)
-	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: w.ID(), Artifacts: artifacts, Evidence: artifacts, Secrets: secrets, OnStep: stepstream.NewSink(w, s.logger, stepstream.WithPublisher(s.publishStep))})
+	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: w.ID(), Artifacts: artifacts, Evidence: artifacts, Secrets: secrets, OnStep: stepstream.NewSink(w, s.logger, stepstream.WithPublisher(s.publishStep), stepstream.WithMask(secrets.String))})
 	s.unroute(w)
 	outcome := scriptOutcome(ctx, result, execErr)
 	kept := finishScriptRecording(ctx, capture, outcome, result)

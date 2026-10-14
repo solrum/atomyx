@@ -186,7 +186,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 			ChildArtifacts:        childArtifacts.forTarget,
 			StepGate:              dbg.gate(),
 			SourceDir:             filepath.Dir(absPath),
-			OnStep:                stepstream.NewSink(record.writer, deps.logger(), stepstream.WithPublisher(opened.PublishStep)),
+			OnStep:                stepstream.NewSink(record.writer, deps.logger(), stepstream.WithPublisher(opened.PublishStep), stepstream.WithMask(record.secrets.String)),
 		})
 		result, err := scenarioRunner.Run(runCtx, scenarioDef)
 		finishedAt := time.Now()
@@ -263,7 +263,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		StepGate:              dbg.gate(),
 		SourcePath:            absPath,
 		SecretSink:            record.secrets,
-		OnStep:                stepstream.NewSink(record.writer, deps.logger(), stepstream.WithPublisher(opened.PublishStep)),
+		OnStep:                stepstream.NewSink(record.writer, deps.logger(), stepstream.WithPublisher(opened.PublishStep), stepstream.WithMask(record.secrets.String)),
 		FailureCapture: runner.NewFailureBundle(runner.FailureBundleDeps{
 			Orchestra: built.Orchestra, Clock: deps.clock(), Logger: deps.logger(), Sink: artifacts,
 		}),

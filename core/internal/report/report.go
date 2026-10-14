@@ -152,6 +152,10 @@ type ReportOptions struct {
 	Formats      []string
 	ReportDir    string
 	ArtifactsDir string
+	// Mask, when non-nil, rewrites every free text field of the result,
+	// such as a step detail or an error, before a report renders it.
+	// Nil renders the text as it is.
+	Mask func(string) string
 }
 
 // FormatHTML, FormatJSON and FormatJUnit are the values a

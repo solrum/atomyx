@@ -43,7 +43,6 @@ func leakCaptureFile(t *testing.T) string {
 var unmaskedBoundaries = map[string]string{
 	"run_script result":  "the run_script result carries step detail without masking it",
 	"parse error result": "a parse error result quotes interpolated values without masking them",
-	"step stream":        "the step stream writes step detail without masking it",
 }
 
 func requireNoSecret(t *testing.T, name, text string) {

@@ -142,7 +142,7 @@ func startSuiteHost(ctx context.Context, deps Deps, cfg suiteSettings, proxyFlag
 		ExternalCommitted: cfg.committedEnv,
 		SecretSink:        record.secrets,
 		ChildArtifacts:    newArtifactSequence(runfolder.ArtifactsDir(record.Dir())).forTarget,
-		OnStep:            stepstream.NewSink(record.writer, deps.logger(), stepstream.WithPublisher(opened.PublishStep)),
+		OnStep:            stepstream.NewSink(record.writer, deps.logger(), stepstream.WithPublisher(opened.PublishStep), stepstream.WithMask(record.secrets.String)),
 		OnEntryStart:      videos.start,
 	})
 	return &suiteHost{opened: opened, runCtx: runCtx, cancel: cancelRun, record: record, runner: suiteRunner, config: cfg}, nil

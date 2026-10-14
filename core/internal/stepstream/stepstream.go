@@ -20,6 +20,14 @@ type Option func(*sinkConfig)
 
 type sinkConfig struct {
 	publish func(runfolder.StepLine)
+	mask    func(string) string
+}
+
+// WithMask makes the sink pass every step detail through mask before it
+// builds the line, so neither steps.jsonl nor a published line carries
+// the unmasked text. A nil mask changes nothing.
+func WithMask(mask func(string) string) Option {
+	return func(c *sinkConfig) { c.mask = mask }
 }
 
 // WithPublisher makes the sink hand every line that was appended to
@@ -51,7 +59,7 @@ func NewSink(appender Appender, logger logging.Logger, opts ...Option) func(runn
 	return func(event runner.StepEvent) {
 		mu.Lock()
 		defer mu.Unlock()
-		stamped, appended, err := appender.AppendStep(lineFor(event))
+		stamped, appended, err := appender.AppendStep(lineFor(event, cfg.mask))
 		if err != nil {
 			warn.Do(func() {
 				logger.Warn("run.step_line_failed", logging.LogContext{"error": err.Error()})
@@ -64,7 +72,7 @@ func NewSink(appender Appender, logger logging.Logger, opts ...Option) func(runn
 	}
 }
 
-func lineFor(event runner.StepEvent) runfolder.StepLine {
+func lineFor(event runner.StepEvent, mask func(string) string) runfolder.StepLine {
 	line := runfolder.StepLine{
 		StepIndex: event.StepIndex,
 		Command:   event.Command,
@@ -76,6 +84,9 @@ func lineFor(event runner.StepEvent) runfolder.StepLine {
 		line.Ok = event.Ok
 		line.DurationMs = event.DurationMs
 		line.Detail = event.Detail
+		if mask != nil {
+			line.Detail = runner.MaskedText(event.Detail, mask)
+		}
 	}
 	return line
 }

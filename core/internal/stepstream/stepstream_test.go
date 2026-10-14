@@ -162,3 +162,24 @@ func TestSinkCarriesTheAttemptOfARetriedEntry(t *testing.T) {
 		t.Errorf("attempts = %d, %d, want 0, 3", appender.lines[0].Attempt, appender.lines[1].Attempt)
 	}
 }
+
+func TestSinkMasksTheDetailOfTheAppendedAndThePublishedLine(t *testing.T) {
+	appender := &recordingAppender{}
+	var published []runfolder.StepLine
+	sink := NewSink(appender, &countingLogger{},
+		WithMask(func(s string) string { return "masked:" + s }),
+		WithPublisher(func(l runfolder.StepLine) { published = append(published, l) }))
+	detail := "raw"
+
+	sink(runner.StepEvent{Type: runner.StepCompleted, Command: "tap", Detail: &detail})
+
+	if got := *appender.lines[0].Detail; got != "masked:raw" {
+		t.Errorf("appended detail = %q", got)
+	}
+	if got := *published[0].Detail; got != "masked:raw" {
+		t.Errorf("published detail = %q", got)
+	}
+	if detail != "raw" {
+		t.Errorf("the event detail was rewritten: %q", detail)
+	}
+}

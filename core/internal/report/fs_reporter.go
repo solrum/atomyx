@@ -39,6 +39,10 @@ func (fsReporter) Generate(input ReportInput, options ReportOptions) (ReportBund
 		return ReportBundle{}, errors.New("report: ReportOptions.ReportDir is required when a format is requested")
 	}
 
+	if options.Mask != nil {
+		input = maskedInput(input, options.Mask)
+	}
+
 	var files []string
 
 	screenshots := input.ReportScreenshots()
