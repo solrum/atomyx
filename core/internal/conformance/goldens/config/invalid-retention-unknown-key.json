@@ -1,0 +1,13 @@
+{
+  "config": null,
+  "envRefError": null,
+  "found": true,
+  "issuePaths": [
+    [
+      "retention"
+    ]
+  ],
+  "resolved": null,
+  "schemaValid": false,
+  "selectError": null
+}

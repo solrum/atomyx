@@ -83,6 +83,9 @@
         "report": {
           "$ref": "#/definitions/Report"
         },
+        "retention": {
+          "$ref": "#/definitions/Retention"
+        },
         "session": {
           "$ref": "#/definitions/Session"
         },
@@ -194,6 +197,23 @@
         "formats",
         "outDir"
       ],
+      "type": "object"
+    },
+    "Retention": {
+      "additionalProperties": false,
+      "description": "Run retention policy. At least one of keepLast and olderThanDays is required. When both are set a run must satisfy both to be deleted.",
+      "properties": {
+        "keepLast": {
+          "description": "Keep the newest this many top-level runs. A suite and its workers count as one.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "olderThanDays": {
+          "description": "Delete runs that started more than this many days ago.",
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
       "type": "object"
     },
     "Session": {

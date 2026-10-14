@@ -214,6 +214,31 @@ func validateReportFormats(obj map[string]any, path []any, c *issueCollector) []
 	return formats
 }
 
+var retentionKeys = map[string]bool{"keepLast": true, "olderThanDays": true}
+
+func validateRetention(root map[string]any, path []any, c *issueCollector) *Retention {
+	raw, present := root["retention"]
+	if !present || raw == nil {
+		return nil
+	}
+	fieldPath := withSegment(path, "retention")
+	obj, ok := asObject(raw, fieldPath, c)
+	if !ok {
+		return nil
+	}
+	checkUnknownKeys(obj, retentionKeys, fieldPath, c)
+	keepLast, keepOK := optionalPositiveInt(obj, "keepLast", fieldPath, c)
+	olderThan, olderOK := optionalPositiveInt(obj, "olderThanDays", fieldPath, c)
+	if !keepOK || !olderOK {
+		return nil
+	}
+	if keepLast == nil && olderThan == nil {
+		c.add(fieldPath, "retention requires keepLast, olderThanDays, or both")
+		return nil
+	}
+	return &Retention{KeepLast: keepLast, OlderThanDays: olderThan}
+}
+
 var sessionKeys = map[string]bool{
 	"mcpIdleTimeoutMs": true, "openRunIdleTimeoutMs": true, "deviceAcquireTimeoutMs": true,
 	"debugPauseTimeoutMs": true,

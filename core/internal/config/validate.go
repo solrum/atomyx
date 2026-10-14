@@ -54,7 +54,7 @@ func ParseAndValidate(yamlContent []byte) (*AtomyxConfig, []ValidationIssue) {
 var topLevelKeys = map[string]bool{
 	"project": true, "apps": true, "environments": true, "launch": true,
 	"preconditions": true, "report": true, "video": true, "suites": true,
-	"testRoots": true, "dataRoots": true, "session": true,
+	"testRoots": true, "dataRoots": true, "session": true, "retention": true,
 }
 
 // ValidateDocument checks a generically decoded YAML document against
@@ -76,6 +76,7 @@ func ValidateDocument(root map[string]any, environmentOrder []string) (*AtomyxCo
 	preconditions := validateEnum(root, "preconditions", []string{PreconditionsSkip, PreconditionsForce}, path, c)
 	report := validateReport(root, path, c)
 	video := validateEnum(root, "video", []string{VideoOff, VideoOnFailure}, path, c)
+	retention := validateRetention(root, path, c)
 	sessionTimeouts := validateSession(root, path, c)
 	suites := validateSuites(root, path, c)
 	testRoots := optionalStringArray(root, "testRoots", 1, path, c)
@@ -102,6 +103,7 @@ func ValidateDocument(root map[string]any, environmentOrder []string) (*AtomyxCo
 		Preconditions:    preconditions,
 		Report:           report,
 		Video:            video,
+		Retention:        retention,
 		Session:          sessionTimeouts,
 		Suites:           suites,
 		TestRoots:        testRoots,

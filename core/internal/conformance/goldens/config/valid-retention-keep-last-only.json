@@ -1,0 +1,31 @@
+{
+  "config": {
+    "apps": [
+      {
+        "appId": "com.example.app",
+        "id": "main",
+        "platform": "android"
+      }
+    ],
+    "environments": {
+      "staging": {
+        "app": "main"
+      }
+    },
+    "project": "Demo",
+    "retention": {
+      "keepLast": 10
+    }
+  },
+  "envRefError": null,
+  "found": true,
+  "issuePaths": [],
+  "resolved": {
+    "appId": "com.example.app",
+    "name": "staging",
+    "platform": "android",
+    "vars": {}
+  },
+  "schemaValid": true,
+  "selectError": null
+}

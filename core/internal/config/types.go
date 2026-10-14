@@ -74,6 +74,15 @@ type Report struct {
 	OutDir  string   `json:"outDir"`
 }
 
+// Retention is the project's run retention policy. KeepLast retains the
+// newest KeepLast top-level runs and OlderThanDays selects runs that
+// started more than that many days ago. At least one field is set, and
+// when both are set a run must satisfy both to be deleted.
+type Retention struct {
+	KeepLast      *int64 `json:"keepLast,omitempty"`
+	OlderThanDays *int64 `json:"olderThanDays,omitempty"`
+}
+
 // Session tunes the device session timeouts shared by the CLI and the
 // MCP server. Every field is optional, and an absent field keeps its
 // default. Values are positive millisecond counts.
@@ -118,6 +127,7 @@ type AtomyxConfig struct {
 	Preconditions    *string                     `json:"preconditions,omitempty"`
 	Report           *Report                     `json:"report,omitempty"`
 	Video            *string                     `json:"video,omitempty"`
+	Retention        *Retention                  `json:"retention,omitempty"`
 	Session          *Session                    `json:"session,omitempty"`
 	Suites           *map[string]SuiteEntry      `json:"suites,omitempty"`
 	TestRoots        *[]string                   `json:"testRoots,omitempty"`

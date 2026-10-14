@@ -1,0 +1,5 @@
+{
+  "name": "invalid-retention-empty-block",
+  "description": "A retention block with neither field is rejected.",
+  "yaml": "project: Demo\napps:\n  - id: main\n    platform: android\n    appId: com.example.app\nenvironments:\n  staging:\n    app: main\nretention: {}\n"
+}

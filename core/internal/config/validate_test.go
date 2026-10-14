@@ -356,3 +356,32 @@ func TestParseAndValidate_AcceptsZeroAndMaximumSuiteRetries(t *testing.T) {
 func TestParseAndValidate_QuarantineAloneDoesNotSelectTests(t *testing.T) {
 	mustReject(t, baseConfig+"suites:\n  smoke:\n    quarantine: [x]\n")
 }
+
+func TestParseAndValidate_ReadsRetention(t *testing.T) {
+	cfg := mustValidate(t, baseConfig+"retention:\n  keepLast: 20\n  olderThanDays: 14\n")
+	r := cfg.Retention
+	if r == nil || *r.KeepLast != 20 || *r.OlderThanDays != 14 {
+		t.Fatalf("Retention = %+v, want keepLast 20 and olderThanDays 14", r)
+	}
+	if cfg.Report != nil {
+		t.Fatalf("Report = %+v, want nil: retention must not enable reports", cfg.Report)
+	}
+}
+
+func TestParseAndValidate_RejectsInvalidRetention(t *testing.T) {
+	cases := map[string]string{
+		"zero":        "retention:\n  keepLast: 0\n",
+		"negative":    "retention:\n  olderThanDays: -1\n",
+		"empty block": "retention: {}\n",
+		"unknown key": "retention:\n  keepLast: 1\n  bogus: 2\n",
+		"not a map":   "retention: 5\n",
+	}
+	for name, block := range cases {
+		t.Run(name, func(t *testing.T) {
+			cfg, issues := ParseAndValidate([]byte(baseConfig + block))
+			if cfg != nil || len(issues) == 0 {
+				t.Fatalf("want rejection, got cfg=%v issues=%v", cfg, issues)
+			}
+		})
+	}
+}

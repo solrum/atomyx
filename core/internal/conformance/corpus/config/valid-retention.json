@@ -1,0 +1,6 @@
+{
+  "name": "valid-retention",
+  "description": "A retention block with both fields is accepted and independent of report.",
+  "yaml": "project: Demo\napps:\n  - id: main\n    platform: android\n    appId: com.example.app\nenvironments:\n  staging:\n    app: main\nretention:\n  keepLast: 50\n  olderThanDays: 30\n",
+  "envName": "staging"
+}

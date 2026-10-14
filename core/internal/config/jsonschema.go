@@ -34,6 +34,7 @@ func jsonSchemaDefinitions() map[string]any {
 		"EnvironmentEntry": environmentEntrySchema(),
 		"LaunchPolicy":     launchPolicySchema(),
 		"Report":           reportSchema(),
+		"Retention":        retentionSchema(),
 		"Session":          sessionSchema(),
 		"SuiteEntry":       suiteEntrySchema(),
 		"AtomyxConfig":     atomyxConfigSchema(),
@@ -94,6 +95,17 @@ func reportSchema() map[string]any {
 	)
 }
 
+func retentionSchema() map[string]any {
+	return objectSchema(
+		map[string]any{
+			"keepLast":      integerMin(1, "Keep the newest this many top-level runs. A suite and its workers count as one."),
+			"olderThanDays": integerMin(1, "Delete runs that started more than this many days ago."),
+		},
+		nil,
+		"Run retention policy. At least one of keepLast and olderThanDays is required. When both are set a run must satisfy both to be deleted.",
+	)
+}
+
 func sessionSchema() map[string]any {
 	return objectSchema(
 		map[string]any{
@@ -130,6 +142,7 @@ func atomyxConfigSchema() map[string]any {
 			"preconditions": stringEnum([]string{PreconditionsSkip, PreconditionsForce}, "Project-wide precondition override."),
 			"report":        ref("Report"),
 			"video":         stringEnum([]string{VideoOff, VideoOnFailure}, "Screen recording of a run. onFailure keeps the video of a failed run, and off (the default) records nothing."),
+			"retention":     ref("Retention"),
 			"session":       ref("Session"),
 			"suites":        recordSchema(ref("SuiteEntry"), "Named test selectors, keyed by suite name."),
 			"testRoots":     arraySchema(stringMinLen(1, ""), 0, "Directories the CLI searches for test scripts."),
