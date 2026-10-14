@@ -91,6 +91,7 @@ func New(conn iosdriver.Conn, proc process.Runner, dialer Dialer, opts Options) 
 
 var _ driver.Driver = (*IosSimDriver)(nil)
 var _ driver.StreamingTouchCapable = (*IosSimDriver)(nil)
+var _ driver.ForeignAutomationReporter = (*IosSimDriver)(nil)
 
 func (d *IosSimDriver) Platform() string { return d.delegate.Platform() }
 
@@ -115,6 +116,12 @@ func (d *IosSimDriver) IsConnected() bool { return d.delegate.IsConnected() }
 // this session routes through it or through the HID helper.
 func (d *IosSimDriver) Ping(ctx context.Context) error {
 	return d.delegate.Ping(ctx)
+}
+
+// ForeignAutomation returns the foreign automation sessions the
+// delegate found at Connect.
+func (d *IosSimDriver) ForeignAutomation() []driver.ForeignAutomationSession {
+	return d.delegate.ForeignAutomation()
 }
 
 // AgentInfo returns the versions the delegate's runner reported. It

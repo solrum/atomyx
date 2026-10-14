@@ -305,7 +305,11 @@ func (f *DriverFactory) createDriverWatched(ctx context.Context, desc Descriptor
 	if desc.Port != 0 {
 		port = desc.Port
 	}
-	iosOpts := iosdriver.Options{UDID: desc.ID, Kind: kind, Port: port, Background: f.background}
+	iosOpts := iosdriver.Options{
+		UDID: desc.ID, Kind: kind, Port: port, Background: f.background,
+		OwnRunnerBundleID: DefaultRunnerBundleID,
+		OwnRunnerAppName:  iosdriver.RunnerAppName,
+	}
 
 	// A descriptor that names its own port belongs to a caller that runs
 	// its own runner there, and a descriptor with no id names no target

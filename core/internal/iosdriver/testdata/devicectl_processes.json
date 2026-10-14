@@ -1,0 +1,39 @@
+{
+  "info": {
+    "arguments": ["devicectl", "device", "info", "processes", "--device", "00008110-000A1B2C3D4E5F60"],
+    "commandType": "devicectl.device.info.processes",
+    "outcome": "success"
+  },
+  "result": {
+    "deviceIdentifier": "00008110-000A1B2C3D4E5F60",
+    "runningProcesses": [
+      {
+        "executable": "file:///sbin/launchd",
+        "processIdentifier": 1
+      },
+      {
+        "executable": "file:///private/var/containers/Bundle/Application/11111111-2222-3333-4444-555555555555/MobileSafari.app/MobileSafari",
+        "processIdentifier": 311
+      },
+      {
+        "executable": "file:///private/var/containers/Bundle/Application/AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE/AtomyxDriverAgent-Runner.app/AtomyxDriverAgent-Runner",
+        "processIdentifier": 402
+      },
+      {
+        "executable": "file:///private/var/containers/Bundle/Application/BBBBBBBB-CCCC-DDDD-EEEE-FFFFFFFFFFFF/ShopUITests-Runner.app/ShopUITests-Runner",
+        "processIdentifier": 455
+      },
+      {
+        "executable": "file:///private/var/containers/Bundle/Application/CCCCCCCC-DDDD-EEEE-FFFF-000000000000/WebDriverAgentRunner-Runner.app/WebDriverAgentRunner-Runner",
+        "processIdentifier": 470
+      },
+      {
+        "executable": "file:///private/var/containers/Bundle/Application/DDDDDDDD-EEEE-FFFF-0000-111111111111/Shop.app/Shop",
+        "processIdentifier": 512
+      },
+      {
+        "processIdentifier": 513
+      }
+    ]
+  }
+}

@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"dev.atomyx/internal/clock"
@@ -78,6 +79,14 @@ type Options struct {
 	// start an iproxy of its own. A driver built without a provisioner
 	// leaves it false and starts and stops its own tunnel.
 	ExternalTunnel bool
+
+	// OwnRunnerBundleID and OwnRunnerAppName identify the Atomyx
+	// runner, so the foreign automation probe never reports it. The
+	// bundle id is matched against simulator job labels and the app name
+	// against physical device executables. Empty values exclude
+	// nothing.
+	OwnRunnerBundleID string
+	OwnRunnerAppName  string
 }
 
 // IosDriver implements driver.Driver over the Swift XCUITest runner's
@@ -115,6 +124,12 @@ type IosDriver struct {
 	// agentInfo is the version pair the runner reported at Connect.
 	// It stays zero until the runner reports versions.
 	agentInfo driver.AgentInfo
+
+	// foreign holds the foreign automation sessions the last Connect
+	// found, guarded by foreignMu because health checks read it while a
+	// reconnect writes it.
+	foreignMu sync.Mutex
+	foreign   []driver.ForeignAutomationSession
 }
 
 // New constructs an IosDriver bound to opts.UDID. conn and proc are
@@ -221,6 +236,7 @@ func (d *IosDriver) Connect(ctx context.Context) error {
 	d.capabilities.CanMultiPointer = pong.Capabilities.CanMultiPointer
 	d.capabilities.CanPressure = pong.Capabilities.CanPressure
 	d.connectedRunnerID = pong.RunnerID
+	d.probeForeignAutomation(ctx)
 	return nil
 }
 

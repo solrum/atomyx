@@ -233,8 +233,9 @@ func TestIosDriver_Connect_Simulator_ConnectsAndPingsWithoutIproxy(t *testing.T)
 	if !d.Capabilities().CanMultiPointer || !d.Capabilities().CanPressure {
 		t.Fatalf("Capabilities() = %+v, want ping capabilities applied", d.Capabilities())
 	}
-	if len(runner.Invocations()) != 0 {
-		t.Fatalf("runner invocations = %+v, want none for a simulator connect", runner.Invocations())
+	inv := runner.Invocations()
+	if len(inv) != 1 || inv[0].Name != "xcrun" || inv[0].Args[len(inv[0].Args)-1] != "list" {
+		t.Fatalf("runner invocations = %+v, want only the foreign automation probe for a simulator connect", inv)
 	}
 }
 
@@ -437,8 +438,8 @@ func TestIosDriver_Connect_Device_LaunchesIproxyWithExactArgsAndWaitsForReadines
 		t.Fatal("IsConnected() = false after Connect")
 	}
 
-	if len(runner.Invocations()) != 0 {
-		t.Fatalf("Runner.Run invocations = %+v, want none: iproxy is long-lived and must not go through Run", runner.Invocations())
+	if inv := runner.Invocations(); len(inv) != 1 || inv[0].Args[0] != "devicectl" {
+		t.Fatalf("Runner.Run invocations = %+v, want only the foreign automation probe: iproxy is long-lived and must not go through Run", inv)
 	}
 	invocations := bg.Invocations()
 	if len(invocations) != 1 {
@@ -581,7 +582,7 @@ func TestIosDriver_Connect_Device_ReusesExistingAtomyxTunnelWithoutSpawning(t *t
 	if err := d.Connect(context.Background()); err != nil {
 		t.Fatalf("Connect() error = %v", err)
 	}
-	if len(runner.Invocations()) != 0 || len(bg.Invocations()) != 0 {
+	if inv := runner.Invocations(); len(inv) != 1 || inv[0].Args[0] != "devicectl" || len(bg.Invocations()) != 0 {
 		t.Fatalf("invocations = %+v, want no iproxy spawn when an existing tunnel answers the ping handshake", runner.Invocations())
 	}
 	if err := d.Disconnect(); err != nil {
