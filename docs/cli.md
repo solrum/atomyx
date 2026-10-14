@@ -996,40 +996,45 @@ first.
 | `android-adb` | none | `adb` is on `PATH`. | none, the remedy names the platform tools install. |
 | `android-device` | `android-adb` | The resolved serial is listed by `adb devices` in the `device` state. An unauthorized, offline, bootloader, or missing device each gets its own message and remedy. | none |
 | `android-apk` | `android-adb` | The agent APK exists at `ATOMYX_ANDROID_APK` or at the built output in the source tree, the same resolution the agent launcher uses. | none, the remedy names the build command. |
-| `android-agent-installed` | `android-device` | The agent package is installed. | Installs the agent and starts it. |
+| `android-agent-installed` | `android-device` | The agent package is installed. | Installs the agent and starts it, then names the accessibility services that were enabled before and are now disabled, because the install rebinds accessibility. When no APK exists it reports a manual result that points at `android-apk` instead of attempting the install. |
 | `android-accessibility` | `android-agent-installed` | The Atomyx accessibility service is enabled. | Enables it. Android keeps one list of enabled services, so enabling Atomyx disables every other enabled accessibility service. The message names the services that were enabled before. |
-| `android-agent-health` | `android-accessibility` | The agent's health route answers ready with its accessibility service connected. No driver connects. | none |
-| `android-agent-protocol` | `android-agent-health` | The protocol version the agent reports on its ping route equals the one this build requires. | Reinstalls the agent once and checks again. |
+| `android-agent-health` | `android-accessibility` | The agent's health route answers ready with its accessibility service connected. No driver connects. | Starts an agent that does not answer, for example after a reboot or a force stop, without reinstalling it or changing accessibility, then checks again. An agent that answers but is not ready, or whose accessibility service is not connected, needs the operator. If the start fails, open the Atomyx app on the device. |
+| `android-agent-protocol` | `android-agent-health` | The protocol version the agent reports on its ping route equals the one this build requires. | Reinstalls the agent once, checks again, and names the accessibility services that were enabled before and are now disabled. |
 
 A missing APK does not skip the steps after it, so an agent that is
 already installed and healthy is still verified. The health and
 protocol steps reach the agent through an `adb` port forward for the
-device, which setup creates when none exists. The forward is host
-plumbing and changes nothing on the device, so it also happens with
-`--check`.
+device, which setup creates when none exists and removes again when the
+step ends. A forward that existed before the step is left in place. The
+forward is host plumbing and changes nothing on the device, so it also
+happens with `--check`.
 
 ### iOS steps
 
 | Step | Requires | Checks | Fix |
 |---|---|---|---|
-| `ios-xcode` | none | `xcrun` is on `PATH` and an Xcode developer directory is selected. | none, the remedy names `xcode-select --install`. |
+| `ios-xcode` | none | `xcrun` is on `PATH` and the selected developer directory is inside a full Xcode installation. A directory that holds only the command line tools is not enough. | none, the remedy names `xcode-select --install`, or installing Xcode and running `xcode-select -s` for the command line tools case. |
 | `ios-iproxy` | none | `iproxy` is on `PATH`. A simulator needs no tunnel, so the step passes without checking. | none, the remedy names `brew install libusbmuxd`. |
-| `ios-signing-team` | none | A physical device build has a signing team: `ATOMYX_DEV_TEAM` names a team that has a code signing identity in the keychain. A simulator build needs no signing, so the step passes. | none |
+| `ios-signing-team` | none | A physical device build has a signing team: `ATOMYX_DEV_TEAM` names the team of a development identity in the keychain. A simulator build needs no signing, so the step passes. | none |
 
 The target is a simulator when the resolved device's kind is
 `simulator`, and a physical device for any other resolved kind. When no
 iOS device is resolved, `ios-iproxy` and `ios-signing-team` check what a
 physical device needs.
 
-`ios-signing-team` reads the output of `security find-identity -v -p
-codesigning` and takes the ten-character id in parentheses at the end of
-each identity name. For an Apple Development certificate that id can
-differ from the Team ID Xcode shows, so when a build rejects it, copy the
-Team ID from Xcode, Settings, Accounts. With one team found and
-`ATOMYX_DEV_TEAM` not set to it, the remedy is the exact line to run,
-`export ATOMYX_DEV_TEAM=<id>`. With several teams the remedy lists them.
-With none, the remedy walks through adding an Apple ID in Xcode. The step
-never writes a file, a shell profile, or the Xcode project.
+`ios-signing-team` lists the development identities with `security
+find-identity -v -p codesigning` and reads the team id from the
+organizational unit of each identity's certificate subject. The id in
+parentheses at the end of an identity name is the certificate holder's
+member id, not the team id, so the step does not use it. With one team
+found, the step passes when `ATOMYX_DEV_TEAM` equals it, and otherwise the
+remedy is the exact line to run, `export ATOMYX_DEV_TEAM=<id>`. With
+several teams the step passes when `ATOMYX_DEV_TEAM` equals one of them,
+and otherwise the remedy lists them. When no certificate can be read, the
+step passes with a note if `ATOMYX_DEV_TEAM` is set, and asks for it when
+it is unset. With no development identity, the remedy walks through adding
+an Apple ID in Xcode. The step never writes a file, a shell profile, or
+the Xcode project.
 
 ## Device ownership
 
