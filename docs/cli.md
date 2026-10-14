@@ -189,6 +189,38 @@ When the run drove a device whose agent reports its versions, the
 `host` object of `meta.json` carries `agentVersion` and
 `protocolVersion`. Each is omitted when the agent does not report it.
 
+### Run retention
+
+The project config can bound how many run folders accumulate:
+
+```yaml
+retention:
+  keepLast: 50
+  olderThanDays: 30
+```
+
+| Key | Meaning |
+|---|---|
+| `keepLast` | Keeps the newest this many top-level runs. A positive integer. |
+| `olderThanDays` | Selects runs that started more than this many days ago. A positive integer. |
+
+At least one key is required when the block is present, and when both are
+set a run is deleted only if both select it. The block does not depend on
+`report` and does not turn reports on.
+
+With a `retention` block, `run` and `suite` prune the run folders under the
+directory they write, once, before the run starts. `atomyx-mcp` prunes its
+storage directory once in the background after it starts. Nothing else
+prunes: `inspect`, `doctor`, `setup`, `runs list` and `runs stats` never
+delete a run, and a `suite --worker` process never prunes, so a sharded suite
+prunes once in its parent.
+
+Rules for the automatic prune:
+
+- `keepLast` counts units, where a sharded suite run and its workers are one unit. The run that is starting is not yet written, so after a `run` or `suite` command the root holds up to `keepLast` earlier units plus the new run.
+- A run that is still being written is kept, and a run migration in progress defers the prune. Each such case prints one `warning:` line on stderr, or one warning in the `atomyx-mcp` log, and never changes the exit code.
+- Without a `retention` block nothing is deleted.
+
 ### Masked values
 
 A run masks secret values with `********` in everything it writes or
@@ -1383,14 +1415,18 @@ Deletes old runs.
 
 | Flag | Meaning | Default | Required |
 |---|---|---|---|
-| `--keep <n>` | Keeps the newest `n` runs and selects the rest. A whole number of at least 1. | off | one of `--keep` and `--older-than` |
-| `--older-than <days>` | Selects runs that started more than this many days ago. A whole number of at least 1. | off | one of `--keep` and `--older-than` |
+| `--keep <n>` | Keeps the newest `n` runs and selects the rest. A whole number of at least 1. | off | one of `--keep`, `--older-than`, or a config `retention` block |
+| `--older-than <days>` | Selects runs that started more than this many days ago. A whole number of at least 1. | off | one of `--keep`, `--older-than`, or a config `retention` block |
 | `--dry-run` | Reports what would be deleted and deletes nothing. | off | no |
 | `--json` | Prints one JSON document instead of a table. | off | no |
 | `--help`, `-h` | Prints this command's usage and exits. | off | no |
 
-Without `--keep` or `--older-than` the command refuses to run, so it
-never deletes every run by default.
+Without `--keep` or `--older-than` the command applies the `retention`
+block of the project config (see [Run retention](#run-retention)). Giving
+either flag replaces the configured policy entirely, so a lone `--keep`
+never inherits `olderThanDays` from the config. With no flags and no
+`retention` block the command refuses to run and exits 2, so it never
+deletes every run by default.
 
 Prune rules:
 
@@ -1419,7 +1455,7 @@ that was not deleted, `error`.
 |---|---|
 | `0` | The command succeeded. For `prune`, every selected unit was deleted or `--dry-run` was given. |
 | `1` | The storage could not be read. For `prune`, a deletion failed or was refused. |
-| `2` | The command was misused: an unknown command or flag, or a bad flag value. |
+| `2` | The command was misused: an unknown command or flag, a bad flag value, or `prune` with neither flags nor a config `retention` block. |
 
 ## Shortcuts
 
