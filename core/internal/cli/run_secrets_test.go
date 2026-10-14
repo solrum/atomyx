@@ -3,9 +3,11 @@ package cli
 import (
 	"bytes"
 	"context"
+	"strings"
 	"testing"
 
 	"dev.atomyx/internal/device"
+	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
 )
 
@@ -47,5 +49,21 @@ func TestEachRunRecordOwnsASecretSet(t *testing.T) {
 
 	if first.secrets == nil || first.secrets == second.secrets {
 		t.Fatal("run records must each own a distinct secret set")
+	}
+}
+
+func TestRunRecordMaskedLoggerUsesTheRunsSecretSet(t *testing.T) {
+	record, err := startRunRecord(runOutput{Root: t.TempDir()}, runIdentity{Label: "log"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = record.writer.Close() }()
+	record.secrets.Add("external-value")
+	var out bytes.Buffer
+
+	record.maskedLogger(logging.NewStructuredLogger(&out, logging.LevelDebug)).Info("saw external-value", nil)
+
+	if strings.Contains(out.String(), "external-value") {
+		t.Errorf("the log line carries the secret: %s", out.String())
 	}
 }

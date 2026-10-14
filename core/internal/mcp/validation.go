@@ -90,6 +90,16 @@ type codedErrorPayload struct {
 // tool failure this surface reports carries the same structured
 // shape a caller can branch on instead of matching message text.
 func errorResult(err error) *mcp.CallToolResult {
+	return maskedErrorResult(err, nil)
+}
+
+// maskedErrorResult is errorResult with the message and the hint passed
+// through mask, so an error that quotes a secret value does not carry it
+// to the caller. A nil mask leaves the text as it is.
+func maskedErrorResult(err error, mask func(string) string) *mcp.CallToolResult {
 	code, message, remedy := diag.Describe(err)
+	if mask != nil {
+		message, remedy = mask(message), mask(remedy)
+	}
 	return marshalStructuredResult(codedErrorPayload{Code: code, Message: message, Hint: remedy})
 }

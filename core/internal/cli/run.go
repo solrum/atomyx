@@ -160,6 +160,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		}
 		defer record.end(ctx, stderr)
 		record.secrets.AddExternal(externalEnv, committedEnv)
+		runLog := record.maskedLogger(deps.logger())
 		opened.recordRun(record)
 		record.beginVideo(runCtx, videoLifecycle, desc)
 
@@ -174,7 +175,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		scenarioRunner := scenario.NewScenarioRunner(scenario.ScenarioRunnerDeps{
 			Orchestra:             built.Orchestra,
 			Clock:                 deps.clock(),
-			Logger:                deps.logger(),
+			Logger:                runLog,
 			RunID:                 record.ID(),
 			NetworkCapture:        networkCapture,
 			Commands:              runner.DefaultCommands(),
@@ -186,7 +187,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 			ChildArtifacts:        childArtifacts.forTarget,
 			StepGate:              dbg.gate(),
 			SourceDir:             filepath.Dir(absPath),
-			OnStep:                stepstream.NewSink(record.writer, deps.logger(), stepstream.WithPublisher(opened.PublishStep), stepstream.WithMask(record.secrets.String)),
+			OnStep:                stepstream.NewSink(record.writer, runLog, stepstream.WithPublisher(opened.PublishStep), stepstream.WithMask(record.secrets.String)),
 		})
 		result, err := scenarioRunner.Run(runCtx, scenarioDef)
 		finishedAt := time.Now()
@@ -245,6 +246,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	}
 	defer record.end(ctx, stderr)
 	record.secrets.AddExternal(externalEnv, committedEnv)
+	runLog := record.maskedLogger(deps.logger())
 	opened.recordRun(record)
 	record.beginVideo(runCtx, videoLifecycle, desc)
 
@@ -253,7 +255,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	scriptRunner := runner.NewScriptRunner(runner.ScriptRunnerDeps{
 		Orchestra:             built.Orchestra,
 		Clock:                 deps.clock(),
-		Logger:                deps.logger(),
+		Logger:                runLog,
 		RunID:                 record.ID(),
 		Commands:              runner.DefaultCommands(),
 		FlowLoader:            fsFlowLoader{},
@@ -263,9 +265,9 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		StepGate:              dbg.gate(),
 		SourcePath:            absPath,
 		SecretSink:            record.secrets,
-		OnStep:                stepstream.NewSink(record.writer, deps.logger(), stepstream.WithPublisher(opened.PublishStep), stepstream.WithMask(record.secrets.String)),
+		OnStep:                stepstream.NewSink(record.writer, runLog, stepstream.WithPublisher(opened.PublishStep), stepstream.WithMask(record.secrets.String)),
 		FailureCapture: runner.NewFailureBundle(runner.FailureBundleDeps{
-			Orchestra: built.Orchestra, Clock: deps.clock(), Logger: deps.logger(), Sink: artifacts,
+			Orchestra: built.Orchestra, Clock: deps.clock(), Logger: runLog, Sink: artifacts,
 		}),
 	})
 	result, err := scriptRunner.Run(runCtx, def)

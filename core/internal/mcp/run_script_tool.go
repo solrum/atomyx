@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/netcapture"
 	"dev.atomyx/internal/runner"
 	"dev.atomyx/internal/script"
@@ -156,23 +157,29 @@ func registerRunScriptTool(server *mcp.Server, tc *ToolContext) {
 			return invalidArgumentsResult("run_script", err), nil
 		}
 
+		// A failure before the run starts has no run folder, so its text is
+		// masked with a set seeded from the call's env argument alone.
+		secrets := runner.NewRunSecrets()
+		secrets.AddExternal(args.Env, nil)
 		orch, err := orchestraOrFail(ctx, tc)
 		if err != nil {
-			return errorResult(err), nil
+			return maskedErrorResult(err, secrets.String), nil
 		}
 		def, err := script.ParseScript(args.Script, args.Env)
 		if err != nil {
-			return errorResult(err), nil
+			return maskedErrorResult(err, secrets.String), nil
 		}
 		networkCapture, err := netcapture.New(netcapture.ParseConfigString(args.Proxy))
 		if err != nil {
-			return errorResult(err), nil
+			return maskedErrorResult(err, secrets.String), nil
 		}
 
 		var actions humanActionLog
 		run, err := tc.RunSession.RunScript(ctx, def.Name, tc.Session.SelectedDescriptor(),
 			func(target scriptTarget) (runner.ScriptResult, error) {
 				target.Secrets.AddExternal(args.Env, nil)
+				secrets = target.Secrets
+				runLog := logging.Masked(tc.Logger, target.Secrets.String)
 				var gate runner.StepGate
 				dbg, endDebug := tc.Session.beginScriptDebug(target.Ctx, orch, def, target.Artifacts)
 				defer endDebug()
@@ -184,7 +191,7 @@ func registerRunScriptTool(server *mcp.Server, tc *ToolContext) {
 					StepGate:       gate,
 					Orchestra:      orch,
 					Clock:          tc.Clock,
-					Logger:         tc.Logger,
+					Logger:         runLog,
 					RunID:          target.RunID,
 					Commands:       runner.DefaultCommands(),
 					NetworkCapture: networkCapture,
@@ -192,7 +199,7 @@ func registerRunScriptTool(server *mcp.Server, tc *ToolContext) {
 					SecretSink:     target.Secrets,
 					OnStep:         target.OnStep,
 					FailureCapture: runner.NewFailureBundle(runner.FailureBundleDeps{
-						Orchestra: orch, Clock: tc.Clock, Logger: tc.Logger, Sink: target.Evidence,
+						Orchestra: orch, Clock: tc.Clock, Logger: runLog, Sink: target.Evidence,
 					}),
 				}).Run(target.Ctx, def)
 				if dbg != nil {
@@ -201,9 +208,9 @@ func registerRunScriptTool(server *mcp.Server, tc *ToolContext) {
 				return result, err
 			})
 		if err != nil {
-			return errorResult(err), nil
+			return maskedErrorResult(err, secrets.String), nil
 		}
-		wire := toScriptResultWire(run.ScriptResult)
+		wire := toScriptResultWire(run.Masked(secrets.String))
 		wire.Recording = toRecordingWire(run.Recording, run.ArtifactsDir)
 		wire.HumanActions, wire.HumanActionsOmittedCount = actions.Entries, actions.Omitted
 		return jsonToolResult(wire)

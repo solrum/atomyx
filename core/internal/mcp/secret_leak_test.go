@@ -7,7 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	mockdriver "dev.atomyx/internal/driver/mock"
 	"dev.atomyx/internal/logging"
+	"dev.atomyx/internal/wire"
 )
 
 const (
@@ -37,20 +39,9 @@ func leakCaptureFile(t *testing.T) string {
 	return path
 }
 
-// unmaskedBoundaries lists the writers that still print step detail
-// without masking, with the reason each check is skipped. A writer leaves
-// the list in the change that masks its fields.
-var unmaskedBoundaries = map[string]string{
-	"run_script result":  "the run_script result carries step detail without masking it",
-	"parse error result": "a parse error result quotes interpolated values without masking them",
-}
-
 func requireNoSecret(t *testing.T, name, text string) {
 	t.Helper()
 	t.Run(name, func(t *testing.T) {
-		if reason, unmasked := unmaskedBoundaries[name]; unmasked {
-			t.Skip(reason)
-		}
 		if strings.Contains(text, leakSecret) {
 			t.Errorf("%s carries the planted secret:\n%s", name, text)
 		}
@@ -124,5 +115,44 @@ func TestPlantedEnvArgumentNeverReachesAWriter(t *testing.T) {
 			requireNoSecret(t, "other run folder files", other)
 			requireNoSecret(t, "log output", log.String())
 		})
+	}
+}
+
+// TestRunScriptMasksAValueReadFromASecureField proves run_script passes
+// its secret set to the runner. The value is not in the env argument and is
+// not token-shaped, so only the runner marking the read secret masks it.
+func TestRunScriptMasksAValueReadFromASecureField(t *testing.T) {
+	const deviceHeld = "device-held-pw-81f3"
+	drv := mockdriver.New()
+	drv.StageHierarchy(wire.TreeNodeWire{
+		Attributes: map[string]string{"id": "root", "bounds": "0,0,400,800"},
+		Children: []wire.TreeNodeWire{{Attributes: map[string]string{
+			"id": "pw", "value": deviceHeld, "bounds": "0,0,100,50", wire.AttrSecure: wire.AttrSecureTrue,
+		}}},
+	})
+	r := newRunServerWith(t, func(deps *ServerDeps) { deps.Factory = singleMockDriverFactory{driver: drv} })
+	selectMockDevice(t, r.cs, t.Context())
+	path := filepath.Join(t.TempDir(), "capture.jsonl")
+	line := `{"method":"GET","url":"https://api.example.com/use/` + deviceHeld + `","status":200,"headers":{},"body":{},"timestamp":1}` + "\n"
+	if err := os.WriteFile(path, []byte(line), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	result, _ := callTool(t, r.cs, t.Context(), "run_script", map[string]any{
+		"script": "appId: com.example.app\nname: Held\nsteps:\n" +
+			"  - read: { selector: { id: pw }, field: value, as: pwd }\n" +
+			"  - capture: { pattern: \"GET /use/" + deviceHeld + "\", as: used }\n",
+		"proxy": "file:" + path,
+	})
+
+	text := textOf(t, result)
+	if !strings.Contains(text, "Captured") {
+		t.Fatalf("the capture step never completed:\n%s", text)
+	}
+	steps, other := runFolderText(t, r.root)
+	for name, body := range map[string]string{"result": text, "step stream": steps, "run folder": other} {
+		if strings.Contains(body, deviceHeld) {
+			t.Errorf("%s carries the value read from the secure field", name)
+		}
 	}
 }

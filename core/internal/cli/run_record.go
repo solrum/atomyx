@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"dev.atomyx/internal/device"
+	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/recording"
 	"dev.atomyx/internal/report"
 	"dev.atomyx/internal/runfolder"
@@ -83,6 +84,12 @@ func startRunRecord(out runOutput, identity runIdentity) (*runRecord, error) {
 		return nil, fmt.Errorf("creating the run folder: %w", err)
 	}
 	return &runRecord{writer: writer, secrets: runner.NewRunSecrets(), formats: out.Formats, outcome: runfolder.OutcomeError}, nil
+}
+
+// maskedLogger returns logger with every entry passed through the secret
+// set of the run.
+func (r *runRecord) maskedLogger(logger logging.Logger) logging.Logger {
+	return logging.Masked(logger, r.secrets.String)
 }
 
 // ID returns the run id, which also correlates the run's step trace.

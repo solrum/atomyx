@@ -148,7 +148,7 @@ func runWorkerEntry(host *suiteHost, positional *string, path string, position i
 	if len(result.Entries) == 0 {
 		return scenario.SuiteEntryResult{}, false
 	}
-	return result.Entries[0], true
+	return result.Entries[0].Masked(host.record.secrets.String), true
 }
 
 // workerPaths reads entry paths from in, one per line, and closes the

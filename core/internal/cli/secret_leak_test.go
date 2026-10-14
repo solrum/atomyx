@@ -230,19 +230,9 @@ func otherRunFolderText(t *testing.T, runDir string) string {
 	return all.String()
 }
 
-// unmaskedBoundaries lists the writers that still print step detail
-// without masking, with the reason each check is skipped. A writer leaves
-// the list in the change that masks its fields.
-var unmaskedBoundaries = map[string]string{
-	"worker lines": "a worker line carries entry errors without masking them",
-}
-
 func requireNoSecret(t *testing.T, name, text string) {
 	t.Helper()
 	t.Run(name, func(t *testing.T) {
-		if reason, unmasked := unmaskedBoundaries[name]; unmasked {
-			t.Skip(reason)
-		}
 		if strings.Contains(text, leakSecret) {
 			t.Errorf("%s carries the planted secret:\n%s", name, text)
 		}

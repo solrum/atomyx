@@ -128,12 +128,13 @@ func startSuiteHost(ctx context.Context, deps Deps, cfg suiteSettings, proxyFlag
 	}
 	opened.recordRun(record)
 	record.secrets.AddExternal(cfg.externalEnv, cfg.committedEnv)
+	runLog := record.maskedLogger(deps.logger())
 
 	videos := newSuiteVideos(deps.videoLifecycle(videoOn), desc, record.writer)
 	suiteRunner := scenario.NewSuiteRunner(scenario.SuiteRunnerDeps{
 		Orchestra:         opened.Built().Orchestra,
 		Clock:             deps.clock(),
-		Logger:            deps.logger(),
+		Logger:            runLog,
 		RunID:             record.ID(),
 		NetworkCapture:    networkCapture,
 		Commands:          runner.DefaultCommands(),
@@ -142,7 +143,7 @@ func startSuiteHost(ctx context.Context, deps Deps, cfg suiteSettings, proxyFlag
 		ExternalCommitted: cfg.committedEnv,
 		SecretSink:        record.secrets,
 		ChildArtifacts:    newArtifactSequence(runfolder.ArtifactsDir(record.Dir())).forTarget,
-		OnStep:            stepstream.NewSink(record.writer, deps.logger(), stepstream.WithPublisher(opened.PublishStep), stepstream.WithMask(record.secrets.String)),
+		OnStep:            stepstream.NewSink(record.writer, runLog, stepstream.WithPublisher(opened.PublishStep), stepstream.WithMask(record.secrets.String)),
 		OnEntryStart:      videos.start,
 	})
 	return &suiteHost{opened: opened, runCtx: runCtx, cancel: cancelRun, record: record, runner: suiteRunner, config: cfg}, nil
