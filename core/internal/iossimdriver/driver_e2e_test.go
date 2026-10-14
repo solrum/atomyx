@@ -37,21 +37,34 @@ func TestIosSimDriver_E2E(t *testing.T) {
 	}
 
 	drivertest.Run(t, func() driver.Driver {
-		launcher := iossimdriver.NewSimHidLauncher(process.NewExecBackground())
-		result, err := launcher.Launch(context.Background(), udid)
-		if err != nil {
-			t.Fatalf("SimHidLauncher.Launch: %v", err)
-		}
-		t.Cleanup(func() { _ = result.Kill() })
-
 		conn := transport.NewTCPClient("127.0.0.1", iosSimE2EControlPort)
-		d, err := iossimdriver.New(conn, process.NewExec(), iossimdriver.NewDialer(), iossimdriver.Options{
-			Options: iosdriver.Options{Background: process.NewExecBackground(), UDID: udid, Kind: iosdriver.KindSimulator, Port: iosSimE2EControlPort},
-			HidPort: result.Port,
-		})
-		if err != nil {
-			t.Fatalf("iossimdriver.New: %v", err)
-		}
-		return d
+		return newSimDriver(t, conn, udid, process.NewExecBackground(), startSimHid(t, udid, process.NewExecBackground()))
 	}, drivertest.Hooks{})
+}
+
+// startSimHid launches the atomyx-sim-hid helper for udid through bg
+// and returns its WebSocket port. The test's cleanup kills the helper,
+// so it is not owned by the driver's Disconnect.
+func startSimHid(t *testing.T, udid string, bg process.BackgroundRunner) int {
+	t.Helper()
+	result, err := iossimdriver.NewSimHidLauncher(bg).Launch(context.Background(), udid)
+	if err != nil {
+		t.Fatalf("SimHidLauncher.Launch: %v", err)
+	}
+	t.Cleanup(func() { _ = result.Kill() })
+	return result.Port
+}
+
+// newSimDriver builds a simulator driver over conn and the helper at
+// hidPort. bg starts any process the driver itself launches.
+func newSimDriver(t *testing.T, conn iosdriver.Conn, udid string, bg process.BackgroundRunner, hidPort int) *iossimdriver.IosSimDriver {
+	t.Helper()
+	d, err := iossimdriver.New(conn, process.NewExec(), iossimdriver.NewDialer(), iossimdriver.Options{
+		Options: iosdriver.Options{Background: bg, UDID: udid, Kind: iosdriver.KindSimulator, Port: iosSimE2EControlPort},
+		HidPort: hidPort,
+	})
+	if err != nil {
+		t.Fatalf("iossimdriver.New: %v", err)
+	}
+	return d
 }
