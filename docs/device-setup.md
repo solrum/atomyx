@@ -35,6 +35,12 @@ make ready-ios-capture
   adb install -r app/build/outputs/apk/debug/app-debug.apk
   ```
 
+`atomyx setup --platform android --device <serial>` checks each of these
+and installs the agent and enables its accessibility service for you.
+`atomyx setup --check` only reports. Enabling the Atomyx accessibility
+service disables any other enabled accessibility service. See
+[`atomyx driver setup`](cli.md#driver-setup) for the steps.
+
 ### Run
 ```bash
 make ready-android
@@ -50,6 +56,9 @@ atomyx run \
 ### Prerequisites
 - Xcode installed
 - Simulator booted (`xcrun simctl boot <UDID>`)
+
+`atomyx setup --platform ios --device <UDID>` checks the Xcode tools. A
+simulator needs no `iproxy` and no signing.
 
 ### Run
 ```bash
@@ -70,6 +79,12 @@ physical device: the CLI looks the UDID up through the same scan
 physical. A UDID that scan does not list fails with `DEVICE_NOT_FOUND`.
 
 ### One-time setup
+
+`atomyx setup --platform ios --device <UDID>` checks the Xcode command
+line tools, `iproxy`, and the signing team, and prints the exact
+`export ATOMYX_DEV_TEAM=<id>` line when it finds one team. It never writes
+`device.env`, so steps 1 and 2 below stay manual. See
+[`atomyx driver setup`](cli.md#driver-setup) for the steps.
 
 1. **Create config file:**
    ```bash
