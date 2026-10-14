@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"dev.atomyx/internal/driver"
+	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/script"
 )
 
@@ -56,7 +57,7 @@ func (LaunchAppCommand) Execute(_ script.ScriptStep, ctx *CommandContext) Comman
 	// a normal, expected outcome of running the script against the
 	// wrong target, not a bug in this handler, so it fails the step
 	// like any other failing command instead of propagating as a panic.
-	if err := ctx.Orchestra.LaunchApp(ctx.Context, appID, driver.LaunchArgs{NoReset: ctx.LaunchNoReset}); err != nil {
+	if err := ctx.Orchestra.LaunchAppWithMode(ctx.Context, appID, orchestra.LaunchModeFromNoReset(ctx.LaunchNoReset)); err != nil {
 		if result, ok := commandFailureFor(err); ok {
 			return withAuthoredAppID(result, ctx)
 		}

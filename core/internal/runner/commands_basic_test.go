@@ -647,3 +647,58 @@ func TestTapCommand_ObscuredFailureNeverPrintsTheObscurersText(t *testing.T) {
 		t.Fatalf("detail = %q, want %q", got, obscuredDetail)
 	}
 }
+
+// TestLaunchAppCommand_DelegatesLaunchMode proves the command hands the
+// script's noReset value to the orchestrator as a launch mode, so the
+// driver sees nil, true or false exactly as the script declared.
+func TestLaunchAppCommand_DelegatesLaunchMode(t *testing.T) {
+	yes, no := true, false
+	tests := []struct {
+		name    string
+		noReset *bool
+		want    string
+	}{
+		{"default", nil, "nil"},
+		{"attach", &yes, "true"},
+		{"fresh", &no, "false"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			d := mock.New()
+			d.Apps = []driver.InstalledApp{{BundleID: "com.test"}}
+			d.StageHierarchy(rootTree())
+			clock := orchestra.NewFakeClock(0)
+			orch := orchestra.New(orchestra.OrchestraDeps{Driver: d, Clock: clock})
+			r := NewScriptRunner(ScriptRunnerDeps{
+				Orchestra:     orch,
+				Clock:         clock,
+				Logger:        noopLogger{},
+				Commands:      DefaultCommands(),
+				LaunchNoReset: tc.noReset,
+			})
+
+			result, err := r.Run(context.Background(), mustParse(t, "appId: com.test\n---\n- launchApp\n"))
+			if err != nil || !result.Ok {
+				t.Fatalf("Run: err=%v steps=%s", err, debugSteps(result.Steps))
+			}
+			var got []string
+			for _, call := range d.Calls {
+				if call.Method != "LaunchApp" {
+					continue
+				}
+				args := call.Args[1].(driver.LaunchArgs)
+				switch {
+				case args.NoReset == nil:
+					got = append(got, "nil")
+				case *args.NoReset:
+					got = append(got, "true")
+				default:
+					got = append(got, "false")
+				}
+			}
+			if len(got) != 1 || got[0] != tc.want {
+				t.Fatalf("driver NoReset = %v, want [%s]", got, tc.want)
+			}
+		})
+	}
+}
