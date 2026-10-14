@@ -52,6 +52,18 @@ type Hooks struct {
 	// transport cannot count requests, or an end-to-end suite against
 	// a real device, leaves it nil and still gets the stability checks.
 	DeviceCalls func() int
+
+	// FailConnect, when set, must arrange for the very next Connect
+	// call made against the driver instance the current sub-test is
+	// exercising to return an error, even though an earlier Connect on
+	// the same instance succeeded. The sub-test discards the instance
+	// afterward, so FailConnect does not need to self-heal.
+	//
+	// A nil FailConnect skips the assertion that AgentInfo is the zero
+	// value after a failed Connect. A caller whose fake cannot make
+	// Connect fail, or an end-to-end suite against a real device, leaves
+	// it nil.
+	FailConnect func()
 }
 
 // Run executes the driver contract suite against every driver value
@@ -75,6 +87,7 @@ func Run(t *testing.T, newDriver Factory, hooks Hooks) {
 	t.Run("disconnect is idempotent", func(t *testing.T) { testDisconnectIdempotent(t, newDriver) })
 	t.Run("ping reports liveness", func(t *testing.T) { testPingReportsLiveness(t, newDriver, hooks) })
 	t.Run("agent info is local and stable", func(t *testing.T) { testAgentInfoIsLocalAndStable(t, newDriver, hooks) })
+	t.Run("agent info is zero after a failed connect", func(t *testing.T) { testAgentInfoZeroAfterFailedConnect(t, newDriver, hooks) })
 	t.Run("context cancellation", func(t *testing.T) { testContextCancellation(t, newDriver) })
 
 	t.Run("tap long press swipe succeed", func(t *testing.T) { testTapLongPressSwipeSucceed(t, newDriver) })
@@ -209,6 +222,28 @@ func testAgentInfoIsLocalAndStable(t *testing.T, newDriver Factory, hooks Hooks)
 	}
 	if after := calls(); after != callsBefore {
 		t.Fatalf("AgentInfo() made %d device calls, want none", after-callsBefore)
+	}
+}
+
+// testAgentInfoZeroAfterFailedConnect asserts that a Connect that
+// fails leaves AgentInfo as the zero value, even when an earlier
+// Connect on the same instance reported versions.
+func testAgentInfoZeroAfterFailedConnect(t *testing.T, newDriver Factory, hooks Hooks) {
+	if hooks.FailConnect == nil {
+		t.Skip("drivertest: no FailConnect hook wired for this driver; skipping the failed-connect assertion")
+	}
+	d := newDriver()
+	if err := d.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	_ = d.Disconnect()
+
+	hooks.FailConnect()
+	if err := d.Connect(context.Background()); err == nil {
+		t.Fatal("Connect() after FailConnect returned no error, want the injected failure surfaced")
+	}
+	if got := d.AgentInfo(); got != (driver.AgentInfo{}) {
+		t.Fatalf("AgentInfo() after a failed Connect = %+v, want the zero value", got)
 	}
 }
 

@@ -236,6 +236,11 @@ func TestIosSimDriver_SatisfiesContract(t *testing.T) {
 		return d
 	}, drivertest.Hooks{
 		DeviceCalls: func() int { return len(conn.Calls()) },
+		FailConnect: func() {
+			conn.Respond("ping", func(map[string]any) (map[string]any, error) {
+				return nil, errors.New("drivertest: simulated unreachable agent")
+			})
+		},
 		FailPing: func() {
 			conn.Respond("ping", func(map[string]any) (map[string]any, error) {
 				return nil, errors.New("drivertest: simulated unreachable agent")

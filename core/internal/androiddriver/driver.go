@@ -142,10 +142,25 @@ func (d *AndroidDriver) Capabilities() driver.Capabilities { return d.capabiliti
 // Connect first probes for a foreign automation session already
 // driving the device, then ensures the adb TCP tunnel is in place,
 // verifies the agent answers /health, and runs the /ping capability
-// handshake. A /ping failure is swallowed and the conservative
-// default capabilities are kept, because an agent build that
-// predates the /ping route must still be usable at the
-// single-pointer, no-pressure gesture surface it always supported.
+// handshake.
+//
+// The /ping outcome decides the result:
+//
+//   - The route cannot be reached at all (a transport failure): the
+//     handshake proves nothing about the agent, so Connect succeeds
+//     with the conservative default capabilities and a zero
+//     AgentInfo. An agent build that predates the /ping route must
+//     still be usable at the single-pointer, no-pressure gesture
+//     surface it always supported.
+//   - The agent answers with an error status, a protocol version other
+//     than the host's, or without the secret field capability: the
+//     agent is stale. It is replaced once through Options.ReinstallAgent
+//     and pinged again. Connect fails with a diagnostic when it cannot
+//     be replaced, or when the replacement is still stale or no longer
+//     answers /ping.
+//
+// AgentInfo is the zero value after a Connect that fails, and after
+// one that succeeds without a /ping answer.
 //
 // Connect checks "adb forward --list" before creating a forward,
 // because a host-side local port is a real listening socket shared by
@@ -171,6 +186,7 @@ func (d *AndroidDriver) Capabilities() driver.Capabilities { return d.capabiliti
 //     fails with a diagnostic naming the conflict rather than
 //     guessing which side should win.
 func (d *AndroidDriver) Connect(ctx context.Context) error {
+	d.agentInfo = driver.AgentInfo{}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -264,7 +280,7 @@ func (d *AndroidDriver) finishConnect(ctx context.Context) error {
 			return err
 		}
 		pong, err = d.transport.Ping(ctx)
-		if agentIsStale(pong, err) {
+		if err != nil || agentIsStale(pong, err) {
 			return d.staleAgentError(pong, err, nil)
 		}
 	}

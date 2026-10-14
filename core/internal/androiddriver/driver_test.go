@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"dev.atomyx/internal/androiddriver"
@@ -55,6 +56,8 @@ type fakeTransport struct {
 	lastTypeKb     transport.TypeKeyboardRequest
 	lastPressKey   transport.KeyRequest
 	launchAppCalls []string
+
+	calls atomic.Int64
 }
 
 func newFakeTransport() *fakeTransport {
@@ -77,6 +80,7 @@ func newFakeTransport() *fakeTransport {
 }
 
 func (f *fakeTransport) Health(context.Context) (transport.HealthResponse, error) {
+	f.calls.Add(1)
 	if f.healthErr != nil {
 		return transport.HealthResponse{}, f.healthErr
 	}
@@ -84,6 +88,7 @@ func (f *fakeTransport) Health(context.Context) (transport.HealthResponse, error
 }
 
 func (f *fakeTransport) Ping(context.Context) (transport.PingResponse, error) {
+	f.calls.Add(1)
 	if f.pingErr != nil {
 		return transport.PingResponse{}, f.pingErr
 	}
@@ -91,6 +96,7 @@ func (f *fakeTransport) Ping(context.Context) (transport.PingResponse, error) {
 }
 
 func (f *fakeTransport) Tree(context.Context) (transport.AndroidTreeNode, error) {
+	f.calls.Add(1)
 	if f.treeErr != nil {
 		return transport.AndroidTreeNode{}, f.treeErr
 	}
@@ -98,6 +104,7 @@ func (f *fakeTransport) Tree(context.Context) (transport.AndroidTreeNode, error)
 }
 
 func (f *fakeTransport) TapCoords(_ context.Context, req transport.TapCoordsRequest) (transport.GestureResult, error) {
+	f.calls.Add(1)
 	f.mu.Lock()
 	f.lastTap = req
 	f.mu.Unlock()
@@ -105,6 +112,7 @@ func (f *fakeTransport) TapCoords(_ context.Context, req transport.TapCoordsRequ
 }
 
 func (f *fakeTransport) LongPress(_ context.Context, req transport.LongPressRequest) (transport.GestureResult, error) {
+	f.calls.Add(1)
 	f.mu.Lock()
 	f.lastLongPres = req
 	f.mu.Unlock()
@@ -112,6 +120,7 @@ func (f *fakeTransport) LongPress(_ context.Context, req transport.LongPressRequ
 }
 
 func (f *fakeTransport) Swipe(_ context.Context, req transport.SwipeRequest) (transport.GestureResult, error) {
+	f.calls.Add(1)
 	f.mu.Lock()
 	f.lastSwipe = req
 	f.mu.Unlock()
@@ -119,6 +128,7 @@ func (f *fakeTransport) Swipe(_ context.Context, req transport.SwipeRequest) (tr
 }
 
 func (f *fakeTransport) DispatchGesture(_ context.Context, req transport.DispatchGestureRequest) (transport.DispatchGestureResult, error) {
+	f.calls.Add(1)
 	f.mu.Lock()
 	f.lastDispatch = req
 	f.mu.Unlock()
@@ -152,6 +162,7 @@ func requestHasCaptureWaypoint(req transport.DispatchGestureRequest) bool {
 }
 
 func (f *fakeTransport) TypeKeyboard(_ context.Context, req transport.TypeKeyboardRequest) (transport.TypeKeyboardResult, error) {
+	f.calls.Add(1)
 	f.mu.Lock()
 	f.lastTypeKb = req
 	f.mu.Unlock()
@@ -159,6 +170,7 @@ func (f *fakeTransport) TypeKeyboard(_ context.Context, req transport.TypeKeyboa
 }
 
 func (f *fakeTransport) ClearFocusedInput(context.Context) (transport.ClearFocusedInputResult, error) {
+	f.calls.Add(1)
 	if f.clearFocusedErr != nil {
 		return transport.ClearFocusedInputResult{}, f.clearFocusedErr
 	}
@@ -166,10 +178,12 @@ func (f *fakeTransport) ClearFocusedInput(context.Context) (transport.ClearFocus
 }
 
 func (f *fakeTransport) HideKeyboard(context.Context) (transport.AckResult, error) {
+	f.calls.Add(1)
 	return f.hideKeyboardResp, nil
 }
 
 func (f *fakeTransport) PressKey(_ context.Context, req transport.KeyRequest) (transport.OkResponse, error) {
+	f.calls.Add(1)
 	f.mu.Lock()
 	f.lastPressKey = req
 	f.mu.Unlock()
@@ -177,6 +191,7 @@ func (f *fakeTransport) PressKey(_ context.Context, req transport.KeyRequest) (t
 }
 
 func (f *fakeTransport) LaunchApp(_ context.Context, req transport.LaunchRequest) (transport.OkResponse, error) {
+	f.calls.Add(1)
 	f.mu.Lock()
 	id := req.PackageName
 	f.foreground = &id
@@ -186,6 +201,7 @@ func (f *fakeTransport) LaunchApp(_ context.Context, req transport.LaunchRequest
 }
 
 func (f *fakeTransport) ForceStopApp(_ context.Context, req transport.ForceStopRequest) (transport.AckResult, error) {
+	f.calls.Add(1)
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if !f.forceStopResp.Ok {
@@ -198,6 +214,7 @@ func (f *fakeTransport) ForceStopApp(_ context.Context, req transport.ForceStopR
 }
 
 func (f *fakeTransport) CurrentActivity(context.Context) (transport.CurrentActivityResponse, error) {
+	f.calls.Add(1)
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.foreground == nil {
@@ -207,10 +224,12 @@ func (f *fakeTransport) CurrentActivity(context.Context) (transport.CurrentActiv
 }
 
 func (f *fakeTransport) Apps(context.Context) ([]transport.InstalledApp, error) {
+	f.calls.Add(1)
 	return f.appsResp, nil
 }
 
 func (f *fakeTransport) Screenshot(context.Context) (transport.ScreenshotResponse, error) {
+	f.calls.Add(1)
 	return f.screenshotResp, nil
 }
 
@@ -259,6 +278,12 @@ func TestAndroidDriver_SatisfiesContract(t *testing.T) {
 		tr = newFakeTransport()
 		return androiddriver.New(tr, newContractRunner(), androiddriver.Options{Serial: "emulator-5554"})
 	}, drivertest.Hooks{
+		DeviceCalls: func() int { return int(tr.calls.Load()) },
+		FailConnect: func() {
+			tr.mu.Lock()
+			tr.healthErr = errors.New("drivertest: simulated unreachable agent")
+			tr.mu.Unlock()
+		},
 		FailPing: func() {
 			tr.mu.Lock()
 			tr.healthErr = errors.New("drivertest: simulated unreachable agent")
@@ -1287,5 +1312,49 @@ func TestAndroidDriver_Connect_AgentWithSecureFields_NeverReinstalls(t *testing.
 
 	if err := d.Connect(context.Background()); err != nil {
 		t.Fatalf("Connect() error = %v", err)
+	}
+}
+
+func TestAndroidDriver_Connect_PingUnreachableAfterReinstall_FailsAsStaleAgent(t *testing.T) {
+	tr := newFakeTransport()
+	tr.pingResp = agentPingWithProtocol(version.AgentProtocolVersion + 1)
+	d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{
+		Serial: "S1",
+		ReinstallAgent: func(context.Context) error {
+			tr.pingErr = errors.New("connection reset")
+			return nil
+		},
+	})
+
+	err := d.Connect(context.Background())
+
+	if err == nil || d.IsConnected() {
+		t.Fatalf("Connect() error = %v, connected = %v, want a failed connect: the replacement could not be verified", err, d.IsConnected())
+	}
+	if code, _, _ := diag.Describe(err); code != diag.CodeAgentNotReady {
+		t.Fatalf("Connect() code = %q, want %q", code, diag.CodeAgentNotReady)
+	}
+	if got := d.AgentInfo(); got != (driver.AgentInfo{}) {
+		t.Fatalf("AgentInfo() = %+v after a failed Connect, want the zero value", got)
+	}
+}
+
+func TestAndroidDriver_Connect_SecondConnectFailing_ClearsTheEarlierAgentInfo(t *testing.T) {
+	tr := newFakeTransport()
+	d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{Serial: "S1"})
+	if err := d.Connect(context.Background()); err != nil {
+		t.Fatalf("first Connect() error = %v", err)
+	}
+	if d.AgentInfo() == (driver.AgentInfo{}) {
+		t.Fatal("AgentInfo() is zero after a successful Connect, want the reported versions")
+	}
+	_ = d.Disconnect()
+	tr.healthErr = errors.New("agent gone")
+
+	if err := d.Connect(context.Background()); err == nil {
+		t.Fatal("second Connect() succeeded, want a failure")
+	}
+	if got := d.AgentInfo(); got != (driver.AgentInfo{}) {
+		t.Fatalf("AgentInfo() = %+v after a failed second Connect, want the zero value", got)
 	}
 }
