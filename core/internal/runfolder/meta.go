@@ -131,22 +131,27 @@ type MCPInfo struct {
 // same value the script runner reports as its failed step index.
 // Display code adds one.
 type Meta struct {
-	SchemaVersion int      `json:"schemaVersion"`
-	RunID         string   `json:"runId"`
-	Kind          Kind     `json:"kind"`
-	ScriptPath    string   `json:"scriptPath,omitempty"`
-	ScriptName    string   `json:"scriptName,omitempty"`
-	DeviceID      string   `json:"deviceId,omitempty"`
-	Device        *Device  `json:"device,omitempty"`
-	Host          *Host    `json:"host,omitempty"`
-	StartedAt     int64    `json:"startedAt"`
-	CompletedAt   *int64   `json:"completedAt,omitempty"`
-	Result        Result   `json:"result,omitempty"`
-	Outcome       Outcome  `json:"outcome,omitempty"`
-	FailedAtStep  *int     `json:"failedAtStep,omitempty"`
-	TotalSteps    int      `json:"totalSteps,omitempty"`
-	MCP           *MCPInfo `json:"mcp,omitempty"`
-	ImportedFrom  string   `json:"importedFrom,omitempty"`
+	SchemaVersion int    `json:"schemaVersion"`
+	RunID         string `json:"runId"`
+	Kind          Kind   `json:"kind"`
+	ScriptPath    string `json:"scriptPath,omitempty"`
+	ScriptName    string `json:"scriptName,omitempty"`
+	// TestKey is the stable identity of the test the run executes: the
+	// script or scenario path relative to its project root, or mcp: and
+	// the run name for an MCP run. Absent on a run recorded without one,
+	// which readers key by scriptPath.
+	TestKey      string   `json:"testKey,omitempty"`
+	DeviceID     string   `json:"deviceId,omitempty"`
+	Device       *Device  `json:"device,omitempty"`
+	Host         *Host    `json:"host,omitempty"`
+	StartedAt    int64    `json:"startedAt"`
+	CompletedAt  *int64   `json:"completedAt,omitempty"`
+	Result       Result   `json:"result,omitempty"`
+	Outcome      Outcome  `json:"outcome,omitempty"`
+	FailedAtStep *int     `json:"failedAtStep,omitempty"`
+	TotalSteps   int      `json:"totalSteps,omitempty"`
+	MCP          *MCPInfo `json:"mcp,omitempty"`
+	ImportedFrom string   `json:"importedFrom,omitempty"`
 	// InterventionsDropped counts the intervention lines that did not fit in
 	// interventions.jsonl. Absent when none were dropped.
 	InterventionsDropped int `json:"interventionsDropped,omitempty"`

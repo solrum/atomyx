@@ -370,7 +370,7 @@ func mcpRunMeta(name string, source *string, dev *device.Descriptor) runfolder.M
 	if source != nil {
 		info.Source = *source
 	}
-	meta := runfolder.Meta{Kind: runfolder.KindMCP, MCP: info}
+	meta := runfolder.Meta{Kind: runfolder.KindMCP, TestKey: runfolder.MCPTestKey(name), MCP: info}
 	if dev != nil {
 		meta.DeviceID = dev.ID
 		meta.Device = &runfolder.Device{

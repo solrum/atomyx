@@ -161,6 +161,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 			Kind:       runfolder.KindSuite,
 			Label:      runLabel(scenarioDef.Name, absPath),
 			ScriptPath: absPath,
+			TestKey:    testKeyOf(absPath),
 			Device:     desc,
 		})
 		if err != nil {
@@ -249,6 +250,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		Kind:       runfolder.KindScript,
 		Label:      runLabel(def.Name, absPath),
 		ScriptPath: absPath,
+		TestKey:    testKeyOf(absPath),
 		Device:     desc,
 	})
 	if err != nil {

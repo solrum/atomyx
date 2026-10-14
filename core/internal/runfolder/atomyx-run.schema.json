@@ -313,6 +313,10 @@
           "minimum": 0,
           "type": "integer"
         },
+        "testKey": {
+          "description": "Stable identity of the executed test. Absent on runs recorded without one.",
+          "type": "string"
+        },
         "totalSteps": {
           "minimum": 0,
           "type": "integer"

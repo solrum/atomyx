@@ -26,7 +26,10 @@ type Index struct {
 // whatever its status, and a quarantined entry that failed does not fail
 // the suite.
 type IndexEntry struct {
-	Path        string         `json:"path"`
+	Path string `json:"path"`
+	// TestKey is the stable identity of the entry, derived like
+	// Meta.TestKey. Absent on an index written without one.
+	TestKey     string         `json:"testKey,omitempty"`
 	Status      Result         `json:"status"`
 	Flaky       bool           `json:"flaky,omitempty"`
 	Quarantined bool           `json:"quarantined,omitempty"`

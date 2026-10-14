@@ -70,6 +70,10 @@
             "failed"
           ],
           "type": "string"
+        },
+        "testKey": {
+          "description": "Stable identity of the entry. Absent on indexes written without one.",
+          "type": "string"
         }
       },
       "required": [

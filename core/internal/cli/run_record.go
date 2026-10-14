@@ -53,7 +53,10 @@ type runIdentity struct {
 	Kind       runfolder.Kind
 	Label      string
 	ScriptPath string
-	Device     device.Descriptor
+	// TestKey is the stable test identity recorded in the meta, empty for a
+	// run that executes no single file.
+	TestKey string
+	Device  device.Descriptor
 	// ParentRunID is the sharding run that started this run as a worker,
 	// empty for a run nothing started.
 	ParentRunID string
@@ -67,6 +70,7 @@ func startRunRecord(out runOutput, identity runIdentity) (*runRecord, error) {
 		Kind:        identity.Kind,
 		ScriptPath:  identity.ScriptPath,
 		ScriptName:  identity.Label,
+		TestKey:     identity.TestKey,
 		ParentRunID: identity.ParentRunID,
 		DeviceID:    identity.Device.ID,
 		Host:        &runfolder.Host{AtomyxVersion: version.Read().Version},

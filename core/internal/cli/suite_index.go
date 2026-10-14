@@ -26,6 +26,7 @@ func suiteIndexEntries(result scenario.SuiteResult) []runfolder.IndexEntry {
 		}
 		entries[i] = runfolder.IndexEntry{
 			Path:        entry.Path,
+			TestKey:     testKeyOf(entry.Path),
 			Status:      indexResult(entry.Status),
 			Flaky:       entry.Flaky,
 			Quarantined: entry.Quarantined,

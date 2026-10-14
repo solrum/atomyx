@@ -127,3 +127,14 @@ func resolveAbs(path string) string {
 	}
 	return abs
 }
+
+// HasConfigFile reports whether dir directly contains an Atomyx config
+// file under one of the names discovery accepts.
+func HasConfigFile(dir string) bool {
+	for _, name := range configFileNames {
+		if fileExists(filepath.Join(dir, name)) {
+			return true
+		}
+	}
+	return false
+}

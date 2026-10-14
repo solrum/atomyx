@@ -28,7 +28,7 @@ func shardedEntries(paths []string, outcome shard.Outcome) ([]scenario.SuiteEntr
 		if slices.Contains(outcome.Unrun, path) {
 			message := unrunMessage
 			entries = append(entries, scenario.SuiteEntryResult{Path: path, Kind: scenario.KindScript, Status: scenario.EntryFailed, Error: &message})
-			index = append(index, runfolder.IndexEntry{Path: path, Status: runfolder.ResultFailed, Attempts: []runfolder.IndexAttempt{}})
+			index = append(index, runfolder.IndexEntry{Path: path, TestKey: testKeyOf(path), Status: runfolder.ResultFailed, Attempts: []runfolder.IndexAttempt{}})
 		}
 	}
 	return entries, index
@@ -77,6 +77,7 @@ func indexEntryFromWire(entry shard.Entry) runfolder.IndexEntry {
 	}
 	return runfolder.IndexEntry{
 		Path:        entry.Path,
+		TestKey:     testKeyOf(entry.Path),
 		Status:      indexResult(scenario.SuiteEntryStatus(entry.Status)),
 		Flaky:       entry.Flaky,
 		Quarantined: entry.Quarantined,

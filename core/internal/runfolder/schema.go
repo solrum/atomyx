@@ -107,6 +107,7 @@ func metaSchema() map[string]any {
 		"kind":                 enum(Kinds(), "What started the run."),
 		"scriptPath":           str(),
 		"scriptName":           str(),
+		"testKey":              map[string]any{"type": "string", "description": "Stable identity of the executed test. Absent on runs recorded without one."},
 		"deviceId":             str(),
 		"device":               ref("Device"),
 		"host":                 ref("Host"),
@@ -199,6 +200,7 @@ func indexEntrySchema() map[string]any {
 		"status":      map[string]any{"type": "string", "enum": []string{string(ResultPassed), string(ResultFailed)}, "description": "Result of the last attempt."},
 		"flaky":       map[string]any{"type": "boolean", "const": true, "description": "The entry failed and then passed. It counts as passed. Absent otherwise."},
 		"quarantined": map[string]any{"type": "boolean", "const": true, "description": "The entry matched the quarantine list. A quarantined failure does not fail the suite. Absent otherwise."},
+		"testKey":     map[string]any{"type": "string", "description": "Stable identity of the entry. Absent on indexes written without one."},
 		"attempts":    map[string]any{"type": "array", "items": ref("IndexAttempt"), "description": "Every attempt in order."},
 	}, []string{"path", "status", "attempts"})
 }
