@@ -1,9 +1,11 @@
 // Package setup defines the contract for preparing a device to run
-// Atomyx: the Step port that one preparation check implements, the
-// Registry that orders steps, the runner that executes them in fix or
-// check mode, and the Report that carries their outcomes. Concrete
-// steps live outside this package, which stays a leaf that knows
-// nothing about devices, adb, or Xcode.
+// Atomyx and holds the preparation steps themselves: the Step port
+// that one check implements, the Registry that orders steps, the
+// runner that executes them in fix or check mode, and the Report that
+// carries their outcomes. Each concrete step sits in its own file and
+// reaches adb, the agent, or the host tools only through a narrow port
+// declared beside it, so the package stays a leaf that knows nothing
+// about how those ports are implemented.
 package setup
 
 import "context"
