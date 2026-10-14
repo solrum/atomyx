@@ -14,6 +14,12 @@ const (
 	// xctestDigestFileMode keeps the digest file private to the current
 	// user.
 	xctestDigestFileMode = 0o600
+	// xctestDigestDirMode is the mode of the product directory when the
+	// pending marker is the first file in it.
+	xctestDigestDirMode = 0o755
+	// pendingDigest is recorded while a build runs. It is not a hash, so no
+	// computed digest equals it, and a product carrying it is stale.
+	pendingDigest = "pending"
 )
 
 // digestPath names the file recording the digest a product was built
@@ -30,9 +36,21 @@ func readDigest(productPath string) string {
 	return strings.TrimSpace(string(data))
 }
 
+// markDigestPending records that a build of the product at productPath
+// has started, replacing the digest of the build before it. A build that
+// fails or is interrupted leaves the marker, so the product stays stale
+// instead of falling back to the weaker modification time check that a
+// product with no digest file gets.
+func markDigestPending(productPath string) error {
+	if err := os.MkdirAll(filepath.Dir(productPath), xctestDigestDirMode); err != nil {
+		return fmt.Errorf("iosdriver: create the product directory: %w", err)
+	}
+	return writeDigest(productPath, pendingDigest)
+}
+
 // removeDigest deletes the digest recorded for the product at
-// productPath, so a product whose build did not finish never carries
-// the digest of the build before it.
+// productPath, so the product is judged by the modification time check
+// alone.
 func removeDigest(productPath string) {
 	_ = os.Remove(digestPath(productPath))
 }

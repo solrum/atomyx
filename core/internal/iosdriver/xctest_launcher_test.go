@@ -102,6 +102,14 @@ type fakeXcodebuildRunner struct {
 
 	// xcodeVersion is what the fake reports as the selected Xcode version.
 	xcodeVersion string
+	// developerDir is what the fake reports as the selected developer
+	// directory. Empty reports the default Xcode location.
+	developerDir string
+	// xcodeErr, when set, makes every command that reads the selected
+	// Xcode fail.
+	xcodeErr error
+	// versionReads counts the xcodebuild -version commands.
+	versionReads int
 }
 
 // defaultIdentityFields is the identity a fake runner reports when a
@@ -148,8 +156,8 @@ func (r *fakeXcodebuildRunner) replyData(env []string) string {
 }
 
 func (r *fakeXcodebuildRunner) Run(_ context.Context, name string, args ...string) (process.Result, error) {
-	if out, ok := r.selectedXcodeOutput(name, args); ok {
-		return process.Result{Stdout: out}, nil
+	if out, ok, err := r.selectedXcodeOutput(name, args); ok {
+		return process.Result{Stdout: out}, err
 	}
 	r.record(name, args)
 	if len(args) > 0 && args[0] == "test-without-building" {
@@ -1005,14 +1013,31 @@ func TestXctestLauncher_EnsureRunning_CanceledDuringReadinessWait_KillsSpawnedXc
 // selectedXcodeOutput answers the commands that read the selected Xcode.
 // They are not recorded, so a test counting invocations sees only the
 // build and spawn commands.
-func (r *fakeXcodebuildRunner) selectedXcodeOutput(name string, args []string) (string, bool) {
+func (r *fakeXcodebuildRunner) selectedXcodeOutput(name string, args []string) (string, bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	switch {
 	case name == "xcode-select" && len(args) == 1 && args[0] == "-p":
-		return "/Applications/Xcode.app/Contents/Developer\n", true
+		if r.xcodeErr != nil {
+			return "", true, r.xcodeErr
+		}
+		if r.developerDir != "" {
+			return r.developerDir + "\n", true, nil
+		}
+		return "/Applications/Xcode.app/Contents/Developer\n", true, nil
 	case name == "xcodebuild" && len(args) == 1 && args[0] == "-version":
-		r.mu.Lock()
-		defer r.mu.Unlock()
-		return "Xcode " + r.xcodeVersion + "\n", true
+		r.versionReads++
+		if r.xcodeErr != nil {
+			return "", true, r.xcodeErr
+		}
+		return "Xcode " + r.xcodeVersion + "\n", true, nil
 	}
-	return "", false
+	return "", false, nil
+}
+
+// VersionReads reports how many times the selected Xcode version was read.
+func (r *fakeXcodebuildRunner) VersionReads() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.versionReads
 }

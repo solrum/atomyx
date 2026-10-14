@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -166,21 +167,38 @@ func TestEnsureBuilt_SigningInputChangeRebuilds(t *testing.T) {
 	}
 }
 
-func TestEnsureBuilt_FailedBuildLeavesNoDigestFile(t *testing.T) {
+func TestEnsureBuilt_FailedBuildLeavesTheProductStale(t *testing.T) {
 	env := newDigestEnv(t)
+	source := filepath.Join(env.dir, digestTestSource)
+	old := time.Now().Add(-2 * time.Hour)
+	if err := os.Chtimes(source, old, old); err != nil {
+		t.Fatal(err)
+	}
 	env.ensure(env.simulator())
-	if env.digestFile("Debug-iphonesimulator") == "" {
+	built := env.digestFile("Debug-iphonesimulator")
+	if built == "" {
 		t.Fatal("setup: no digest after the first build")
 	}
 
 	env.write(digestTestSource, "let a = 2\n")
+	if err := os.Chtimes(source, old, old); err != nil {
+		t.Fatal(err)
+	}
 	env.runner.buildErr = errors.New("exit status 65")
 	if err := env.simulator().EnsureBuilt(context.Background()); err == nil {
 		t.Fatal("EnsureBuilt() error = nil, want the build failure")
 	}
+	env.runner.buildErr = nil
 
-	if got := env.digestFile("Debug-iphonesimulator"); got != "" {
-		t.Fatalf("digest file = %q after a failed build, want none", got)
+	if got := env.digestFile("Debug-iphonesimulator"); got == "" || got == built {
+		t.Fatalf("digest file = %q after a failed build, want a marker that is not the previous digest %q", got, built)
+	}
+	if product, ok := env.simulator().CurrentBuildProduct(context.Background()); ok {
+		t.Fatalf("CurrentBuildProduct() = %+v, want nothing for a product whose build failed", product)
+	}
+	env.ensure(env.simulator())
+	if got := env.builds(); got != 3 {
+		t.Fatalf("builds = %d, want 3 because the failed build left the product stale", got)
 	}
 }
 
@@ -254,5 +272,66 @@ func TestCurrentBuildProduct_DigestLessFreshProductIsAdopted(t *testing.T) {
 	env.ensure(env.simulator())
 	if got := env.builds(); got != 0 {
 		t.Fatalf("builds = %d, want none for a fresh digest-less product", got)
+	}
+}
+
+func TestInspectBuildProduct_SharedXcodeIdentityReadsTheVersionOnce(t *testing.T) {
+	env := newDigestEnv(t)
+	env.ensure(env.simulator())
+	reads := env.runner.VersionReads()
+	shared := iosdriver.NewXcodeIdentity()
+	for i := 0; i < 3; i++ {
+		launcher := env.launcher(iosdriver.LaunchConfig{Kind: iosdriver.KindSimulator, Xcode: shared})
+		if _, reason := launcher.InspectBuildProduct(context.Background()); reason != "" {
+			t.Fatalf("InspectBuildProduct() reason = %q, want a current product", reason)
+		}
+	}
+	if got := env.runner.VersionReads() - reads; got != 1 {
+		t.Fatalf("version reads = %d across three checks sharing one identity, want 1", got)
+	}
+}
+
+func TestInspectBuildProduct_SwitchedXcodeIsReadAgainThroughASharedIdentity(t *testing.T) {
+	env := newDigestEnv(t)
+	shared := iosdriver.NewXcodeIdentity()
+	cfg := iosdriver.LaunchConfig{Kind: iosdriver.KindSimulator, Xcode: shared}
+	env.ensure(env.launcher(cfg))
+
+	env.runner.developerDir = "/Applications/Xcode-beta.app/Contents/Developer"
+	env.runner.xcodeVersion = "28.0"
+	_, reason := env.launcher(cfg).InspectBuildProduct(context.Background())
+
+	if reason != "the runner product was built from other inputs" {
+		t.Fatalf("reason = %q, want the switched Xcode to read as other inputs", reason)
+	}
+}
+
+func TestInspectBuildProduct_UnreadableXcodeIsReportedAsTheReason(t *testing.T) {
+	env := newDigestEnv(t)
+	env.ensure(env.simulator())
+	env.runner.xcodeErr = errors.New("xcode-select: no developer directory")
+
+	product, reason := env.simulator().InspectBuildProduct(context.Background())
+
+	if !strings.Contains(reason, "cannot be read") || !strings.Contains(reason, "selected Xcode") {
+		t.Fatalf("reason = %q, want the unreadable Xcode named", reason)
+	}
+	if product != (iosdriver.BuildProduct{}) {
+		t.Fatalf("product = %+v, want none for a product that cannot be checked", product)
+	}
+}
+
+func TestInspectBuildProduct_ReasonsForAMissingAndAnInterruptedProduct(t *testing.T) {
+	env := newDigestEnv(t)
+	if _, reason := env.simulator().InspectBuildProduct(context.Background()); reason != "the runner product is missing" {
+		t.Fatalf("missing product reason = %q", reason)
+	}
+	env.ensure(env.simulator())
+	env.write(digestTestSource, "let a = 2\n")
+	env.runner.buildErr = errors.New("exit status 65")
+	_ = env.simulator().EnsureBuilt(context.Background())
+	_, reason := env.simulator().InspectBuildProduct(context.Background())
+	if reason != "the last build of the runner product did not finish" {
+		t.Fatalf("interrupted build reason = %q", reason)
 	}
 }

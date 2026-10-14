@@ -175,6 +175,11 @@ type DriverProvisioner struct {
 	// process is due, and fails once ctx ends.
 	awaitWatchTick func(ctx context.Context) error
 
+	// xcode is shared by every runner launcher this provisioner builds, so
+	// the selected Xcode version is read once per process and not once per
+	// adoption check.
+	xcode *iosdriver.XcodeIdentity
+
 	mu       sync.Mutex
 	reserved map[int]struct{}
 }
@@ -199,6 +204,7 @@ func NewDriverProvisioner(deps DriverProvisionerDeps) *DriverProvisioner {
 	}
 	p := &DriverProvisioner{
 		runner: deps.Runner, background: background, clock: clock, logger: logger, inspector: inspector, deps: deps,
+		xcode:    iosdriver.NewXcodeIdentity(),
 		freePort: operatingSystemFreePort, newRunnerID: randomRunnerID, now: time.Now, ownPid: os.Getpid,
 		reserved: make(map[int]struct{}),
 	}
@@ -505,6 +511,7 @@ func (p *DriverProvisioner) iosLaunchConfig(udid string, kind IosAgentKind) iosd
 	}
 	progress := p.logger.Child(logging.LogContext{"udid": udid, "kind": string(kind)})
 	cfg := iosdriver.LaunchConfig{
+		Xcode:                        p.xcode,
 		ProjectDir:                   projectDir,
 		Port:                         iosControlPort,
 		Kind:                         driverKind,

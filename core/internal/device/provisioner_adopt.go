@@ -108,8 +108,11 @@ func (p *DriverProvisioner) adoptionBlocker(ctx context.Context, path string, ad
 	if reason := p.deps.Reaper.AdoptionBlocker(state, udid, kind); reason != "" {
 		return reason
 	}
-	current, ok := iosdriver.NewXctestLauncher(p.runner, p.background, p.clock, cfg).CurrentBuildProduct(ctx)
-	if !ok || !state.BuildProduct().Matches(current) {
+	current, reason := iosdriver.NewXctestLauncher(p.runner, p.background, p.clock, cfg).InspectBuildProduct(ctx)
+	if reason != "" {
+		return "the runner product is not current: " + reason
+	}
+	if !state.BuildProduct().Matches(current) {
 		return "the runner was started from a different build of the runner product"
 	}
 	driverKind := iosdriver.KindSimulator

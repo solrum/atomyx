@@ -97,9 +97,10 @@ const (
 	xctestSpawnExitStderrTailChars   = 500
 )
 
-// xctestSourceDirNames are the project subdirectories EnsureRunning
-// scans for a Swift file newer than the compiled test runner, to
-// decide whether a rebuild is needed.
+// xctestSourceDirNames are the project subdirectories whose files are
+// compiled into the test runner. The build digest covers every file in
+// them, and the modification time check that judges a product with no
+// recorded digest looks at their Swift files.
 var xctestSourceDirNames = [...]string{"Tests", "Sources", "App"}
 
 // XctestLauncherErrorCode names one of the known ways bringing up the
@@ -190,6 +191,10 @@ type LaunchConfig struct {
 	// launcher accepts only a runner that echoes it back. Empty means
 	// identity rests on the UDID alone.
 	RunnerID string
+	// Xcode is shared by the launchers of one process so the selected
+	// Xcode version is read once. Nil gives the launcher a cache of its
+	// own.
+	Xcode *XcodeIdentity
 	// AllocatePort, when set, picks a fresh host port for every launch
 	// attempt instead of using Port, and enables the bounded retry on a
 	// lost bind race. XctestLauncher.Port reports the port the last
@@ -323,7 +328,6 @@ type XctestLauncher struct {
 	clock      clock.Clock
 	cfg        LaunchConfig
 	port       int
-	xcode      xcodeIdentityCache
 }
 
 // Port reports the host port the most recent EnsureRunning attempt
@@ -353,6 +357,9 @@ func NewXctestLauncher(proc process.Runner, background process.BackgroundRunner,
 	}
 	if cfg.LaunchTimeoutMs == 0 {
 		cfg.LaunchTimeoutMs = xctestDefaultLaunchTimeoutMs
+	}
+	if cfg.Xcode == nil {
+		cfg.Xcode = NewXcodeIdentity()
 	}
 	return &XctestLauncher{proc: proc, background: background, clock: clock, cfg: cfg, port: cfg.Port}
 }
@@ -421,13 +428,13 @@ func (l *XctestLauncher) EnsureRunning(ctx context.Context) (kill func() error, 
 }
 
 // EnsureBuilt makes sure the compiled test runner exists and matches its
-// current inputs, building it when it is missing or stale. It does not start the
-// runner. The build is serialized across launches and processes by a
-// lock on the shared build directory, so a call that waits for another process's build
-// returns once that build finishes, and builds nothing when the
-// product is then fresh. It returns an *XctestLauncherError for a
-// missing project, a signing problem or a failed build, and ctx's
-// error when ctx ends while waiting for the lock.
+// current inputs, building it when it is missing or stale. It does not
+// start the runner. The build is serialized across launches and processes
+// by a lock on the shared build directory, so a call that waits for
+// another process's build returns once that build finishes, and builds
+// nothing when the product is then fresh. It returns an
+// *XctestLauncherError for a missing project, a signing problem or a
+// failed build, and ctx's error when ctx ends while waiting for the lock.
 func (l *XctestLauncher) EnsureBuilt(ctx context.Context) error {
 	return l.ensureBuilt(ctx, true)
 }
@@ -477,11 +484,24 @@ func (l *XctestLauncher) runnerAppPath() string {
 // a runner started from such a product does not run the current source. ctx
 // bounds the commands that read the selected Xcode.
 func (l *XctestLauncher) CurrentBuildProduct(ctx context.Context) (product BuildProduct, ok bool) {
-	product, ok = l.statProduct()
-	if !ok || l.needsBuild(ctx, product.Path) {
-		return BuildProduct{}, false
+	product, reason := l.InspectBuildProduct(ctx)
+	return product, reason == ""
+}
+
+// InspectBuildProduct is CurrentBuildProduct with the reason a product
+// is not current. The reason is an empty string, and the product is set,
+// for a current product, and a sentence without a trailing period for a
+// missing or stale one, including a product whose inputs could not be
+// read, for example because the selected Xcode does not answer.
+func (l *XctestLauncher) InspectBuildProduct(ctx context.Context) (BuildProduct, string) {
+	product, ok := l.statProduct()
+	if !ok {
+		return BuildProduct{}, "the runner product is missing"
 	}
-	return product, true
+	if reason := l.staleReason(ctx, product.Path); reason != "" {
+		return BuildProduct{}, reason
+	}
+	return product, ""
 }
 
 func (l *XctestLauncher) statProduct() (BuildProduct, bool) {
@@ -519,10 +539,12 @@ func (l *XctestLauncher) buildLocked(ctx context.Context, xcodeprojPath, buildDi
 	}
 	// The digest is taken before the build, so a source edited while the
 	// build runs changes the next digest and forces another build. The
-	// old digest goes first, so a build that fails or is interrupted
-	// leaves a product that claims no inputs.
+	// pending marker replaces the old digest first, so a build that fails
+	// or is interrupted leaves a product that reads as stale.
 	digest, digestErr := l.buildDigest(ctx)
-	removeDigest(runnerApp)
+	if err := markDigestPending(runnerApp); err != nil {
+		return err
+	}
 	l.progress(XctestProgressBuilding)
 	buildStarted := time.Now()
 	if err := l.build(ctx, xcodeprojPath, buildDir); err != nil {
@@ -540,8 +562,8 @@ func (l *XctestLauncher) buildLocked(ctx context.Context, xcodeprojPath, buildDi
 	_ = os.Chtimes(runnerApp, buildStarted, buildStarted)
 	// A digest that cannot be computed or recorded leaves the product
 	// without one, which falls back to the modification time check.
-	if digestErr == nil {
-		_ = writeDigest(runnerApp, digest)
+	if digestErr != nil || writeDigest(runnerApp, digest) != nil {
+		removeDigest(runnerApp)
 	}
 	return nil
 }
@@ -647,23 +669,41 @@ func runnerMismatchError(err *RunnerIdentityError) *XctestLauncherError {
 	return &XctestLauncherError{Code: XctestErrRunnerMismatch, Message: err.Error()}
 }
 
-// needsBuild reports whether runnerApp is missing or stale. A product
-// with a recorded digest is stale when the digest of its inputs differs,
-// or cannot be computed. A product with no recorded digest is stale when
-// it is older than the project file or a Swift source file under the
-// project directory, so a product built before digests were recorded is
-// not rebuilt on that account alone.
+// needsBuild reports whether runnerApp is missing or stale.
 func (l *XctestLauncher) needsBuild(ctx context.Context, runnerApp string) bool {
+	return l.staleReason(ctx, runnerApp) != ""
+}
+
+// staleReason says why runnerApp is missing or stale, or returns an empty
+// string for a current product. A product with a recorded digest is stale
+// when the digest of its inputs differs or cannot be computed, and a
+// product whose build never finished is always stale. A product that
+// never had a digest file is stale when it is older than the project file
+// or a Swift source file under the project directory, so a product built
+// before digests were recorded is not rebuilt on that account alone.
+func (l *XctestLauncher) staleReason(ctx context.Context, runnerApp string) string {
 	info, err := os.Stat(runnerApp)
 	if err != nil {
-		return true
+		return "the runner product is missing"
 	}
 	recorded := readDigest(runnerApp)
-	if recorded == "" {
-		return l.isSourceNewer(info.ModTime())
+	switch recorded {
+	case pendingDigest:
+		return "the last build of the runner product did not finish"
+	case "":
+		if l.isSourceNewer(info.ModTime()) {
+			return "the runner product is older than its sources"
+		}
+		return ""
 	}
 	current, err := l.buildDigest(ctx)
-	return err != nil || current != recorded
+	if err != nil {
+		return "the inputs of the runner product cannot be read: " + err.Error()
+	}
+	if current != recorded {
+		return "the runner product was built from other inputs"
+	}
+	return ""
 }
 
 // isSourceNewer reports whether project.pbxproj or any .swift file

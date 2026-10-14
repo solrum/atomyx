@@ -2,6 +2,7 @@ package device
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -251,13 +252,19 @@ func TestDriverProvisioner_ProvisionIOSAgent_EndsAndReplacesARunnerThatFailsAnAd
 				t.Fatal(err)
 			}
 		}},
-		{"product is older than a source", "different build", func(t *testing.T, f *launchFixture, _ RunnerState) {
+		{"product is older than a source", "older than its sources", func(t *testing.T, f *launchFixture, _ RunnerState) {
 			newer := time.Now().Add(2 * time.Hour)
 			if err := os.Chtimes(filepath.Join(f.projectDir, "AtomyxDriver.xcodeproj", "project.pbxproj"), newer, newer); err != nil {
 				t.Fatal(err)
 			}
 		}},
-		{"product digest no longer matches its inputs", "different build", func(t *testing.T, f *launchFixture, _ RunnerState) {
+		{"selected Xcode cannot be read", "selected Xcode cannot be read", func(t *testing.T, f *launchFixture, _ RunnerState) {
+			if err := os.WriteFile(f.runnerApp()+".digest", []byte("recorded-digest\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			f.runner.Stub(process.ExactMatch("xcode-select", "-p"), process.Result{}, errors.New("no developer directory"))
+		}},
+		{"product digest no longer matches its inputs", "built from other inputs", func(t *testing.T, f *launchFixture, _ RunnerState) {
 			if err := os.WriteFile(f.runnerApp()+".digest", []byte("built-from-other-inputs\n"), 0o600); err != nil {
 				t.Fatal(err)
 			}

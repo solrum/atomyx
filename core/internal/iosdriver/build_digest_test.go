@@ -137,13 +137,17 @@ func TestBuildDigest_ChangesWithTheSelectedXcode(t *testing.T) {
 	}
 }
 
-func TestBuildDigest_ReadsXcodeOncePerLauncher(t *testing.T) {
+func TestBuildDigest_ReadsTheXcodeVersionOncePerDeveloperDirectory(t *testing.T) {
 	dir := newDigestTree(t)
 	l := simulatorLauncher(t, dir)
 	digestOf(t, l)
 	digestOf(t, l)
-	if got := len(l.proc.(*process.Fake).Invocations()); got != 2 {
-		t.Fatalf("host commands = %d, want 2 (one developer directory read, one version read)", got)
+	counts := map[string]int{}
+	for _, call := range l.proc.(*process.Fake).Invocations() {
+		counts[call.Name]++
+	}
+	if counts["xcode-select"] != 2 || counts["xcodebuild"] != 1 {
+		t.Fatalf("host commands = %v, want the developer directory read twice and the version read once", counts)
 	}
 }
 

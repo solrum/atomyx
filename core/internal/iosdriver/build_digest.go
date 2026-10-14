@@ -29,11 +29,21 @@ const (
 	finderMetadataName = ".DS_Store"
 )
 
-// xcodeIdentityCache holds the selected Xcode identity after its first
-// successful read, so one launcher reads it once.
-type xcodeIdentityCache struct {
-	mu    sync.Mutex
-	value string
+// XcodeIdentity remembers the version of each Xcode developer directory
+// it has read, so a process that checks many runner products runs the
+// slow version command once per Xcode instead of once per check. The
+// developer directory itself is read on every use, which is fast, so
+// switching the selected Xcode takes effect at once. It is safe for
+// concurrent use, and a new value starts empty, which is how a test
+// resets it.
+type XcodeIdentity struct {
+	mu       sync.Mutex
+	versions map[string]string
+}
+
+// NewXcodeIdentity returns an empty XcodeIdentity.
+func NewXcodeIdentity() *XcodeIdentity {
+	return &XcodeIdentity{versions: map[string]string{}}
 }
 
 // buildDigest returns the SHA-256 digest of everything that decides the
@@ -55,7 +65,11 @@ func (l *XctestLauncher) buildDigest(ctx context.Context) (string, error) {
 		writeDigestField(sum, "codeSignStyle", l.cfg.CodeSignStyle)
 		writeDigestField(sum, "provisioningProfile", l.cfg.ProvisioningProfileSpecifier)
 	}
-	writeDigestField(sum, "xcode", l.selectedXcode(ctx))
+	xcode, err := l.selectedXcode(ctx)
+	if err != nil {
+		return "", err
+	}
+	writeDigestField(sum, "xcode", xcode)
 
 	files, err := l.digestInputFiles()
 	if err != nil {
@@ -129,30 +143,34 @@ func writeDigestField(sum hash.Hash, name, value string) {
 }
 
 // selectedXcode reads the selected Xcode developer directory and
-// version through the launcher's command runner. A command that fails
-// contributes an empty line, so a missing toolchain does not hide a
-// source change, and the failure itself surfaces when the build runs.
-func (l *XctestLauncher) selectedXcode(ctx context.Context) string {
-	l.xcode.mu.Lock()
-	defer l.xcode.mu.Unlock()
-	if l.xcode.value != "" {
-		return l.xcode.value
+// version through the launcher's command runner. A command that fails is
+// an error, because a digest taken without the toolchain identity could
+// match a product built by another Xcode.
+func (l *XctestLauncher) selectedXcode(ctx context.Context) (string, error) {
+	developerDir, err := l.hostOutput(ctx, "xcode-select", "-p")
+	if err != nil {
+		return "", fmt.Errorf("the selected Xcode cannot be read: %w", err)
 	}
-	developerDir, dirOK := l.hostOutput(ctx, "xcode-select", "-p")
-	version, versionOK := l.hostOutput(ctx, "xcodebuild", "-version")
-	value := developerDir + "\n" + version
-	if dirOK && versionOK {
-		l.xcode.value = value
+	xcode := l.cfg.Xcode
+	xcode.mu.Lock()
+	defer xcode.mu.Unlock()
+	if version, ok := xcode.versions[developerDir]; ok {
+		return developerDir + "\n" + version, nil
 	}
-	return value
+	version, err := l.hostOutput(ctx, "xcodebuild", "-version")
+	if err != nil {
+		return "", fmt.Errorf("the version of the selected Xcode cannot be read: %w", err)
+	}
+	xcode.versions[developerDir] = version
+	return developerDir + "\n" + version, nil
 }
 
-func (l *XctestLauncher) hostOutput(ctx context.Context, name string, args ...string) (string, bool) {
+func (l *XctestLauncher) hostOutput(ctx context.Context, name string, args ...string) (string, error) {
 	probeCtx, cancel := context.WithTimeout(ctx, xcodeProbeTimeout)
 	defer cancel()
 	result, err := l.proc.Run(probeCtx, name, args...)
 	if err != nil {
-		return "", false
+		return "", err
 	}
-	return strings.TrimSpace(result.Stdout), true
+	return strings.TrimSpace(result.Stdout), nil
 }
