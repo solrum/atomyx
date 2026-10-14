@@ -303,6 +303,7 @@ None
 - remedy: string, present only when healthy is false and the failure carries an actionable next step.
 - agentVersion: string, present only when the connected agent reported its build version. Informational.
 - protocolVersion: integer, present only when the connected agent reported the version of its wire protocol with the host.
+- warnings: array of strings, present only when the check found something worth a look that does not make the device unhealthy. Today that is another UI automation session active on an iOS device, named with its kind, with the advice to stop it if steps behave unexpectedly. A warning never changes healthy, and it is read from what was found when the device connected, so the check stays within its time bound.
 
 **Errors and recovery**
 - selected false: call select_device with a platform and id from list_devices before retrying whatever action prompted the health check.

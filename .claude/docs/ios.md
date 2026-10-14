@@ -590,6 +590,21 @@ data path, `RUN_DERIVED`, which defaults to `build/run-<udid>`.
 
 ## Platform-specific quirks
 
+**Other UI automation on the device is reported as a warning, never a
+failure.** At connect the driver lists the processes on the target once
+and caches the foreign automation sessions it finds, which
+`driver.ForeignAutomationReporter` exposes to `Orchestra.CheckHealth`.
+On a simulator the listing is `xcrun simctl spawn <udid> launchctl
+list`, and only rows with a numeric pid whose label contains
+`.xctrunner` or `WebDriverAgent` count, so exited jobs are ignored. On a
+physical device the listing is `xcrun devicectl device info processes`,
+and an executable counts when it lives in a `*-Runner.app` bundle or is
+a WebDriverAgent binary, because devicectl reports paths and not bundle
+ids. Atomyx's own runner is excluded by the bundle id and app name the
+device factory passes in `iosdriver.Options`. Each listing has its own
+short timeout, and a failure reports nothing. The warning appears in
+`atomyx doctor` and `check_health`.
+
 **A secure text field carries the `secure` attribute and keeps the
 role `secure-text-field`.** The runner reports the element type
 `secureTextField`, and the normalizer sets `attributes["secure"] =

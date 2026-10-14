@@ -36,7 +36,7 @@ type system enforces it.
 | `list_devices` | `core/internal/mcp/list_devices_tool.go` | `platform` (`ios`, `android`, `all`) | `{count, devices[], hint?}` | `device.Probe.Scan` |
 | `select_device` | `core/internal/mcp/select_device_tool.go` | `platform`, `id`, `kind` (accepted and ignored), `port` | `{ok, active}` or `{ok:false, reason}` | `DeviceSession.Select`, which resolves the descriptor through `device.ResolveDescriptor`. A server started with `--platform` and `--device` carries `ServerDeps.Pinned`, `Select` fails any other device with `DEVICE_PINNED`, and `Ensure` selects the pinned device on first use |
 | `disconnect_device` | `core/internal/mcp/select_device_tool.go` | none | `{ok:true, wasActive?}` | `DeviceSession.Current` and `DeviceSession.Disconnect` |
-| `check_health` | `core/internal/mcp/check_health_tool.go` | none | `HealthReport` (selected, healthy, state, code, remedy), never takes or probes a released, borrowed or lost device | `DeviceSession.CheckHealth` |
+| `check_health` | `core/internal/mcp/check_health_tool.go` | none | `HealthReport` (selected, healthy, state, code, remedy, warnings), never takes or probes a released, borrowed or lost device | `DeviceSession.CheckHealth` |
 | `list_apps` | `core/internal/mcp/list_apps_tool.go` | none | `{count, apps[], note?}` | `Orchestra.ListApps` |
 | `launch_app` | `core/internal/mcp/launch_app_tool.go` | `appId`, `mode` (`default`, `fresh`, `attach`) | `{ok, appId}` | `Orchestra.LaunchAppWithMode` |
 | **Screen** | | | | |

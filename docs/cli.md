@@ -676,6 +676,12 @@ an `agent:` line with the build version and a `protocol:` line with the
 wire protocol version, and `--json` carries `agentVersion` and
 `protocolVersion`. Each is omitted when the agent does not report it.
 
+When another UI automation session is active on the device, the text
+output prints a `warning:` line naming it and advising to stop it if
+steps behave unexpectedly, and `--json` carries the same text in a
+`warnings` array. A warning never changes the exit code. Only iOS
+devices report such sessions.
+
 Exit codes: `0` when the device is healthy or held by another process,
 `1` when it could not be reached or is unhealthy, `2` when the command
 was misused.

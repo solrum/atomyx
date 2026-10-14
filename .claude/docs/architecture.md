@@ -364,7 +364,12 @@ for a host that does not need to split them.
    while it ran, and the hub never pairs an unstable capture. It forwards `driver.StreamingTouchCapable`
    and the launched-app accessors exactly when the wrapped driver has
    them, and exposes `Unwrap()`. A caller that asserts an optional
-   interface uses `driver.As`, which looks through decorators.
+   interface uses `driver.As`, which looks through decorators. The
+   optional `driver.ForeignAutomationReporter` is reached this way: a
+   driver that implements it reports, from a cache filled at connect,
+   the other UI automation sessions active on its device, and
+   `Orchestra.CheckHealth` turns them into a health warning without
+   branching on platform.
    The `drivertest` contract suite runs over the decorator for each
    combination of those optional interfaces, using mock-backed test
    doubles, because the protocol fakes of the real adapters are private
