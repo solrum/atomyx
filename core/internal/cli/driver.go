@@ -9,7 +9,7 @@ import (
 )
 
 // ExecuteDriver dispatches one driver-module command: list-devices,
-// run, suite, doctor, inspect, version, or help.
+// run, suite, doctor, inspect, setup, version, or help.
 func ExecuteDriver(ctx context.Context, deps Deps, args []string) int {
 	argv, err := ParseArgv(args)
 	if err != nil {
@@ -60,6 +60,12 @@ func ExecuteDriver(ctx context.Context, deps Deps, args []string) int {
 			return 0
 		}
 		return Inspect(ctx, deps, argv.Flags)
+	case CommandSetup:
+		if argv.Help {
+			PrintCommandHelp(CommandSetup, deps.stdout())
+			return 0
+		}
+		return Setup(ctx, deps, argv.Flags)
 	case CommandVersion:
 		_, _ = fmt.Fprintf(deps.stdout(), "atomyx %s\n", version.Read())
 		return 0

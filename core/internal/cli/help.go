@@ -205,6 +205,45 @@ EXIT CODES
   130  stopped by Ctrl-C
   143  stopped by SIGTERM
 `)
+	case CommandSetup:
+		_, _ = io.WriteString(w, `atomyx driver setup
+  Prepare a device to run Atomyx. Runs the platform's setup steps in
+  order, applies the safe fixes it can make from this machine, and
+  prints the exact action for everything else. A step whose
+  prerequisite did not pass is skipped. The command takes the device
+  lease without connecting a driver, so a broken agent cannot fail
+  inside it. A device that another Atomyx process holds is reported
+  with its holder and left unchanged.
+
+USAGE
+  atomyx driver setup [flags]
+
+FLAGS
+  --platform <ios|android> Target platform. Defaults to android.
+  --device <id>            Device identifier, as reported by
+                           atomyx driver list-devices.
+  --check                  Only observe. Nothing on this machine or the
+                           device is changed.
+  --json                   Print {ok, steps:[{id, status, message,
+                           remedy}]} to standard output instead of
+                           text. Status is one of ok, fixed, manual,
+                           failed, or skipped. ok is true when every
+                           step is ok or fixed.
+  --help, -h               Show this message.
+
+EXAMPLES
+  atomyx setup --platform android
+  atomyx driver setup --platform ios --device <UDID> --check
+  atomyx setup --platform android --json
+
+EXIT CODES
+  0    every step is ok or fixed
+  1    a step is manual, failed, or skipped, or the device is held
+       by another Atomyx process
+  2    the command was misused
+  130  interrupted by SIGINT
+  143  stopped by SIGTERM
+`)
 	case CommandDoctor:
 		_, _ = io.WriteString(w, `atomyx driver doctor
   Connect to a device and report its health: whether the connection
@@ -299,6 +338,7 @@ COMMANDS
   list-devices [--json]    Enumerate connected devices.
   doctor [flags]           Connect to a device and report its health.
   inspect [flags]          Open the browser inspector for a device.
+  setup [flags]            Prepare a device to run Atomyx.
   version                  Print the driver module's version and exit.
   help                     Print this usage and exit.
 
@@ -311,6 +351,7 @@ SHORTCUTS
   atomyx devices            same as atomyx driver list-devices
   atomyx doctor ...         same as atomyx driver doctor ...
   atomyx inspect ...        same as atomyx driver inspect ...
+  atomyx setup ...          same as atomyx driver setup ...
 
 SEE ALSO
   https://atomyx.dev (documentation)
