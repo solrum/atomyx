@@ -67,7 +67,7 @@ and `getting-started.md` for the first end-to-end walkthrough.
 | [disconnect_device](#disconnect_device) | Session and device | Disconnects the active device and leaves the session idle |
 | [check_health](#check_health) | Session and device | Reports whether a device is bound and answering, without changing app state |
 | [list_apps](#list_apps) | Apps and inspection | Lists apps installed on the current device with identifiers and labels |
-| [launch_app](#launch_app) | Apps and inspection | Launches an app by its identifier and brings it to the foreground |
+| [launch_app](#launch_app) | Apps and inspection | Launches an app by its identifier and brings it to the foreground, optionally as a fresh restart or an attach |
 | [get_ui_tree](#get_ui_tree) | Apps and inspection | Captures the current UI hierarchy as a flat list of elements with bounds and state |
 | [find_element](#find_element) | Apps and inspection | Finds a single element matching a selector and returns its bounds and tap center |
 | [screenshot](#screenshot) | Apps and inspection | Saves a screenshot to disk for cases the UI hierarchy cannot answer |
@@ -349,11 +349,12 @@ Launches an app on the connected device by its app identifier and brings it to t
 | Name | Type | Required | Default | Meaning |
 |---|---|---|---|---|
 | appId | string | Yes | None | Cross-platform app identifier (bundle id or package name), as reported by list_apps |
+| mode | string | No | default | One of `default`, `fresh`, `attach`. `default` starts the app without promising anything about process state, `fresh` stops the app and starts it clean, `attach` reuses a running instance |
 
 **Behavior**
 - Requires an active device. Call select_device first.
 - Confirms the app is installed before launching it, using the same installed-app list list_apps reports.
-- Within one flow (a script run or a chain of steps), calling launch_app again for an app identifier that this tool already launched is a no-op: the app is left running as is, rather than being restarted. This tool does not expose a way to force a fresh restart, so use a stop or reset action first if a clean relaunch is required.
+- Within one flow (a script run or a chain of steps), calling launch_app again in `default` or `attach` mode for an app identifier that this tool already launched is a no-op: the app is left running as is, rather than being restarted. Pass mode `fresh` to force a restart, which stops the app and starts it clean even when it was already launched. A repeat launch with mode `attach` is skipped like a default launch.
 - Subsequent tool calls (get_ui_tree, tap, find_element, and so on) operate on the launched app's foreground UI.
 
 **Returns**
@@ -366,7 +367,7 @@ Launches an app on the connected device by its app identifier and brings it to t
 
 **Example**
 ```json
-{ "appId": "com.example.app" }
+{ "appId": "com.example.app", "mode": "fresh" }
 ```
 
 ### get_ui_tree
