@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -35,25 +34,24 @@ type runStatsEntryJSON struct {
 //
 // Exit codes: 0 on success, 1 when the storage cannot be read, and 2
 // when the command is misused.
-func runsStats(ctx context.Context, deps Deps, catalog *storage.RunCatalog, root string, flags map[string]FlagValue) int {
+func runsStats(ctx context.Context, deps Deps, catalog *storage.RunCatalog, _ string, flags map[string]FlagValue) int {
 	window, err := statsWindow(flags)
 	if err != nil {
 		return runsMisuse(deps, "%s", err)
 	}
-	source := &catalogSource{catalog: catalog, root: root}
-	records, err := history.Collect(source.source())
+	filter := history.Filter{Window: window}
+	if test, ok := flagString(flags, "--test"); ok {
+		filter.Key = test
+	}
+	var source history.Source = catalog
+	result, err := history.Query(source, filter)
 	if err != nil {
 		return reportUncaught(ctx, deps.stderr(), deps.Debug, err)
 	}
-	stats := history.Aggregate(records, window)
-	if test, ok := flagString(flags, "--test"); ok {
-		stats = filterStats(stats, test)
-	}
-	sortStats(stats)
 	if flagBool(flags, "--json") {
-		return printStatsJSON(ctx, deps, stats, source.skipped)
+		return printStatsJSON(ctx, deps, result.Tests, result.Skipped)
 	}
-	return printStatsTable(deps, stats, source.skipped)
+	return printStatsTable(deps, result.Tests, result.Skipped)
 }
 
 func statsWindow(flags map[string]FlagValue) (history.Window, error) {
@@ -71,31 +69,6 @@ func statsWindow(flags map[string]FlagValue) (history.Window, error) {
 		window.LastN = n
 	}
 	return window, nil
-}
-
-func filterStats(stats []history.TestStats, key string) []history.TestStats {
-	kept := stats[:0]
-	for _, s := range stats {
-		if s.Key == key {
-			kept = append(kept, s)
-		}
-	}
-	return kept
-}
-
-// sortStats orders stats by flaky rate, then failures, both descending,
-// then by key so the order is deterministic.
-func sortStats(stats []history.TestStats) {
-	sort.SliceStable(stats, func(i, j int) bool {
-		a, b := stats[i], stats[j]
-		if a.FlakyRate != b.FlakyRate {
-			return a.FlakyRate > b.FlakyRate
-		}
-		if a.Failed != b.Failed {
-			return a.Failed > b.Failed
-		}
-		return a.Key < b.Key
-	})
 }
 
 func printStatsJSON(ctx context.Context, deps Deps, stats []history.TestStats, skipped int) int {

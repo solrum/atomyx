@@ -13,10 +13,11 @@ import (
 type fakeSource struct {
 	metas   []runfolder.Meta
 	indexes map[string]runfolder.Index
+	skipped int
 	err     error
 }
 
-func (f fakeSource) Metas() ([]runfolder.Meta, error) { return f.metas, f.err }
+func (f fakeSource) Metas() ([]runfolder.Meta, int, error) { return f.metas, f.skipped, f.err }
 
 func (f fakeSource) ReadIndex(runID string) (runfolder.Index, error) {
 	index, ok := f.indexes[runID]

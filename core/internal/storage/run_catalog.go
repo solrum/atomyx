@@ -250,3 +250,20 @@ func (c *RunCatalog) shareMigration() (func(), error) {
 	}
 	return func() { _ = lock.Release() }, nil
 }
+
+// Metas returns every readable run and the number of run records that
+// could not be read, so a RunCatalog can serve as the run source of the
+// history package.
+func (c *RunCatalog) Metas() ([]runfolder.Meta, int, error) {
+	listing, err := c.List()
+	if err != nil {
+		return nil, 0, err
+	}
+	return listing.Runs, len(listing.Skipped), nil
+}
+
+// ReadIndex returns the index.json of one versioned run. The error
+// satisfies errors.Is(err, fs.ErrNotExist) when the run has no index.
+func (c *RunCatalog) ReadIndex(runID string) (runfolder.Index, error) {
+	return runfolder.ReadIndex(runfolder.RunDir(c.root, runID))
+}

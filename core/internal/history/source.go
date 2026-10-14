@@ -10,11 +10,12 @@ import (
 
 // Source supplies the recorded runs that history reads.
 //
-// Metas returns the meta of every readable run. ReadIndex returns the
-// index.json of one run, and its error satisfies errors.Is(err,
-// fs.ErrNotExist) when the run has none.
+// Metas returns the meta of every readable run and the number of run
+// records that could not be read and are therefore absent from that list.
+// ReadIndex returns the index.json of one run, and its error satisfies
+// errors.Is(err, fs.ErrNotExist) when the run has none.
 type Source interface {
-	Metas() ([]runfolder.Meta, error)
+	Metas() (metas []runfolder.Meta, skipped int, err error)
 	ReadIndex(runID string) (runfolder.Index, error)
 }
 
@@ -36,9 +37,16 @@ type Source interface {
 //   - A run with no test key is keyed by its script path, and a run with
 //     neither is skipped.
 func Collect(source Source) ([]Record, error) {
-	metas, err := source.Metas()
+	records, _, err := collect(source)
+	return records, err
+}
+
+// collect is Collect that also reports how many run records the source
+// could not read.
+func collect(source Source) ([]Record, int, error) {
+	metas, skipped, err := source.Metas()
 	if err != nil {
-		return nil, fmt.Errorf("listing runs: %w", err)
+		return nil, 0, fmt.Errorf("listing runs: %w", err)
 	}
 	present := make(map[string]bool, len(metas))
 	for _, m := range metas {
@@ -55,7 +63,7 @@ func Collect(source Source) ([]Record, error) {
 		if m.Kind == runfolder.KindSuite {
 			entries, found, err := suiteRecords(source, m)
 			if err != nil {
-				return nil, err
+				return nil, 0, err
 			}
 			if found {
 				records = append(records, entries...)
@@ -66,7 +74,7 @@ func Collect(source Source) ([]Record, error) {
 			records = append(records, record)
 		}
 	}
-	return records, nil
+	return records, skipped, nil
 }
 
 func suiteRecords(source Source, m runfolder.Meta) ([]Record, bool, error) {

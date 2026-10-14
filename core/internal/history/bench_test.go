@@ -52,9 +52,9 @@ type readerSource struct {
 	reader *runfolder.Reader
 }
 
-func (s readerSource) Metas() ([]runfolder.Meta, error) {
-	metas, _, err := s.reader.List()
-	return metas, err
+func (s readerSource) Metas() ([]runfolder.Meta, int, error) {
+	metas, skipped, err := s.reader.List()
+	return metas, len(skipped), err
 }
 
 func (s readerSource) ReadIndex(runID string) (runfolder.Index, error) {
