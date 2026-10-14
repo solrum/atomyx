@@ -3,6 +3,7 @@ package drivertest
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -147,7 +148,7 @@ func serveLineProxy(t *testing.T, client net.Conn, target, holdType string, hold
 			}
 		}
 		if err != nil {
-			if err != io.EOF {
+			if err != io.EOF && !errors.Is(err, net.ErrClosed) {
 				t.Logf("delay proxy upstream read: %v", err)
 			}
 			return

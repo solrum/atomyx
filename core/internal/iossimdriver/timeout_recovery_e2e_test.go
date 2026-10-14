@@ -25,7 +25,7 @@ const (
 
 // TestIosSimDriver_E2E_TimeoutRecovery_HeldReplyIsToolTimeoutAndNextCallSucceeds
 // puts a delay proxy between the driver and the real runner, holds the
-// reply to the first hierarchy request past the client's own bound,
+// reply to the first screen size request past the client's own bound,
 // and checks the call fails with TOOL_TIMEOUT and that the next calls
 // succeed against the same runner. The call carries no context
 // deadline, so the classification comes from the transport's own
@@ -37,7 +37,7 @@ func TestIosSimDriver_E2E_TimeoutRecovery_HeldReplyIsToolTimeoutAndNextCallSucce
 		t.Skip("skipping: set ATOMYX_IOS_SIM_UDID to the target simulator's UDID")
 	}
 
-	proxyPort := drivertest.NewLineDelayProxy(t, fmt.Sprintf("127.0.0.1:%d", iosSimE2EControlPort), "dumpRawTree", e2eHoldDuration)
+	proxyPort := drivertest.NewLineDelayProxy(t, fmt.Sprintf("127.0.0.1:%d", iosSimE2EControlPort), "getScreenSize", e2eHoldDuration)
 	conn := transport.NewTCPClient("127.0.0.1", proxyPort, transport.WithTCPResponseTimeout(e2eClientBound))
 	d := newSimDriver(t, conn, udid, process.NewExecBackground(), startSimHid(t, udid, process.NewExecBackground()))
 	ctx := context.Background()
@@ -46,14 +46,14 @@ func TestIosSimDriver_E2E_TimeoutRecovery_HeldReplyIsToolTimeoutAndNextCallSucce
 	}
 	t.Cleanup(func() { _ = d.Disconnect() })
 
-	_, err := d.Hierarchy(ctx)
+	_, err := d.ScreenSize(ctx)
 	if code, _, _ := diag.Describe(err); code != diag.CodeToolTimeout {
-		t.Fatalf("held Hierarchy error = %v (code %q), want code %q", err, code, diag.CodeToolTimeout)
+		t.Fatalf("held ScreenSize error = %v (code %q), want code %q", err, code, diag.CodeToolTimeout)
 	}
 	if err := d.Ping(ctx); err != nil {
 		t.Fatalf("Ping after the timeout: %v", err)
 	}
-	if _, err := d.Hierarchy(ctx); err != nil {
-		t.Fatalf("Hierarchy after the timeout: %v", err)
+	if _, err := d.ScreenSize(ctx); err != nil {
+		t.Fatalf("ScreenSize after the timeout: %v", err)
 	}
 }
