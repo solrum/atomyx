@@ -98,14 +98,21 @@ func (s VariableSnapshot) Redactor() *Redactor {
 		}
 	}
 	sort.Strings(names)
-	values := make([]string, 0, len(names))
-	var short []string
+	texts := make([]string, 0, len(names))
 	for _, name := range names {
-		value, ok := s.Values[name]
-		if !ok {
-			continue
+		if value, ok := s.Values[name]; ok {
+			texts = append(texts, scriptValueToEnvString(value))
 		}
-		text := scriptValueToEnvString(value)
+	}
+	return newRedactor(texts)
+}
+
+// newRedactor builds a Redactor over secret value texts. Empty texts are
+// ignored.
+func newRedactor(texts []string) *Redactor {
+	values := make([]string, 0, len(texts))
+	var short []string
+	for _, text := range texts {
 		switch {
 		case len(text) >= redact.MinSecretLen:
 			values = append(values, text)

@@ -71,10 +71,10 @@ func TestSecretTable_SecureReadIsSecretAndPlainReadIsNot(t *testing.T) {
 func TestSecretTable_PlainReadOverSecretClearsTag(t *testing.T) {
 	tr := newTestRunner()
 	tr.driver.StageHierarchy(rootTree(button("go", "Go", "0,0,10,10")))
-	yaml := "appId: com.test\nenv:\n  v: hunter2hunter2\n---\n" +
+	yaml := "appId: com.test\n---\n" +
 		"- read: { selector: { id: go }, field: text, as: v }\n" +
 		"- screenshot: last\n"
-	snap := snapshotAtLastStep(t, tr, yaml, 1)
+	snap := snapshotAtLastStepWithEnv(t, tr, yaml, map[string]string{"v": "hunter2hunter2"}, 1)
 	if snap.Secret["v"] {
 		t.Fatalf("overwritten variable keeps its tag: %+v", snap.Secret)
 	}
@@ -135,10 +135,10 @@ func TestSecretTable_SnapshotCopiesTags(t *testing.T) {
 func TestSecretTable_StateReadOverSecretClearsTag(t *testing.T) {
 	tr := newTestRunner()
 	tr.driver.StageHierarchy(rootTree(focusedButton("go", "Go", "0,0,10,10")))
-	yaml := "appId: com.test\nenv:\n  v: hunter2hunter2\n---\n" +
+	yaml := "appId: com.test\n---\n" +
 		"- read: { selector: { id: go }, field: focused, as: v }\n" +
 		"- screenshot: last\n"
-	snap := snapshotAtLastStep(t, tr, yaml, 1)
+	snap := snapshotAtLastStepWithEnv(t, tr, yaml, map[string]string{"v": "hunter2hunter2"}, 1)
 	if snap.Secret["v"] {
 		t.Fatalf("overwritten variable keeps its tag: %+v", snap.Secret)
 	}

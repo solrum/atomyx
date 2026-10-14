@@ -122,6 +122,9 @@ type CommandContext struct {
 	// command that writes a variable records its secrecy through
 	// markSecret.
 	Secrets map[string]bool
+	// SecretSink receives the value of every variable markSecret tags.
+	// Nil collects nothing.
+	SecretSink SecretSink
 	// Captures holds captured API responses, keyed by the variable
 	// name a `capture ... as: varName` step bound them to.
 	Captures map[string]CapturedRequest
@@ -211,6 +214,9 @@ type conditionalCommand interface {
 // markSecret records whether the variable name now holds a secret.
 // Overwriting a secret variable with a plain value clears the tag.
 func (c *CommandContext) markSecret(name string, secret bool) {
+	if secret && c.SecretSink != nil {
+		c.SecretSink.Add(scriptValueToEnvString(c.Variables[name]))
+	}
 	if c.Secrets == nil {
 		return
 	}

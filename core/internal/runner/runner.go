@@ -95,6 +95,11 @@ type ScriptRunnerDeps struct {
 	// StepGate, when non-nil, is consulted before every step at every
 	// depth. Nil gates nothing.
 	StepGate StepGate
+	// SecretSink, when non-nil, receives every value the runner marks
+	// secret: the external env values at the start of Run, and each
+	// variable a command tags later, including from a step run in a
+	// paused scope. Nil collects nothing.
+	SecretSink SecretSink
 }
 
 // StepResult is the outcome of one executed top-level step.
@@ -297,6 +302,8 @@ func (r *ScriptRunner) Run(ctx context.Context, def *script.ScriptDefinition) (S
 		artifacts:                   artifacts,
 		completedPreconditionSetups: make(map[string]struct{}),
 	}
+
+	r.feedSecrets(rs)
 
 	failure, err := r.runRequiredFlows(ctx, rs, def.Requires, startedAt, artifacts)
 	if rs.gateErr != nil {
@@ -540,6 +547,7 @@ func (r *ScriptRunner) contextFor(ctx context.Context, rs *runState, stepIndex i
 		Logger:           r.deps.Logger,
 		Variables:        rs.variables,
 		Secrets:          rs.secrets,
+		SecretSink:       r.deps.SecretSink,
 		Captures:         rs.captures,
 		NetworkCapture:   r.deps.NetworkCapture,
 		StepIndex:        stepIndex,
