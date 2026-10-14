@@ -270,12 +270,17 @@ Build and run layout, both under `platforms/ios-agent/build`:
   missing or when its recorded digest differs from the digest of the
   current inputs, so an edit that keeps an old file time, a header or a
   plist change all trigger a rebuild, and a file touched without a
-  content change does not. A product with no digest file, such as one
-  built by an older host, is rebuilt only when it is older than the
-  project file or a Swift source. The digest is taken before the build
-  and the previous digest file is removed first, so a failed build leaves
-  a product with no digest. The new digest is written atomically after a
-  successful build, all under the build lock.
+  content change does not. A product that never had a digest file, such
+  as one built by an older host, is rebuilt only when it is older than the
+  project file or a Swift source. The digest is taken before the build,
+  and a pending marker replaces the previous digest file first, so a
+  failed or interrupted build leaves a product that always reads as stale
+  and never one judged by file times. The new digest is written
+  atomically after a successful build, all under the build lock. The
+  version of each selected Xcode is read once per process, while the
+  developer directory is read on every check, so selecting another Xcode
+  takes effect at once. When the selected Xcode cannot be read, the
+  product counts as stale and an adoption check reports that reason.
 - One run directory per target, `build/run-<udid>`. Each target runs
   `xcodebuild test-without-building -xctestrun <file from the shared
   build>` with that directory as its `-derivedDataPath` and a result
