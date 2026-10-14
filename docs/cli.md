@@ -181,23 +181,28 @@ When the run drove a device whose agent reports its versions, the
 
 ### Masked values
 
-A run masks secret values with `[REDACTED]` in everything it writes
-for the run: step text, the report, the run log, and `index.json` for a
-suite. A value is secret when it comes from outside the committed
-files:
+A run masks secret values with `********` in everything it writes or
+prints for the run: the text and JSON result on standard output, error
+messages on standard error, step text, the report, failure artifacts,
+screenshot file names, the run log, and `index.json` for a suite. A
+value is secret when it comes from outside the committed files:
 
 - A project config value written as `${ENV:NAME}`, which is read from
-  the environment of the process.
+  the environment of the process. When the value mixes text with the
+  reference, such as `Bearer ${ENV:NAME}`, the environment value alone
+  is masked too.
 - A value given with `--var` or `--var-file`.
 - A value given in the `env` argument of the MCP `run_script` tool.
 - A value the run captured and recognized as secret. `extract` marks a
   stored value secret when it looks like a token, and `read` marks the
   value of a secure field, such as a password input.
+- A value captured into one of the variables above, which stays secret
+  whatever the new value looks like.
 
 A literal written in a script's `env` block or in a project config
 stays readable, because it is already in a committed file. A value
-captured from the screen that is not recognized as secret stays
-readable too.
+captured from the screen into a new variable that is not recognized as
+secret stays readable too.
 
 Masking starts when a value becomes secret, so text written before a
 captured value was recognized is not rewritten. A short secret is
