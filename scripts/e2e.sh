@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# Runs the device-gated end-to-end suite for one platform and records
+# the machine-readable result.
+#
+# Usage: scripts/e2e.sh <iossim|android|ios>
+#
+# Exit codes:
+#   0  the suite passed
+#   1  a test failed, or the runner prerequisite is not met
+#   2  misuse: unknown platform or a missing required environment variable
+#
+# The report lands in e2e-results/<UTC timestamp>-<platform>/ with the
+# raw go test JSON stream in go-test.json and the pass, fail, and skip
+# counts in summary.txt. Environment variable values are never printed,
+# because they can name a specific device.
+set -euo pipefail
+
+readonly SIM_RUNNER_HOST="127.0.0.1"
+readonly SIM_RUNNER_PORT="22087"
+
+usage() {
+  echo "usage: scripts/e2e.sh <iossim|android|ios>" >&2
+  echo "  iossim   requires ATOMYX_IOS_SIM_UDID and a runner on port ${SIM_RUNNER_PORT}" >&2
+  echo "  android  requires ATOMYX_ANDROID_SERIAL" >&2
+  echo "  ios      requires ATOMYX_IOS_DEVICE_UDID" >&2
+}
+
+platform="${1:-}"
+
+case "$platform" in
+  iossim)
+    required_var="ATOMYX_IOS_SIM_UDID"
+    packages=(./internal/iossimdriver/... ./internal/iosdriver/...)
+    ;;
+  android)
+    required_var="ATOMYX_ANDROID_SERIAL"
+    packages=(./internal/androiddriver/...)
+    ;;
+  ios)
+    required_var="ATOMYX_IOS_DEVICE_UDID"
+    packages=(./internal/iosdriver/...)
+    ;;
+  *)
+    usage
+    exit 2
+    ;;
+esac
+
+if [ -z "${!required_var:-}" ]; then
+  echo "error: ${required_var} is not set for platform ${platform}." >&2
+  echo "Set it to the target device identifier and run again." >&2
+  usage
+  exit 2
+fi
+
+if [ "$platform" = "iossim" ]; then
+  if ! nc -z "$SIM_RUNNER_HOST" "$SIM_RUNNER_PORT" >/dev/null 2>&1; then
+    echo "error: no iOS runner answers on ${SIM_RUNNER_HOST}:${SIM_RUNNER_PORT}." >&2
+    echo "Start it with 'make serve' in platforms/ios-agent against the booted simulator, then run again." >&2
+    exit 1
+  fi
+fi
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+out_dir="${repo_root}/e2e-results/${stamp}-${platform}"
+mkdir -p "$out_dir"
+
+export ATOMYX_DRIVER_E2E="$platform"
+
+echo "Running the ${platform} end-to-end suite, report in ${out_dir}"
+
+set +e
+(cd "${repo_root}/core" && go test -tags e2e -count=1 -json "${packages[@]}") | tee "${out_dir}/go-test.json" >/dev/null
+test_status="${PIPESTATUS[0]}"
+set -e
+
+# Count only test-level events, which carry a "Test" field, so package
+# summary lines do not inflate the totals.
+count_action() {
+  local n
+  n="$(grep -c "\"Action\":\"$1\",\"Package\":\"[^\"]*\",\"Test\":" "${out_dir}/go-test.json" || true)"
+  echo "${n:-0}"
+}
+
+pass_count="$(count_action pass)"
+fail_count="$(count_action fail)"
+skip_count="$(count_action skip)"
+
+{
+  echo "platform: ${platform}"
+  echo "pass: ${pass_count}"
+  echo "fail: ${fail_count}"
+  echo "skip: ${skip_count}"
+  echo "exit: ${test_status}"
+} > "${out_dir}/summary.txt"
+
+cat "${out_dir}/summary.txt"
+exit "$test_status"

@@ -56,7 +56,7 @@ GO_RELEASE_BINARIES := atomyx atomyx-mcp atomyx-runtime
 # access for code signing verification (OCSP, provisioning).
 APPLE_BYPASS := '(.*\.apple\.com|.*\.mzstatic\.com|.*\.icloud\.com)'
 
-.PHONY: help build build-core release-core check hooks ready-android ready-ios ready-ios-sim \
+.PHONY: help build build-core release-core check e2e hooks ready-android ready-ios ready-ios-sim \
         ready-ios-capture ready-android-capture \
         stop serve-ios serve-android mitm
 
@@ -71,6 +71,7 @@ help:
 	@echo "  make release-core               Build reproducible, checksummed core release binaries"
 	@echo "  make check                      Run every local gate: core + repo-wide lints"
 	@echo "  make hooks                      Install the commit size hook (core.hooksPath)"
+	@echo "  make e2e PLATFORM=<p>           Run the device-gated end-to-end suite (iossim, android, or ios)"
 	@echo ""
 	@echo "READY (start driver, ready to run scripts):"
 	@echo "  make ready-android              Android device/emulator"
@@ -138,6 +139,13 @@ check:
 	bash scripts/check-commit-size-hook.sh
 	node scripts/lint-banned-phrases.mjs
 	node scripts/lint-doc-paths.mjs
+
+# Run the device-gated end-to-end suite for one platform and write the
+# report under e2e-results/. PLATFORM is iossim, android, or ios, and
+# scripts/e2e.sh checks the environment that platform needs. It is not
+# part of check, because it needs a real device or simulator.
+e2e:
+	@bash scripts/e2e.sh "$(PLATFORM)"
 
 # Point git at the versioned hooks in scripts/hooks (the commit size
 # check). Run once per clone.

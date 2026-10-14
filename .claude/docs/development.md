@@ -289,6 +289,92 @@ cd core && make build
 # 3. Wire the running process into an MCP client and drive the device
 ```
 
+## Running the device-lab end-to-end suite
+
+Purpose of this section: run the device-gated Go tests that exercise a
+real simulator, emulator, or phone, and keep a machine-readable report.
+The suite is separate from `make check`, which only compiles and lints
+the e2e files.
+
+```bash
+ATOMYX_IOS_SIM_UDID=<booted simulator UDID> make e2e PLATFORM=iossim
+ATOMYX_ANDROID_SERIAL=<adb serial> make e2e PLATFORM=android
+ATOMYX_IOS_DEVICE_UDID=<device UDID> make e2e PLATFORM=ios
+```
+
+`PLATFORM` selects the driver packages under test. The required
+environment variable per platform:
+
+| Platform | Required variable | Extra prerequisite |
+|---|---|---|
+| `iossim` | `ATOMYX_IOS_SIM_UDID` | A runner answering on `127.0.0.1:22087` (`make serve` in `platforms/ios-agent`) |
+| `android` | `ATOMYX_ANDROID_SERIAL` | The Android agent running on the device |
+| `ios` | `ATOMYX_IOS_DEVICE_UDID` | The runner served and tunneled to the device |
+
+Optional variables unlock extra cases, and those cases skip when the
+variable is unset: `ATOMYX_ANDROID_SERIAL_A` and `ATOMYX_ANDROID_SERIAL_B`
+(two attached Android devices), and `ATOMYX_E2E_IOS_SIM_UDID` with
+`ATOMYX_E2E_IOS_PROJECT_DIR` (runner identity check on a simulator).
+
+The script exits 2 on an unknown platform or a missing variable, exits
+1 when the iossim runner does not answer or a test fails, and otherwise
+exits with the `go test` status. It never prints variable values.
+
+Each run writes `e2e-results/<UTC timestamp>-<platform>/`, which git
+ignores:
+
+- `go-test.json` holds the `go test -json` stream.
+- `summary.txt` holds the platform, the pass, fail, and skip counts for
+  tests and subtests, and the exit status.
+
+### Scheduling
+
+The repository does not install a schedule. An operator who wants a
+nightly run on a lab Mac can save the following as
+`~/Library/LaunchAgents/dev.atomyx.e2e.plist`, replace the angle
+bracket values, and load it with `launchctl load`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>dev.atomyx.e2e</string>
+  <key>WorkingDirectory</key>
+  <string>/path/to/atomyx</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/make</string>
+    <string>e2e</string>
+    <string>PLATFORM=iossim</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/local/go/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>ATOMYX_IOS_SIM_UDID</key>
+    <string>SIMULATOR-UDID</string>
+  </dict>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>2</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/path/to/atomyx/e2e-results/launchd.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/path/to/atomyx/e2e-results/launchd.err.log</string>
+</dict>
+</plist>
+```
+
+The simulator must be booted and the runner served before the
+scheduled time, because the script fails fast when port 22087 does not
+answer.
+
 ## Testing philosophy
 
 - **Mock the Driver, not the Orchestra.** `core/internal/driver/mock`
