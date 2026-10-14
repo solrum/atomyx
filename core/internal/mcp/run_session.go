@@ -427,6 +427,33 @@ func legacyStatusOf(outcome runfolder.Outcome) storage.RunStatus {
 	return storage.RunStatus(runfolder.LegacyStatusOf(runfolder.Meta{Outcome: outcome}))
 }
 
+// RecordAgent stores the agent versions of a newly bound driver in the
+// run the device is serving, unless that run already recorded versions.
+// It covers a run that starts while the device is released, since no
+// driver is bound to read versions from at that point. It takes only the
+// routing lock, because a script cancelled by Finish may bind the device
+// while Finish holds the run lock.
+func (s *runSession) RecordAgent(info driver.AgentInfo) {
+	if info == (driver.AgentInfo{}) {
+		return
+	}
+	s.routeMu.Lock()
+	w := s.routed
+	s.routeMu.Unlock()
+	if w == nil {
+		return
+	}
+	err := w.Update(func(m *runfolder.Meta) {
+		if m.Host != nil && (m.Host.ProtocolVersion != 0 || m.Host.AgentVersion != "") {
+			return
+		}
+		runfolder.RecordAgent(m, info.ProtocolVersion, info.AgentVersion)
+	})
+	if err != nil {
+		s.logger.Debug("run.record_agent_failed", logging.LogContext{"id": w.ID(), "error": err.Error()})
+	}
+}
+
 // route sends the interventions of the held device to w until unroute.
 // An unconditional route replaces the current one. A conditional route
 // leaves a run that is already routed alone and reports whether it took

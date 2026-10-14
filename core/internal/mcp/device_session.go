@@ -668,6 +668,9 @@ func (s *DeviceSession) install(ctx context.Context, sess *session.Session, plat
 	s.mu.Unlock()
 	s.releasePrevious(displaced) //nolint:contextcheck // teardown is bounded by its own grace timer, not by a call context
 	go s.watchLost(sess)         //nolint:contextcheck // teardown is bounded by its own grace timer, not by a call context
+	if s.runs != nil && active.Driver != nil {
+		s.runs.RecordAgent(active.Driver.AgentInfo())
+	}
 	reportPhase(ctx, phaseConnected)
 	return active, nil
 }
