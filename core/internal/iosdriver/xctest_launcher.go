@@ -311,6 +311,7 @@ type XctestLauncher struct {
 	clock      clock.Clock
 	cfg        LaunchConfig
 	port       int
+	xcode      xcodeIdentityCache
 }
 
 // Port reports the host port the most recent EnsureRunning attempt
