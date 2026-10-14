@@ -57,7 +57,7 @@ func TestIosDriver_E2E_SimulatorTimeoutRecovery_HeldReplyIsToolTimeoutAndNextCal
 // transport's own fallback bound.
 func requireTimeoutRecovery(t *testing.T, udid string, kind iosdriver.Kind) {
 	t.Helper()
-	proxyPort := drivertest.NewLineDelayProxy(t, fmt.Sprintf("127.0.0.1:%d", iosE2EControlPort), "getScreenSize", e2eHoldDuration)
+	proxyPort, delivered := drivertest.NewLineDelayProxy(t, fmt.Sprintf("127.0.0.1:%d", iosE2EControlPort), "getScreenSize", e2eHoldDuration)
 	conn := transport.NewTCPClient("127.0.0.1", proxyPort, transport.WithTCPResponseTimeout(e2eClientBound))
 	d := iosdriver.New(conn, process.NewExec(), iosdriver.Options{
 		Background: process.NewExecBackground(),
@@ -80,5 +80,17 @@ func requireTimeoutRecovery(t *testing.T, udid string, kind iosdriver.Kind) {
 	}
 	if _, err := d.ScreenSize(ctx); err != nil {
 		t.Fatalf("ScreenSize after the timeout: %v", err)
+	}
+	select {
+	case <-delivered:
+	case <-time.After(e2eHoldDuration + e2eClientBound):
+		t.Fatal("the held reply was neither delivered nor dropped in time")
+	}
+	size, err := d.ScreenSize(ctx)
+	if err != nil {
+		t.Fatalf("ScreenSize after the late reply: %v", err)
+	}
+	if size.Width <= 0 || size.Height <= 0 {
+		t.Fatalf("ScreenSize after the late reply = %+v, want positive dimensions from the matching reply", size)
 	}
 }

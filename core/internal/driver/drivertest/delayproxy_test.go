@@ -58,7 +58,7 @@ func TestLineDelayProxy_HoldsOnlyTheMatchingReplyAndKeepsTheConnectionUsable(t *
 			}
 		}
 	}()
-	port := NewLineDelayProxy(t, backend.Addr().String(), "slow", testHold)
+	port, delivered := NewLineDelayProxy(t, backend.Addr().String(), "slow", testHold)
 	conn, err := new(net.Dialer).DialContext(t.Context(), "tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		t.Fatalf("dial proxy: %v", err)
@@ -75,6 +75,43 @@ func TestLineDelayProxy_HoldsOnlyTheMatchingReplyAndKeepsTheConnectionUsable(t *
 	_ = conn.SetReadDeadline(time.Now().Add(testHold * 3))
 	if line, err := reader.ReadString('\n'); err != nil || line != "{\"id\":1,\"ok\":true}\n" {
 		t.Fatalf("held reply = %q, %v, want the delayed reply for id 1", line, err)
+	}
+	select {
+	case <-delivered:
+	case <-time.After(testBound):
+		t.Fatal("delivered channel still open after the held reply arrived")
+	}
+}
+
+func TestLineDelayProxy_CleanupDoesNotWaitForAClientThatNeverDisconnects(t *testing.T) {
+	backend, err := new(net.ListenConfig).Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer func() { _ = backend.Close() }()
+	go func() {
+		conn, err := backend.Accept()
+		if err != nil {
+			return
+		}
+		_, _ = io.Copy(io.Discard, conn)
+	}()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		t.Run("proxy", func(t *testing.T) {
+			port, _ := NewLineDelayProxy(t, backend.Addr().String(), "slow", testHold)
+			conn, err := new(net.Dialer).DialContext(t.Context(), "tcp", fmt.Sprintf("127.0.0.1:%d", port))
+			if err != nil {
+				t.Fatalf("dial proxy: %v", err)
+			}
+			_ = conn
+		})
+	}()
+	select {
+	case <-done:
+	case <-time.After(testHold * 5):
+		t.Fatal("proxy cleanup hung on an open client connection")
 	}
 }
 

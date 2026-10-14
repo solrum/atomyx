@@ -18,11 +18,12 @@ import (
 )
 
 const (
-	// e2eClientBound is the client's own fallback bound, short enough
-	// that the held reply outlasts it.
-	e2eClientBound = 500 * time.Millisecond
+	// e2eClientBound is the client's own fallback bound. It applies to
+	// every call through the proxy, so it is long enough for an
+	// unheld hierarchy dump and shorter than the hold.
+	e2eClientBound = 3 * time.Second
 	// e2eHoldDuration is how long the proxy holds the chosen request.
-	e2eHoldDuration = 3 * e2eClientBound
+	e2eHoldDuration = 10 * time.Second
 )
 
 // TestAndroidDriver_E2E_TimeoutRecovery_HeldReplyIsToolTimeoutAndNextCallSucceeds

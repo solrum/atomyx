@@ -46,7 +46,9 @@ func TestIosSimDriver_E2E_Teardown_DisconnectStopsWhatTheDriverStarted(t *testin
 		t.Fatalf("Disconnect: %v", err)
 	}
 
+	if started := len(driverBackground.processes()); started != 0 {
+		t.Errorf("the simulator driver started %d background processes, want 0: a process the driver starts must be stopped by Disconnect, so extend this case to assert that before allowing one", started)
+	}
 	driverBackground.requireAllExited(t)
-	t.Logf("driver-started processes: %d, all exited", len(driverBackground.processes()))
 	t.Logf("sim-hid helper still running after Disconnect: %t (stopped by test cleanup, not by Disconnect)", hidBackground.running())
 }

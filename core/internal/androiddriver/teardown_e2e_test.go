@@ -79,7 +79,7 @@ func TestAndroidDriver_E2E_Teardown_DisconnectRemovesEveryForwardItCreated(t *te
 
 	runner := &recordingRunner{inner: process.NewExec()}
 	ctx := context.Background()
-	before := forwardTable(t, runner.inner)
+	before := forwardTable(t, runner.inner, serial)
 	d := androiddriver.New(nil, runner, androiddriver.Options{
 		Serial:           serial,
 		AllocateHostPort: true,
@@ -104,18 +104,27 @@ func TestAndroidDriver_E2E_Teardown_DisconnectRemovesEveryForwardItCreated(t *te
 			t.Errorf("forward %s was created and never removed: creates %v, removals %v", created, creates, removals)
 		}
 	}
-	if after := forwardTable(t, runner.inner); after != before {
+	if after := forwardTable(t, runner.inner, serial); after != before {
 		t.Errorf("forward table changed across Connect and Disconnect:\nbefore:\n%s\nafter:\n%s", before, after)
 	}
 }
 
-func forwardTable(t *testing.T, runner process.Runner) string {
+// forwardTable lists the adb forward entries that belong to serial, so a
+// forward another device or session adds meanwhile cannot fail the
+// comparison.
+func forwardTable(t *testing.T, runner process.Runner, serial string) string {
 	t.Helper()
 	listing, err := runner.Run(context.Background(), "adb", "forward", "--list")
 	if err != nil {
 		t.Fatalf("adb forward --list: %v", err)
 	}
-	return listing.Stdout
+	var own []string
+	for _, line := range strings.Split(listing.Stdout, "\n") {
+		if fields := strings.Fields(line); len(fields) > 0 && fields[0] == serial {
+			own = append(own, line)
+		}
+	}
+	return strings.Join(own, "\n")
 }
 
 func contains(items []string, want string) bool {

@@ -37,7 +37,7 @@ func TestIosSimDriver_E2E_TimeoutRecovery_HeldReplyIsToolTimeoutAndNextCallSucce
 		t.Skip("skipping: set ATOMYX_IOS_SIM_UDID to the target simulator's UDID")
 	}
 
-	proxyPort := drivertest.NewLineDelayProxy(t, fmt.Sprintf("127.0.0.1:%d", iosSimE2EControlPort), "getScreenSize", e2eHoldDuration)
+	proxyPort, delivered := drivertest.NewLineDelayProxy(t, fmt.Sprintf("127.0.0.1:%d", iosSimE2EControlPort), "getScreenSize", e2eHoldDuration)
 	conn := transport.NewTCPClient("127.0.0.1", proxyPort, transport.WithTCPResponseTimeout(e2eClientBound))
 	d := newSimDriver(t, conn, udid, process.NewExecBackground(), startSimHid(t, udid, process.NewExecBackground()))
 	ctx := context.Background()
@@ -55,5 +55,17 @@ func TestIosSimDriver_E2E_TimeoutRecovery_HeldReplyIsToolTimeoutAndNextCallSucce
 	}
 	if _, err := d.ScreenSize(ctx); err != nil {
 		t.Fatalf("ScreenSize after the timeout: %v", err)
+	}
+	select {
+	case <-delivered:
+	case <-time.After(e2eHoldDuration + e2eClientBound):
+		t.Fatal("the held reply was neither delivered nor dropped in time")
+	}
+	size, err := d.ScreenSize(ctx)
+	if err != nil {
+		t.Fatalf("ScreenSize after the late reply: %v", err)
+	}
+	if size.Width <= 0 || size.Height <= 0 {
+		t.Fatalf("ScreenSize after the late reply = %+v, want positive dimensions from the matching reply", size)
 	}
 }
