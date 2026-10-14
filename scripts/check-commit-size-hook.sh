@@ -4,8 +4,14 @@
 # repository, stages changes of known size, and asserts that the hook
 # passes under the limit, fails over it, passes over it with a
 # Large-Commit trailer, ignores binary files and generated schema
-# files, and does nothing during a merge. One case also drives a real
-# `git commit` through core.hooksPath to prove the wiring.
+# files, ignores a Large-Commit line that is not a trailer, and does
+# nothing during a merge, a cherry-pick or a revert. One case also
+# drives a real `git commit` through core.hooksPath to prove the
+# wiring.
+#
+# It also checks that the hook's list of generated schema files equals
+# the set of schema files core/scripts/check-schema-fresh.sh
+# regenerates, so the two lists cannot drift apart.
 set -euo pipefail
 
 root="$(git rev-parse --show-toplevel)"
@@ -83,6 +89,37 @@ new_repo
 stage_lines a.txt 401
 touch "$(cd "$work/repo" && git rev-parse --absolute-git-dir)/MERGE_HEAD"
 expect "skips during a merge" 0 "subject"
+
+new_repo
+stage_lines a.txt 401
+touch "$(cd "$work/repo" && git rev-parse --absolute-git-dir)/CHERRY_PICK_HEAD"
+expect "skips during a cherry-pick" 0 "subject"
+
+new_repo
+stage_lines a.txt 401
+touch "$(cd "$work/repo" && git rev-parse --absolute-git-dir)/REVERT_HEAD"
+expect "skips during a revert" 0 "subject"
+
+new_repo
+stage_lines a.txt 401
+expect "ignores a Large-Commit line in the body" 1 "$(printf 'subject\n\nLarge-Commit: one generated table\n\nMore explanation follows.')"
+
+new_repo
+stage_lines a.txt 401
+expect "accepts the trailer after other trailers" 0 "$(printf 'subject\n\nbody text\n\nLarge-Commit: one generated table\nCo-Authored-By: Someone <someone@example.com>')"
+
+# The hook's generated file list must equal the schema files the schema
+# freshness gate regenerates.
+hook_list="$(sed -n '/^readonly GENERATED_FILES=(/,/^)/p' "$hook" | grep -Eo '"[^"]+"' | tr -d '"' | sort)"
+gate_list="$(grep -E '^[A-Z_]*SCHEMA="' "$root/core/scripts/check-schema-fresh.sh" | sed -E 's/^[A-Z_]*SCHEMA="([^"]+)"$/core\/\1/' | sort)"
+if [ -z "$gate_list" ] || [ "$hook_list" != "$gate_list" ]; then
+  echo "FAIL: the hook's generated file list differs from the schema freshness gate's list" >&2
+  echo "  hook: $(echo $hook_list)" >&2
+  echo "  gate: $(echo $gate_list)" >&2
+  failures=$((failures + 1))
+else
+  echo "PASS: the hook's generated file list matches the schema freshness gate"
+fi
 
 new_repo
 mkdir "$work/repo/hooks"

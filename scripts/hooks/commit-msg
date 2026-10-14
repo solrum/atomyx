@@ -10,9 +10,14 @@
 #   - binary files, which git reports with "-" instead of a line count
 #   - the generated JSON Schema files that `make gen-schema` rewrites
 #
-# Skipped entirely while a merge is in progress. An amend is measured
-# by the staged delta only, and `git commit --no-verify` bypasses the
-# hook.
+# Skipped entirely while a merge, a cherry-pick or a revert is in
+# progress, because those replay changes that were already reviewed.
+# An amend is measured by the staged delta only, and
+# `git commit --no-verify` bypasses the hook.
+#
+# The Large-Commit line counts only when it is a real trailer, that is,
+# in the final block of the message. The same text in the body is
+# ignored.
 set -euo pipefail
 
 readonly MAX_CHANGED_LINES=400
@@ -26,9 +31,19 @@ readonly GENERATED_FILES=(
 
 message_file="${1:?commit-msg hook requires the commit message file path}"
 
-if [ -e "$(git rev-parse --git-path MERGE_HEAD)" ]; then
-  exit 0
-fi
+for marker in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD; do
+  if [ -e "$(git rev-parse --git-path "$marker")" ]; then
+    exit 0
+  fi
+done
+
+# has_large_commit_trailer reports whether the message carries a
+# Large-Commit trailer that states a reason.
+has_large_commit_trailer() {
+  git stripspace --strip-comments < "$message_file" \
+    | git interpret-trailers --parse \
+    | grep -Eq '^Large-Commit:[[:space:]]*[^[:space:]]'
+}
 
 is_generated() {
   local path="$1" generated
@@ -55,7 +70,7 @@ if [ "$total" -le "$MAX_CHANGED_LINES" ]; then
   exit 0
 fi
 
-if grep -Eq '^Large-Commit:[[:space:]]*[^[:space:]]' "$message_file"; then
+if has_large_commit_trailer; then
   exit 0
 fi
 
