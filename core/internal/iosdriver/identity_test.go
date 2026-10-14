@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"dev.atomyx/internal/iosdriver"
+	"dev.atomyx/internal/version"
 )
 
 func TestExpectedRunner_Verify(t *testing.T) {
@@ -59,7 +60,7 @@ func TestProbeRunnerIdentity_ReadsReportedFields(t *testing.T) {
 	if !ok {
 		t.Fatal("ProbeRunnerIdentity() ok = false, want true for a listener answering ping")
 	}
-	want := iosdriver.RunnerIdentity{RunnerID: "r-9", TargetUDID: "DEV-9", SimulatorUDID: "SIM-9"}
+	want := iosdriver.RunnerIdentity{RunnerID: "r-9", TargetUDID: "DEV-9", SimulatorUDID: "SIM-9", ProtocolVersion: version.AgentProtocolVersion}
 	if got != want {
 		t.Fatalf("ProbeRunnerIdentity() = %+v, want %+v", got, want)
 	}
@@ -92,8 +93,19 @@ func TestCheckRunnerIdentity_MismatchReturnsIdentityError(t *testing.T) {
 // pongReply builds a ping reply frame whose data object carries
 // identityFields, the inner part of the object, after the pong flag.
 func pongReply(id int64, identityFields string) string {
-	if identityFields == "" {
+	fields := fmt.Sprintf(`"protocolVersion":%d`, version.AgentProtocolVersion)
+	if identityFields != "" {
+		fields += "," + identityFields
+	}
+	return rawPongReply(id, fields)
+}
+
+// rawPongReply builds a ping reply frame whose data object carries
+// exactly fields after the pong flag, so a test can omit or change the
+// protocol version.
+func rawPongReply(id int64, fields string) string {
+	if fields == "" {
 		return fmt.Sprintf(`{"id":%d,"ok":true,"data":{"pong":true}}`+"\n", id)
 	}
-	return fmt.Sprintf(`{"id":%d,"ok":true,"data":{"pong":true,%s}}`+"\n", id, identityFields)
+	return fmt.Sprintf(`{"id":%d,"ok":true,"data":{"pong":true,%s}}`+"\n", id, fields)
 }

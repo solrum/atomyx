@@ -26,6 +26,12 @@ type RunnerIdentity struct {
 	// sets it for every simulator destination, whoever launched the
 	// runner.
 	SimulatorUDID string
+	// ProtocolVersion is the wire contract version the runner declares.
+	// It is zero for a runner that reports none.
+	ProtocolVersion int
+	// AgentVersion is the runner build version, for display only. It is
+	// empty for a runner that reports none.
+	AgentVersion string
 }
 
 // ExpectedRunner describes the runner a caller means to reach on a
@@ -147,10 +153,12 @@ func ProbeRunnerIdentity(ctx context.Context, port int, timeout time.Duration) (
 	var frame struct {
 		Ok   *bool `json:"ok"`
 		Data struct {
-			Pong          bool   `json:"pong"`
-			RunnerID      string `json:"runnerId"`
-			TargetUDID    string `json:"targetUdid"`
-			SimulatorUDID string `json:"simulatorUdid"`
+			Pong            bool   `json:"pong"`
+			RunnerID        string `json:"runnerId"`
+			TargetUDID      string `json:"targetUdid"`
+			SimulatorUDID   string `json:"simulatorUdid"`
+			ProtocolVersion int    `json:"protocolVersion"`
+			AgentVersion    string `json:"agentVersion"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(line), &frame); err != nil {
@@ -160,9 +168,11 @@ func ProbeRunnerIdentity(ctx context.Context, port int, timeout time.Duration) (
 		return RunnerIdentity{}, false
 	}
 	return RunnerIdentity{
-		RunnerID:      frame.Data.RunnerID,
-		TargetUDID:    frame.Data.TargetUDID,
-		SimulatorUDID: frame.Data.SimulatorUDID,
+		RunnerID:        frame.Data.RunnerID,
+		TargetUDID:      frame.Data.TargetUDID,
+		SimulatorUDID:   frame.Data.SimulatorUDID,
+		ProtocolVersion: frame.Data.ProtocolVersion,
+		AgentVersion:    frame.Data.AgentVersion,
 	}, true
 }
 
@@ -198,15 +208,24 @@ func (e *RunnerIdentityError) Error() string {
 // nil error, so a caller decides whether absence is acceptable. unmanaged is true when the
 // runner was accepted without a launch identifier.
 func CheckRunnerIdentity(ctx context.Context, port int, timeout time.Duration, want ExpectedRunner) (found, unmanaged bool, err *RunnerIdentityError) {
+	_, found, unmanaged, err = CheckRunner(ctx, port, timeout, want)
+	return found, unmanaged, err
+}
+
+// CheckRunner behaves like CheckRunnerIdentity and also returns the
+// identity the answering runner reported, so a caller can read its
+// protocol version without a second probe. got is the zero value when
+// nothing answers.
+func CheckRunner(ctx context.Context, port int, timeout time.Duration, want ExpectedRunner) (got RunnerIdentity, found, unmanaged bool, err *RunnerIdentityError) {
 	got, ok := ProbeRunnerIdentity(ctx, port, timeout)
 	if !ok {
-		return false, false, nil
+		return RunnerIdentity{}, false, false, nil
 	}
 	verdict, reason := want.Verify(got)
 	if verdict == IdentityMismatch || verdict == IdentityLegacy {
-		return true, false, &RunnerIdentityError{Port: port, Expect: want, Got: got, Reason: reason, Legacy: verdict == IdentityLegacy}
+		return got, true, false, &RunnerIdentityError{Port: port, Expect: want, Got: got, Reason: reason, Legacy: verdict == IdentityLegacy}
 	}
-	return true, verdict == IdentityUnmanaged, nil
+	return got, true, verdict == IdentityUnmanaged, nil
 }
 
 // RunnerProbeTimeout bounds one identity probe of a runner port.

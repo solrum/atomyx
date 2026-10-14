@@ -379,11 +379,14 @@ func (l *XctestLauncher) EnsureRunning(ctx context.Context) (kill func() error, 
 		return noopKill, err
 	}
 	if l.cfg.AllocatePort == nil {
-		found, unmanaged, idErr := CheckRunnerIdentity(ctx, l.cfg.Port, iproxyPingProbeTimeout, l.expected())
+		got, found, unmanaged, idErr := CheckRunner(ctx, l.cfg.Port, iproxyPingProbeTimeout, l.expected())
 		if idErr != nil {
 			return noopKill, runnerMismatchError(idErr)
 		}
 		if found {
+			if !got.SpeaksHostProtocol() {
+				return noopKill, runnerProtocolMismatchError(l.cfg.Port, got.ProtocolVersion)
+			}
 			if unmanaged && l.cfg.Warn != nil {
 				l.cfg.Warn(unmanagedRunnerWarning(l.cfg.Port))
 			}

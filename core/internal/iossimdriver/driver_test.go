@@ -10,11 +10,13 @@ import (
 	"testing"
 
 	"dev.atomyx/internal/clock"
+	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/driver"
 	"dev.atomyx/internal/driver/drivertest"
 	"dev.atomyx/internal/iosdriver"
 	"dev.atomyx/internal/iossimdriver"
 	"dev.atomyx/internal/process"
+	"dev.atomyx/internal/version"
 	"dev.atomyx/internal/wire"
 )
 
@@ -55,8 +57,14 @@ type fakeCall struct {
 	args    map[string]any
 }
 
+// newFakeConn returns a conn whose ping reports the host's protocol
+// version, so Connect succeeds unless a test overrides the reply.
 func newFakeConn() *fakeConn {
-	return &fakeConn{handlers: map[string]func(args map[string]any) (map[string]any, error){}}
+	c := &fakeConn{handlers: map[string]func(args map[string]any) (map[string]any, error){}}
+	c.Respond("ping", func(map[string]any) (map[string]any, error) {
+		return map[string]any{"protocolVersion": version.AgentProtocolVersion, "capabilities": map[string]any{}}, nil
+	})
+	return c
 }
 
 func (f *fakeConn) Respond(cmdType string, handler func(args map[string]any) (map[string]any, error)) {
@@ -581,4 +589,32 @@ func remarshal(data map[string]any, out any) error {
 		return err
 	}
 	return json.Unmarshal(encoded, out)
+}
+
+func TestIosSimDriver_AgentInfo_ReportsWhatTheDelegateRunnerDeclared(t *testing.T) {
+	d, conn := newContractSimDriver(t)
+	conn.Respond("ping", func(map[string]any) (map[string]any, error) {
+		return map[string]any{"protocolVersion": version.AgentProtocolVersion, "agentVersion": "3.1", "capabilities": map[string]any{}}, nil
+	})
+
+	if err := d.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	want := driver.AgentInfo{ProtocolVersion: version.AgentProtocolVersion, AgentVersion: "3.1"}
+	if got := d.AgentInfo(); got != want {
+		t.Fatalf("AgentInfo() = %+v, want %+v", got, want)
+	}
+}
+
+func TestIosSimDriver_Connect_RunnerProtocolMismatch_FailsWithAgentVersionMismatch(t *testing.T) {
+	d, conn := newContractSimDriver(t)
+	conn.Respond("ping", func(map[string]any) (map[string]any, error) {
+		return map[string]any{"protocolVersion": version.AgentProtocolVersion + 1, "capabilities": map[string]any{}}, nil
+	})
+
+	err := d.Connect(context.Background())
+
+	if code, _, _ := diag.Describe(err); code != diag.CodeAgentVersionMismatch {
+		t.Fatalf("Connect() error = %v, want code %s", err, diag.CodeAgentVersionMismatch)
+	}
 }

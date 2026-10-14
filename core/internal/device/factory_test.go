@@ -259,7 +259,7 @@ func serveRunnerReply(t *testing.T, identityFields string) int {
 				if _, err := c.Read(buf); err != nil {
 					return
 				}
-				_, _ = fmt.Fprintf(c, `{"id":0,"ok":true,"data":{"pong":true,%s}}`+"\n", identityFields)
+				_, _ = fmt.Fprintf(c, `{"id":0,"ok":true,"data":{"pong":true,%s}}`+"\n", withHostProtocol(identityFields))
 			}(c)
 		}
 	}()

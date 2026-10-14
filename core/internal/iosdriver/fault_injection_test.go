@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"dev.atomyx/internal/iosdriver"
 	"dev.atomyx/internal/process"
 	"dev.atomyx/internal/transport"
+	"dev.atomyx/internal/version"
 	"dev.atomyx/internal/wire"
 )
 
@@ -193,7 +195,7 @@ func (a *faultInjectionIosAgent) writeReject(conn net.Conn, id int64) {
 // assertion ever runs.
 func faultInjectionIosOkData(cmdType string) string {
 	if cmdType == "ping" {
-		return `{"capabilities":{"canMultiPointer":false,"canPressure":false}}`
+		return `{"protocolVersion":` + strconv.Itoa(version.AgentProtocolVersion) + `,"capabilities":{"canMultiPointer":false,"canPressure":false}}`
 	}
 	return `{}`
 }

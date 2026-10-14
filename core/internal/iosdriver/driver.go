@@ -14,6 +14,7 @@ import (
 	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/driver"
 	"dev.atomyx/internal/process"
+	"dev.atomyx/internal/version"
 	"dev.atomyx/internal/wire"
 )
 
@@ -164,6 +165,9 @@ type pingCapabilities struct {
 type pingResponse struct {
 	Capabilities pingCapabilities `json:"capabilities"`
 	RunnerID     string           `json:"runnerId"`
+	// ProtocolVersion is zero when the runner reports none.
+	ProtocolVersion int    `json:"protocolVersion"`
+	AgentVersion    string `json:"agentVersion"`
 }
 
 // Connect opens the transport and verifies the runner is live via a
@@ -189,6 +193,7 @@ func (d *IosDriver) Connect(ctx context.Context) error {
 	}
 	d.lastLaunchedBundleID = ""
 	d.connectedRunnerID = ""
+	d.agentInfo = driver.AgentInfo{}
 	if d.opts.Kind == KindDevice && !d.opts.ExternalTunnel {
 		if err := d.launchIproxy(ctx); err != nil {
 			return diag.New(diag.CodeAgentUnreachable,
@@ -207,6 +212,10 @@ func (d *IosDriver) Connect(ctx context.Context) error {
 	if err := d.conn.CallInto(ctx, "ping", map[string]any{}, &pong); err != nil {
 		return d.fail(err)
 	}
+	if pong.ProtocolVersion != version.AgentProtocolVersion {
+		return connectProtocolMismatchError(pong.ProtocolVersion)
+	}
+	d.agentInfo = driver.AgentInfo{ProtocolVersion: pong.ProtocolVersion, AgentVersion: pong.AgentVersion}
 	d.capabilities.CanMultiPointer = pong.Capabilities.CanMultiPointer
 	d.capabilities.CanPressure = pong.Capabilities.CanPressure
 	d.connectedRunnerID = pong.RunnerID

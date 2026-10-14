@@ -16,6 +16,7 @@ import (
 
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/process"
+	"dev.atomyx/internal/version"
 )
 
 const (
@@ -53,6 +54,10 @@ type runnerFarm struct {
 	// exitFirstRunners makes the first N started runners exit at once with
 	// status 65, modeling a runner that lost the race for its port.
 	exitFirstRunners int
+	// extraPingFields, when set, is appended to the identity fields every
+	// started runner answers with, for example a protocol version the host
+	// does not support.
+	extraPingFields string
 }
 
 type farmProcess struct {
@@ -97,7 +102,7 @@ func (f *runnerFarm) Start(ctx context.Context, name string, args ...string) (pr
 			return nil, err
 		}
 		proc.listener = listener
-		go serveIdentity(listener, identityFieldsOf(runnerEnv))
+		go serveIdentity(listener, f.pingFields(runnerEnv))
 		f.t.Cleanup(func() { _ = listener.Close() })
 	case "xcodebuild":
 		f.mu.Lock()
@@ -115,7 +120,7 @@ func (f *runnerFarm) Start(ctx context.Context, name string, args ...string) (pr
 				return nil, err
 			}
 			proc.listener = listener
-			go serveIdentity(listener, identityFieldsOf(runnerEnv))
+			go serveIdentity(listener, f.pingFields(runnerEnv))
 			f.t.Cleanup(func() { _ = listener.Close() })
 		}
 	}
@@ -123,6 +128,14 @@ func (f *runnerFarm) Start(ctx context.Context, name string, args ...string) (pr
 	f.procs = append(f.procs, proc)
 	f.mu.Unlock()
 	return proc, nil
+}
+
+func (f *runnerFarm) pingFields(env []string) string {
+	fields := identityFieldsOf(env)
+	if f.extraPingFields != "" {
+		fields += "," + f.extraPingFields
+	}
+	return fields
 }
 
 func (f *runnerFarm) started(name string) []*farmProcess {
@@ -152,6 +165,16 @@ func envOf(env []string, key string) string {
 	return ""
 }
 
+// withHostProtocol adds the host's protocol version to a ping reply's
+// fields unless they already declare one, so a test can serve a runner
+// that speaks another version.
+func withHostProtocol(fields string) string {
+	if strings.Contains(fields, `"protocolVersion"`) {
+		return fields
+	}
+	return fmt.Sprintf(`"protocolVersion":%d,`, version.AgentProtocolVersion) + fields
+}
+
 func identityFieldsOf(env []string) string {
 	fields := fmt.Sprintf(`"runnerId":%q`, envOf(env, "TEST_RUNNER_ATOMYX_RUNNER_ID"))
 	if udid := envOf(env, "TEST_RUNNER_ATOMYX_TARGET_UDID"); udid != "" {
@@ -165,6 +188,7 @@ func identityFieldsOf(env []string) string {
 // serveIdentity answers every line on every connection with a ping
 // reply that echoes the request id and carries identityFields.
 func serveIdentity(l net.Listener, identityFields string) {
+	identityFields = withHostProtocol(identityFields)
 	for {
 		c, err := l.Accept()
 		if err != nil {

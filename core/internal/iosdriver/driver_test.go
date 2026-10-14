@@ -21,6 +21,7 @@ import (
 	"dev.atomyx/internal/driver/drivertest"
 	"dev.atomyx/internal/iosdriver"
 	"dev.atomyx/internal/process"
+	"dev.atomyx/internal/version"
 	"dev.atomyx/internal/wire"
 )
 
@@ -44,8 +45,14 @@ type fakeCall struct {
 	args    map[string]any
 }
 
+// newFakeConn returns a conn whose ping reports the host's protocol
+// version, so Connect succeeds unless a test overrides the reply.
 func newFakeConn() *fakeConn {
-	return &fakeConn{handlers: map[string]func(args map[string]any) (map[string]any, error){}}
+	c := &fakeConn{handlers: map[string]func(args map[string]any) (map[string]any, error){}}
+	c.Respond("ping", func(map[string]any) (map[string]any, error) {
+		return map[string]any{"protocolVersion": version.AgentProtocolVersion, "capabilities": map[string]any{}}, nil
+	})
+	return c
 }
 
 func (f *fakeConn) Respond(cmdType string, handler func(args map[string]any) (map[string]any, error)) {
@@ -207,7 +214,7 @@ func TestIosDriver_SatisfiesContract(t *testing.T) {
 func TestIosDriver_Connect_Simulator_ConnectsAndPingsWithoutIproxy(t *testing.T) {
 	conn := newDefaultFakeConn()
 	conn.Respond("ping", func(map[string]any) (map[string]any, error) {
-		return map[string]any{"capabilities": map[string]any{"canMultiPointer": true, "canPressure": true}}, nil
+		return map[string]any{"protocolVersion": version.AgentProtocolVersion, "capabilities": map[string]any{"canMultiPointer": true, "canPressure": true}}, nil
 	})
 	runner := process.NewFake()
 	d := iosdriver.New(conn, runner, iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
@@ -359,6 +366,18 @@ func startFakeTunnelListener(t *testing.T, answerPing bool) (int, func()) {
 // the reply's data object, for example `"simulatorUdid":"SIM-2"`.
 func startFakeRunnerListener(t *testing.T, answerPing bool, identityFields string) (int, func()) {
 	t.Helper()
+	return startReplyingListener(t, answerPing, func(id int64) string { return pongReply(id, identityFields) })
+}
+
+// startRawRunnerListener starts a listener whose ping reply carries
+// exactly fields, so a test controls whether protocolVersion appears.
+func startRawRunnerListener(t *testing.T, fields string) (int, func()) {
+	t.Helper()
+	return startReplyingListener(t, true, func(id int64) string { return rawPongReply(id, fields) })
+}
+
+func startReplyingListener(t *testing.T, answerPing bool, reply func(id int64) string) (int, func()) {
+	t.Helper()
 	l, err := new(net.ListenConfig).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("startFakeTunnelListener: %v", err)
@@ -385,7 +404,7 @@ func startFakeRunnerListener(t *testing.T, answerPing bool, identityFields strin
 					ID int64 `json:"id"`
 				}
 				_ = json.Unmarshal([]byte(line), &req)
-				_, _ = fmt.Fprint(c, pongReply(req.ID, identityFields))
+				_, _ = fmt.Fprint(c, reply(req.ID))
 			}(c)
 		}
 	}()
@@ -400,7 +419,7 @@ func TestIosDriver_Connect_Device_LaunchesIproxyWithExactArgsAndWaitsForReadines
 	port := freeTCPPort(t)
 	conn := newDefaultFakeConn()
 	conn.Respond("ping", func(map[string]any) (map[string]any, error) {
-		return map[string]any{"capabilities": map[string]any{"canMultiPointer": true, "canPressure": true}}, nil
+		return map[string]any{"protocolVersion": version.AgentProtocolVersion, "capabilities": map[string]any{"canMultiPointer": true, "canPressure": true}}, nil
 	})
 	bg := &tunnelBackground{}
 	runner := process.NewFake()
@@ -434,7 +453,7 @@ func TestIosDriver_Connect_Device_WaitsForTunnelToBecomeReadyAfterDelay(t *testi
 	port := freeTCPPort(t)
 	conn := newDefaultFakeConn()
 	conn.Respond("ping", func(map[string]any) (map[string]any, error) {
-		return map[string]any{"capabilities": map[string]any{}}, nil
+		return map[string]any{"protocolVersion": version.AgentProtocolVersion, "capabilities": map[string]any{}}, nil
 	})
 	const readyDelay = 300 * time.Millisecond
 	bg := &tunnelBackground{readyDelay: readyDelay}
@@ -623,7 +642,7 @@ func TestIosDriver_Connect_PingFailure_ReturnsError(t *testing.T) {
 func TestIosDriver_Ping_Succeeds(t *testing.T) {
 	conn := newDefaultFakeConn()
 	conn.Respond("ping", func(map[string]any) (map[string]any, error) {
-		return map[string]any{"capabilities": map[string]any{"canMultiPointer": false, "canPressure": false}}, nil
+		return map[string]any{"protocolVersion": version.AgentProtocolVersion, "capabilities": map[string]any{"canMultiPointer": false, "canPressure": false}}, nil
 	})
 	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
@@ -1429,7 +1448,7 @@ func connectedDriverAndConn(t *testing.T, runnerID string) (*iosdriver.IosDriver
 	t.Helper()
 	conn := newDefaultFakeConn()
 	conn.Respond("ping", func(map[string]any) (map[string]any, error) {
-		return map[string]any{"capabilities": map[string]any{}, "runnerId": runnerID}, nil
+		return map[string]any{"protocolVersion": version.AgentProtocolVersion, "capabilities": map[string]any{}, "runnerId": runnerID}, nil
 	})
 	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 	if err := d.Connect(context.Background()); err != nil {
