@@ -13,11 +13,13 @@
 //
 // Invariants callers rely on:
 //
-//   - The lock file is never unlinked, by any process. A holder
-//     detects a replaced file by comparing its descriptor's identity
-//     with the path's, at acquire time and on every Recheck.
+//   - Release unlinks the lock file while still holding the flock.
+//     Every opener therefore compares its descriptor's identity with
+//     the path's after the flock, at acquire time, on every Recheck,
+//     and in Probe, and restarts when the file was replaced.
 //   - A probe takes the same real flock as an acquirer but never
-//     creates or writes the lock file.
+//     creates or writes the lock file, and never reports free while a
+//     new holder owns a replacement file.
 //   - A lock file is always opened through os.OpenFile so the
 //     close-on-exec flag applies. A raw syscall.Open is rejected by
 //     the check-no-raw-syscall-open gate.

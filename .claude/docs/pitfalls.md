@@ -152,10 +152,13 @@ corresponding area. For the high-level map see
 - **Key on the hardware identity, never on the transport string.** The
   Wi-Fi serial `<ip>:<port>` and the USB serial of the same phone must
   map to one lease, which is why identity reads `ro.serialno`.
-- **Never unlink a lock file.** It is created once and reused. Replacing
-  it is exactly what the descriptor-versus-path comparison detects, so
-  removing and recreating it defeats that check. Only a socket may be
-  unlinked, and only by the process holding its flock.
+- **Unlink a lock file only through `Lease.Release`.** Release unlinks it
+  while still holding the flock, and only when the path still names the
+  held descriptor. Every other opener must flock, then compare the
+  descriptor with the path and restart on a mismatch, because it may have
+  won the flock on an inode no path names. `Probe` follows the same
+  protocol. Only a socket may be unlinked besides, and only by the process
+  holding its flock.
 - **Never open a lease file with a raw `syscall.Open` or `unix.Open`.**
   Use `os.OpenFile` so close-on-exec applies, because a leaked lease
   descriptor in a spawned child keeps the device held after the owner

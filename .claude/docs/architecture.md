@@ -276,7 +276,9 @@ Contract:
   comparison for a long-lived holder, and `Lease.Watch` runs it every
   `InodeRecheckPeriod` (5 seconds). A failed re-acquire returns an error
   wrapping `ErrLost`.
-- **Lock file.** It is never unlinked. It carries the holder's
+- **Lock file.** `Lease.Release` unlinks it while still holding the flock,
+  when the path still names the held descriptor, so a free device leaves no
+  file. It carries the holder's
   `{pid, processStartedAt, command, role, runId, socket, socketError,
   startedAt, idleSince}`. Most fields are for display. `pid` and
   `processStartedAt` together identify the holder process, so a borrower
@@ -289,7 +291,11 @@ Contract:
   one that is still starting.
 - **Probe.** `Manager.Probe` takes the same real flock and releases it
   immediately. It never creates the lock file and never writes holder
-  metadata.
+  metadata. Like an acquirer it compares the descriptor with the path after
+  the flock and restarts on a replaced file, so it never reports a device
+  free while a new holder owns the replacement. Persistent replacement
+  returns `ErrLockFileReplaced`. A holder read that loses the race to an
+  unlink reports an unknown holder.
 
 Canonical identity lives in `core/internal/device/identity.go`.
 `IdentityResolver.Resolve` runs before any agent connect, through
