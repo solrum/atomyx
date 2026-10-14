@@ -4,7 +4,9 @@
 # protocol version as a one-line constant, and the host accepts an agent
 # only when the numbers are equal. Three copies of one number drift
 # silently, so this gate reads each declaration with an anchored pattern
-# that must match exactly once and fails unless all three agree.
+# that must match exactly once and fails unless all three agree. It also
+# fails when any other tracked Go, Kotlin, or Swift file declares the
+# constant, because a fourth copy would be read by nothing and drift.
 #
 # Scope: the Go constant in core/internal/version/protocol.go, the
 # Android agent constant in
@@ -40,6 +42,24 @@ read_version() {
   fi
   grep -E "$pattern" "$file" | sed -E 's/.*= ([0-9]+)$/\1/'
 }
+
+# only_declared_in GLOB PATTERN FILE reports every tracked file matching
+# GLOB whose content matches the declaration PATTERN, other than FILE.
+# The patterns are looser than the ones above so a copy with a different
+# spelling or value is still found.
+only_declared_in() {
+  local glob="$1" pattern="$2" expected="$3" other
+  other="$(git grep -lE -e "$pattern" -- "$glob" | grep -vxF "$expected" || true)"
+  if [ -n "$other" ]; then
+    echo "agent protocol gate FAILED: the protocol version is declared outside $expected:" >&2
+    echo "$other" | sed 's/^/  /' >&2
+    return 1
+  fi
+}
+
+only_declared_in '*.go' '(const|var)[[:space:]]+AgentProtocolVersion([^[:alnum:]_]|$)|^[[:space:]]*AgentProtocolVersion[[:space:]]*(=|:=)' "$go_file" || fail=1
+only_declared_in '*.kt' 'AGENT_PROTOCOL_VERSION[[:space:]]*(:[^=]+)?=' "$kotlin_file" || fail=1
+only_declared_in '*.swift' '(enum|struct|class)[[:space:]]+AgentProtocol([^[:alnum:]_]|$)|(let|var)[[:space:]]+version[[:space:]]*(:[^=]+)?=[[:space:]]*[0-9]+' "$swift_file" || fail=1
 
 go_version="$(read_version "$go_file" "$go_pattern")" || fail=1
 kotlin_version="$(read_version "$kotlin_file" "$kotlin_pattern")" || fail=1
