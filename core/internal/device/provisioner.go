@@ -644,17 +644,26 @@ func (p *DriverProvisioner) androidLauncher(ctx context.Context, serial string) 
 	if apkPath == "" {
 		apkPath = os.Getenv("ATOMYX_ANDROID_APK")
 	}
-	hostPort, err := androiddriver.ForwardHostPort(ctx, p.runner, serial, androidControlPort)
+	launcher, _, err := newAndroidAgentLauncher(ctx, p.runner, p.clock, serial, apkPath)
+	return launcher, err
+}
+
+// newAndroidAgentLauncher forwards the agent port of the device with
+// the given serial and returns the launcher for it together with the
+// HTTP client that reaches the same forward.
+func newAndroidAgentLauncher(ctx context.Context, runner process.Runner, clk orchestra.Clock, serial, apkPath string) (*androiddriver.AgentLauncher, *transport.HTTPClient, error) {
+	hostPort, err := androiddriver.ForwardHostPort(ctx, runner, serial, androidControlPort)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	client := transport.NewHTTPClient("127.0.0.1", hostPort)
-	return androiddriver.NewAgentLauncher(p.runner, p.clock, client, androiddriver.AgentLauncherOptions{
+	launcher := androiddriver.NewAgentLauncher(runner, clk, client, androiddriver.AgentLauncherOptions{
 		Serial:     serial,
 		HostPort:   hostPort,
 		DevicePort: androidControlPort,
 		APKPath:    apkPath,
-	}), nil
+	})
+	return launcher, client, nil
 }
 
 // FakeIOSCall records one EnsureIOSAgent invocation FakeProvisioner
