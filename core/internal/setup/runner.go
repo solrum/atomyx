@@ -15,18 +15,15 @@ import (
 func Run(ctx context.Context, reg *Registry, mode Mode) Report {
 	entries := reg.Entries()
 	report := Report{Steps: make([]StepReport, 0, len(entries))}
-	blocked := map[string]bool{}
 	outcome := map[string]Status{}
 	for _, entry := range entries {
 		id := entry.Step.ID()
 		if ctx.Err() != nil {
-			blocked[id] = true
 			outcome[id] = StatusSkipped
 			report.Steps = append(report.Steps, skipped(id, "the run was interrupted before this step"))
 			continue
 		}
-		if req, ok := unmetPrerequisite(entry, blocked, outcome); ok {
-			blocked[id] = true
+		if req, ok := unmetPrerequisite(entry, outcome); ok {
 			outcome[id] = StatusSkipped
 			report.Steps = append(report.Steps, skipped(id, fmt.Sprintf("a prerequisite did not pass: %s is %s", req, outcome[req])))
 			continue
@@ -38,13 +35,11 @@ func Run(ctx context.Context, reg *Registry, mode Mode) Report {
 	return report
 }
 
-// unmetPrerequisite names the first required step that blocks entry:
-// one the runner skipped, or one that ended manual or failed. A step
-// that skipped itself as not applicable does not block its dependents.
-func unmetPrerequisite(entry Entry, blocked map[string]bool, outcome map[string]Status) (string, bool) {
+// unmetPrerequisite names the first required step that did not end
+// satisfied.
+func unmetPrerequisite(entry Entry, outcome map[string]Status) (string, bool) {
 	for _, req := range entry.Requires {
-		status := outcome[req]
-		if blocked[req] || status == StatusManual || status == StatusFailed {
+		if !outcome[req].Satisfied() {
 			return req, true
 		}
 	}

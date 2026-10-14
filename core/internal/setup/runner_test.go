@@ -108,20 +108,6 @@ func TestRunSkipsDependentsOfAFailedPrerequisite(t *testing.T) {
 	}
 }
 
-func TestRunDoesNotBlockOnAStepThatSkippedItselfAsNotApplicable(t *testing.T) {
-	var calls []string
-	reg := build(t,
-		Entry{Step: &fakeStep{id: "iproxy", check: Result{Status: StatusSkipped, Message: "simulator needs none"}, calls: &calls}},
-		Entry{Step: &fakeStep{id: "next", check: okResult(), calls: &calls}, Requires: []string{"iproxy"}},
-	)
-
-	report := Run(context.Background(), reg, ModeCheck)
-
-	if report.Steps[1].Status != StatusOK {
-		t.Errorf("next = %+v, want ok", report.Steps[1])
-	}
-}
-
 func TestRunInCheckModeNeverCallsFix(t *testing.T) {
 	var calls []string
 	fixed := Result{Status: StatusFixed, Message: "repaired"}

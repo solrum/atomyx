@@ -23,8 +23,8 @@ const (
 	// StatusFailed means the step tried and could not establish or
 	// verify the requirement.
 	StatusFailed Status = "failed"
-	// StatusSkipped means the step does not apply to this device or
-	// an earlier step already made it moot.
+	// StatusSkipped means the runner did not run the step because
+	// an earlier step it depends on did not pass or the run stopped.
 	StatusSkipped Status = "skipped"
 )
 
@@ -61,9 +61,9 @@ type Step interface {
 	// ID is the stable, lower-case identifier reported for the step.
 	ID() string
 	// Check observes the machine or device and never changes it. It
-	// reports StatusOK when the requirement holds, StatusManual with a
-	// Remedy when it does not, StatusFailed when it could not tell, and
-	// StatusSkipped when the step does not apply.
+	// reports StatusOK when the requirement holds or does not apply to
+	// this device, StatusManual with a Remedy when it does not hold, and
+	// StatusFailed when it could not tell.
 	Check(ctx context.Context) Result
 }
 
