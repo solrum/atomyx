@@ -13,9 +13,9 @@ func (f fakeLocator) Locate(name string) (string, bool) {
 	return path, ok
 }
 
-type fakeStates map[string]DeviceState
+type fakeStates map[string]string
 
-func (f fakeStates) DeviceState(_ context.Context, serial string) DeviceState {
+func (f fakeStates) DeviceState(_ context.Context, serial string) string {
 	if state, ok := f[serial]; ok {
 		return state
 	}

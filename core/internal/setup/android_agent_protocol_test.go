@@ -8,15 +8,17 @@ import (
 )
 
 type fakeHealth struct {
-	health AgentHealth
-	err    error
+	ready, connected bool
+	err              error
 }
 
-func (f fakeHealth) AgentHealth(context.Context, string) (AgentHealth, error) { return f.health, f.err }
+func (f fakeHealth) AgentHealth(context.Context, string) (bool, bool, error) {
+	return f.ready, f.connected, f.err
+}
 
 type protocolReply struct {
-	protocol AgentProtocol
-	err      error
+	agent, host int
+	err         error
 }
 
 type fakeProtocol struct {
@@ -24,10 +26,10 @@ type fakeProtocol struct {
 	calls   int
 }
 
-func (f *fakeProtocol) AgentProtocol(context.Context, string) (AgentProtocol, error) {
+func (f *fakeProtocol) AgentProtocol(context.Context, string) (int, int, error) {
 	reply := f.replies[min(f.calls, len(f.replies)-1)]
 	f.calls++
-	return reply.protocol, reply.err
+	return reply.agent, reply.host, reply.err
 }
 
 type fakeReinstaller struct {
@@ -47,9 +49,9 @@ func TestAndroidAgentHealthStep(t *testing.T) {
 		status Status
 		remedy string
 	}{
-		{"ready", fakeHealth{health: AgentHealth{Ready: true, AccessibilityConnected: true}}, StatusOK, ""},
+		{"ready", fakeHealth{ready: true, connected: true}, StatusOK, ""},
 		{"not ready", fakeHealth{}, StatusManual, "Unlock the device"},
-		{"service not bound", fakeHealth{health: AgentHealth{Ready: true}}, StatusManual, "off and on"},
+		{"service not bound", fakeHealth{ready: true}, StatusManual, "off and on"},
 		{"unreachable", fakeHealth{err: errors.New("connection refused")}, StatusFailed, "logcat"},
 	}
 	for _, tc := range cases {
@@ -64,11 +66,11 @@ func TestAndroidAgentHealthStep(t *testing.T) {
 
 func TestAndroidAgentProtocolCheck(t *testing.T) {
 	ctx := context.Background()
-	match := &fakeProtocol{replies: []protocolReply{{protocol: AgentProtocol{Agent: 1, Host: 1}}}}
+	match := &fakeProtocol{replies: []protocolReply{{agent: 1, host: 1}}}
 	if got := NewAndroidAgentProtocolStep("s1", match, &fakeReinstaller{}).Check(ctx); got.Status != StatusOK {
 		t.Errorf("match: %+v", got)
 	}
-	old := &fakeProtocol{replies: []protocolReply{{protocol: AgentProtocol{Agent: 0, Host: 1}}}}
+	old := &fakeProtocol{replies: []protocolReply{{agent: 0, host: 1}}}
 	reinstaller := &fakeReinstaller{}
 	got := NewAndroidAgentProtocolStep("s1", old, reinstaller).Check(ctx)
 	if got.Status != StatusManual || !strings.Contains(got.Message, "version 0 but this host requires version 1") || !strings.Contains(got.Remedy, "assembleDebug") {
@@ -85,7 +87,7 @@ func TestAndroidAgentProtocolCheck(t *testing.T) {
 
 func TestAndroidAgentProtocolFixReinstallsOnceAndChecksAgain(t *testing.T) {
 	ctx := context.Background()
-	probe := &fakeProtocol{replies: []protocolReply{{protocol: AgentProtocol{Agent: 1, Host: 1}}}}
+	probe := &fakeProtocol{replies: []protocolReply{{agent: 1, host: 1}}}
 	reinstaller := &fakeReinstaller{}
 	got := NewAndroidAgentProtocolStep("s1", probe, reinstaller).Fix(ctx)
 	if got.Status != StatusFixed || reinstaller.calls != 1 || probe.calls != 1 {
@@ -95,16 +97,16 @@ func TestAndroidAgentProtocolFixReinstallsOnceAndChecksAgain(t *testing.T) {
 
 func TestAndroidAgentProtocolFixFailures(t *testing.T) {
 	ctx := context.Background()
-	stale := AgentProtocol{Agent: 0, Host: 1}
+	stale := protocolReply{agent: 0, host: 1}
 
-	probe := &fakeProtocol{replies: []protocolReply{{protocol: stale}}}
+	probe := &fakeProtocol{replies: []protocolReply{stale}}
 	reinstaller := &fakeReinstaller{}
 	got := NewAndroidAgentProtocolStep("s1", probe, reinstaller).Fix(ctx)
 	if got.Status != StatusFailed || reinstaller.calls != 1 || !strings.HasPrefix(got.Message, "after a reinstall") {
 		t.Errorf("still stale: %+v reinstalls=%d", got, reinstaller.calls)
 	}
 
-	got = NewAndroidAgentProtocolStep("s1", &fakeProtocol{replies: []protocolReply{{protocol: stale}}}, &fakeReinstaller{err: errors.New("no apk")}).Fix(ctx)
+	got = NewAndroidAgentProtocolStep("s1", &fakeProtocol{replies: []protocolReply{stale}}, &fakeReinstaller{err: errors.New("no apk")}).Fix(ctx)
 	if got.Status != StatusFailed || !strings.Contains(got.Message, "no apk") {
 		t.Errorf("reinstall error: %+v", got)
 	}

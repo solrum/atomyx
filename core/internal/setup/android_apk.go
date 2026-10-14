@@ -10,7 +10,8 @@ type APKResolver interface {
 	ResolveAgentAPK() (path string, found bool)
 }
 
-const androidAPKStepID = "android-apk"
+// AndroidAPKStepID is the stable identifier the step reports.
+const AndroidAPKStepID = "android-apk"
 
 type androidAPKStep struct{ resolver APKResolver }
 
@@ -20,7 +21,7 @@ func NewAndroidAPKStep(resolver APKResolver) Step {
 	return androidAPKStep{resolver: resolver}
 }
 
-func (androidAPKStep) ID() string { return androidAPKStepID }
+func (androidAPKStep) ID() string { return AndroidAPKStepID }
 
 func (s androidAPKStep) Check(context.Context) Result {
 	path, found := s.resolver.ResolveAgentAPK()

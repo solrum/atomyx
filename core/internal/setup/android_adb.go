@@ -9,7 +9,8 @@ type ToolLocator interface {
 	Locate(name string) (path string, found bool)
 }
 
-const androidAdbStepID = "android-adb"
+// AndroidAdbStepID is the stable identifier the step reports.
+const AndroidAdbStepID = "android-adb"
 
 type androidAdbStep struct{ tools ToolLocator }
 
@@ -20,7 +21,7 @@ func NewAndroidAdbStep(tools ToolLocator) Step {
 	return androidAdbStep{tools: tools}
 }
 
-func (androidAdbStep) ID() string { return androidAdbStepID }
+func (androidAdbStep) ID() string { return AndroidAdbStepID }
 
 func (s androidAdbStep) Check(context.Context) Result {
 	if path, found := s.tools.Locate("adb"); found {

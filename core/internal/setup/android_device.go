@@ -2,32 +2,33 @@ package setup
 
 import "context"
 
-// DeviceState is how adb sees one Android device.
-type DeviceState string
-
+// The states a DeviceStateReader reports for a device adb lists, and the
+// empty state it reports for a device adb does not list.
 const (
 	// DeviceOnline means adb lists the device in the device state.
-	DeviceOnline DeviceState = "online"
+	DeviceOnline = "online"
 	// DeviceOffline means adb lists the device but cannot reach it.
-	DeviceOffline DeviceState = "offline"
+	DeviceOffline = "offline"
 	// DeviceUnauthorized means the device has not accepted this host
 	// for USB debugging.
-	DeviceUnauthorized DeviceState = "unauthorized"
+	DeviceUnauthorized = "unauthorized"
 	// DeviceUnavailable means the device is in the bootloader, recovery
 	// or sideload mode, so no Android shell answers.
-	DeviceUnavailable DeviceState = "unavailable"
+	DeviceUnavailable = "unavailable"
 	// DeviceAbsent means adb does not list the device at all.
-	DeviceAbsent DeviceState = "absent"
+	DeviceAbsent = ""
 )
 
 // DeviceStateReader reports how adb sees an Android device.
 type DeviceStateReader interface {
 	// DeviceState reports the state of the device with the given
-	// serial, or DeviceAbsent when adb does not list it.
-	DeviceState(ctx context.Context, serial string) DeviceState
+	// serial as one of the Device constants, which is DeviceAbsent
+	// when adb does not list it.
+	DeviceState(ctx context.Context, serial string) string
 }
 
-const androidDeviceStepID = "android-device"
+// AndroidDeviceStepID is the stable identifier the step reports.
+const AndroidDeviceStepID = "android-device"
 
 type androidDeviceStep struct {
 	serial string
@@ -41,7 +42,7 @@ func NewAndroidDeviceStep(serial string, reader DeviceStateReader) Step {
 	return androidDeviceStep{serial: serial, reader: reader}
 }
 
-func (androidDeviceStep) ID() string { return androidDeviceStepID }
+func (androidDeviceStep) ID() string { return AndroidDeviceStepID }
 
 func (s androidDeviceStep) Check(ctx context.Context) Result {
 	if s.serial == "" {

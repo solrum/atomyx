@@ -26,14 +26,15 @@ func (f *fakeInstaller) InstallAgent(context.Context, string) error {
 }
 
 type fakeAccessibility struct {
-	state    AccessibilityState
+	agent    bool
+	others   []string
 	readErr  error
 	enableEr error
 	enables  int
 }
 
-func (f *fakeAccessibility) AccessibilityServices(context.Context, string) (AccessibilityState, error) {
-	return f.state, f.readErr
+func (f *fakeAccessibility) AccessibilityServices(context.Context, string) (bool, []string, error) {
+	return f.agent, f.others, f.readErr
 }
 
 func (f *fakeAccessibility) EnableAgentAccessibility(context.Context, string) error {
@@ -75,11 +76,11 @@ func TestAndroidAgentInstalledFix(t *testing.T) {
 
 func TestAndroidAccessibilityCheck(t *testing.T) {
 	ctx := context.Background()
-	on := &fakeAccessibility{state: AccessibilityState{AgentEnabled: true}}
+	on := &fakeAccessibility{agent: true}
 	if got := NewAndroidAccessibilityStep("s1", on).Check(ctx); got.Status != StatusOK {
 		t.Errorf("enabled: %+v", got)
 	}
-	off := &fakeAccessibility{state: AccessibilityState{Others: []string{"com.a/.One", "com.b/.Two"}}}
+	off := &fakeAccessibility{others: []string{"com.a/.One", "com.b/.Two"}}
 	got := NewAndroidAccessibilityStep("s1", off).Check(ctx)
 	if got.Status != StatusManual || !strings.Contains(got.Message, "disables the other enabled accessibility services: com.a/.One, com.b/.Two") {
 		t.Errorf("not enabled lists the others: %+v", got)
@@ -99,7 +100,7 @@ func TestAndroidAccessibilityCheck(t *testing.T) {
 
 func TestAndroidAccessibilityFix(t *testing.T) {
 	ctx := context.Background()
-	control := &fakeAccessibility{state: AccessibilityState{Others: []string{"com.a/.One"}}}
+	control := &fakeAccessibility{others: []string{"com.a/.One"}}
 	got := NewAndroidAccessibilityStep("s1", control).Fix(ctx)
 	if got.Status != StatusFixed || control.enables != 1 || !strings.Contains(got.Message, "now disabled: com.a/.One") {
 		t.Errorf("fix: %+v enables=%d", got, control.enables)

@@ -5,24 +5,13 @@ import (
 	"fmt"
 )
 
-// AgentProtocol pairs the wire protocol version an agent reports with
-// the one this host supports. Agent is zero for an agent that reports
-// none.
-type AgentProtocol struct {
-	Agent int
-	Host  int
-}
-
-// Matches reports whether the agent speaks the version the host
-// requires.
-func (p AgentProtocol) Matches() bool { return p.Agent == p.Host }
-
 // AgentProtocolProbe reads the protocol version of the agent on an
 // Android device without connecting a driver.
 type AgentProtocolProbe interface {
-	// AgentProtocol returns the agent's and the host's protocol
-	// versions, or an error when the agent cannot be reached.
-	AgentProtocol(ctx context.Context, serial string) (AgentProtocol, error)
+	// AgentProtocol returns the protocol version the agent reports,
+	// zero when it reports none, and the one this host requires. It
+	// returns an error only when the agent cannot be reached.
+	AgentProtocol(ctx context.Context, serial string) (agent, host int, err error)
 }
 
 // AgentReinstaller replaces the agent on an Android device with the
@@ -33,7 +22,8 @@ type AgentReinstaller interface {
 	ReinstallAgent(ctx context.Context, serial string) error
 }
 
-const androidAgentProtocolStepID = "android-agent-protocol"
+// AndroidAgentProtocolStepID is the stable identifier the step reports.
+const AndroidAgentProtocolStepID = "android-agent-protocol"
 
 type androidAgentProtocolStep struct {
 	serial      string
@@ -48,41 +38,41 @@ func NewAndroidAgentProtocolStep(serial string, probe AgentProtocolProbe, reinst
 	return androidAgentProtocolStep{serial: serial, probe: probe, reinstaller: reinstaller}
 }
 
-func (androidAgentProtocolStep) ID() string { return androidAgentProtocolStepID }
+func (androidAgentProtocolStep) ID() string { return AndroidAgentProtocolStepID }
 
 const protocolRemedy = "Build the agent from the same source tree as this host with cd platforms/android-agent && ./gradlew :app:assembleDebug, " +
 	"or set ATOMYX_ANDROID_APK to a current agent APK, then run atomyx setup again."
 
 func (s androidAgentProtocolStep) Check(ctx context.Context) Result {
-	protocol, err := s.probe.AgentProtocol(ctx, s.serial)
+	agent, host, err := s.probe.AgentProtocol(ctx, s.serial)
 	if err != nil {
 		return failedFrom("could not read the agent protocol version", err,
 			"Run atomyx setup again once the agent is ready.")
 	}
-	if protocol.Matches() {
-		return Result{Status: StatusOK, Message: fmt.Sprintf("the agent speaks protocol version %d", protocol.Agent)}
+	if agent == host {
+		return Result{Status: StatusOK, Message: fmt.Sprintf("the agent speaks protocol version %d", agent)}
 	}
-	return Result{Status: StatusManual, Message: mismatchMessage(protocol), Remedy: protocolRemedy}
+	return Result{Status: StatusManual, Message: mismatchMessage(agent, host), Remedy: protocolRemedy}
 }
 
 func (s androidAgentProtocolStep) Fix(ctx context.Context) Result {
 	if err := s.reinstaller.ReinstallAgent(ctx, s.serial); err != nil {
 		return failedFrom("could not reinstall the agent", err, protocolRemedy)
 	}
-	protocol, err := s.probe.AgentProtocol(ctx, s.serial)
+	agent, host, err := s.probe.AgentProtocol(ctx, s.serial)
 	if err != nil {
 		return failedFrom("could not read the agent protocol version after the reinstall", err, protocolRemedy)
 	}
-	if !protocol.Matches() {
+	if agent != host {
 		return Result{
 			Status:  StatusFailed,
-			Message: "after a reinstall " + mismatchMessage(protocol),
+			Message: "after a reinstall " + mismatchMessage(agent, host),
 			Remedy:  protocolRemedy,
 		}
 	}
-	return Result{Status: StatusFixed, Message: fmt.Sprintf("reinstalled the agent, which now speaks protocol version %d", protocol.Agent)}
+	return Result{Status: StatusFixed, Message: fmt.Sprintf("reinstalled the agent, which now speaks protocol version %d", agent)}
 }
 
-func mismatchMessage(p AgentProtocol) string {
-	return fmt.Sprintf("the agent speaks protocol version %d but this host requires version %d", p.Agent, p.Host)
+func mismatchMessage(agent, host int) string {
+	return fmt.Sprintf("the agent speaks protocol version %d but this host requires version %d", agent, host)
 }

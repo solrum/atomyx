@@ -13,7 +13,8 @@ type AgentInstaller interface {
 	InstallAgent(ctx context.Context, serial string) error
 }
 
-const androidAgentInstalledStepID = "android-agent-installed"
+// AndroidAgentInstalledStepID is the stable identifier the step reports.
+const AndroidAgentInstalledStepID = "android-agent-installed"
 
 type androidAgentInstalledStep struct {
 	serial    string
@@ -26,7 +27,7 @@ func NewAndroidAgentInstalledStep(serial string, installer AgentInstaller) Fixer
 	return androidAgentInstalledStep{serial: serial, installer: installer}
 }
 
-func (androidAgentInstalledStep) ID() string { return androidAgentInstalledStepID }
+func (androidAgentInstalledStep) ID() string { return AndroidAgentInstalledStepID }
 
 func (s androidAgentInstalledStep) Check(ctx context.Context) Result {
 	installed, err := s.installer.AgentInstalled(ctx, s.serial)
