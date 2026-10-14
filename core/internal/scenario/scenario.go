@@ -130,6 +130,9 @@ type ScenarioRunnerDeps struct {
 	// written in a committed file, so they are not secret. Every other
 	// ExternalEnv entry is.
 	ExternalCommitted map[string]bool
+	// SecretSink, when non-nil, is forwarded to every child
+	// runner.ScriptRunner this ScenarioRunner constructs.
+	SecretSink runner.SecretSink
 	// OnStep, when non-nil, is forwarded to every child
 	// runner.ScriptRunner this ScenarioRunner constructs.
 	OnStep                func(runner.StepEvent)
@@ -340,6 +343,7 @@ func (r *ScenarioRunner) runOne(ctx context.Context, scriptIndex int, scriptPath
 		Artifacts:             artifacts,
 		FailureCapture:        failureCapture,
 		StepGate:              r.deps.StepGate,
+		SecretSink:            r.deps.SecretSink,
 		SourcePath:            childSourcePath(r.deps.SourceDir, scriptPath),
 	})
 

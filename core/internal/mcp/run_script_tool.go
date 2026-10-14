@@ -172,6 +172,7 @@ func registerRunScriptTool(server *mcp.Server, tc *ToolContext) {
 		var actions humanActionLog
 		run, err := tc.RunSession.RunScript(ctx, def.Name, tc.Session.SelectedDescriptor(),
 			func(target scriptTarget) (runner.ScriptResult, error) {
+				target.Secrets.AddExternal(args.Env, nil)
 				var gate runner.StepGate
 				dbg, endDebug := tc.Session.beginScriptDebug(target.Ctx, orch, def, target.Artifacts)
 				defer endDebug()
@@ -188,6 +189,7 @@ func registerRunScriptTool(server *mcp.Server, tc *ToolContext) {
 					Commands:       runner.DefaultCommands(),
 					NetworkCapture: networkCapture,
 					Artifacts:      target.Artifacts,
+					SecretSink:     target.Secrets,
 					OnStep:         target.OnStep,
 					FailureCapture: runner.NewFailureBundle(runner.FailureBundleDeps{
 						Orchestra: orch, Clock: tc.Clock, Logger: tc.Logger, Sink: target.Evidence,

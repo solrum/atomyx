@@ -127,6 +127,7 @@ func startSuiteHost(ctx context.Context, deps Deps, cfg suiteSettings, proxyFlag
 		return nil, err
 	}
 	opened.recordRun(record)
+	record.secrets.AddExternal(cfg.externalEnv, cfg.committedEnv)
 
 	videos := newSuiteVideos(deps.videoLifecycle(videoOn), desc, record.writer)
 	suiteRunner := scenario.NewSuiteRunner(scenario.SuiteRunnerDeps{
@@ -139,6 +140,7 @@ func startSuiteHost(ctx context.Context, deps Deps, cfg suiteSettings, proxyFlag
 		CreateLoadScript:  fsScenarioScriptLoader,
 		ExternalEnv:       cfg.externalEnv,
 		ExternalCommitted: cfg.committedEnv,
+		SecretSink:        record.secrets,
 		ChildArtifacts:    newArtifactSequence(runfolder.ArtifactsDir(record.Dir())).forTarget,
 		OnStep:            stepstream.NewSink(record.writer, deps.logger(), stepstream.WithPublisher(opened.PublishStep)),
 		OnEntryStart:      videos.start,

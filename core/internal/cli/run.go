@@ -159,6 +159,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 			return reportUncaught(ctx, stderr, deps.Debug, err)
 		}
 		defer record.end(ctx, stderr)
+		record.secrets.AddExternal(externalEnv, committedEnv)
 		opened.recordRun(record)
 		record.beginVideo(runCtx, videoLifecycle, desc)
 
@@ -180,6 +181,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 			LoadScript:            fsScenarioScriptLoader(filepath.Dir(absPath)),
 			ExternalEnv:           externalEnv,
 			ExternalCommitted:     committedEnv,
+			SecretSink:            record.secrets,
 			PreconditionsOverride: preconditionsOverride,
 			ChildArtifacts:        childArtifacts.forTarget,
 			StepGate:              dbg.gate(),
@@ -242,6 +244,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}
 	defer record.end(ctx, stderr)
+	record.secrets.AddExternal(externalEnv, committedEnv)
 	opened.recordRun(record)
 	record.beginVideo(runCtx, videoLifecycle, desc)
 
@@ -259,6 +262,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		Artifacts:             artifacts,
 		StepGate:              dbg.gate(),
 		SourcePath:            absPath,
+		SecretSink:            record.secrets,
 		OnStep:                stepstream.NewSink(record.writer, deps.logger(), stepstream.WithPublisher(opened.PublishStep)),
 		FailureCapture: runner.NewFailureBundle(runner.FailureBundleDeps{
 			Orchestra: built.Orchestra, Clock: deps.clock(), Logger: deps.logger(), Sink: artifacts,

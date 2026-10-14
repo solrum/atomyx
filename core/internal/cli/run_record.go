@@ -25,7 +25,10 @@ import (
 // command returns before it records a verdict. The command narrows it
 // through setOutcome once it knows how the run ended.
 type runRecord struct {
-	writer  *runfolder.Writer
+	writer *runfolder.Writer
+	// secrets collects the secret values of this run for as long as the
+	// run folder is written, across every script the run executes.
+	secrets *runner.RunSecrets
 	formats []string
 	outcome runfolder.Outcome
 	mutate  func(*runfolder.Meta)
@@ -79,7 +82,7 @@ func startRunRecord(out runOutput, identity runIdentity) (*runRecord, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating the run folder: %w", err)
 	}
-	return &runRecord{writer: writer, formats: out.Formats, outcome: runfolder.OutcomeError}, nil
+	return &runRecord{writer: writer, secrets: runner.NewRunSecrets(), formats: out.Formats, outcome: runfolder.OutcomeError}, nil
 }
 
 // ID returns the run id, which also correlates the run's step trace.

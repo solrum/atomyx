@@ -33,6 +33,9 @@ type scriptTarget struct {
 	RunID     string
 	Artifacts runner.ScriptArtifacts
 	Evidence  runner.EvidenceWriter
+	// Secrets collects the secret values of the run folder the execution
+	// writes into, shared by every execution of an open run.
+	Secrets *runner.RunSecrets
 	// OnStep receives the step events of the execution and appends them to
 	// the run folder's step stream.
 	OnStep func(runner.StepEvent)
@@ -61,11 +64,11 @@ func (s *runSession) RunScript(
 ) (scriptRun, error) {
 	s.mu.Lock()
 	if open := s.writer; open != nil {
-		counter := s.artifacts
+		counter, secrets := s.artifacts, s.secrets
 		runCtx, end := s.flight.begin(ctx)
 		s.mu.Unlock()
 		defer end()
-		result, err := s.runInOpenRun(runCtx, open, counter, exec)
+		result, err := s.runInOpenRun(runCtx, open, counter, secrets, exec)
 		return scriptRun{ScriptResult: result}, err
 	}
 	runCtx, end := s.bare.begin(ctx)
@@ -75,7 +78,7 @@ func (s *runSession) RunScript(
 }
 
 func (s *runSession) runInOpenRun(
-	ctx context.Context, open *runfolder.Writer, counter *artifactCounter,
+	ctx context.Context, open *runfolder.Writer, counter *artifactCounter, secrets *runner.RunSecrets,
 	exec func(scriptTarget) (runner.ScriptResult, error),
 ) (runner.ScriptResult, error) {
 	dir, err := open.ArtifactsDir()
@@ -83,7 +86,7 @@ func (s *runSession) runInOpenRun(
 		return runner.ScriptResult{}, err
 	}
 	artifacts := newScriptArtifacts(dir, counter, s.logger)
-	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: open.ID(), Artifacts: artifacts, Evidence: artifacts, OnStep: stepstream.NewSink(open, s.logger, stepstream.WithPublisher(s.publishStep))})
+	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: open.ID(), Artifacts: artifacts, Evidence: artifacts, Secrets: secrets, OnStep: stepstream.NewSink(open, s.logger, stepstream.WithPublisher(s.publishStep))})
 	if execErr == nil {
 		s.recordScriptTotals(open, result)
 	}
@@ -107,9 +110,10 @@ func (s *runSession) runAsOwnRun(
 		return scriptRun{}, err
 	}
 	artifacts := newScriptArtifacts(dir, &artifactCounter{}, s.logger)
+	secrets := runner.NewRunSecrets()
 	s.route(w, false)
 	capture := s.beginScriptRecording(ctx, dev, w)
-	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: w.ID(), Artifacts: artifacts, Evidence: artifacts, OnStep: stepstream.NewSink(w, s.logger, stepstream.WithPublisher(s.publishStep))})
+	result, execErr := exec(scriptTarget{Ctx: ctx, RunID: w.ID(), Artifacts: artifacts, Evidence: artifacts, Secrets: secrets, OnStep: stepstream.NewSink(w, s.logger, stepstream.WithPublisher(s.publishStep))})
 	s.unroute(w)
 	outcome := scriptOutcome(ctx, result, execErr)
 	kept := finishScriptRecording(ctx, capture, outcome, result)

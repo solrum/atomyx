@@ -82,9 +82,12 @@ type SuiteRunnerDeps struct {
 	// ExternalCommitted names the ExternalEnv entries whose value is
 	// written in a committed file, so they are not secret.
 	ExternalCommitted map[string]bool
-	LaunchNoReset     *bool
-	ClearDataOnFresh  bool
-	AppArtifact       *string
+	// SecretSink, when non-nil, is forwarded to every script the suite
+	// runs, directly or through a scenario entry.
+	SecretSink       runner.SecretSink
+	LaunchNoReset    *bool
+	ClearDataOnFresh bool
+	AppArtifact      *string
 	// OnStep, when non-nil, is forwarded to every script the suite runs,
 	// directly or through a scenario entry.
 	OnStep func(runner.StepEvent)
@@ -471,6 +474,7 @@ func (r *SuiteRunner) runScriptEntry(ctx context.Context, index, attempt int, en
 		OnStep:                r.stepHook(attempt),
 		Artifacts:             artifacts,
 		FailureCapture:        failureCapture,
+		SecretSink:            r.deps.SecretSink,
 	})
 	return childRunner.Run(ctx, def)
 }
@@ -507,6 +511,7 @@ func (r *SuiteRunner) runScenarioEntry(ctx context.Context, index, attempt int, 
 		PreconditionsOverride: override,
 		OnStep:                r.stepHook(attempt),
 		ChildArtifacts:        r.deps.ChildArtifacts.forAttempt(index, entry.Path, attempt),
+		SecretSink:            r.deps.SecretSink,
 	})
 	return scenarioRunner.Run(ctx, def)
 }

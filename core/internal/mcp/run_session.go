@@ -97,7 +97,10 @@ type runSession struct {
 	mu        sync.Mutex
 	writer    *runfolder.Writer
 	artifacts *artifactCounter
-	flight    *scriptFlight
+	// secrets collects the secret values of the open run, across every
+	// script the run executes.
+	secrets *runner.RunSecrets
+	flight  *scriptFlight
 }
 
 type runSessionDeps struct {
@@ -173,7 +176,7 @@ func (s *runSession) Start(ctx context.Context, name string, source *string, dev
 			"id": predecessor.ID, "newRunId": started.Run.ID,
 		})
 	}
-	s.writer, s.artifacts, s.flight = writer, &artifactCounter{}, newScriptFlight()
+	s.writer, s.artifacts, s.secrets, s.flight = writer, &artifactCounter{}, runner.NewRunSecrets(), newScriptFlight()
 	s.route(writer, true)
 	return startedRun{Run: started.Run, Superseded: started.ErroredPredecessor}, nil
 }
