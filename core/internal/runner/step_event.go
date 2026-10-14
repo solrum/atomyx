@@ -114,13 +114,17 @@ func (r *ScriptRunner) recordTrail(event StepEvent) {
 // step, to the configured FailureCapture. A capture that panics is
 // logged and discarded so evidence gathering can never change the run
 // outcome.
-func (r *ScriptRunner) captureFailure(ctx context.Context, failure StepFailure) {
+func (r *ScriptRunner) captureFailure(ctx context.Context, failure StepFailure, mask func(string) string) {
 	if r.deps.FailureCapture == nil || ctx.Err() != nil {
 		return
 	}
 	r.trailMu.Lock()
-	failure.Events = append([]StepEvent(nil), r.trail...)
+	failure.Events = make([]StepEvent, len(r.trail))
+	for i, event := range r.trail {
+		failure.Events[i] = event.Masked(mask)
+	}
 	r.trailMu.Unlock()
+	failure.Detail = MaskedText(failure.Detail, mask)
 
 	defer func() {
 		if rec := recover(); rec != nil {

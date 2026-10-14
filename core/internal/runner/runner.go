@@ -434,7 +434,7 @@ func (r *ScriptRunner) Run(ctx context.Context, def *script.ScriptDefinition) (S
 			} else {
 				r.captureFailure(ctx, StepFailure{
 					StepNumber: i + 1, Command: step.StepCommand(), Detail: result.Detail,
-				})
+				}, snapshotVariables(rs.variables, rs.secrets).Redactor().String)
 			}
 			break
 		}

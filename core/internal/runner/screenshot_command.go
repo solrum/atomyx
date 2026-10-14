@@ -27,6 +27,6 @@ func (ScreenshotCommand) Execute(step script.ScriptStep, ctx *CommandContext) Co
 	// Driver.Screenshot carries no mime type of its own (Android
 	// encodes JPEG, iOS encodes PNG), so it is sniffed from the image's
 	// own magic bytes rather than assumed from the active platform.
-	ctx.Artifacts.AddScreenshot(label, data, http.DetectContentType(data))
+	ctx.Artifacts.AddScreenshot(ctx.artifactLabel(label), data, http.DetectContentType(data))
 	return CommandResult{Ok: true, Detail: strPtr(fmt.Sprintf("Screenshot saved as \"%s\"", shownLabel))}
 }

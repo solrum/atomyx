@@ -27,3 +27,17 @@ func MaskedText(text *string, mask func(string) string) *string {
 	masked := mask(*text)
 	return &masked
 }
+
+// Masked returns a copy of the event whose summary, token texts and detail
+// pass through mask. The receiver is left as it was.
+func (e StepEvent) Masked(mask func(string) string) StepEvent {
+	e.Summary = mask(e.Summary)
+	e.Detail = MaskedText(e.Detail, mask)
+	tokens := make([]StepToken, len(e.Tokens))
+	for i, token := range e.Tokens {
+		token.Text = mask(token.Text)
+		tokens[i] = token
+	}
+	e.Tokens = tokens
+	return e
+}

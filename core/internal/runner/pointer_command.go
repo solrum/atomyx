@@ -447,7 +447,7 @@ func routePointerCaptures(images []driver.CapturedImage, labels []string, ctx *C
 		if i < len(labels) {
 			label = labels[i]
 		}
-		ctx.Artifacts.AddScreenshot(label, img.Data, img.MimeType)
+		ctx.Artifacts.AddScreenshot(ctx.artifactLabel(label), img.Data, img.MimeType)
 	}
 }
 

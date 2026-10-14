@@ -2,8 +2,10 @@ package runner
 
 import (
 	"context"
+	"strings"
 	"testing"
 
+	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/wire"
 )
 
@@ -68,15 +70,15 @@ func TestSecretTable_SecureReadIsSecretAndPlainReadIsNot(t *testing.T) {
 	}
 }
 
-func TestSecretTable_PlainReadOverSecretClearsTag(t *testing.T) {
+func TestSecretTable_PlainReadOverSecretKeepsTag(t *testing.T) {
 	tr := newTestRunner()
 	tr.driver.StageHierarchy(rootTree(button("go", "Go", "0,0,10,10")))
 	yaml := "appId: com.test\n---\n" +
 		"- read: { selector: { id: go }, field: text, as: v }\n" +
 		"- screenshot: last\n"
 	snap := snapshotAtLastStepWithEnv(t, tr, yaml, map[string]string{"v": "hunter2hunter2"}, 1)
-	if snap.Secret["v"] {
-		t.Fatalf("overwritten variable keeps its tag: %+v", snap.Secret)
+	if !snap.Secret["v"] {
+		t.Fatalf("overwritten variable lost its tag: %+v", snap.Secret)
 	}
 }
 
@@ -132,14 +134,42 @@ func TestSecretTable_SnapshotCopiesTags(t *testing.T) {
 	}
 }
 
-func TestSecretTable_StateReadOverSecretClearsTag(t *testing.T) {
+func TestSecretTable_StateReadOverSecretKeepsTag(t *testing.T) {
 	tr := newTestRunner()
 	tr.driver.StageHierarchy(rootTree(focusedButton("go", "Go", "0,0,10,10")))
 	yaml := "appId: com.test\n---\n" +
 		"- read: { selector: { id: go }, field: focused, as: v }\n" +
 		"- screenshot: last\n"
 	snap := snapshotAtLastStepWithEnv(t, tr, yaml, map[string]string{"v": "hunter2hunter2"}, 1)
-	if snap.Secret["v"] {
-		t.Fatalf("overwritten variable keeps its tag: %+v", snap.Secret)
+	if !snap.Secret["v"] {
+		t.Fatalf("overwritten variable lost its tag: %+v", snap.Secret)
+	}
+}
+
+func TestSecretTable_ExtractIntoAnExternalNameKeepsTagAndFeedsTheSink(t *testing.T) {
+	sink := &collectingSink{}
+	tr := runnerWithSink(sink)
+	tr.driver.StageHierarchy(rootTree())
+	tr.capture.queue = []CapturedRequest{{Method: "POST", URL: "/login", Status: 200, Body: map[string]any{"name": "alice-rotated"}}}
+	yaml := "appId: com.test\nproxy: required\n---\n" +
+		"- capture: \"POST /login as: r\"\n" +
+		"- extract: { from: r, values: { SESSION: $.body.name } }\n" +
+		"- screenshot: last\n"
+	snap := snapshotAtLastStepWithEnv(t, tr, yaml, map[string]string{"SESSION": "initial-session-value"}, 2)
+	if !snap.Secret["SESSION"] {
+		t.Fatalf("a value extracted into an external variable lost its tag: %+v", snap.Secret)
+	}
+	requireSunk(t, sink, "alice-rotated", "initial-session-value")
+}
+
+func TestSecretTable_ScreenshotLabelHidesAnInterpolatedSecret(t *testing.T) {
+	tr := newTestRunner()
+	result := runWithEnv(t, tr, "appId: com.test\n---\n- screenshot: \"shot-${TOKEN}\"\n", map[string]string{"TOKEN": "hunter2hunter2"})
+	shots := result.Artifacts.Screenshots()
+	if len(shots) != 1 {
+		t.Fatalf("got %d screenshots, want 1", len(shots))
+	}
+	if strings.Contains(shots[0].Label, "hunter2hunter2") || shots[0].Label != "shot-"+orchestra.SecureMask {
+		t.Fatalf("label = %q, want the secret masked", shots[0].Label)
 	}
 }

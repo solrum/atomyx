@@ -6,6 +6,7 @@ import (
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/script"
+	"dev.atomyx/internal/script/expression"
 )
 
 // Screenshot is one entry a ScriptArtifacts collector holds.
@@ -211,18 +212,25 @@ type conditionalCommand interface {
 	shouldSkip(ctx *CommandContext) bool
 }
 
-// markSecret records whether the variable name now holds a secret.
-// Overwriting a secret variable with a plain value clears the tag.
+// markSecret records whether the variable name now holds a secret. A
+// variable that was secret before the write stays secret whatever the new
+// value is, because an external variable such as a login token is secret
+// by origin and a value captured into it is as sensitive as the one it
+// replaced. Only the value of a non-boolean write reaches the sink, since
+// a boolean would mask every "true" or "false" word in the run's output.
 func (c *CommandContext) markSecret(name string, secret bool) {
-	if secret && c.SecretSink != nil {
+	secret = secret || c.Secrets[name]
+	if secret && c.SecretSink != nil && c.Variables[name].Kind() != expression.KindBool {
 		c.SecretSink.Add(scriptValueToEnvString(c.Variables[name]))
 	}
-	if c.Secrets == nil {
-		return
-	}
-	if secret {
+	if secret && c.Secrets != nil {
 		c.Secrets[name] = true
-		return
 	}
-	delete(c.Secrets, name)
+}
+
+// artifactLabel returns label with every secret value of the run replaced
+// by the mask. A label names a file in the run folder and a line in the
+// report, so a value interpolated into it must not reach either.
+func (c *CommandContext) artifactLabel(label string) string {
+	return snapshotVariables(c.Variables, c.Secrets).Redactor().String(label)
 }
