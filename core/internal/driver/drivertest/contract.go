@@ -41,6 +41,17 @@ type Hooks struct {
 	// an end-to-end suite driving a real device or agent process,
 	// which has no on-demand way to take that process offline.
 	FailPing func()
+
+	// DeviceCalls, when set, returns the running count of round trips
+	// the driver instance the current sub-test is exercising has made
+	// to the device or agent. The AgentInfo sub-test compares the count
+	// before and after reading AgentInfo to prove it never reaches the
+	// device.
+	//
+	// A nil DeviceCalls skips that comparison. A caller whose fake
+	// transport cannot count requests, or an end-to-end suite against
+	// a real device, leaves it nil and still gets the stability checks.
+	DeviceCalls func() int
 }
 
 // Run executes the driver contract suite against every driver value
@@ -63,6 +74,7 @@ func Run(t *testing.T, newDriver Factory, hooks Hooks) {
 	t.Run("connect lifecycle", func(t *testing.T) { testConnectLifecycle(t, newDriver) })
 	t.Run("disconnect is idempotent", func(t *testing.T) { testDisconnectIdempotent(t, newDriver) })
 	t.Run("ping reports liveness", func(t *testing.T) { testPingReportsLiveness(t, newDriver, hooks) })
+	t.Run("agent info is local and stable", func(t *testing.T) { testAgentInfoIsLocalAndStable(t, newDriver, hooks) })
 	t.Run("context cancellation", func(t *testing.T) { testContextCancellation(t, newDriver) })
 
 	t.Run("tap long press swipe succeed", func(t *testing.T) { testTapLongPressSwipeSucceed(t, newDriver) })
@@ -167,6 +179,36 @@ func testPingReportsLiveness(t *testing.T, newDriver Factory, hooks Hooks) {
 	}
 	if code, _, _ := diag.Describe(err); code != diag.CodeAgentUnreachable {
 		t.Fatalf("Ping() after FailPing code = %q, want %q", code, diag.CodeAgentUnreachable)
+	}
+}
+
+// testAgentInfoIsLocalAndStable asserts that AgentInfo is readable
+// before Connect, returns the same value on every call, and, when
+// hooks.DeviceCalls is wired, makes no round trip to the device.
+func testAgentInfoIsLocalAndStable(t *testing.T, newDriver Factory, hooks Hooks) {
+	d := newDriver()
+	before := d.AgentInfo()
+	if before != d.AgentInfo() {
+		t.Fatal("AgentInfo() before Connect changed between calls, want a stable value")
+	}
+	if err := d.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	defer func() { _ = d.Disconnect() }()
+
+	first := d.AgentInfo()
+	calls := func() int { return 0 }
+	if hooks.DeviceCalls != nil {
+		calls = hooks.DeviceCalls
+	}
+	callsBefore := calls()
+	for i := 0; i < 3; i++ {
+		if got := d.AgentInfo(); got != first {
+			t.Fatalf("AgentInfo() call %d = %+v, want the stable value %+v", i, got, first)
+		}
+	}
+	if after := calls(); after != callsBefore {
+		t.Fatalf("AgentInfo() made %d device calls, want none", after-callsBefore)
 	}
 }
 

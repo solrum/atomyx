@@ -53,6 +53,15 @@ type Driver interface {
 	// disturbing device state.
 	Ping(ctx context.Context) error
 
+	// AgentInfo reports the versions the bound agent declared when
+	// this driver connected. It is filled by a successful Connect and
+	// is the zero AgentInfo before Connect, after a Connect that
+	// failed, and whenever the agent does not report a version. It
+	// never makes a device call, so a caller may invoke it at any
+	// time, and it returns the same value on every call until the
+	// next Connect.
+	AgentInfo() AgentInfo
+
 	// Hierarchy captures the current UI hierarchy. An implementation
 	// must return a fully normalized tree using the canonical
 	// attribute key set; no platform-native field name may leak to

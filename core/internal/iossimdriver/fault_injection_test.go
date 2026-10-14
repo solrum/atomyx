@@ -123,6 +123,7 @@ var boundaryTranslationSkipped = map[string]string{
 	"Platform":     "returns a static string, never an error",
 	"Capabilities": "returns a struct, never an error",
 	"IsConnected":  "returns a bool, never an error",
+	"AgentInfo":    "returns the delegate's stored value, never an error and never issues a wire call",
 	"Disconnect":   "best-effort by contract, never returns a non-nil error",
 	"Ping": "delegates entirely to the embedded IosDriver, whose own fail boundary " +
 		"already classifies this failure; see iosdriver's boundary translation gate",

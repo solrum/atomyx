@@ -110,6 +110,10 @@ type IosDriver struct {
 	connectedRunnerID string
 
 	iproxyStop func()
+
+	// agentInfo is the version pair the runner reported at Connect.
+	// It stays zero until the runner reports versions.
+	agentInfo driver.AgentInfo
 }
 
 // New constructs an IosDriver bound to opts.UDID. conn and proc are
@@ -255,6 +259,10 @@ func (d *IosDriver) Disconnect() error {
 }
 
 func (d *IosDriver) IsConnected() bool { return d.conn.IsConnected() }
+
+// AgentInfo returns the versions the runner reported at Connect. It
+// never contacts the device.
+func (d *IosDriver) AgentInfo() driver.AgentInfo { return d.agentInfo }
 
 // Ping reuses the same "ping" round trip Connect's handshake performs,
 // bounded to pingProbeTimeout so a caller gets a fast answer instead

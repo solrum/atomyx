@@ -459,3 +459,18 @@ func TestInstallUninstallAndClearAppData(t *testing.T) {
 		t.Fatal("IsAppInstalled after UninstallApp reported true")
 	}
 }
+
+func TestAgentInfo_ReportsTheConfiguredValueWithoutRecordingACall(t *testing.T) {
+	d := New()
+	if got := d.AgentInfo(); got != (driver.AgentInfo{}) {
+		t.Fatalf("AgentInfo() on a fresh mock = %+v, want the zero value", got)
+	}
+	want := driver.AgentInfo{ProtocolVersion: 3, AgentVersion: "1.2.3"}
+	d.Agent = want
+	if got := d.AgentInfo(); got != want {
+		t.Fatalf("AgentInfo() = %+v, want %+v", got, want)
+	}
+	if len(d.Calls) != 0 {
+		t.Fatalf("AgentInfo() recorded %d calls, want none", len(d.Calls))
+	}
+}

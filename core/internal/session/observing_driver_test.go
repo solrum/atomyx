@@ -36,6 +36,7 @@ var driverMethodClasses = map[string]methodClass{
 	"Disconnect":        classPassive,
 	"IsConnected":       classPassive,
 	"Ping":              classPassive,
+	"AgentInfo":         classPassive,
 	"WaitForIdle":       classPassive,
 	"CurrentForeground": classPassive,
 	"ListApps":          classPassive,
@@ -586,4 +587,14 @@ func BenchmarkCapture(b *testing.B) {
 	}
 	b.Run("unwrapped", func(b *testing.B) { run(b, prepared()) })
 	b.Run("wrapped", func(b *testing.B) { run(b, session.NewObservingDriver(prepared(), nil)) })
+}
+
+func TestObservingDriver_AgentInfo_ForwardsTheInnerValue(t *testing.T) {
+	inner := mockdriver.New()
+	want := driver.AgentInfo{ProtocolVersion: 2, AgentVersion: "0.9.0"}
+	inner.Agent = want
+	wrapped := session.NewObservingDriver(inner, nil)
+	if got := wrapped.AgentInfo(); got != want {
+		t.Fatalf("AgentInfo() through the observing driver = %+v, want %+v", got, want)
+	}
 }

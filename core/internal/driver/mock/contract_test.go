@@ -27,7 +27,8 @@ func TestDriverSatisfiesContract(t *testing.T) {
 		d = mock.New()
 		return d
 	}, drivertest.Hooks{
-		FailPing: func() { d.FailNextPingForContract(simulatedUnreachablePing()) },
+		DeviceCalls: func() int { return len(d.Calls) },
+		FailPing:    func() { d.FailNextPingForContract(simulatedUnreachablePing()) },
 	})
 }
 
@@ -37,6 +38,7 @@ func TestStreamingDriverSatisfiesContract(t *testing.T) {
 		d = mock.NewStreamingTouchCapable()
 		return d
 	}, drivertest.Hooks{
-		FailPing: func() { d.FailNextPingForContract(simulatedUnreachablePing()) },
+		DeviceCalls: func() int { return len(d.Calls) },
+		FailPing:    func() { d.FailNextPingForContract(simulatedUnreachablePing()) },
 	})
 }

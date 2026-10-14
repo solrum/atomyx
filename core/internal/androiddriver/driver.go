@@ -96,6 +96,10 @@ type AndroidDriver struct {
 	// hostPort is the host-side port the live forward uses: the fixed
 	// option value, or the port adb allocated for this serial.
 	hostPort int
+
+	// agentInfo is the version pair the agent reported at Connect.
+	// It stays zero until the agent reports versions.
+	agentInfo driver.AgentInfo
 }
 
 // New constructs an AndroidDriver bound to opts.Serial. t and proc
@@ -356,6 +360,10 @@ func (d *AndroidDriver) DisconnectContext(ctx context.Context) error {
 }
 
 func (d *AndroidDriver) IsConnected() bool { return d.connected }
+
+// AgentInfo returns the versions the agent reported at Connect. It
+// never contacts the device.
+func (d *AndroidDriver) AgentInfo() driver.AgentInfo { return d.agentInfo }
 
 // Ping reuses the same /health route Connect verifies against,
 // bounded to healthProbeTimeout so a caller gets a fast answer

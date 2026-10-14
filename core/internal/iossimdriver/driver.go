@@ -117,6 +117,10 @@ func (d *IosSimDriver) Ping(ctx context.Context) error {
 	return d.delegate.Ping(ctx)
 }
 
+// AgentInfo returns the versions the delegate's runner reported. It
+// never contacts the device.
+func (d *IosSimDriver) AgentInfo() driver.AgentInfo { return d.delegate.AgentInfo() }
+
 func (d *IosSimDriver) Hierarchy(ctx context.Context) (wire.TreeNodeWire, error) {
 	return d.delegate.Hierarchy(ctx)
 }

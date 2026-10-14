@@ -92,6 +92,10 @@ type Driver struct {
 	LaunchAppErr  error
 	ListAppsErr   error
 	PingErr       error
+
+	// Agent is the AgentInfo the mock reports, settable so a test can
+	// drive a caller's version-reporting path without a real agent.
+	Agent driver.AgentInfo
 }
 
 // Call is one recorded gesture or lifecycle call.
@@ -194,6 +198,10 @@ func (d *Driver) Ping(ctx context.Context) error {
 	d.record("Ping")
 	return nil
 }
+
+// AgentInfo returns the Agent field and records no call, matching the
+// port contract that it never reaches a device.
+func (d *Driver) AgentInfo() driver.AgentInfo { return d.Agent }
 
 // FailNextPingForContract sets err as the error Ping returns until a
 // test clears PingErr. A driver contract suite caller wires this as

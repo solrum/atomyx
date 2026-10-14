@@ -278,6 +278,7 @@ var boundaryTranslationSkipped = map[string]string{
 	"Platform":     "returns a static string, never an error",
 	"Capabilities": "returns a struct, never an error",
 	"IsConnected":  "returns a bool, never an error",
+	"AgentInfo":    "returns a stored value, never an error and never issues a wire call",
 	"Disconnect":   "best-effort by contract, never returns a non-nil error",
 	"WaitForIdle":  "returns a defensive true unconditionally, never issues a wire call",
 	"DeviceInfo":   "derives its result from opts.Serial alone, never issues a wire call",

@@ -400,6 +400,7 @@ var boundaryTranslationSkipped = map[string]string{
 	"Disconnect":   "best-effort by contract, never returns a non-nil error",
 	"WaitForIdle":  "returns a defensive true unconditionally, never issues a wire call",
 	"DeviceInfo":   "derives its result from opts alone, never issues a wire call",
+	"AgentInfo":    "returns a stored value, never an error and never issues a wire call",
 	"CurrentForeground": "always returns a local unsupported diagnostic without touching the conn, " +
 		"because this driver has no way to query the true foreground app",
 	"Connect": "already checked directly by TestIosDriver_Connect_HungPing_SurfacesTypedTimeout " +

@@ -121,6 +121,7 @@ func (o *observingCore) Connect(ctx context.Context) error { return o.inner.Conn
 func (o *observingCore) Disconnect() error                 { return o.inner.Disconnect() }
 func (o *observingCore) IsConnected() bool                 { return o.inner.IsConnected() }
 func (o *observingCore) Ping(ctx context.Context) error    { return o.inner.Ping(ctx) }
+func (o *observingCore) AgentInfo() driver.AgentInfo       { return o.inner.AgentInfo() }
 
 func (o *observingCore) Hierarchy(ctx context.Context) (wire.TreeNodeWire, error) {
 	start := o.beginCapture()
