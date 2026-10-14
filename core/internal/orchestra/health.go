@@ -26,9 +26,9 @@ const HealthCheckTimeoutMs = 5000
 //
 // State names where the session stands: unselected, idle, running,
 // released, borrowed or lost. A session in the released, borrowed or
-// lost state is not probed, so Healthy is false there without meaning the device
-// failed. The orchestra itself leaves State empty because it does not
-// know the holder state.
+// lost state is not probed, so Healthy is false there without
+// meaning the device failed. The orchestra itself leaves State empty
+// because it does not know the holder state.
 type HealthReport struct {
 	Selected bool   `json:"selected"`
 	Healthy  bool   `json:"healthy"`
@@ -56,9 +56,9 @@ type HealthReport struct {
 // failure of the check itself. Both outcomes carry the agent versions
 // the driver recorded at connect, read without a device call.
 //
-// CheckHealth has no error return at all, so a caller that wraps it in a tool or command surface should
-// treat every call as successful and branch on Healthy, not on an
-// error.
+// CheckHealth has no error return at all, so a caller that wraps it
+// in a tool or command surface should treat every call as successful
+// and branch on Healthy, not on an error.
 func (o *Orchestra) CheckHealth(ctx context.Context) HealthReport {
 	pingCtx, cancel := context.WithTimeout(ctx, HealthCheckTimeoutMs*time.Millisecond)
 	defer cancel()

@@ -522,6 +522,10 @@ Protocol version handshake:
 - Provisioner adoption: a recorded runner whose `protocolVersion` differs
   from the host's is not adopted. The provisioner ends it under the
   device lease and launches a runner from the current build.
+- Borrowed device: when a process borrows a device from an idle session
+  and the runner on it reports another protocol version, the borrower
+  replaces that runner. Borrowing across host builds with different
+  protocol versions therefore relaunches the runner.
 - Fixed-port path: a runner that already answers on the fixed port may
   belong to another process, so the host never stops it. It fails with
   `AGENT_VERSION_MISMATCH`, and the remedy is to stop that runner, rebuild
