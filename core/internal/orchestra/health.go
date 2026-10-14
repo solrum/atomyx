@@ -36,6 +36,12 @@ type HealthReport struct {
 	Code     string `json:"code,omitempty"`
 	Message  string `json:"message,omitempty"`
 	Remedy   string `json:"remedy,omitempty"`
+
+	// AgentVersion and ProtocolVersion are the build version and the
+	// wire protocol version the agent reported when the driver
+	// connected. Each is omitted when the agent did not report it.
+	AgentVersion    string `json:"agentVersion,omitempty"`
+	ProtocolVersion int    `json:"protocolVersion,omitempty"`
 }
 
 // CheckHealth probes the bound driver's liveness, bounded by
@@ -47,18 +53,24 @@ type HealthReport struct {
 // A failed probe, including one that misses its own deadline, is
 // folded into an unhealthy report rather than returned as a Go
 // error: an unreachable agent is a normal check outcome, not a
-// failure of the check itself. CheckHealth has no error return at
-// all, so a caller that wraps it in a tool or command surface should
+// failure of the check itself. Both outcomes carry the agent versions
+// the driver recorded at connect, read without a device call.
+//
+// CheckHealth has no error return at all, so a caller that wraps it in a tool or command surface should
 // treat every call as successful and branch on Healthy, not on an
 // error.
 func (o *Orchestra) CheckHealth(ctx context.Context) HealthReport {
 	pingCtx, cancel := context.WithTimeout(ctx, HealthCheckTimeoutMs*time.Millisecond)
 	defer cancel()
+	info := o.driver.AgentInfo()
+	report := HealthReport{Selected: true, AgentVersion: info.AgentVersion, ProtocolVersion: info.ProtocolVersion}
 	if err := o.driver.Ping(pingCtx); err != nil {
 		code, message, remedy := diag.Describe(err)
 		o.runLogger(ctx).Debug("orchestra.checkHealth", logging.LogContext{"healthy": false, "code": code})
-		return HealthReport{Selected: true, Healthy: false, Code: code, Message: message, Remedy: remedy}
+		report.Code, report.Message, report.Remedy = code, message, remedy
+		return report
 	}
 	o.runLogger(ctx).Debug("orchestra.checkHealth", logging.LogContext{"healthy": true})
-	return HealthReport{Selected: true, Healthy: true}
+	report.Healthy = true
+	return report
 }

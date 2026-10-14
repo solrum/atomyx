@@ -300,6 +300,8 @@ None
 - code: string, present only when a probe of a held device failed, a stable failure code.
 - message: string, present only when healthy is false, a human-readable description of the failure or of the state.
 - remedy: string, present only when healthy is false and the failure carries an actionable next step.
+- agentVersion: string, present only when the connected agent reported its build version. Informational.
+- protocolVersion: integer, present only when the connected agent reported the version of its wire protocol with the host.
 
 **Errors and recovery**
 - selected false: call select_device with a platform and id from list_devices before retrying whatever action prompted the health check.

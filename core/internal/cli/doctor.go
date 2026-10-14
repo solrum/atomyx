@@ -140,6 +140,12 @@ func printHealthReport(w io.Writer, platform, deviceID string, report orchestra.
 	_, _ = fmt.Fprintf(w, "Atomyx: device health\n")
 	_, _ = fmt.Fprintf(w, "  platform: %s\n", platform)
 	_, _ = fmt.Fprintf(w, "  device:   %s\n", deviceID)
+	if report.AgentVersion != "" {
+		_, _ = fmt.Fprintf(w, "  agent:    %s\n", report.AgentVersion)
+	}
+	if report.ProtocolVersion != 0 {
+		_, _ = fmt.Fprintf(w, "  protocol: %d\n", report.ProtocolVersion)
+	}
 	if report.Healthy {
 		_, _ = fmt.Fprintf(w, "  healthy:  true\n")
 		return

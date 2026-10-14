@@ -593,6 +593,11 @@ output then carries `held: true`, `healthChecked: false`, and a
 when known. For a free device, `--json` carries `held: false` and
 `healthChecked: true` next to the health fields.
 
+When the connected agent reports its versions, the text output prints
+an `agent:` line with the build version and a `protocol:` line with the
+wire protocol version, and `--json` carries `agentVersion` and
+`protocolVersion`. Each is omitted when the agent does not report it.
+
 Exit codes: `0` when the device is healthy or held by another process,
 `1` when it could not be reached or is unhealthy, `2` when the command
 was misused.

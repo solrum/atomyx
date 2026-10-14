@@ -9,6 +9,7 @@ import (
 
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/diag"
+	"dev.atomyx/internal/driver"
 	mockdriver "dev.atomyx/internal/driver/mock"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/session/sessiontest"
@@ -126,5 +127,51 @@ func TestRunDoctorShortcutDispatchesToDriverDoctor(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "Atomyx: device health") {
 		t.Errorf("stdout: got %q", stdout.String())
+	}
+}
+
+func TestDoctorPrintsAgentVersionsWhenReported(t *testing.T) {
+	drv := mockdriver.New()
+	drv.Agent = driver.AgentInfo{ProtocolVersion: 2, AgentVersion: "0.1.0"}
+	var stdout, stderr bytes.Buffer
+	deps := Deps{Factory: singleMockDriverFactory{driver: drv}, Stdout: &stdout, Stderr: &stderr}
+
+	if code := Doctor(context.Background(), deps, map[string]FlagValue{}); code != 0 {
+		t.Fatalf("exit code: got %d, want 0; stderr: %s", code, stderr.String())
+	}
+	for _, want := range []string{"agent:    0.1.0", "protocol: 2"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Errorf("stdout: got %q, want a %q line", stdout.String(), want)
+		}
+	}
+}
+
+func TestDoctorOmitsAgentVersionsWhenUnreported(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	deps := Deps{Factory: singleMockDriverFactory{driver: mockdriver.New()}, Stdout: &stdout, Stderr: &stderr}
+
+	if code := Doctor(context.Background(), deps, map[string]FlagValue{}); code != 0 {
+		t.Fatalf("exit code: got %d, want 0; stderr: %s", code, stderr.String())
+	}
+	if strings.Contains(stdout.String(), "agent:") || strings.Contains(stdout.String(), "protocol:") {
+		t.Errorf("stdout: got %q, want no agent or protocol line", stdout.String())
+	}
+}
+
+func TestDoctorJSONCarriesAgentVersions(t *testing.T) {
+	drv := mockdriver.New()
+	drv.Agent = driver.AgentInfo{ProtocolVersion: 2, AgentVersion: "0.1.0"}
+	var stdout, stderr bytes.Buffer
+	deps := Deps{Factory: singleMockDriverFactory{driver: drv}, Stdout: &stdout, Stderr: &stderr}
+
+	if code := Doctor(context.Background(), deps, map[string]FlagValue{"--json": true}); code != 0 {
+		t.Fatalf("exit code: got %d, want 0; stderr: %s", code, stderr.String())
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &decoded); err != nil {
+		t.Fatalf("decoding doctor --json output: %v", err)
+	}
+	if decoded["agentVersion"] != "0.1.0" || decoded["protocolVersion"] != float64(2) {
+		t.Fatalf("doctor --json = %v, want agentVersion 0.1.0 and protocolVersion 2", decoded)
 	}
 }

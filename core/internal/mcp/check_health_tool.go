@@ -22,6 +22,7 @@ func registerCheckHealthTool(server *mcp.Server, tc *ToolContext) {
 		Description: "Report whether a device is currently bound to this session and, " +
 			"when one is, whether it answers a quick liveness check. Returns " +
 			"selected and healthy booleans, a state (unselected, idle, running, released, borrowed or lost), plus a code and remedy when unhealthy. " +
+			"When the agent reports them, it also returns agentVersion (the agent build) and protocolVersion (the wire protocol version). " +
 			"Does not run a flow or change app state. Call this to diagnose a " +
 			"stalled session before retrying an action, instead of guessing from " +
 			"a timed-out call.",

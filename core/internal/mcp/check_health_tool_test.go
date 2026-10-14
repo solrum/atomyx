@@ -5,6 +5,7 @@ import (
 
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/diag"
+	"dev.atomyx/internal/driver"
 	mockdriver "dev.atomyx/internal/driver/mock"
 	"dev.atomyx/internal/storage"
 )
@@ -82,5 +83,34 @@ func TestCheckHealth_UnreachableAgentReportsHealthyFalseWithoutIsError(t *testin
 	}
 	if hint, _ := decoded["remedy"].(string); hint == "" {
 		t.Fatalf("check_health remedy: got %v, want a non-empty remedy", decoded["remedy"])
+	}
+}
+
+func TestCheckHealth_ReportsAgentVersionsOnlyWhenTheAgentReportsThem(t *testing.T) {
+	drv := mockdriver.New()
+	drv.Agent = driver.AgentInfo{ProtocolVersion: 3, AgentVersion: "0.1.0"}
+	cs, ctx := testServer(t, ServerDeps{
+		Probe:   device.NewStaticProbe(),
+		Factory: singleMockDriverFactory{driver: drv},
+		Storage: storage.NewInMemoryStorage(),
+	})
+	selectMockDevice(t, cs, ctx)
+
+	_, decoded := callTool(t, cs, ctx, "check_health", map[string]any{})
+	if decoded["agentVersion"] != "0.1.0" || decoded["protocolVersion"] != float64(3) {
+		t.Fatalf("check_health = %v, want agentVersion 0.1.0 and protocolVersion 3", decoded)
+	}
+
+	bare, bareCtx := testServer(t, ServerDeps{
+		Probe:   device.NewStaticProbe(),
+		Factory: singleMockDriverFactory{driver: mockdriver.New()},
+		Storage: storage.NewInMemoryStorage(),
+	})
+	selectMockDevice(t, bare, bareCtx)
+	_, decoded = callTool(t, bare, bareCtx, "check_health", map[string]any{})
+	for _, key := range []string{"agentVersion", "protocolVersion"} {
+		if _, present := decoded[key]; present {
+			t.Fatalf("check_health carries %s for an agent that reports none: %v", key, decoded)
+		}
 	}
 }
