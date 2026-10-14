@@ -27,6 +27,8 @@ func TestIOSXcodeStep(t *testing.T) {
 		{"no xcrun", fakeLocator{}, fakeDeveloperDir{dir: "/x"}, StatusManual, "xcode-select --install"},
 		{"nothing selected", present, fakeDeveloperDir{err: errors.New("no developer tools")}, StatusManual, "xcode-select -s"},
 		{"blank selection", present, fakeDeveloperDir{dir: "  \n"}, StatusManual, "xcode-select -s"},
+		{"command line tools only", present, fakeDeveloperDir{dir: "/Library/Developer/CommandLineTools\n"}, StatusManual, "Install Xcode from the App Store"},
+		{"renamed Xcode bundle", present, fakeDeveloperDir{dir: "/Applications/Xcode-15.app/Contents/Developer"}, StatusOK, ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

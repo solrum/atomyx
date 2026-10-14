@@ -22,7 +22,9 @@ type iosXcodeStep struct {
 }
 
 // NewIOSXcodeStep returns the step that requires xcrun on the host
-// search path and a selected developer directory. It has no fix,
+// search path and a selected developer directory inside a full Xcode
+// installation, because the command line tools alone cannot build the
+// iOS agent. It has no fix,
 // because installing the toolchain is the operator's decision.
 func NewIOSXcodeStep(tools ToolLocator, dir DeveloperDirReader) Step {
 	return iosXcodeStep{tools: tools, dir: dir}
@@ -46,5 +48,25 @@ func (s iosXcodeStep) Check(ctx context.Context) Result {
 			Remedy:  "Install Xcode, then select it with sudo xcode-select -s /Applications/Xcode.app/Contents/Developer, or run xcode-select --install for the command line tools, then run atomyx setup again.",
 		}
 	}
-	return Result{Status: StatusOK, Message: "xcrun is available and the developer directory is " + strings.TrimSpace(dir)}
+	dir = strings.TrimSpace(dir)
+	if !insideAppBundle(dir) {
+		return Result{
+			Status:  StatusManual,
+			Message: "the developer directory " + dir + " holds only the command line tools, which cannot build or run the iOS agent",
+			Remedy:  "Install Xcode from the App Store, then select it with sudo xcode-select -s /Applications/Xcode.app/Contents/Developer and run atomyx setup again.",
+		}
+	}
+	return Result{Status: StatusOK, Message: "xcrun is available and the developer directory is " + dir}
+}
+
+// insideAppBundle reports whether dir sits inside an application
+// bundle, which is where a full Xcode keeps its developer directory.
+// The command line tools live outside any bundle.
+func insideAppBundle(dir string) bool {
+	for _, segment := range strings.Split(dir, "/") {
+		if strings.HasSuffix(segment, ".app") {
+			return true
+		}
+	}
+	return false
 }
