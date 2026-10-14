@@ -93,7 +93,7 @@ func (o *Orchestra) CheckHealth(ctx context.Context) HealthReport {
 // than Atomyx's own that the driver found on the device, or returns
 // an empty string when it found none or cannot report them.
 func (o *Orchestra) foreignAutomationWarning() string {
-	reporter, ok := driver.As[driver.ForeignAutomationReporter](o.driver)
+	reporter, ok := driver.AsForeignAutomationReporter(o.driver)
 	if !ok {
 		return ""
 	}

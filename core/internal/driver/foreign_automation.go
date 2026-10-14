@@ -1,7 +1,5 @@
 package driver
 
-import "context"
-
 // ForeignAutomationSession describes one UI automation session running
 // on the target device that Atomyx did not start. Two automation
 // sessions driving the same device can interfere with each other, so
@@ -33,5 +31,3 @@ type ForeignAutomationReporter interface {
 func AsForeignAutomationReporter(d Driver) (ForeignAutomationReporter, bool) {
 	return As[ForeignAutomationReporter](d)
 }
-
-var _ = context.Background
