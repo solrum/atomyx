@@ -194,14 +194,16 @@ func (c *RunCatalog) workerLinks(runs []runfolder.Meta) map[string][]string {
 }
 
 // DeletePruneUnit deletes every run of unit, the root first and then its
-// workers, so a failure part way leaves workers that belong to no parent
-// rather than a parent whose index names missing workers.
+// workers.
 //
 // It checks every member for a live writer before deleting any, and when
 // one is live it deletes nothing and returns an error that satisfies
 // errors.Is(err, ErrRunLive). A member that is already gone counts as
-// deleted. Any other failure is returned after the remaining members
-// were still attempted.
+// deleted. When the root cannot be deleted the call returns that error
+// at once and leaves every worker in place, so a kept parent never has
+// an index that names a missing worker. When a worker cannot be deleted
+// the remaining workers are still attempted and every failure is
+// returned together.
 func (c *RunCatalog) DeletePruneUnit(unit PruneUnit) error {
 	if c.live != nil {
 		for _, id := range unit.Members {
@@ -211,8 +213,11 @@ func (c *RunCatalog) DeletePruneUnit(unit PruneUnit) error {
 		}
 	}
 	var errs []error
-	for _, id := range unit.Members {
+	for i, id := range unit.Members {
 		if _, err := c.Delete(id); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			if i == 0 {
+				return fmt.Errorf("run %s: %w", id, err)
+			}
 			errs = append(errs, fmt.Errorf("run %s: %w", id, err))
 		}
 	}

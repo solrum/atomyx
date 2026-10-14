@@ -323,6 +323,38 @@ func TestDeletePruneUnitRefusesAUnitWithALiveWorkerAndRemovesNothing(t *testing.
 	}
 }
 
+// flipLive reports an id as quiet on its first query and live after that,
+// which models a writer that appears between the pre-check and the delete.
+type flipLive struct {
+	id    string
+	calls int
+}
+
+func (f *flipLive) IsLive(id string) bool {
+	if id != f.id {
+		return false
+	}
+	f.calls++
+	return f.calls > 1
+}
+
+func TestDeletePruneUnitLeavesWorkersWhenTheRootCannotBeDeleted(t *testing.T) {
+	root := t.TempDir()
+	c := NewRunCatalog(mustStorage(t, root), root, &flipLive{id: "suite"})
+	writePruneRun(t, root, finishedMeta("suite", 30*pruneDay))
+	writePruneRun(t, root, withParent(finishedMeta("worker", 30*pruneDay), "suite"))
+	unit := PruneUnit{Root: finishedMeta("suite", 30*pruneDay), Members: []string{"suite", "worker"}}
+
+	err := c.DeletePruneUnit(unit)
+
+	if !errors.Is(err, ErrRunLive) {
+		t.Fatalf("DeletePruneUnit = %v, want ErrRunLive from the root", err)
+	}
+	if !runExists(root, "suite") || !runExists(root, "worker") {
+		t.Error("a worker was deleted although the root could not be")
+	}
+}
+
 func mustStorage(t *testing.T, root string) Storage {
 	t.Helper()
 	fs, err := NewFileStorage(FileStorageOptions{Root: root})
