@@ -60,7 +60,10 @@ func Aggregate(records []Record, window Window) []TestStats {
 			if group[i].StartedAtMs != group[j].StartedAtMs {
 				return group[i].StartedAtMs > group[j].StartedAtMs
 			}
-			return group[i].RunID > group[j].RunID
+			if group[i].RunID != group[j].RunID {
+				return group[i].RunID > group[j].RunID
+			}
+			return group[i].EntryIndex > group[j].EntryIndex
 		})
 		if window.LastN > 0 && len(group) > window.LastN {
 			group = group[:window.LastN]

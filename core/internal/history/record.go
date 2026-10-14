@@ -26,4 +26,7 @@ type Record struct {
 	Outcome     Outcome
 	DurationMs  int64
 	HasDuration bool
+	// EntryIndex is the position of the entry inside its suite index, and
+	// zero for a script run. It orders records of one run deterministically.
+	EntryIndex int
 }

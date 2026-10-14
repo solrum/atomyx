@@ -24,12 +24,15 @@ type Source interface {
 //
 //   - A run that has not completed, or that ended cancelled, device lost,
 //     or interrupted, says nothing about the test and yields no record.
+//     This holds for a suite run too, even when it has an index.
 //   - A suite run with an index contributes one record per index entry
 //     and none for its own meta, so a suite is never counted twice.
 //   - A worker run whose sharding parent is also present contributes
 //     nothing, because the parent index already holds its entries.
 //   - A suite run without an index, such as a single scenario run, is
 //     keyed by its own meta.
+//   - An index entry with no attempts was never run, for example a shard
+//     entry a worker did not reach, and yields no record.
 //   - A run with no test key is keyed by its script path, and a run with
 //     neither is skipped.
 func Collect(source Source) ([]Record, error) {
@@ -44,6 +47,9 @@ func Collect(source Source) ([]Record, error) {
 	var records []Record
 	for _, m := range metas {
 		if m.CompletedAt == nil || m.ParentRunID != "" && present[m.ParentRunID] {
+			continue
+		}
+		if m.Result != runfolder.ResultPassed && m.Result != runfolder.ResultFailed {
 			continue
 		}
 		if m.Kind == runfolder.KindSuite {
@@ -72,7 +78,7 @@ func suiteRecords(source Source, m runfolder.Meta) ([]Record, bool, error) {
 		return nil, false, fmt.Errorf("reading the index of run %s: %w", m.RunID, err)
 	}
 	records := make([]Record, 0, len(index.Entries))
-	for _, entry := range index.Entries {
+	for i, entry := range index.Entries {
 		outcome, ok := entryOutcome(entry)
 		if !ok {
 			continue
@@ -82,12 +88,16 @@ func suiteRecords(source Source, m runfolder.Meta) ([]Record, bool, error) {
 			RunID:       m.RunID,
 			StartedAtMs: m.StartedAt,
 			Outcome:     outcome,
+			EntryIndex:  i,
 		})
 	}
 	return records, true, nil
 }
 
 func entryOutcome(entry runfolder.IndexEntry) (Outcome, bool) {
+	if len(entry.Attempts) == 0 {
+		return "", false
+	}
 	switch entry.Status {
 	case runfolder.ResultPassed:
 		if entry.Flaky {

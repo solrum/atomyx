@@ -236,8 +236,8 @@ func seedStatsStore(t *testing.T) {
 	}
 	seedRecordedRun(t, root, "c", runsEpoch, time.Second, runfolder.OutcomePassed, runfolder.Meta{ScriptPath: "/abs/c.yml"})
 	seedSuiteRun(t, root, runsEpoch.Add(5*time.Hour), []runfolder.IndexEntry{
-		{Path: "x.yml", TestKey: "flows/x.yml", Status: runfolder.ResultPassed, Flaky: true},
-		{Path: "a.yml", TestKey: "flows/a.yml", Status: runfolder.ResultPassed},
+		{Path: "x.yml", TestKey: "flows/x.yml", Status: runfolder.ResultPassed, Flaky: true, Attempts: []runfolder.IndexAttempt{{Number: 1, Result: runfolder.ResultPassed}}},
+		{Path: "a.yml", TestKey: "flows/a.yml", Status: runfolder.ResultPassed, Attempts: []runfolder.IndexAttempt{{Number: 1, Result: runfolder.ResultPassed}}},
 	})
 	seedRecordedRun(t, root, "cancelled", runsEpoch, time.Second, runfolder.OutcomeCancelled, runfolder.Meta{TestKey: "flows/a.yml"})
 }

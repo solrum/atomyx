@@ -77,9 +77,9 @@ func TestCollectSuiteContributesIndexEntriesNotItsOwnMeta(t *testing.T) {
 	source := fakeSource{
 		metas: []runfolder.Meta{suite},
 		indexes: map[string]runfolder.Index{"s1": {SchemaVersion: 1, RunID: "s1", Entries: []runfolder.IndexEntry{
-			{Path: "a.yml", TestKey: "flows/a.yml", Status: runfolder.ResultPassed},
-			{Path: "b.yml", Status: runfolder.ResultPassed, Flaky: true},
-			{Path: "c.yml", TestKey: "flows/c.yml", Status: runfolder.ResultFailed},
+			{Path: "a.yml", TestKey: "flows/a.yml", Status: runfolder.ResultPassed, Attempts: []runfolder.IndexAttempt{{Number: 1}}},
+			{Path: "b.yml", Status: runfolder.ResultPassed, Flaky: true, Attempts: []runfolder.IndexAttempt{{Number: 1}}},
+			{Path: "c.yml", TestKey: "flows/c.yml", Status: runfolder.ResultFailed, Attempts: []runfolder.IndexAttempt{{Number: 1}}},
 		}}},
 	}
 	records, err := Collect(source)
@@ -113,7 +113,7 @@ func TestCollectCountsAShardedEntryOnceThroughItsParent(t *testing.T) {
 	parent := done("p1", runfolder.KindSuite, runfolder.ResultPassed, 1000, 2000)
 	worker := done("w1", runfolder.KindSuite, runfolder.ResultPassed, 1100, 1900)
 	worker.ParentRunID = "p1"
-	entry := runfolder.IndexEntry{Path: "a.yml", TestKey: "a.yml", Status: runfolder.ResultPassed}
+	entry := runfolder.IndexEntry{Path: "a.yml", TestKey: "a.yml", Status: runfolder.ResultPassed, Attempts: []runfolder.IndexAttempt{{Number: 1}}}
 	source := fakeSource{
 		metas: []runfolder.Meta{parent, worker},
 		indexes: map[string]runfolder.Index{
@@ -151,3 +151,73 @@ type failingIndex struct {
 }
 
 func (f failingIndex) ReadIndex(string) (runfolder.Index, error) { return runfolder.Index{}, f.err }
+
+func TestCollectCancelledSuiteWithIndexContributesNothing(t *testing.T) {
+	suite := done("s1", runfolder.KindSuite, runfolder.ResultCancelled, 1, 2)
+	source := fakeSource{
+		metas: []runfolder.Meta{suite},
+		indexes: map[string]runfolder.Index{"s1": {Entries: []runfolder.IndexEntry{
+			{Path: "a.yml", Status: runfolder.ResultPassed, Attempts: []runfolder.IndexAttempt{{Number: 1}}},
+		}}},
+	}
+	records, err := Collect(source)
+	if err != nil || len(records) != 0 {
+		t.Fatalf("records = %+v, err = %v", records, err)
+	}
+}
+
+func TestCollectSkipsIndexEntriesWithoutAttempts(t *testing.T) {
+	suite := done("s1", runfolder.KindSuite, runfolder.ResultFailed, 1, 2)
+	source := fakeSource{
+		metas: []runfolder.Meta{suite},
+		indexes: map[string]runfolder.Index{"s1": {Entries: []runfolder.IndexEntry{
+			{Path: "ran.yml", Status: runfolder.ResultPassed, Attempts: []runfolder.IndexAttempt{{Number: 1}}},
+			{Path: "never.yml", Status: runfolder.ResultFailed},
+		}}},
+	}
+	records, err := Collect(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := keysOf(records), []string{"ran.yml=passed"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("records = %v, want %v", got, want)
+	}
+}
+
+func TestCollectWorkerWithParentPresentButNoIndexIsSkipped(t *testing.T) {
+	parent := done("p1", runfolder.KindSuite, runfolder.ResultPassed, 1000, 2000)
+	worker := done("w1", runfolder.KindSuite, runfolder.ResultPassed, 1100, 1900)
+	worker.ParentRunID = "p1"
+	worker.TestKey = "a.yml"
+	parent.TestKey = "parent.yml"
+	records, err := Collect(fakeSource{metas: []runfolder.Meta{parent, worker}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := keysOf(records), []string{"parent.yml=passed"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("records = %v, want %v", got, want)
+	}
+}
+
+func TestCollectKeepsDuplicateKeysInsideOneSuite(t *testing.T) {
+	suite := done("s1", runfolder.KindSuite, runfolder.ResultFailed, 1, 2)
+	attempt := []runfolder.IndexAttempt{{Number: 1}}
+	source := fakeSource{
+		metas: []runfolder.Meta{suite},
+		indexes: map[string]runfolder.Index{"s1": {Entries: []runfolder.IndexEntry{
+			{Path: "a.yml", TestKey: "k", Status: runfolder.ResultPassed, Attempts: attempt},
+			{Path: "b.yml", TestKey: "k", Status: runfolder.ResultFailed, Attempts: attempt},
+		}}},
+	}
+	records, err := Collect(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stats := Aggregate(records, Window{})
+	if len(stats) != 1 || stats[0].Runs != 2 || stats[0].Passed != 1 || stats[0].Failed != 1 {
+		t.Fatalf("stats = %+v", stats)
+	}
+	if got := stats[0].LastOutcomes; got[0] != OutcomeFailed || got[1] != OutcomePassed {
+		t.Fatalf("last outcomes = %v, want the later entry first", got)
+	}
+}
