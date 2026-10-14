@@ -433,7 +433,7 @@ func (d *AndroidDriver) Ping(ctx context.Context) error {
 // agentNotReadyRemedy is the actionable next step reported when the
 // agent answered /health but declared itself unable to serve
 // requests, as opposed to not answering at all.
-const agentNotReadyRemedy = "Re-enable the accessibility service on the device, then try again."
+const agentNotReadyRemedy = "Re-enable the accessibility service on the device, or run `atomyx setup --platform android` to find what is missing, then try again."
 
 // classifyHealthFailure turns a failed /health call into a diag error,
 // distinguishing an agent that never answered from one that answered

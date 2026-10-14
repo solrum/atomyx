@@ -610,6 +610,9 @@ func TestAndroidDriver_Ping_HealthNotReady_ReturnsAgentNotReadyWithReason(t *tes
 	if remedy == "" {
 		t.Fatal("Ping() remedy is empty, want an actionable hint")
 	}
+	if !strings.Contains(remedy, "atomyx setup --platform android") {
+		t.Fatalf("Ping() remedy = %q, want it to name atomyx setup", remedy)
+	}
 	for _, forbidden := range []string{"http", "127.0.0.1", "get ", "/health", ":8765"} {
 		if strings.Contains(strings.ToLower(message), forbidden) || strings.Contains(strings.ToLower(remedy), forbidden) {
 			t.Fatalf("Ping() message/remedy names the route, host, or port: message=%q remedy=%q", message, remedy)
