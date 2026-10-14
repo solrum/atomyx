@@ -23,6 +23,10 @@ version: "2"
 
 run:
   timeout: 5m
+  # Compile and lint the files behind the e2e build tag too, so a
+  # broken device-lab test fails the normal gate.
+  build-tags:
+    - e2e
 
 issues:
   # Report every finding. golangci-lint otherwise caps output at 50 per

@@ -79,7 +79,7 @@ gen-schema:
 check-schema:
 	bash scripts/check-schema-fresh.sh
 
-# The full local gate for the core module: format, build, vet, the
+# The full local gate for the core module: format, build, vet, the e2e-tag vet, the
 # layer-import gate, the lint gate, the comment gate, the raw-open
 # gate, the run folder layout gate, the loopback listener gate, the
 # inspector boundary gate, the schema freshness gate, and the
@@ -98,6 +98,8 @@ check:
 	go build ./...
 	@echo "Vet ..."
 	go vet ./...
+	@echo "E2E compile gate ..."
+	go vet -tags e2e ./...
 	@echo "Layer-import gate ..."
 	go-arch-lint check --project-path .
 	@echo "Lint gate ..."

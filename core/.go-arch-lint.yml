@@ -81,6 +81,8 @@ components:
     in: internal/attach
   runfolder:
     in: internal/runfolder
+  history:
+    in: internal/history
   session:
     in: internal/session
   sessiontest:
@@ -258,6 +260,7 @@ deps:
       - recording
       - shard
       - setup
+      - history
   skills:
     anyVendorDeps: true
   storage:
@@ -305,6 +308,10 @@ deps:
   runfolder:
     mayDependOn:
       - flock
+  history:
+    mayDependOn:
+      - runfolder
+      - diag
   stepstream:
     mayDependOn:
       - runner
