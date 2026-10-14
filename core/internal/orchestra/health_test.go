@@ -93,3 +93,51 @@ func TestOrchestra_CheckHealth_OmitsUnreportedVersionsFromJSON(t *testing.T) {
 		t.Fatalf("report %s carries a version field, want both omitted when the agent reports none", encoded)
 	}
 }
+
+func TestOrchestra_CheckHealth_WarnsAboutForeignAutomationWithoutChangingHealth(t *testing.T) {
+	d := mock.New()
+	d.SetForeignAutomation(
+		driver.ForeignAutomationSession{Name: "com.example.UITests.xctrunner", Kind: "XCUITest runner"},
+		driver.ForeignAutomationSession{Name: "WebDriverAgentRunner-Runner", Kind: "WebDriverAgent"},
+	)
+	o, _ := newTestOrchestra(d)
+
+	report := o.CheckHealth(context.Background())
+
+	if !report.Healthy {
+		t.Fatalf("Healthy = false, want a warning to leave health unchanged")
+	}
+	if len(report.Warnings) != 1 {
+		t.Fatalf("Warnings = %q, want exactly one", report.Warnings)
+	}
+	for _, want := range []string{"com.example.UITests.xctrunner (XCUITest runner)", "WebDriverAgentRunner-Runner (WebDriverAgent)", "Stop the other UI automation session"} {
+		if !strings.Contains(report.Warnings[0], want) {
+			t.Fatalf("warning %q does not contain %q", report.Warnings[0], want)
+		}
+	}
+}
+
+func TestOrchestra_CheckHealth_WarnsEvenWhenTheAgentIsUnreachable(t *testing.T) {
+	d := mock.New()
+	d.SetForeignAutomation(driver.ForeignAutomationSession{Name: "WebDriverAgentRunner-Runner", Kind: "WebDriverAgent"})
+	d.FailNextPingForContract(diag.New(diag.CodeAgentUnreachable, "unreachable", "Retry.", nil))
+	o, _ := newTestOrchestra(d)
+
+	report := o.CheckHealth(context.Background())
+
+	if report.Healthy || len(report.Warnings) != 1 {
+		t.Fatalf("report = %+v, want unhealthy with one warning", report)
+	}
+}
+
+func TestOrchestra_CheckHealth_OmitsWarningsFromJSONWhenThereAreNone(t *testing.T) {
+	o, _ := newTestOrchestra(mock.New())
+
+	encoded, err := json.Marshal(o.CheckHealth(context.Background()))
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if strings.Contains(string(encoded), "warnings") {
+		t.Fatalf("report %s carries warnings, want the field omitted", encoded)
+	}
+}

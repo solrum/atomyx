@@ -2,9 +2,12 @@ package orchestra
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"dev.atomyx/internal/diag"
+	"dev.atomyx/internal/driver"
 	"dev.atomyx/internal/logging"
 )
 
@@ -42,6 +45,12 @@ type HealthReport struct {
 	// connected. Each is omitted when the agent did not report it.
 	AgentVersion    string `json:"agentVersion,omitempty"`
 	ProtocolVersion int    `json:"protocolVersion,omitempty"`
+
+	// Warnings lists conditions worth a look that do not make the
+	// device unhealthy, for example another UI automation session
+	// active on the device. It is omitted when there are none, and a
+	// warning never changes Healthy.
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // CheckHealth probes the bound driver's liveness, bounded by
@@ -54,7 +63,9 @@ type HealthReport struct {
 // folded into an unhealthy report rather than returned as a Go
 // error: an unreachable agent is a normal check outcome, not a
 // failure of the check itself. Both outcomes carry the agent versions
-// the driver recorded at connect, read without a device call.
+// the driver recorded at connect, and any warnings about foreign UI
+// automation sessions the driver found at connect, read without a
+// device call.
 //
 // CheckHealth has no error return at all, so a caller that wraps it
 // in a tool or command surface should treat every call as successful
@@ -64,6 +75,9 @@ func (o *Orchestra) CheckHealth(ctx context.Context) HealthReport {
 	defer cancel()
 	info := o.driver.AgentInfo()
 	report := HealthReport{Selected: true, AgentVersion: info.AgentVersion, ProtocolVersion: info.ProtocolVersion}
+	if warning := o.foreignAutomationWarning(); warning != "" {
+		report.Warnings = []string{warning}
+	}
 	if err := o.driver.Ping(pingCtx); err != nil {
 		code, message, remedy := diag.Describe(err)
 		o.runLogger(ctx).Debug("orchestra.checkHealth", logging.LogContext{"healthy": false, "code": code})
@@ -73,4 +87,24 @@ func (o *Orchestra) CheckHealth(ctx context.Context) HealthReport {
 	o.runLogger(ctx).Debug("orchestra.checkHealth", logging.LogContext{"healthy": true})
 	report.Healthy = true
 	return report
+}
+
+// foreignAutomationWarning describes the UI automation sessions other
+// than Atomyx's own that the driver found on the device, or returns
+// an empty string when it found none or cannot report them.
+func (o *Orchestra) foreignAutomationWarning() string {
+	reporter, ok := driver.As[driver.ForeignAutomationReporter](o.driver)
+	if !ok {
+		return ""
+	}
+	sessions := reporter.ForeignAutomation()
+	if len(sessions) == 0 {
+		return ""
+	}
+	parts := make([]string, len(sessions))
+	for i, s := range sessions {
+		parts[i] = fmt.Sprintf("%s (%s)", s.Name, s.Kind)
+	}
+	return "Another UI automation session is active on this device: " + strings.Join(parts, ", ") +
+		". Stop the other UI automation session if steps behave unexpectedly."
 }

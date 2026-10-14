@@ -175,3 +175,38 @@ func TestDoctorJSONCarriesAgentVersions(t *testing.T) {
 		t.Fatalf("doctor --json = %v, want agentVersion 0.1.0 and protocolVersion 2", decoded)
 	}
 }
+
+func TestDoctorPrintsForeignAutomationWarning(t *testing.T) {
+	drv := mockdriver.New()
+	drv.SetForeignAutomation(driver.ForeignAutomationSession{Name: "WebDriverAgentRunner-Runner", Kind: "WebDriverAgent"})
+	var stdout, stderr bytes.Buffer
+	deps := Deps{Factory: singleMockDriverFactory{driver: drv}, Stdout: &stdout, Stderr: &stderr}
+
+	if code := Doctor(context.Background(), deps, map[string]FlagValue{}); code != 0 {
+		t.Fatalf("exit code: got %d, want 0 because a warning never fails the check; stderr: %s", code, stderr.String())
+	}
+	for _, want := range []string{"healthy:  true", "warning:  Another UI automation session is active on this device: WebDriverAgentRunner-Runner (WebDriverAgent)"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Errorf("stdout: got %q, want it to contain %q", stdout.String(), want)
+		}
+	}
+}
+
+func TestDoctorJSONCarriesForeignAutomationWarning(t *testing.T) {
+	drv := mockdriver.New()
+	drv.SetForeignAutomation(driver.ForeignAutomationSession{Name: "WebDriverAgentRunner-Runner", Kind: "WebDriverAgent"})
+	var stdout, stderr bytes.Buffer
+	deps := Deps{Factory: singleMockDriverFactory{driver: drv}, Stdout: &stdout, Stderr: &stderr}
+
+	if code := Doctor(context.Background(), deps, map[string]FlagValue{"--json": true}); code != 0 {
+		t.Fatalf("exit code: got %d, want 0; stderr: %s", code, stderr.String())
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &decoded); err != nil {
+		t.Fatalf("decoding doctor --json output: %v", err)
+	}
+	warnings, _ := decoded["warnings"].([]any)
+	if len(warnings) != 1 {
+		t.Fatalf("doctor --json = %v, want one warning", decoded)
+	}
+}

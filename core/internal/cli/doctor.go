@@ -148,12 +148,15 @@ func printHealthReport(w io.Writer, platform, deviceID string, report orchestra.
 	}
 	if report.Healthy {
 		_, _ = fmt.Fprintf(w, "  healthy:  true\n")
-		return
+	} else {
+		_, _ = fmt.Fprintf(w, "  healthy:  false\n")
+		_, _ = fmt.Fprintf(w, "  code:     %s\n", report.Code)
+		_, _ = fmt.Fprintf(w, "  message:  %s\n", report.Message)
+		if report.Remedy != "" {
+			_, _ = fmt.Fprintf(w, "  remedy:   %s\n", report.Remedy)
+		}
 	}
-	_, _ = fmt.Fprintf(w, "  healthy:  false\n")
-	_, _ = fmt.Fprintf(w, "  code:     %s\n", report.Code)
-	_, _ = fmt.Fprintf(w, "  message:  %s\n", report.Message)
-	if report.Remedy != "" {
-		_, _ = fmt.Fprintf(w, "  remedy:   %s\n", report.Remedy)
+	for _, warning := range report.Warnings {
+		_, _ = fmt.Fprintf(w, "  warning:  %s\n", warning)
 	}
 }

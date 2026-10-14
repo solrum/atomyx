@@ -114,3 +114,20 @@ func TestCheckHealth_ReportsAgentVersionsOnlyWhenTheAgentReportsThem(t *testing.
 		}
 	}
 }
+
+func TestCheckHealth_CarriesForeignAutomationWarning(t *testing.T) {
+	drv := mockdriver.New()
+	drv.SetForeignAutomation(driver.ForeignAutomationSession{Name: "WebDriverAgentRunner-Runner", Kind: "WebDriverAgent"})
+	cs, ctx := testServer(t, ServerDeps{
+		Probe:   device.NewStaticProbe(),
+		Factory: singleMockDriverFactory{driver: drv},
+		Storage: storage.NewInMemoryStorage(),
+	})
+	selectMockDevice(t, cs, ctx)
+
+	_, decoded := callTool(t, cs, ctx, "check_health", map[string]any{})
+	warnings, _ := decoded["warnings"].([]any)
+	if decoded["healthy"] != true || len(warnings) != 1 {
+		t.Fatalf("check_health = %v, want healthy with one warning", decoded)
+	}
+}
