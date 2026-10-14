@@ -312,8 +312,17 @@ func agentLacksSecureFields(pong transport.PingResponse, err error) bool {
 // counts as version 0. A failure to reach the route at all proves
 // nothing about the agent, so it is not a mismatch.
 func agentProtocolMismatch(pong transport.PingResponse, err error) (agentVersion int, mismatch bool) {
+	agentVersion, known := PingedProtocolVersion(pong, err)
+	return agentVersion, known && agentVersion != version.AgentProtocolVersion
+}
+
+// PingedProtocolVersion reports the protocol version a /ping outcome
+// shows and whether it shows one. An agent that answered with an error
+// status predates the route and counts as version 0. A failure to reach
+// the route at all shows nothing, so known is false.
+func PingedProtocolVersion(pong transport.PingResponse, err error) (agentVersion int, known bool) {
 	if err == nil {
-		return pong.ProtocolVersion, pong.ProtocolVersion != version.AgentProtocolVersion
+		return pong.ProtocolVersion, true
 	}
 	var agentErr *transport.AgentError
 	return 0, errors.As(err, &agentErr)

@@ -235,7 +235,21 @@ func (l *AgentLauncher) installAndStart(ctx context.Context) error {
 	return l.waitForHealth(ctx)
 }
 
-// resolveAPKPath resolves the agent APK's path in priority order: an
+func (l *AgentLauncher) resolveAPKPath() string {
+	return resolveAgentAPKPath(l.opts.APKPath)
+}
+
+// ResolveAgentAPK resolves the agent APK path the way AgentLauncher does
+// for the given explicit option, which may be empty, and reports whether
+// a file exists at the resolved path. The path is returned either way,
+// so a caller can tell the operator where the APK is expected.
+func ResolveAgentAPK(explicit string) (path string, found bool) {
+	path = resolveAgentAPKPath(explicit)
+	_, err := os.Stat(path)
+	return path, err == nil
+}
+
+// resolveAgentAPKPath resolves the agent APK's path in priority order: an
 // explicit option first, then the ATOMYX_ANDROID_APK environment
 // variable, then an ascent from the running binary's directory and
 // the current working directory looking for the repo-relative
@@ -243,9 +257,9 @@ func (l *AgentLauncher) installAndStart(ctx context.Context) error {
 // anchor. When nothing is found it returns the default path relative
 // to the current working directory, so the caller's existence check
 // reports an actionable location.
-func (l *AgentLauncher) resolveAPKPath() string {
-	if l.opts.APKPath != "" {
-		return l.opts.APKPath
+func resolveAgentAPKPath(explicit string) string {
+	if explicit != "" {
+		return explicit
 	}
 	if fromEnv := os.Getenv(apkPathEnvVar); fromEnv != "" {
 		return fromEnv
@@ -325,6 +339,15 @@ func (l *AgentLauncher) rebindAccessibilitySteps(ctx context.Context) error {
 		return err
 	}
 	return l.clock.Sleep(ctx, rebindSettleMs)
+}
+
+// EnableAccessibility makes the Atomyx accessibility service the only
+// enabled one. Android keeps a single list of enabled services, so every
+// other enabled service is disabled by this call. It returns an
+// *AgentLauncherError with ErrCodeRebindFailed when a settings write
+// fails.
+func (l *AgentLauncher) EnableAccessibility(ctx context.Context) error {
+	return l.rebindAccessibility(ctx)
 }
 
 func (l *AgentLauncher) startForegroundService(ctx context.Context) error {
