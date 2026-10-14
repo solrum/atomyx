@@ -6,6 +6,7 @@ import (
 
 	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/device"
+	"dev.atomyx/internal/driver"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/recording"
@@ -115,6 +116,12 @@ func NewServer(info Info, deps ServerDeps) (*Server, error) {
 		PublishStep:             func(line runfolder.StepLine) { devices.PublishStep(line) },
 		SetInterventionRecorder: func(r session.InterventionRecorder) { devices.SetInterventionRecorder(r) },
 		Recordings:              recordings,
+		AgentInfo: func() driver.AgentInfo {
+			if active := devices.Current(); active != nil {
+				return active.Driver.AgentInfo()
+			}
+			return driver.AgentInfo{}
+		},
 	})
 	devices = NewDeviceSession(DeviceSessionDeps{
 		Factory: deps.Factory, Probe: deps.Probe, Runners: deps.Runners, Clock: clk, TimerClock: timers, Logger: logger,

@@ -327,3 +327,24 @@ func TestMetaParentRunIDIsOmittedWhenEmptyAndRoundTripsWhenSet(t *testing.T) {
 		t.Fatalf("round trip = %+v, %v", back, err)
 	}
 }
+
+func TestRecordAgentKeepsTheHostAndSkipsZeroValues(t *testing.T) {
+	meta := Meta{Host: &Host{AtomyxVersion: "0.1.0"}}
+	RecordAgent(&meta, 0, "")
+	if *meta.Host != (Host{AtomyxVersion: "0.1.0"}) {
+		t.Fatalf("host = %+v, want it unchanged for zero values", *meta.Host)
+	}
+	RecordAgent(&meta, 2, "1.4")
+	if *meta.Host != (Host{AtomyxVersion: "0.1.0", ProtocolVersion: 2, AgentVersion: "1.4"}) {
+		t.Fatalf("host = %+v, want the agent versions beside the atomyx version", *meta.Host)
+	}
+	bare := Meta{}
+	RecordAgent(&bare, 0, "")
+	if bare.Host != nil {
+		t.Fatalf("host = %+v, want nil for zero values", bare.Host)
+	}
+	RecordAgent(&bare, 1, "")
+	if bare.Host == nil || bare.Host.ProtocolVersion != 1 {
+		t.Fatalf("host = %+v, want protocol 1", bare.Host)
+	}
+}

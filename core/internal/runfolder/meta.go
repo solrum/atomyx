@@ -61,9 +61,29 @@ type Device struct {
 }
 
 // Host identifies the software that wrote the run.
+//
+// AgentVersion and ProtocolVersion describe the on-device agent the run
+// drove and are absent for a run with no connected agent or an agent that
+// reports neither.
 type Host struct {
-	AtomyxVersion string `json:"atomyxVersion,omitempty"`
-	AgentVersion  string `json:"agentVersion,omitempty"`
+	AtomyxVersion   string `json:"atomyxVersion,omitempty"`
+	AgentVersion    string `json:"agentVersion,omitempty"`
+	ProtocolVersion int    `json:"protocolVersion,omitempty"`
+}
+
+// RecordAgent stores the versions a connected agent reports into
+// m.Host, keeping the other host fields. It leaves m untouched when
+// both values are zero.
+func RecordAgent(m *Meta, protocolVersion int, agentVersion string) {
+	if protocolVersion == 0 && agentVersion == "" {
+		return
+	}
+	var host Host
+	if m.Host != nil {
+		host = *m.Host
+	}
+	host.ProtocolVersion, host.AgentVersion = protocolVersion, agentVersion
+	m.Host = &host
 }
 
 // Finding is one bug finding recorded against an MCP run.

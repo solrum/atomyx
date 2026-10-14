@@ -8,6 +8,7 @@ import (
 
 	"dev.atomyx/internal/device"
 	"dev.atomyx/internal/lease"
+	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/session"
 )
 
@@ -31,6 +32,10 @@ func (d *deviceSession) Close() {
 func (d *deviceSession) recordRun(record *runRecord) {
 	d.SetInterventionRecorder(record.writer)
 	record.onEnd = func() { d.SetInterventionRecorder(nil) }
+	info := d.Built().Driver.AgentInfo()
+	_ = record.writer.Update(func(m *runfolder.Meta) {
+		runfolder.RecordAgent(m, info.ProtocolVersion, info.AgentVersion)
+	})
 	_ = d.SetRunning(record.ID())
 }
 

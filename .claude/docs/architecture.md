@@ -1060,6 +1060,9 @@ Contract:
   `startedAt` and `completedAt` as epoch milliseconds, `result`,
   `outcome`, `failedAtStep`, `totalSteps`, and an optional `mcp` block
   for the fields only an MCP run has.
+  A run that drove a connected agent also carries a `host` block with
+  `agentVersion` and `protocolVersion` as the agent reported them, each
+  omitted when the agent does not report it.
   A suite run also carries `flakyEntries` and `quarantinedFailures`,
   each omitted when zero. A worker of a sharded suite carries
   `parentRunId`, the id of the sharded suite run.

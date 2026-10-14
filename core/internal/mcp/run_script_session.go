@@ -94,7 +94,7 @@ func (s *runSession) runAsOwnRun(
 	ctx context.Context, name string, dev *device.Descriptor,
 	exec func(scriptTarget) (runner.ScriptResult, error),
 ) (scriptRun, error) {
-	meta := mcpRunMeta(name, nil, dev)
+	meta := s.runMeta(name, nil, dev)
 	meta.ScriptName = name
 	meta.MCP.Source = scriptRunSource
 	w, err := s.starter.Start(name, meta)

@@ -173,6 +173,10 @@ Every `run` and `suite` command writes a run folder, with or without
 command ends. With `--json`, the printed result carries the same path
 in a top level `runFolder` field and the line is not printed.
 
+When the run drove a device whose agent reports its versions, the
+`host` object of `meta.json` carries `agentVersion` and
+`protocolVersion`. Each is omitted when the agent does not report it.
+
 ### Failure artifacts
 
 When a step of a script run fails, the run folder's `artifacts/`

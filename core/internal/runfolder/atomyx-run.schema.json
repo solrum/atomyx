@@ -61,6 +61,11 @@
         },
         "atomyxVersion": {
           "type": "string"
+        },
+        "protocolVersion": {
+          "description": "Wire protocol version the on-device agent reported.",
+          "minimum": 1,
+          "type": "integer"
         }
       },
       "type": "object"

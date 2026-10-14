@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"dev.atomyx/internal/device"
+	"dev.atomyx/internal/driver"
 	mockdriver "dev.atomyx/internal/driver/mock"
 	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/storage"
@@ -321,5 +322,39 @@ func TestDeleteAndSummaryUpdateAskToWaitWhileARunMigrationHoldsTheLock(t *testin
 	_ = lock.Release()
 	if got := r.call("delete_run", map[string]any{"id": "flat"}); got["ok"] != true {
 		t.Fatalf("delete after the migration = %v", got)
+	}
+}
+
+func TestMCPRunsRecordTheAgentVersionsOfTheSelectedDevice(t *testing.T) {
+	tests := []struct {
+		name  string
+		agent driver.AgentInfo
+		want  *runfolder.Host
+	}{
+		{"reported", driver.AgentInfo{ProtocolVersion: 3, AgentVersion: "1.2.3"}, &runfolder.Host{ProtocolVersion: 3, AgentVersion: "1.2.3"}},
+		{"unreported", driver.AgentInfo{}, nil},
+	}
+	for _, tc := range tests {
+		for _, route := range []string{"start_run", "run_script"} {
+			t.Run(route+" "+tc.name, func(t *testing.T) {
+				drv := mockdriver.New()
+				drv.StageHierarchy(sampleTree())
+				drv.Agent = tc.agent
+				r := newRunServerWith(t, func(d *ServerDeps) { d.Factory = singleMockDriverFactory{driver: drv} })
+				selectMockDevice(t, r.cs, t.Context())
+				if route == "start_run" {
+					r.call(route, map[string]any{"name": "smoke"})
+				} else {
+					r.call(route, map[string]any{"script": "appId: com.example.app\nname: Smoke\nsteps:\n  - assertVisible: \"Does Not Exist\"\n"})
+				}
+				got := r.onlyMeta(t).Host
+				switch {
+				case tc.want == nil && got != nil:
+					t.Fatalf("host = %+v, want none", got)
+				case tc.want != nil && (got == nil || *got != *tc.want):
+					t.Fatalf("host = %+v, want %+v", got, tc.want)
+				}
+			})
+		}
 	}
 }

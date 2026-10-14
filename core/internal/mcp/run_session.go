@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"dev.atomyx/internal/device"
+	"dev.atomyx/internal/driver"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/recording"
@@ -86,6 +87,9 @@ type runSession struct {
 	// recordings records the screen of a script that is its own run. Nil
 	// means recording is off.
 	recordings *recording.Lifecycle
+	// agentInfo reports the agent versions of the bound device, nil when
+	// the host tracks none.
+	agentInfo func() driver.AgentInfo
 
 	routeMu sync.Mutex
 	routed  *runfolder.Writer
@@ -113,13 +117,16 @@ type runSessionDeps struct {
 	// its own run and keeps the video of the ones that fail. Nil records
 	// nothing.
 	Recordings *recording.Lifecycle
+	// AgentInfo reports the agent versions of the bound device, zero when
+	// none is bound. Nil records no agent versions.
+	AgentInfo func() driver.AgentInfo
 }
 
 func newRunSession(deps runSessionDeps) *runSession {
 	return &runSession{
 		store: deps.Store, catalog: deps.Catalog, starter: deps.Starter,
 		clock: deps.Clock, logger: deps.Logger, artifacts: &artifactCounter{},
-		drainTimeout: runDrainTimeout, bare: newScriptFlight(), flight: newScriptFlight(), publishStep: deps.PublishStep, setInterventionRecorder: deps.SetInterventionRecorder, recordings: deps.Recordings,
+		drainTimeout: runDrainTimeout, bare: newScriptFlight(), flight: newScriptFlight(), publishStep: deps.PublishStep, setInterventionRecorder: deps.SetInterventionRecorder, recordings: deps.Recordings, agentInfo: deps.AgentInfo,
 	}
 }
 
@@ -154,7 +161,7 @@ func (s *runSession) Start(ctx context.Context, name string, source *string, dev
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	writer, err := s.starter.Start(deviceLabel(dev), mcpRunMeta(name, source, dev))
+	writer, err := s.starter.Start(deviceLabel(dev), s.runMeta(name, source, dev))
 	if err != nil {
 		return startedRun{}, err
 	}
@@ -342,6 +349,17 @@ func withSummary(info *runfolder.MCPInfo, summary string) *runfolder.MCPInfo {
 	}
 	next.Summary = &summary
 	return &next
+}
+
+// runMeta builds the starting meta of an MCP run and records the agent
+// versions of the bound device in it.
+func (s *runSession) runMeta(name string, source *string, dev *device.Descriptor) runfolder.Meta {
+	meta := mcpRunMeta(name, source, dev)
+	if s.agentInfo != nil {
+		info := s.agentInfo()
+		runfolder.RecordAgent(&meta, info.ProtocolVersion, info.AgentVersion)
+	}
+	return meta
 }
 
 func mcpRunMeta(name string, source *string, dev *device.Descriptor) runfolder.Meta {

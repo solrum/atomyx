@@ -63,8 +63,9 @@ func deviceSchema() map[string]any {
 
 func hostSchema() map[string]any {
 	return object(map[string]any{
-		"atomyxVersion": str(),
-		"agentVersion":  str(),
+		"atomyxVersion":   str(),
+		"agentVersion":    str(),
+		"protocolVersion": map[string]any{"type": "integer", "minimum": 1, "description": "Wire protocol version the on-device agent reported."},
 	}, nil)
 }
 
