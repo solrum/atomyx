@@ -35,9 +35,11 @@ const runnerStateFileMode = 0o600
 // tunnel leads its own process group. TunnelPid is zero for a simulator
 // runner and for a tunnel the launcher reused instead of starting.
 //
-// BuildProductPath and BuildProductModTime identify the compiled runner
-// product the runner was started from, so a later reader adopts the
-// runner only while the product on disk is still that build.
+// BuildProductPath, BuildProductModTime and BuildProductDigest identify the
+// compiled runner product the runner was started from, so a later reader
+// adopts the runner only while the product on disk is still that build.
+// The digest is empty in a record written before digests existed, and a
+// reader then compares the modification time instead.
 //
 // OwnerPid and OwnerStartTime identify the process that answers for the
 // runner, the one that stops it when it exits. The owner is not the
@@ -70,11 +72,12 @@ type RunnerState struct {
 
 	BuildProductPath    string    `json:"buildProductPath,omitempty"`
 	BuildProductModTime time.Time `json:"buildProductModTime"`
+	BuildProductDigest  string    `json:"buildProductDigest,omitempty"`
 }
 
 // BuildProduct returns the build product the record names.
 func (s RunnerState) BuildProduct() iosdriver.BuildProduct {
-	return iosdriver.BuildProduct{Path: s.BuildProductPath, ModTime: s.BuildProductModTime}
+	return iosdriver.BuildProduct{Path: s.BuildProductPath, ModTime: s.BuildProductModTime, Digest: s.BuildProductDigest}
 }
 
 // RunnerOwner identifies one host process. The start time pairs with the

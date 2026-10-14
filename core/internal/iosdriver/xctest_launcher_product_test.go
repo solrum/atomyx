@@ -87,3 +87,27 @@ func TestBuildProduct_Matches(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildProduct_MatchesComparesDigestsWhenBothHaveOne(t *testing.T) {
+	stamp := time.Now().UTC()
+	later := stamp.Add(time.Minute)
+	cases := []struct {
+		name        string
+		left, right iosdriver.BuildProduct
+		want        bool
+	}{
+		{"same digest, different stamps", iosdriver.BuildProduct{Path: "/p", ModTime: stamp, Digest: "d"}, iosdriver.BuildProduct{Path: "/p", ModTime: later, Digest: "d"}, true},
+		{"different digest, same stamp", iosdriver.BuildProduct{Path: "/p", ModTime: stamp, Digest: "d1"}, iosdriver.BuildProduct{Path: "/p", ModTime: stamp, Digest: "d2"}, false},
+		{"record without digest, same stamp", iosdriver.BuildProduct{Path: "/p", ModTime: stamp}, iosdriver.BuildProduct{Path: "/p", ModTime: stamp, Digest: "d"}, true},
+		{"record without digest, other stamp", iosdriver.BuildProduct{Path: "/p", ModTime: stamp}, iosdriver.BuildProduct{Path: "/p", ModTime: later, Digest: "d"}, false},
+		{"product without digest, other stamp", iosdriver.BuildProduct{Path: "/p", ModTime: stamp, Digest: "d"}, iosdriver.BuildProduct{Path: "/p", ModTime: later}, false},
+		{"same digest, other path", iosdriver.BuildProduct{Path: "/p", Digest: "d"}, iosdriver.BuildProduct{Path: "/q", Digest: "d"}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.left.Matches(tc.right); got != tc.want {
+				t.Fatalf("Matches() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

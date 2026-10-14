@@ -242,20 +242,32 @@ type SpawnedRunner struct {
 	Product BuildProduct
 }
 
-// BuildProduct identifies one compiled runner product. A build stamps the
-// product's modification time, so a rebuilt product never shares its
-// identity with the one it replaced.
+// BuildProduct identifies one compiled runner product. A build records the
+// digest of its inputs next to the product and stamps the product's
+// modification time, so a rebuilt product never shares its identity with
+// the one it replaced.
 type BuildProduct struct {
 	// Path is the location of the compiled runner app.
 	Path string
 	// ModTime is the product's modification time in UTC.
 	ModTime time.Time
+	// Digest is the digest of the inputs the product was built from. It
+	// is empty for a product built before digests were recorded.
+	Digest string
 }
 
 // Matches reports whether other names the same product at the same
-// build. A zero product matches nothing.
+// build. Two products at the same path match when both carry a digest
+// and the digests are equal. When either has no digest, they match when
+// their modification times are equal. A zero product matches nothing.
 func (p BuildProduct) Matches(other BuildProduct) bool {
-	return p.Path != "" && p.Path == other.Path && p.ModTime.Equal(other.ModTime)
+	if p.Path == "" || p.Path != other.Path {
+		return false
+	}
+	if p.Digest != "" && other.Digest != "" {
+		return p.Digest == other.Digest
+	}
+	return p.ModTime.Equal(other.ModTime)
 }
 
 // scheme returns c.Scheme, falling back to the standard Atomyx driver
@@ -476,7 +488,7 @@ func (l *XctestLauncher) statProduct() (BuildProduct, bool) {
 	if err != nil {
 		return BuildProduct{}, false
 	}
-	return BuildProduct{Path: path, ModTime: info.ModTime().UTC()}, true
+	return BuildProduct{Path: path, ModTime: info.ModTime().UTC(), Digest: readDigest(path)}, true
 }
 
 func (l *XctestLauncher) progress(message string) {
