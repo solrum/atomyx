@@ -9,6 +9,7 @@ type ModuleExecutor func(ctx context.Context, deps Deps, args []string) int
 var Modules = map[string]ModuleExecutor{
 	"driver": ExecuteDriver,
 	"skills": ExecuteSkills,
+	"runs":   ExecuteRuns,
 }
 
 // Shortcut resolves a top-level shortcut command into the module and

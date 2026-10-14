@@ -1,7 +1,5 @@
 package cli
 
-import "strings"
-
 // SkillsCommand identifies a skills-module command this build
 // implements.
 type SkillsCommand string
@@ -45,61 +43,9 @@ type ParsedSkillsArgv struct {
 // flag, a value flag given with no value, an empty "--flag=" value,
 // or a flag given more than once.
 func ParseSkillsArgv(args []string, command SkillsCommand) (ParsedSkillsArgv, error) {
-	defs := skillsCommandFlags[command]
-	flags := make(map[string]FlagValue)
-
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-
-		if arg == "--help" || arg == "-h" {
-			return ParsedSkillsArgv{Command: command, Flags: flags, Help: true}, nil
-		}
-
-		key := arg
-		var inlineValue *string
-		if eqIdx := strings.IndexByte(arg, '='); eqIdx > 0 {
-			key = arg[:eqIdx]
-			v := arg[eqIdx+1:]
-			inlineValue = &v
-		}
-
-		kind, known := flagKindFor(defs, key)
-		if !known {
-			return ParsedSkillsArgv{}, newArgvError(
-				"Command %q does not accept %q. Valid flags: %s.",
-				string(command), key, flagNameList(defs),
-			)
-		}
-
-		if inlineValue != nil {
-			if *inlineValue == "" {
-				return ParsedSkillsArgv{}, newArgvError("Flag %q requires a non-empty value.", key)
-			}
-			if _, dup := flags[key]; dup {
-				return ParsedSkillsArgv{}, newArgvError("Flag %q was specified more than once.", key)
-			}
-			flags[key] = *inlineValue
-			continue
-		}
-
-		if kind == flagBoolean {
-			if _, dup := flags[key]; dup {
-				return ParsedSkillsArgv{}, newArgvError("Flag %q was specified more than once.", key)
-			}
-			flags[key] = true
-			continue
-		}
-
-		next := i + 1
-		if next >= len(args) || strings.HasPrefix(args[next], "-") {
-			return ParsedSkillsArgv{}, newArgvError("Flag %q requires a value.", key)
-		}
-		if _, dup := flags[key]; dup {
-			return ParsedSkillsArgv{}, newArgvError("Flag %q was specified more than once.", key)
-		}
-		flags[key] = args[next]
-		i = next
+	flags, help, err := parseModuleFlags(args, string(command), skillsCommandFlags[command])
+	if err != nil {
+		return ParsedSkillsArgv{}, err
 	}
-
-	return ParsedSkillsArgv{Command: command, Flags: flags, Help: false}, nil
+	return ParsedSkillsArgv{Command: command, Flags: flags, Help: help}, nil
 }

@@ -53,3 +53,29 @@ func TestCheck(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckModuleRouterMapKey(t *testing.T) {
+	const keyed = "package p\nvar m = map[string]int{\"runs\": 1}\n"
+	const valued = "package p\nvar m = map[string]string{\"a\": \"runs\"}\n"
+	cases := []struct {
+		name     string
+		filename string
+		src      string
+		want     int
+	}{
+		{"map key in the router file", moduleRouterFile, keyed, 0},
+		{"map key in another file", "internal/cli/other.go", keyed, 1},
+		{"map value in the router file", moduleRouterFile, valued, 1},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got, err := check(c.filename, []byte(c.src))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(got) != c.want {
+				t.Fatalf("got %d findings %+v, want %d", len(got), got, c.want)
+			}
+		})
+	}
+}

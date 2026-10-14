@@ -52,6 +52,10 @@ const (
 	// selfDir is this checker, which has to name the layout names to
 	// look for them.
 	selfDir = "scripts/check-runfolder-layout/"
+	// moduleRouterFile registers the top-level CLI modules by name. One of
+	// them is called runs, which only coincides with the run folder
+	// directory name, so a map key in this file is not a layout name.
+	moduleRouterFile = "internal/cli/router.go"
 )
 
 var alwaysNames = map[string]bool{
@@ -150,7 +154,7 @@ func scan(root string) ([]string, error) {
 }
 
 // check parses one file and returns every literal that spells a layout
-// name.
+// name. filename is the slash-separated path relative to the module root.
 func check(filename string, src []byte) ([]finding, error) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, filename, src, parser.SkipObjectResolution)
@@ -166,6 +170,12 @@ func check(filename string, src []byte) ([]finding, error) {
 		case *ast.Field:
 			if x.Tag != nil {
 				skip[x.Tag] = true
+			}
+		case *ast.KeyValueExpr:
+			if filename == moduleRouterFile {
+				if key, ok := x.Key.(*ast.BasicLit); ok {
+					skip[key] = true
+				}
 			}
 		case *ast.CallExpr:
 			if isPathCall(x.Fun) {
