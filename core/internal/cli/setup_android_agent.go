@@ -32,6 +32,7 @@ func (absentAndroidHost) EnableAgentAccessibility(context.Context, string) error
 func (absentAndroidHost) AgentHealth(context.Context, string) (bool, bool, error) {
 	return false, false, errSetupHostMissing
 }
+func (absentAndroidHost) StartAgent(context.Context, string) error { return errSetupHostMissing }
 func (absentAndroidHost) AgentProtocol(context.Context, string) (int, int, error) {
 	return 0, 0, errSetupHostMissing
 }
@@ -122,8 +123,9 @@ func androidAccessibilityEntry(t setupTarget) setup.Entry {
 }
 
 func androidAgentHealthEntry(t setupTarget) setup.Entry {
+	host := t.Deps.androidAgent()
 	return setup.Entry{
-		Step:     setup.NewAndroidAgentHealthStep(t.DeviceID, t.Deps.androidAgent()),
+		Step:     setup.NewAndroidAgentHealthStep(t.DeviceID, host, host),
 		Requires: []string{setup.AndroidAccessibilityStepID},
 	}
 }

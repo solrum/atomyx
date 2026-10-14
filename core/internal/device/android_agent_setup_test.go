@@ -187,3 +187,25 @@ func TestAndroidAgentSetupInstallLeavesAHealthyAgentAloneButReinstallReplacesIt(
 		t.Fatalf("install commands = %v, want one install of %s", got, apk)
 	}
 }
+
+func TestAndroidAgentSetupStartAgentStartsTheServiceWithoutReinstalling(t *testing.T) {
+	setup, runner := setupAgentServer(t, map[string]http.HandlerFunc{
+		"/health": writeJSON(`{"ok":true,"accessibilityConnected":true}`),
+	})
+	if err := setup.StartAgent(context.Background(), "S1"); err != nil {
+		t.Fatalf("StartAgent() error = %v", err)
+	}
+	var started bool
+	for _, inv := range runner.Invocations() {
+		args := strings.Join(inv.Args, " ")
+		if strings.Contains(args, "start-foreground-service") {
+			started = true
+		}
+		if strings.Contains(args, " install ") || strings.Contains(args, "settings ") {
+			t.Errorf("StartAgent ran %q, which changes the install or the accessibility setting", args)
+		}
+	}
+	if !started {
+		t.Error("StartAgent did not start the foreground service")
+	}
+}

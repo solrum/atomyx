@@ -131,7 +131,8 @@ type AgentLauncherOptions struct {
 //     elapses.
 //
 // EnsureRunning is idempotent: calling it repeatedly is cheap once
-// step 2's probe passes. Reinstall runs steps 1 and 3 to 6 only.
+// step 2's probe passes. Reinstall runs steps 1 and 3 to 6 only, and
+// Start runs steps 1, 5, and 6 only.
 type AgentLauncher struct {
 	proc   process.Runner
 	clock  clock.Clock
@@ -190,6 +191,21 @@ func (l *AgentLauncher) Reinstall(ctx context.Context) error {
 		return err
 	}
 	return l.installAndStart(ctx)
+}
+
+// Start brings an installed agent up without reinstalling it or
+// touching the accessibility setting: it starts the foreground service
+// and waits for /health to report ready. It returns an
+// *AgentLauncherError with ErrCodeLaunchTimeout when the agent does not
+// become ready within the launch timeout.
+func (l *AgentLauncher) Start(ctx context.Context) error {
+	if err := l.forward(ctx); err != nil {
+		return err
+	}
+	if err := l.startForegroundService(ctx); err != nil {
+		return fmt.Errorf("agentlauncher: start foreground service: %w", err)
+	}
+	return l.waitForHealth(ctx)
 }
 
 func (l *AgentLauncher) forward(ctx context.Context) error {

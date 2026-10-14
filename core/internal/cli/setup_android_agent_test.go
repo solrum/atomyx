@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,6 +35,7 @@ type fakeAndroidHost struct {
 	agentEnabled bool
 	others       []string
 	ready        bool
+	unreachable  bool
 	axConnected  bool
 	agentProto   int
 	hostProto    int
@@ -68,7 +70,16 @@ func (f *fakeAndroidHost) EnableAgentAccessibility(context.Context, string) erro
 	return nil
 }
 
+func (f *fakeAndroidHost) StartAgent(context.Context, string) error {
+	f.calls = append(f.calls, "start")
+	f.unreachable, f.ready = false, true
+	return nil
+}
+
 func (f *fakeAndroidHost) AgentHealth(context.Context, string) (bool, bool, error) {
+	if f.unreachable {
+		return false, false, errors.New("connection refused")
+	}
 	return f.ready, f.axConnected, nil
 }
 
@@ -278,5 +289,17 @@ func TestAndroidSetupFixModeNamesTheServicesTheInstallDisabled(t *testing.T) {
 
 	if !strings.Contains(report.Steps[3].Message, "now disabled: com.a/.One") {
 		t.Errorf("install message = %q", report.Steps[3].Message)
+	}
+}
+
+func TestAndroidSetupFixModeStartsAnInstalledAgentThatDoesNotAnswer(t *testing.T) {
+	host := &fakeAndroidHost{apkFound: true, installed: true, agentEnabled: true, axConnected: true, unreachable: true, agentProto: 1, hostProto: 1}
+	code, report := runAndroidSetup(t, host, fakeTools{"adb": "/sdk/adb"}, map[string]FlagValue{"--platform": "android", "--device": "emulator-5554"})
+
+	if got := strings.Join(host.calls, ","); code != 0 || got != "start" {
+		t.Fatalf("code = %d, repairs = %s, steps = %s, want 0 and one start", code, got, statuses(report))
+	}
+	if report.Steps[5].ID != "android-agent-health" || report.Steps[5].Status != "fixed" {
+		t.Errorf("health step = %+v", report.Steps[5])
 	}
 }

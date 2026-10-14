@@ -9,5 +9,6 @@ type AndroidAgentHost interface {
 	AgentReinstaller
 	AccessibilityControl
 	AgentHealthProbe
+	AgentStarter
 	AgentProtocolProbe
 }

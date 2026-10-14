@@ -16,6 +16,30 @@ func (f fakeHealth) AgentHealth(context.Context, string) (bool, bool, error) {
 	return f.ready, f.connected, f.err
 }
 
+// fakeStarter starts an agent by flipping a scripted health probe.
+type fakeStarter struct {
+	err   error
+	calls int
+}
+
+func (f *fakeStarter) StartAgent(context.Context, string) error {
+	f.calls++
+	return f.err
+}
+
+// startableHealth reports an unreachable agent until its starter ran.
+type startableHealth struct {
+	starter *fakeStarter
+	after   fakeHealth
+}
+
+func (h startableHealth) AgentHealth(context.Context, string) (bool, bool, error) {
+	if h.starter.calls == 0 {
+		return false, false, errors.New("connection refused")
+	}
+	return h.after.ready, h.after.connected, h.after.err
+}
+
 type protocolReply struct {
 	agent, host int
 	err         error
@@ -52,11 +76,11 @@ func TestAndroidAgentHealthStep(t *testing.T) {
 		{"ready", fakeHealth{ready: true, connected: true}, StatusOK, ""},
 		{"not ready", fakeHealth{}, StatusManual, "Unlock the device"},
 		{"service not bound", fakeHealth{ready: true}, StatusManual, "off and on"},
-		{"unreachable", fakeHealth{err: errors.New("connection refused")}, StatusFailed, "logcat"},
+		{"unreachable", fakeHealth{err: errors.New("connection refused")}, StatusManual, "open the Atomyx app"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := NewAndroidAgentHealthStep("s1", tc.probe).Check(context.Background())
+			got := NewAndroidAgentHealthStep("s1", tc.probe, &fakeStarter{}).Check(context.Background())
 			if got.Status != tc.status || !strings.Contains(got.Remedy, tc.remedy) {
 				t.Errorf("got %+v, want status %s with remedy containing %q", got, tc.status, tc.remedy)
 			}
@@ -129,5 +153,44 @@ func TestAndroidAgentProtocolFixStatesTheServicesTheReinstallDisabled(t *testing
 	got = NewAndroidAgentProtocolStep("s1", probe, reinstaller, &fakeAccessibility{readErr: errors.New("no shell")}).Fix(ctx)
 	if got.Status != StatusFailed || reinstaller.calls != 0 {
 		t.Errorf("an unreadable service list must stop before the reinstall: %+v", got)
+	}
+}
+
+func TestAndroidAgentHealthFixStartsAnAgentThatDoesNotAnswer(t *testing.T) {
+	starter := &fakeStarter{}
+	probe := startableHealth{starter: starter, after: fakeHealth{ready: true, connected: true}}
+	got := NewAndroidAgentHealthStep("s1", probe, starter).Fix(context.Background())
+	if got.Status != StatusFixed || starter.calls != 1 {
+		t.Errorf("fix: %+v starts=%d", got, starter.calls)
+	}
+}
+
+func TestAndroidAgentHealthCheckNeverStarts(t *testing.T) {
+	starter := &fakeStarter{}
+	NewAndroidAgentHealthStep("s1", startableHealth{starter: starter}, starter).Check(context.Background())
+	if starter.calls != 0 {
+		t.Error("Check must never start the agent")
+	}
+}
+
+func TestAndroidAgentHealthFixLeavesAnAnsweringAgentToTheOperator(t *testing.T) {
+	starter := &fakeStarter{}
+	got := NewAndroidAgentHealthStep("s1", fakeHealth{ready: true}, starter).Fix(context.Background())
+	if got.Status != StatusManual || starter.calls != 0 || !strings.Contains(got.Remedy, "off and on") {
+		t.Errorf("answering but unbound agent: %+v starts=%d", got, starter.calls)
+	}
+}
+
+func TestAndroidAgentHealthFixFailures(t *testing.T) {
+	failing := &fakeStarter{err: errors.New("service refused")}
+	got := NewAndroidAgentHealthStep("s1", startableHealth{starter: failing}, failing).Fix(context.Background())
+	if got.Status != StatusFailed || !strings.Contains(got.Message, "service refused") || !strings.Contains(got.Remedy, "Open the Atomyx app") {
+		t.Errorf("start error: %+v", got)
+	}
+	starter := &fakeStarter{}
+	probe := startableHealth{starter: starter, after: fakeHealth{ready: true}}
+	got = NewAndroidAgentHealthStep("s1", probe, starter).Fix(context.Background())
+	if got.Status != StatusManual || !strings.Contains(got.Message, "accessibility service is not connected") {
+		t.Errorf("started but unbound keeps the manual result: %+v", got)
 	}
 }

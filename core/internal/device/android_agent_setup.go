@@ -73,6 +73,16 @@ func (s *AndroidAgentSetup) ReinstallAgent(ctx context.Context, serial string) e
 	return launcher.Reinstall(ctx)
 }
 
+// StartAgent starts the installed agent and waits for it to answer,
+// without reinstalling it or changing the accessibility setting.
+func (s *AndroidAgentSetup) StartAgent(ctx context.Context, serial string) error {
+	launcher, _, err := newAndroidAgentLauncher(ctx, s.runner, s.clock, serial, s.apkPath)
+	if err != nil {
+		return err
+	}
+	return launcher.Start(ctx)
+}
+
 // AccessibilityServices reports whether the Atomyx accessibility
 // service is enabled and which other services are.
 func (s *AndroidAgentSetup) AccessibilityServices(ctx context.Context, serial string) (agentEnabled bool, others []string, err error) {
