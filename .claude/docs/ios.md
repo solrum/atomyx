@@ -132,7 +132,7 @@ and `make serve-device` remain for contributors who drive the runner by
 hand, attach a debugger, or read its output live.
 
 `iosdriver.XctestLauncher` (`core/internal/iosdriver/xctest_launcher.go`)
-builds the runner when it is missing or stale, then spawns
+builds the runner when it is missing or stale (see Rebuild rule), then spawns
 `xcodebuild test-without-building` as a background child process
 (`process.BackgroundRunner`), which stays up until the launcher's kill
 function stops it. A launcher without a port allocator is reuse-first:
@@ -259,6 +259,23 @@ Build and run layout, both under `platforms/ios-agent/build`:
   compile into the directory together. The build stamp on the product is
   the time the build started, so a source edited during a build still
   reads as newer than the product.
+- Rebuild rule. The launcher records a digest next to each product, in
+  `<product path>.digest`, so the simulator and the device product keep
+  separate digests. The digest is a SHA-256 over the relative path and
+  content of every regular file under `Tests`, `Sources` and `App`
+  (Finder metadata excluded), `project.yml` and `project.pbxproj`, the
+  destination kind, and the selected Xcode developer directory and
+  version. A device digest also covers the signing team, the signing
+  style and the provisioning profile. A product is rebuilt when it is
+  missing or when its recorded digest differs from the digest of the
+  current inputs, so an edit that keeps an old file time, a header or a
+  plist change all trigger a rebuild, and a file touched without a
+  content change does not. A product with no digest file, such as one
+  built by an older host, is rebuilt only when it is older than the
+  project file or a Swift source. The digest is taken before the build
+  and the previous digest file is removed first, so a failed build leaves
+  a product with no digest. The new digest is written atomically after a
+  successful build, all under the build lock.
 - One run directory per target, `build/run-<udid>`. Each target runs
   `xcodebuild test-without-building -xctestrun <file from the shared
   build>` with that directory as its `-derivedDataPath` and a result
@@ -428,6 +445,12 @@ probed.
 | `lenderStartTime` | Start time of the lender process, read from the kernel, in UTC |
 | `buildProductPath` | Path of the compiled runner app the runner was started from |
 | `buildProductModTime` | Modification time of that app when the runner started, in UTC |
+| `buildProductDigest` | Digest of the inputs that app was built from, absent in a record written before digests were recorded |
+
+Adoption requires the product on disk to still be the recorded build. The
+digests are compared when both the record and the product have one, and
+the path and modification time are compared otherwise, so a runner
+recorded by an older host still adopts while its product is current.
 
 `kill` removes the file only while it still names its own `runnerId` and
 owner. A record that survives while its owner is alive belongs to a
