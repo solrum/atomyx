@@ -90,11 +90,16 @@ func runAndroidSetup(t *testing.T, host setup.AndroidAgentHost, tools setup.Tool
 	deps.Tools = tools
 	flags["--json"] = true
 	code := Setup(context.Background(), deps, flags)
+	return code, decodeSetupReport(t, stdout.Bytes(), stderr.String(), code)
+}
+
+func decodeSetupReport(t *testing.T, stdout []byte, stderr string, code int) setupReport {
+	t.Helper()
 	var report setupReport
-	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
-		t.Fatalf("stdout is not JSON: %v\n%s\nstderr: %s", err, stdout.String(), stderr.String())
+	if err := json.Unmarshal(stdout, &report); err != nil {
+		t.Fatalf("exit code %d, stdout is not JSON: %v\n%s\nstderr: %s", code, err, stdout, stderr)
 	}
-	return code, report
+	return report
 }
 
 func statuses(report setupReport) string {

@@ -66,6 +66,7 @@ func runSetup(ctx context.Context, deps Deps, flags map[string]FlagValue, steps 
 		_, _ = fmt.Fprintf(stderr, "note: no device was resolved, so no device lease is taken: %s\n", message)
 	} else {
 		target.DeviceID = desc.ID
+		target.Kind = desc.Kind
 		release, err := takeSetupLease(ctx, deps, desc)
 		if err != nil {
 			if holder, known, isHeld := heldHolder(err); isHeld {

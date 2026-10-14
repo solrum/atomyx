@@ -1,13 +1,18 @@
 package cli
 
-import "dev.atomyx/internal/setup"
+import (
+	"dev.atomyx/internal/device"
+	"dev.atomyx/internal/setup"
+)
 
 // setupTarget is what a step constructor knows about the device being
 // prepared. DeviceID is empty when no device was named and none could
-// be resolved, in which case steps that need a device report that.
+// be resolved, in which case steps that need a device report that. Kind
+// is the resolved device's kind and is empty in the same case.
 type setupTarget struct {
 	Platform string
 	DeviceID string
+	Kind     device.Kind
 	Deps     Deps
 }
 
@@ -28,5 +33,9 @@ var setupStepsByPlatform = map[string][]setupStepFactory{
 		androidAgentHealthEntry,
 		androidAgentProtocolEntry,
 	},
-	"ios": {},
+	"ios": {
+		iosXcodeEntry,
+		iosIproxyEntry,
+		iosSigningTeamEntry,
+	},
 }
