@@ -293,8 +293,10 @@ Contract:
   immediately. It never creates the lock file and never writes holder
   metadata. Like an acquirer it compares the descriptor with the path after
   the flock and restarts on a replaced file, so it never reports a device
-  free while a new holder owns the replacement. Persistent replacement
-  returns `ErrLockFileReplaced`. A holder read that loses the race to an
+  free while a new holder owns the replacement. A restart after waiting
+  out a holder follows a handoff and is not counted, while persistent
+  replacement under a caller that never waited returns
+  `ErrLockFileReplaced`. A holder read that loses the race to an
   unlink reports an unknown holder.
 
 Canonical identity lives in `core/internal/device/identity.go`.

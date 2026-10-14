@@ -34,8 +34,10 @@ const (
 	// retry window.
 	AcquirePollInterval = 25 * time.Millisecond
 
-	// maxAcquireAttempts bounds how many times acquire restarts after
-	// finding the lock file replaced.
+	// maxAcquireAttempts bounds how many times acquire or probe restarts
+	// after finding the lock file replaced by a process that did not make
+	// the caller wait. A restart after the caller waited out a holder is
+	// not counted, see lockFile.
 	maxAcquireAttempts = 3
 )
 
@@ -110,8 +112,10 @@ type Lease struct {
 // lock file. A contended flock is retried for about 200 milliseconds,
 // then reported as a *HeldError carrying DEVICE_HELD with the current
 // holder's metadata. After the flock succeeds, a lock file replaced
-// since it was opened forces a bounded restart, and persistent
-// replacement returns ErrLockFileReplaced.
+// since it was opened forces a restart. Restarts after a wait for a
+// holder are unbounded because each follows a handoff, and persistent
+// replacement of a lock file that was never waited on returns
+// ErrLockFileReplaced.
 func (m *Manager) Acquire(ctx context.Context, key Key, holder Holder) (*Lease, error) {
 	return m.acquire(ctx, key, holder, AcquireRetryWindow)
 }
@@ -137,16 +141,31 @@ func (m *Manager) acquire(ctx context.Context, key Key, holder Holder, retryWind
 	return l, nil
 }
 
+// lockFile opens and flocks the lock file at path, restarting when the
+// file turns out to have been replaced.
+//
+// A restart is counted against maxAcquireAttempts only when the flock was
+// taken without waiting. A caller that had to wait for a holder and then
+// finds its file unlinked has seen the lease change hands, which is the
+// normal end of a handoff and not interference, so with several waiters
+// queued behind one holder each of them can see the file go stale once per
+// handoff ahead of it. Those restarts cannot loop without bound, because
+// each one needs another holder to take and release the lease, and every
+// wait is bounded by the retry window and the context. A file replaced
+// under a caller that never waited has no such progress behind it, so
+// those restarts stay capped.
 func (m *Manager) lockFile(ctx context.Context, path string, retryWindow time.Duration) (*os.File, error) {
-	for attempt := 0; attempt < maxAcquireAttempts; attempt++ {
+	counted := 0
+	for opened := 0; counted < maxAcquireAttempts; opened++ {
 		f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, fileMode)
 		if err != nil {
 			return nil, fmt.Errorf("open lease file %s: %w", path, err)
 		}
 		if m.afterOpen != nil {
-			m.afterOpen(attempt)
+			m.afterOpen(opened)
 		}
-		if err := m.flockWithRetry(ctx, f, retryWindow); err != nil {
+		waited, err := m.flockWithRetry(ctx, f, retryWindow)
+		if err != nil {
 			_ = f.Close()
 			if flock.IsContended(err) {
 				h, known := readHolder(path)
@@ -158,25 +177,32 @@ func (m *Manager) lockFile(ctx context.Context, path string, retryWindow time.Du
 			return f, nil
 		}
 		_ = f.Close()
+		if !waited {
+			counted++
+		}
 	}
 	return nil, ErrLockFileReplaced
 }
 
-func (m *Manager) flockWithRetry(ctx context.Context, f *os.File, retryWindow time.Duration) error {
+// flockWithRetry takes the exclusive flock on f, polling a contended lock
+// for up to retryWindow. waited reports whether the lock was contended at
+// least once before it was taken.
+func (m *Manager) flockWithRetry(ctx context.Context, f *os.File, retryWindow time.Duration) (waited bool, err error) {
 	deadline := m.clock.NowMs() + retryWindow.Milliseconds()
 	for {
 		err := flock.TryExclusive(f)
 		if err == nil {
-			return nil
+			return waited, nil
 		}
 		if !flock.IsContended(err) {
-			return fmt.Errorf("flock lease file: %w", err)
+			return waited, fmt.Errorf("flock lease file: %w", err)
 		}
 		if m.clock.NowMs() >= deadline {
-			return err
+			return waited, err
 		}
+		waited = true
 		if err := m.clock.Sleep(ctx, AcquirePollInterval.Milliseconds()); err != nil {
-			return err
+			return waited, err
 		}
 	}
 }
@@ -324,41 +350,67 @@ type Status struct {
 // ErrLockFileReplaced.
 func (m *Manager) Probe(ctx context.Context, key Key) (Status, error) {
 	path := m.LockPath(key)
-	for attempt := 0; attempt < maxAcquireAttempts; attempt++ {
-		status, settled, err := m.probeOnce(ctx, path, attempt)
-		if settled || err != nil {
+	counted := 0
+	for opened := 0; counted < maxAcquireAttempts; opened++ {
+		status, outcome, err := m.probeOnce(ctx, path, opened)
+		if err != nil || outcome == probeSettled {
 			return status, err
+		}
+		if outcome == probeReplaced {
+			counted++
 		}
 	}
 	return Status{}, ErrLockFileReplaced
 }
 
-// probeOnce runs one probe attempt. settled is false when the file was
-// replaced after the flock succeeded and the caller should retry.
-func (m *Manager) probeOnce(ctx context.Context, path string, attempt int) (status Status, settled bool, err error) {
+type probeOutcome int
+
+const (
+	// probeSettled means the probe has its answer.
+	probeSettled probeOutcome = iota
+	// probeReplaced means the file was replaced under a probe that never
+	// waited, so the restart counts against the cap.
+	probeReplaced
+	// probeHandedOff means the file was replaced after the probe waited out
+	// a holder, so the restart is not counted, as in lockFile.
+	probeHandedOff
+)
+
+// probeOnce runs one probe attempt. Its outcome is not probeSettled when
+// the file was replaced after the flock succeeded and the caller should
+// retry.
+func (m *Manager) probeOnce(ctx context.Context, path string, attempt int) (Status, probeOutcome, error) {
 	f, err := os.OpenFile(path, os.O_RDONLY, 0)
 	if errors.Is(err, os.ErrNotExist) {
-		return Status{}, true, nil
+		return Status{}, probeSettled, nil
 	}
 	if err != nil {
-		return Status{}, false, fmt.Errorf("open lease file %s: %w", path, err)
+		return Status{}, probeSettled, fmt.Errorf("open lease file %s: %w", path, err)
 	}
 	defer func() { _ = f.Close() }()
 	if m.afterOpen != nil {
 		m.afterOpen(attempt)
 	}
-	if err := m.flockWithRetry(ctx, f, AcquireRetryWindow); err != nil {
+	waited, err := m.flockWithRetry(ctx, f, AcquireRetryWindow)
+	if err != nil {
 		if flock.IsContended(err) {
 			h, known := readHolder(path)
-			return Status{Held: true, Holder: h, HolderKnown: known}, true, nil
+			return Status{Held: true, Holder: h, HolderKnown: known}, probeSettled, nil
 		}
-		return Status{}, false, err
+		return Status{}, probeSettled, err
 	}
 	same := flock.SameFile(f, path)
 	if err := flock.Unlock(f); err != nil {
-		return Status{}, false, fmt.Errorf("unlock probed lease file: %w", err)
+		return Status{}, probeSettled, fmt.Errorf("unlock probed lease file: %w", err)
 	}
-	return Status{}, same || !pathExists(path), nil
+	switch {
+	case same || !pathExists(path):
+		return Status{}, probeSettled, nil
+	case waited:
+		return Status{}, probeHandedOff, nil
+	default:
+		return Status{}, probeReplaced, nil
+	}
 }
 
 func pathExists(path string) bool {
