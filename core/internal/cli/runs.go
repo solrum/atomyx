@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"dev.atomyx/internal/config"
+	"dev.atomyx/internal/history"
 	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/storage"
 )
@@ -109,11 +110,8 @@ func parseSinceFlag(flags map[string]FlagValue) (int64, error) {
 	if !ok {
 		return 0, nil
 	}
-	if t, err := time.Parse(time.RFC3339, raw); err == nil {
-		return t.UnixMilli(), nil
-	}
-	if t, err := time.Parse(time.DateOnly, raw); err == nil {
-		return t.UnixMilli(), nil
+	if ms, ok := history.ParseSince(raw); ok {
+		return ms, nil
 	}
 	return 0, fmt.Errorf("--since %q is neither an RFC 3339 timestamp nor a YYYY-MM-DD date", raw)
 }
