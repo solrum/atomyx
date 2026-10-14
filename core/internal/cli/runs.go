@@ -42,7 +42,7 @@ func ExecuteRuns(ctx context.Context, deps Deps, args []string) int {
 
 // dispatchRunsCommand parses rest against command's flag table and
 // either prints that command's help, runs it, or reports a usage error.
-func dispatchRunsCommand(ctx context.Context, deps Deps, rest []string, command RunsCommand, run func(context.Context, Deps, *storage.RunCatalog, string, map[string]FlagValue) int) int {
+func dispatchRunsCommand(ctx context.Context, deps Deps, rest []string, command RunsCommand, run func(context.Context, Deps, runsEnv, map[string]FlagValue) int) int {
 	argv, err := ParseRunsArgv(rest, command)
 	if err != nil {
 		var argvErr *ArgvError
@@ -58,7 +58,11 @@ func dispatchRunsCommand(ctx context.Context, deps Deps, rest []string, command 
 		PrintRunsCommandHelp(command, deps.stdout())
 		return 0
 	}
-	root, err := resolveRunsRoot()
+	loaded, err := loadRunsConfig()
+	if err != nil {
+		return reportUncaught(ctx, deps.stderr(), deps.Debug, err)
+	}
+	root, err := resolveRunsRoot(loaded)
 	if err != nil {
 		return reportUncaught(ctx, deps.stderr(), deps.Debug, err)
 	}
@@ -67,23 +71,38 @@ func dispatchRunsCommand(ctx context.Context, deps Deps, rest []string, command 
 		return reportUncaught(ctx, deps.stderr(), deps.Debug, err)
 	}
 	catalog := storage.NewRunCatalog(store, root, runfolder.NewLockLiveness(root))
-	return run(ctx, deps, catalog, root, argv.Flags)
+	env := runsEnv{Catalog: catalog, History: catalog}
+	if loaded != nil {
+		env.Retention = loaded.Config.Retention
+	}
+	return run(ctx, deps, env, argv.Flags)
+}
+
+// runsEnv is what a runs command works against, built once per
+// invocation at the dispatch site. Catalog serves reads that need the
+// concrete store, History is the read port for statistics, and Retention
+// is the project config's retention policy, nil when there is none.
+type runsEnv struct {
+	Catalog   *storage.RunCatalog
+	History   history.Source
+	Retention *config.Retention
+}
+
+// loadRunsConfig loads the project config discovered from the working
+// directory. It returns nil when there is no config file.
+func loadRunsConfig() (*config.LoadedConfig, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	return config.Load(config.LoadOptions{Cwd: cwd})
 }
 
 // resolveRunsRoot returns the storage root the runs commands read, chosen
 // the same way the run command chooses where it writes: the report
-// outDir of the project config discovered from the working directory,
-// then the storage root environment variable, then the default under the
-// home directory.
-func resolveRunsRoot() (string, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	loaded, err := config.Load(config.LoadOptions{Cwd: cwd})
-	if err != nil {
-		return "", err
-	}
+// outDir of the loaded project config, then the storage root environment
+// variable, then the default under the home directory.
+func resolveRunsRoot(loaded *config.LoadedConfig) (string, error) {
 	var configReport *config.Report
 	if loaded != nil {
 		configReport = loaded.Config.Report

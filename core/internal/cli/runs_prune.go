@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strconv"
 	"time"
 
@@ -65,12 +64,7 @@ func parsePruneRequest(flags map[string]FlagValue, retention *config.Retention) 
 		if retention == nil {
 			return req, errors.New("runs prune needs --keep, --older-than, or both, or a retention policy in the project config, so it never deletes every run by default")
 		}
-		if retention.KeepLast != nil {
-			req.keep = int(*retention.KeepLast)
-		}
-		if retention.OlderThanDays != nil {
-			req.olderThanDays = int(*retention.OlderThanDays)
-		}
+		req.keep, req.olderThanDays = retention.Bounds()
 	}
 	return req, nil
 }
@@ -108,13 +102,13 @@ func (r pruneRequest) reason() string {
 // Exit codes: 0 when every selected unit was deleted or the command ran
 // with --dry-run, 1 when a deletion failed or was refused or the storage
 // cannot be read, and 2 when the command is misused.
-func runsPrune(ctx context.Context, deps Deps, catalog *storage.RunCatalog, _ string, flags map[string]FlagValue) int {
-	req, err := parsePruneRequest(flags, loadRetention())
+func runsPrune(ctx context.Context, deps Deps, env runsEnv, flags map[string]FlagValue) int {
+	req, err := parsePruneRequest(flags, env.Retention)
 	if err != nil {
 		return runsMisuse(deps, "%s", err)
 	}
 	criteria := storage.NewPruneCriteria(req.keep, req.olderThanDays, time.UnixMilli(deps.clock().NowMs()))
-	result, err := catalog.ApplyPrune(criteria, req.dryRun)
+	result, err := env.Catalog.ApplyPrune(criteria, req.dryRun)
 	if err != nil {
 		return reportUncaught(ctx, deps.stderr(), deps.Debug, err)
 	}
@@ -144,22 +138,6 @@ func runsPrune(ctx context.Context, deps Deps, catalog *storage.RunCatalog, _ st
 		return 1
 	}
 	return 0
-}
-
-// loadRetention returns the retention policy of the project config
-// discovered from the working directory, or nil when there is no config
-// or it has no retention block. A config that cannot be loaded gives nil,
-// because runs prune already resolved its root from the same config.
-func loadRetention() *config.Retention {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil
-	}
-	loaded, err := config.Load(config.LoadOptions{Cwd: cwd})
-	if err != nil || loaded == nil {
-		return nil
-	}
-	return loaded.Config.Retention
 }
 
 func printPruneReport(deps Deps, doc runPruneJSON) {

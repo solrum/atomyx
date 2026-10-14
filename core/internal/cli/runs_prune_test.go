@@ -298,3 +298,19 @@ func TestRunsPruneWithoutFlagsOrRetentionExitsTwo(t *testing.T) {
 		t.Fatalf("code = %d, stderr = %q", code, stderr)
 	}
 }
+
+func TestRunsPruneReportsAnInvalidProjectConfig(t *testing.T) {
+	root, ids := seedPruneStore(t)
+	writeRetentionConfig(t, "retention:\n  keepLast: 0\n")
+
+	code, _, stderr := execRunsAt(t, pruneNow, "prune", "--keep", "1")
+
+	if code != 1 || !strings.Contains(stderr, "retention") {
+		t.Fatalf("code = %d, stderr = %q, want exit 1 naming the retention problem", code, stderr)
+	}
+	for name, id := range ids {
+		if !runFolderExists(root, id) {
+			t.Errorf("run %s was deleted despite the config error", name)
+		}
+	}
+}

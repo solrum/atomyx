@@ -21,8 +21,8 @@ func pruneRetention(cfg *config.AtomyxConfig, root string, now time.Time, logger
 	if cfg == nil || cfg.Retention == nil {
 		return
 	}
-	retention := cfg.Retention
-	criteria := storage.NewPruneCriteria(int(derefInt64(retention.KeepLast)), int(derefInt64(retention.OlderThanDays)), now)
+	keep, olderThanDays := cfg.Retention.Bounds()
+	criteria := storage.NewPruneCriteria(keep, olderThanDays, now)
 	result, err := prune(root, criteria)
 	if err != nil {
 		logger.Warn("retention prune skipped", logging.LogContext{"error": err.Error()})
@@ -31,11 +31,4 @@ func pruneRetention(cfg *config.AtomyxConfig, root string, now time.Time, logger
 	for _, warning := range result.Warnings() {
 		logger.Warn(fmt.Sprintf("retention prune: %s", warning), nil)
 	}
-}
-
-func derefInt64(p *int64) int64 {
-	if p == nil {
-		return 0
-	}
-	return *p
 }

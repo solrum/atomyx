@@ -83,6 +83,22 @@ type Retention struct {
 	OlderThanDays *int64 `json:"olderThanDays,omitempty"`
 }
 
+// Bounds returns the keepLast and olderThanDays limits as plain ints,
+// with zero standing for a limit that is not set. A nil Retention has
+// no limits.
+func (r *Retention) Bounds() (keep, olderThanDays int) {
+	if r == nil {
+		return 0, 0
+	}
+	if r.KeepLast != nil {
+		keep = int(*r.KeepLast)
+	}
+	if r.OlderThanDays != nil {
+		olderThanDays = int(*r.OlderThanDays)
+	}
+	return keep, olderThanDays
+}
+
 // Session tunes the device session timeouts shared by the CLI and the
 // MCP server. Every field is optional, and an absent field keeps its
 // default. Values are positive millisecond counts.

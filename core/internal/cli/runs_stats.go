@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"dev.atomyx/internal/history"
-	"dev.atomyx/internal/storage"
 )
 
 // runStatsJSON is the --json shape of runs stats. Tests is present and
@@ -34,7 +33,7 @@ type runStatsEntryJSON struct {
 //
 // Exit codes: 0 on success, 1 when the storage cannot be read, and 2
 // when the command is misused.
-func runsStats(ctx context.Context, deps Deps, catalog *storage.RunCatalog, _ string, flags map[string]FlagValue) int {
+func runsStats(ctx context.Context, deps Deps, env runsEnv, flags map[string]FlagValue) int {
 	window, err := statsWindow(flags)
 	if err != nil {
 		return runsMisuse(deps, "%s", err)
@@ -43,8 +42,7 @@ func runsStats(ctx context.Context, deps Deps, catalog *storage.RunCatalog, _ st
 	if test, ok := flagString(flags, "--test"); ok {
 		filter.Key = test
 	}
-	var source history.Source = catalog
-	result, err := history.Query(source, filter)
+	result, err := history.Query(env.History, filter)
 	if err != nil {
 		return reportUncaught(ctx, deps.stderr(), deps.Debug, err)
 	}

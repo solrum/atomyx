@@ -21,7 +21,7 @@ func pruneToRetention(deps Deps, loaded *config.LoadedConfig, root string) {
 	if loaded == nil || loaded.Config.Retention == nil {
 		return
 	}
-	criteria := retentionCriteria(*loaded.Config.Retention, time.UnixMilli(deps.clock().NowMs()))
+	criteria := retentionCriteria(loaded.Config.Retention, time.UnixMilli(deps.clock().NowMs()))
 	result, err := storage.PruneRoot(root, criteria)
 	if err != nil {
 		_, _ = fmt.Fprintf(deps.stderr(), "warning: retention prune skipped: %v\n", err)
@@ -32,13 +32,7 @@ func pruneToRetention(deps Deps, loaded *config.LoadedConfig, root string) {
 	}
 }
 
-func retentionCriteria(r config.Retention, now time.Time) storage.PruneCriteria {
-	return storage.NewPruneCriteria(int(derefInt64(r.KeepLast)), int(derefInt64(r.OlderThanDays)), now)
-}
-
-func derefInt64(p *int64) int64 {
-	if p == nil {
-		return 0
-	}
-	return *p
+func retentionCriteria(r *config.Retention, now time.Time) storage.PruneCriteria {
+	keep, olderThanDays := r.Bounds()
+	return storage.NewPruneCriteria(keep, olderThanDays, now)
 }

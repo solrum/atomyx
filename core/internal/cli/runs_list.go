@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"dev.atomyx/internal/runfolder"
-	"dev.atomyx/internal/storage"
 )
 
 // runListJSON is the --json shape of runs list. Runs is present and
@@ -30,13 +29,13 @@ type runListEntryJSON struct {
 //
 // Exit codes: 0 on success, 1 when the storage cannot be read, and 2
 // when the command is misused.
-func runsList(ctx context.Context, deps Deps, catalog *storage.RunCatalog, _ string, flags map[string]FlagValue) int {
+func runsList(ctx context.Context, deps Deps, env runsEnv, flags map[string]FlagValue) int {
 	sinceMs, err := parseSinceFlag(flags)
 	if err != nil {
 		return runsMisuse(deps, "%s", err)
 	}
 	test, _ := flagString(flags, "--test")
-	listing, err := catalog.List()
+	listing, err := env.Catalog.List()
 	if err != nil {
 		return reportUncaught(ctx, deps.stderr(), deps.Debug, err)
 	}
