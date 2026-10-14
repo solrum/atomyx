@@ -40,8 +40,10 @@ type ownRunnerIdentity struct {
 	appName  string
 }
 
-// ForeignAutomation returns the foreign UI automation sessions found
-// when Connect last probed the target. It never contacts the device.
+// ForeignAutomation returns the foreign UI automation sessions found by
+// the probe that the last Connect started. It never contacts the device
+// and never waits for the probe, so it returns nil until the probe has
+// finished.
 func (d *IosDriver) ForeignAutomation() []driver.ForeignAutomationSession {
 	d.foreignMu.Lock()
 	defer d.foreignMu.Unlock()
@@ -53,30 +55,73 @@ func (d *IosDriver) ForeignAutomation() []driver.ForeignAutomationSession {
 
 var _ driver.ForeignAutomationReporter = (*IosDriver)(nil)
 
-// probeForeignAutomation lists the automation sessions on the target
-// and caches the result. The probe is best effort: a command or
-// parse failure caches nothing and is not reported.
-func (d *IosDriver) probeForeignAutomation(ctx context.Context) {
+// startForeignAutomationProbe begins a background probe for the target
+// and returns immediately, so Connect never waits on a slow device
+// listing. The probe outlives the
+// ctx passed to Connect and ends only when it finishes, is superseded,
+// or Disconnect cancels it. It first stops any probe still running from an earlier
+// Connect and clears the cache, which means a reconnect replaces what a
+// previous connection found.
+func (d *IosDriver) startForeignAutomationProbe(ctx context.Context) {
+	probeCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	d.foreignMu.Lock()
+	if d.foreignCancel != nil {
+		d.foreignCancel()
+	}
+	d.foreignCancel = cancel
+	d.foreign = nil
+	d.foreignGeneration++
+	generation := d.foreignGeneration
+	d.foreignWG.Add(1)
+	d.foreignMu.Unlock()
+
+	go func() {
+		defer d.foreignWG.Done()
+		sessions := d.probeForeignAutomation(probeCtx)
+		d.foreignMu.Lock()
+		defer d.foreignMu.Unlock()
+		// A newer Connect or a Disconnect has superseded this probe, so
+		// its result describes a connection that no longer exists.
+		if generation == d.foreignGeneration && probeCtx.Err() == nil {
+			d.foreign = sessions
+		}
+	}()
+}
+
+// stopForeignAutomationProbe cancels a running probe and discards the
+// cached sessions, because they describe a connection that has ended.
+func (d *IosDriver) stopForeignAutomationProbe() {
+	d.foreignMu.Lock()
+	defer d.foreignMu.Unlock()
+	if d.foreignCancel != nil {
+		d.foreignCancel()
+		d.foreignCancel = nil
+	}
+	d.foreignGeneration++
+	d.foreign = nil
+}
+
+// probeForeignAutomation lists the automation sessions on the target.
+// The probe is best effort: a command or parse failure yields nothing
+// and is not reported.
+func (d *IosDriver) probeForeignAutomation(ctx context.Context) []driver.ForeignAutomationSession {
 	own := ownRunnerIdentity{bundleID: d.opts.OwnRunnerBundleID, appName: d.opts.OwnRunnerAppName}
-	var sessions []driver.ForeignAutomationSession
 	if d.opts.Kind == KindSimulator {
 		probeCtx, cancel := context.WithTimeout(ctx, simulatorProbeTimeout)
 		defer cancel()
 		result, err := d.proc.Run(probeCtx, "xcrun", "simctl", "spawn", d.opts.UDID, "launchctl", "list")
-		if err == nil {
-			sessions = parseSimulatorForeignAutomation(result.Stdout, own)
+		if err != nil {
+			return nil
 		}
-	} else {
-		probeCtx, cancel := context.WithTimeout(ctx, deviceProbeTimeout)
-		defer cancel()
-		result, err := d.proc.Run(probeCtx, "xcrun", "devicectl", "device", "info", "processes", "--device", d.opts.UDID, "--json-output", "-")
-		if err == nil {
-			sessions = parseDeviceForeignAutomation(result.Stdout, own)
-		}
+		return parseSimulatorForeignAutomation(result.Stdout, own)
 	}
-	d.foreignMu.Lock()
-	d.foreign = sessions
-	d.foreignMu.Unlock()
+	probeCtx, cancel := context.WithTimeout(ctx, deviceProbeTimeout)
+	defer cancel()
+	result, err := d.proc.Run(probeCtx, "xcrun", "devicectl", "device", "info", "processes", "--device", d.opts.UDID, "--json-output", "-")
+	if err != nil {
+		return nil
+	}
+	return parseDeviceForeignAutomation(result.Stdout, own)
 }
 
 // parseSimulatorForeignAutomation extracts foreign automation sessions

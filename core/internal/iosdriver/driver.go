@@ -125,11 +125,17 @@ type IosDriver struct {
 	// It stays zero until the runner reports versions.
 	agentInfo driver.AgentInfo
 
-	// foreign holds the foreign automation sessions the last Connect
-	// found, guarded by foreignMu because health checks read it while a
-	// reconnect writes it.
-	foreignMu sync.Mutex
-	foreign   []driver.ForeignAutomationSession
+	// foreign holds the foreign automation sessions the probe started by
+	// the last Connect found. foreignMu guards it together with the probe
+	// bookkeeping, because health checks read it while the probe goroutine
+	// and a reconnect write it. foreignGeneration identifies the current
+	// probe so a superseded one never publishes, foreignCancel stops it,
+	// and foreignWG lets a test wait for it to finish.
+	foreignMu         sync.Mutex
+	foreign           []driver.ForeignAutomationSession
+	foreignGeneration uint64
+	foreignCancel     context.CancelFunc
+	foreignWG         sync.WaitGroup
 }
 
 // New constructs an IosDriver bound to opts.UDID. conn and proc are
@@ -202,6 +208,10 @@ type pingResponse struct {
 // launch this driver tracked, so trusting a stale bundle id would let
 // LaunchApp's NoReset attach fast path skip dispatch for an app that
 // is not actually running.
+//
+// Connect starts a background probe for foreign UI automation sessions
+// and does not wait for it, so a slow device listing never delays the
+// connection. ForeignAutomation reports the result once the probe ends.
 func (d *IosDriver) Connect(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -236,7 +246,7 @@ func (d *IosDriver) Connect(ctx context.Context) error {
 	d.capabilities.CanMultiPointer = pong.Capabilities.CanMultiPointer
 	d.capabilities.CanPressure = pong.Capabilities.CanPressure
 	d.connectedRunnerID = pong.RunnerID
-	d.probeForeignAutomation(ctx)
+	d.startForeignAutomationProbe(ctx)
 	return nil
 }
 
@@ -274,11 +284,13 @@ func (d *IosDriver) RestoreLaunchedApp(ctx context.Context, bundleID, fromRunner
 }
 
 // Disconnect closes the transport, stops the iproxy tunnel if one was
-// launched, and clears launch-tracked state. It never stops a runner,
+// launched, cancels a foreign automation probe still running, and clears
+// launch-tracked state. It never stops a runner,
 // which outlives the connection. It is idempotent: the underlying
 // Conn.Close and the iproxy stop are both safe to call when nothing is
 // running.
 func (d *IosDriver) Disconnect() error {
+	d.stopForeignAutomationProbe()
 	_ = d.conn.Close()
 	d.stopIproxy()
 	d.lastLaunchedBundleID = ""

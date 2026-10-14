@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
+	"reflect"
 	"sync"
 	"testing"
+	"time"
 
 	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/diag"
@@ -621,5 +623,38 @@ func TestIosSimDriver_Connect_RunnerProtocolMismatch_FailsWithAgentVersionMismat
 
 	if code, _, _ := diag.Describe(err); code != diag.CodeAgentVersionMismatch {
 		t.Fatalf("Connect() error = %v, want code %s", err, diag.CodeAgentVersionMismatch)
+	}
+}
+
+func TestIosSimDriver_ForeignAutomation_ForwardsTheDelegatesSessions(t *testing.T) {
+	conn := newDefaultFakeConn()
+	clientConn, serverConn := net.Pipe()
+	srv := newFakeHidServer(serverConn)
+	go srv.run()
+	defer func() { _ = clientConn.Close() }()
+	runner := process.NewFake()
+	runner.Default = process.Result{Stdout: "4907\t0\tUIKitApplication:dev.spike.uitests.xctrunner[4b50][rb-legacy]\n"}
+
+	d, err := iossimdriver.New(conn, runner, &fakeDialer{conn: clientConn}, iossimdriver.Options{
+		Options: iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator},
+		HidPort: 1,
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	if err := d.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+
+	want := []driver.ForeignAutomationSession{{Name: "dev.spike.uitests.xctrunner", Kind: "XCUITest runner"}}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if got := d.ForeignAutomation(); reflect.DeepEqual(got, want) {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("ForeignAutomation() = %+v, want %+v", d.ForeignAutomation(), want)
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 }
