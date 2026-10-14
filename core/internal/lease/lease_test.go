@@ -54,8 +54,8 @@ func TestAcquire_WritesHolderAndReleaseFreesIt(t *testing.T) {
 	if _, ok := readHolder(m.LockPath(key)); ok {
 		t.Fatal("holder metadata survived Release")
 	}
-	if _, err := os.Stat(m.LockPath(key)); err != nil {
-		t.Fatalf("lock file must stay after Release: %v", err)
+	if _, err := os.Stat(m.LockPath(key)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("lock file must be unlinked by Release: %v", err)
 	}
 }
 

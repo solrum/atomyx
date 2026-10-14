@@ -276,8 +276,13 @@ func (l *Lease) Watch(ctx context.Context, onLost func(error)) {
 	}
 }
 
-// Release clears the holder metadata and gives up the lease. It does
-// not unlink the lock file. Releasing twice is a no-op.
+// Release clears the holder metadata, unlinks the lock file while the
+// flock is still held, and then gives up the lease. The file is
+// unlinked only when the path still names the descriptor this lease
+// holds, so a replacement file owned by another process is never
+// removed. A process that opened the old file before the unlink wins
+// the flock on an inode no path names, notices the mismatch, and
+// restarts on a fresh file. Releasing twice is a no-op.
 func (l *Lease) Release() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -287,8 +292,15 @@ func (l *Lease) Release() error {
 	f := l.file
 	l.file = nil
 	truncErr := f.Truncate(0)
+	var unlinkErr error
+	if flock.SameFile(f, l.path) {
+		unlinkErr = os.Remove(l.path)
+		if errors.Is(unlinkErr, os.ErrNotExist) {
+			unlinkErr = nil
+		}
+	}
 	closeErr := f.Close()
-	return errors.Join(truncErr, closeErr)
+	return errors.Join(truncErr, unlinkErr, closeErr)
 }
 
 // Status is the result of a Probe.
@@ -305,26 +317,51 @@ type Status struct {
 // Probe reports whether key's lease is held, using the same real flock
 // an acquirer takes, released immediately. It never creates or writes
 // the lock file, so a device that was never leased reports free
-// without leaving a file behind.
+// without leaving a file behind. Like an acquirer, it compares the
+// descriptor with the path after the flock succeeds and restarts when
+// the file was replaced, so it never reports free while a new holder
+// owns the replacement. Persistent replacement returns
+// ErrLockFileReplaced.
 func (m *Manager) Probe(ctx context.Context, key Key) (Status, error) {
 	path := m.LockPath(key)
+	for attempt := 0; attempt < maxAcquireAttempts; attempt++ {
+		status, settled, err := m.probeOnce(ctx, path, attempt)
+		if settled || err != nil {
+			return status, err
+		}
+	}
+	return Status{}, ErrLockFileReplaced
+}
+
+// probeOnce runs one probe attempt. settled is false when the file was
+// replaced after the flock succeeded and the caller should retry.
+func (m *Manager) probeOnce(ctx context.Context, path string, attempt int) (status Status, settled bool, err error) {
 	f, err := os.OpenFile(path, os.O_RDONLY, 0)
 	if errors.Is(err, os.ErrNotExist) {
-		return Status{}, nil
+		return Status{}, true, nil
 	}
 	if err != nil {
-		return Status{}, fmt.Errorf("open lease file %s: %w", path, err)
+		return Status{}, false, fmt.Errorf("open lease file %s: %w", path, err)
 	}
 	defer func() { _ = f.Close() }()
+	if m.afterOpen != nil {
+		m.afterOpen(attempt)
+	}
 	if err := m.flockWithRetry(ctx, f, AcquireRetryWindow); err != nil {
 		if flock.IsContended(err) {
 			h, known := readHolder(path)
-			return Status{Held: true, Holder: h, HolderKnown: known}, nil
+			return Status{Held: true, Holder: h, HolderKnown: known}, true, nil
 		}
-		return Status{}, err
+		return Status{}, false, err
 	}
+	same := flock.SameFile(f, path)
 	if err := flock.Unlock(f); err != nil {
-		return Status{}, fmt.Errorf("unlock probed lease file: %w", err)
+		return Status{}, false, fmt.Errorf("unlock probed lease file: %w", err)
 	}
-	return Status{}, nil
+	return Status{}, same || !pathExists(path), nil
+}
+
+func pathExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
