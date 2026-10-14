@@ -262,6 +262,26 @@
       "type": "object"
     }
   },
+  "get_test_stats": {
+    "description": "Report how each test has behaved across its persisted runs: how often it passed, failed, or flipped between the two, and how long it takes. Use it to decide whether a failure is a real regression or a flaky test, and which tests to investigate first. It complements list_runs, which lists individual runs, while this tool aggregates them per test. Each entry has `testKey`, `runs`, `passed` (includes flaky runs), `failed`, `flaky` (passed only after a retry), `flakyRate` (flaky divided by runs, 0 to 1), `lastOutcomes` (up to 10 of passed, failed, or flaky, most recent first), and `durationP50Ms` and `durationP95Ms` (0 when no run has a duration). Entries are sorted flakiest first, then by failures, then by key. `skipped` counts stored runs that could not be read and are not included. A test key is the path of a script or scenario file relative to its project root (the nearest folder holding an Atomyx config file, else the git root), written with forward slashes, and a run started from this server through run_script is keyed `mcp:` followed by the script name. Runs that are unfinished, cancelled, interrupted, or lost with the device are not counted. `test` limits the report to one key, `last` keeps the most recent N runs of each test, and `since` drops older runs, and when both are given `since` applies first.",
+    "inputSchema": {
+      "properties": {
+        "last": {
+          "description": "Count only the most recent N runs of each test. A whole number of at least 1.",
+          "type": "number"
+        },
+        "since": {
+          "description": "Count only runs started at or after this time. An RFC 3339 timestamp or a YYYY-MM-DD date taken as midnight UTC.",
+          "type": "string"
+        },
+        "test": {
+          "description": "Report only the test with exactly this test key.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
   "get_ui_tree": {
     "description": "Capture the current UI hierarchy as a flat depth-annotated list of elements. Each entry includes role, id, text, label, bounds, and interactive state. A password field reports secure:true and a masked text and value. THIS IS YOUR PRIMARY OBSERVATION TOOL, so call it FIRST after launch_app, after every navigation action (tap, back, swipe), and whenever you need to understand the current screen. Prefer this over screenshot because it is faster, cheaper, and gives you actionable selectors for tap/input_text directly.",
     "inputSchema": {

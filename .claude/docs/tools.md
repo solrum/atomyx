@@ -57,6 +57,7 @@ type system enforces it.
 | `report_bug` | `core/internal/mcp/report_bug_tool.go` | `title`, `description`, `captureScreenshot` | `{ok, id, runId, screenshotPath?}` | `storage.RunStore.RecordBug`, plus `Orchestra.Screenshot` when requested |
 | **Run and bug queries** | | | | |
 | `list_runs` | `core/internal/mcp/run_read_tool.go` | `status`, `limit`, `offset` | paginated run summaries, each with `result` and `outcome` (absent while running), plus `totalMatching` and `skipped` | `storage.RunCatalog.List` |
+| `get_test_stats` | `core/internal/mcp/test_stats_tool.go` | `test`, `last`, `since` | `{ok, tests, skipped}`, one entry per test key sorted flakiest first, with run, pass, fail, and flaky counts, `flakyRate`, `lastOutcomes`, and duration percentiles | `history.Query` over `storage.RunCatalog` |
 | `get_run` | `core/internal/mcp/run_read_tool.go` | `id` | the full run record, with `result` and `outcome` (absent while running) | `storage.RunCatalog.Get` |
 | `update_run_summary` | `core/internal/mcp/run_read_tool.go` | `id`, `summary` | `{ok}`, `RUN_READ_ONLY` for a run with no summary field, or `RUN_BUSY` for a run a writer still holds open, or while a run migration holds the run store | `storage.RunCatalog.SetSummary` |
 | `delete_run` | `core/internal/mcp/run_read_tool.go` | `id` | `{ok}`, or `RUN_BUSY` for a run a writer still holds open, which is left untouched, or `RUN_BUSY` while a run migration holds the run store | `storage.RunCatalog.Delete` |

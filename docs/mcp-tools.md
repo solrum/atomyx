@@ -81,6 +81,7 @@ and `getting-started.md` for the first end-to-end walkthrough.
 | [start_run](#start_run) | Run tracking | Starts a named test run so later findings attach to it |
 | [finish_run](#finish_run) | Run tracking | Finishes the active run with a verdict and optional summary |
 | [list_runs](#list_runs) | Run tracking | Lists persisted run summaries with filtering and pagination |
+| [get_test_stats](#get_test_stats) | Run tracking | Reports pass, fail, and flaky statistics per test across persisted runs |
 | [get_run](#get_run) | Run tracking | Fetches the full record for one persisted run |
 | [update_run_summary](#update_run_summary) | Run tracking | Replaces the summary field on a persisted run |
 | [delete_run](#delete_run) | Run tracking | Deletes a persisted run record |
@@ -1085,6 +1086,59 @@ its findings.
 **Example**
 ```json
 { "status": "failed", "limit": 10 }
+```
+
+### get_test_stats
+Reports how each test has behaved across its persisted runs.
+
+**Use when:** deciding whether a failure is a real regression or a flaky
+test, or choosing which tests to investigate first. Use list_runs to see
+individual runs instead.
+
+**Parameters**
+| Name | Type | Required | Default | Meaning |
+|---|---|---|---|---|
+| test | string | no | all tests | Report only the test with exactly this test key. |
+| last | integer, at least 1 | no | all runs | Count only the most recent N runs of each test. |
+| since | string | no | no limit | Count only runs started at or after this time. An RFC 3339 timestamp, or a `YYYY-MM-DD` date taken as midnight UTC. |
+
+**Behavior**
+- A test key is the path of a script or scenario file relative to its
+  project root, written with forward slashes. The project root is the
+  nearest folder holding an Atomyx config file, else the nearest git
+  root, else the file's own folder. A run started through run_script
+  without a file is keyed `mcp:` followed by the script name.
+- A suite run counts through its entries, one outcome per entry under
+  the entry's test key, and the suite run itself is not counted.
+- An entry that passed after a retry counts as flaky, and a flaky run
+  also counts as passed.
+- Runs that are unfinished, cancelled, interrupted, or lost with the
+  device are not counted.
+- When both `since` and `last` are given, `since` applies first and
+  `last` trims what remains.
+- Entries are sorted by flaky rate, then by failures, both highest
+  first, then by key.
+
+**Returns**
+- `ok`: whether the call completed.
+- `tests`: array that is always present. Each entry has `testKey`,
+  `runs`, `passed` (includes flaky runs), `failed`, `flaky`, `flakyRate`
+  (a fraction from 0 to 1), `lastOutcomes` (up to 10 of `passed`,
+  `failed`, or `flaky`, most recent first), `durationP50Ms`, and
+  `durationP95Ms` (0 when no run has a duration).
+- `skipped`: number of stored runs that could not be read and are not
+  counted. Always present, and zero when every stored run was readable.
+
+**Errors and recovery**
+- `INVALID_ARGUMENT` for a `last` below 1 or not a whole number, or a
+  `since` that is neither an RFC 3339 timestamp nor a `YYYY-MM-DD` date.
+  Fix the argument and retry.
+- An empty `tests` array means no finished run matches. Widen or drop
+  `test`, `last`, and `since`.
+
+**Example**
+```json
+{ "test": "flows/checkout.yml", "last": 20 }
 ```
 
 ### get_run

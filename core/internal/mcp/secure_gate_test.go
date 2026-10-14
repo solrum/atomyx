@@ -80,6 +80,7 @@ func gateCalls() map[string]gateCall {
 		"finish_run":         {args: map[string]any{"status": "passed"}},
 		"report_bug":         {args: map[string]any{"title": "t", "description": "d"}},
 		"list_runs":          {args: map[string]any{}},
+		"get_test_stats":     {args: map[string]any{}},
 		"get_run":            {args: map[string]any{"id": "missing"}},
 		"list_bugs":          {args: map[string]any{}},
 		"get_bug":            {args: map[string]any{"id": "missing"}},

@@ -176,6 +176,7 @@ func NewServer(info Info, deps ServerDeps) (*Server, error) {
 	registerReportBugTool(server, tc)
 
 	registerListRunsTool(server, tc)
+	registerGetTestStatsTool(server, tc)
 	registerGetRunTool(server, tc)
 	registerListBugsTool(server, tc)
 	registerGetBugTool(server, tc)

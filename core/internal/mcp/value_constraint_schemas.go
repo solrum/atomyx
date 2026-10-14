@@ -104,6 +104,9 @@ var toolValueConstraintSchemas = map[string]*jsonschema.Schema{
 		"limit":  jsIntPositive(),
 		"offset": jsIntNonnegative(),
 	})),
+	"get_test_stats": compileConstraintSchema("get_test_stats", jsObject(map[string]any{
+		"last": jsIntPositive(),
+	})),
 	"get_run":            compileConstraintSchema("get_run", jsObject(map[string]any{"id": jsStringMinLen(1)})),
 	"delete_run":         compileConstraintSchema("delete_run", jsObject(map[string]any{"id": jsStringMinLen(1)})),
 	"update_run_summary": compileConstraintSchema("update_run_summary", jsObject(map[string]any{"id": jsStringMinLen(1)})),
