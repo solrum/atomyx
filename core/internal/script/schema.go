@@ -37,18 +37,21 @@ type ScriptDefinition struct {
 	AppID  string  `json:"appId"`
 	// AppIDSource is AppID as written, before `${var}` interpolation. It
 	// is empty for a definition built without parsing a script.
-	AppIDSource   string            `json:"-"`
-	Name          string            `json:"name"`
-	Description   *string           `json:"description,omitempty"`
-	Precondition  *string           `json:"precondition,omitempty"`
-	Tags          []string          `json:"tags,omitempty"`
-	Env           map[string]string `json:"env"`
-	Proxy         *string           `json:"proxy,omitempty"`
-	Requires      []string          `json:"requires,omitempty"`
-	Preconditions []Precondition    `json:"preconditions,omitempty"`
-	StepDelay     *float64          `json:"stepDelay,omitempty"`
-	Steps         []ScriptStep      `json:"steps"`
-	StepLines     []int             `json:"_stepLines,omitempty"`
+	AppIDSource  string            `json:"-"`
+	Name         string            `json:"name"`
+	Description  *string           `json:"description,omitempty"`
+	Precondition *string           `json:"precondition,omitempty"`
+	Tags         []string          `json:"tags,omitempty"`
+	Env          map[string]string `json:"env"`
+	// SecretEnv names the Env entries whose value came from outside the
+	// committed files. A definition built without parsing has none.
+	SecretEnv     map[string]bool `json:"-"`
+	Proxy         *string         `json:"proxy,omitempty"`
+	Requires      []string        `json:"requires,omitempty"`
+	Preconditions []Precondition  `json:"preconditions,omitempty"`
+	StepDelay     *float64        `json:"stepDelay,omitempty"`
+	Steps         []ScriptStep    `json:"steps"`
+	StepLines     []int           `json:"_stepLines,omitempty"`
 }
 
 // AuthoredAppID returns the app id as the script author wrote it, so

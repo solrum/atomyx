@@ -76,7 +76,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 	deviceID := resolveDeviceID(flags, resolvedEnvironment)
 	proxyFlag := resolveProxyFlag(flags, resolvedEnvironment)
 
-	externalEnv, err := buildExternalEnv(flags, resolvedEnvironment)
+	externalEnv, committedEnv, err := buildExternalEnv(flags, resolvedEnvironment)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "error: %s\n", err)
 		return 2
@@ -179,6 +179,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 			Commands:              runner.DefaultCommands(),
 			LoadScript:            fsScenarioScriptLoader(filepath.Dir(absPath)),
 			ExternalEnv:           externalEnv,
+			ExternalCommitted:     committedEnv,
 			PreconditionsOverride: preconditionsOverride,
 			ChildArtifacts:        childArtifacts.forTarget,
 			StepGate:              dbg.gate(),
@@ -225,7 +226,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		return 1
 	}
 
-	def, err := script.ParseScript(string(content), externalEnv)
+	def, err := script.ParseScript(string(content), externalEnv, script.WithCommittedNames(committedEnv))
 	if err != nil {
 		return reportUncaught(ctx, stderr, deps.Debug, err)
 	}

@@ -29,11 +29,12 @@ func ResolveEnvRefs(cfg AtomyxConfig, path string) (AtomyxConfig, error) {
 			environments[name] = environment
 			continue
 		}
-		resolved, err := resolveVars(*environment.Vars, name, path)
+		resolved, fromEnv, err := resolveVars(*environment.Vars, name, path)
 		if err != nil {
 			return AtomyxConfig{}, err
 		}
 		environment.Vars = &resolved
+		environment.EnvRefVars = fromEnv
 		environments[name] = environment
 	}
 
@@ -42,8 +43,12 @@ func ResolveEnvRefs(cfg AtomyxConfig, path string) (AtomyxConfig, error) {
 	return resolvedConfig, nil
 }
 
-func resolveVars(vars map[string]string, environmentName, path string) (map[string]string, error) {
+// resolveVars substitutes every reference in vars. It also returns the
+// names of the variables that held at least one reference, because their
+// value comes from the process environment and not from the config file.
+func resolveVars(vars map[string]string, environmentName, path string) (map[string]string, map[string]bool, error) {
 	resolved := make(map[string]string, len(vars))
+	fromEnv := make(map[string]bool)
 	keys := make([]string, 0, len(vars))
 	for key := range vars {
 		keys = append(keys, key)
@@ -56,6 +61,7 @@ func resolveVars(vars map[string]string, environmentName, path string) (map[stri
 			if substitutionErr != nil {
 				return match
 			}
+			fromEnv[key] = true
 			varName := envRefPattern.FindStringSubmatch(match)[1]
 			fromEnv, ok := os.LookupEnv(varName)
 			if !ok {
@@ -69,9 +75,9 @@ func resolveVars(vars map[string]string, environmentName, path string) (map[stri
 			return fromEnv
 		})
 		if substitutionErr != nil {
-			return nil, substitutionErr
+			return nil, nil, substitutionErr
 		}
 		resolved[key] = replaced
 	}
-	return resolved, nil
+	return resolved, fromEnv, nil
 }

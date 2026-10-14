@@ -49,10 +49,12 @@ type scriptService struct {
 
 func newScriptService(session *Session, events *EventBus, logger logging.Logger) *scriptService {
 	return &scriptService{
-		session:       session,
-		events:        events,
-		logger:        logger,
-		parseScript:   script.ParseScript,
+		session: session,
+		events:  events,
+		logger:  logger,
+		parseScript: func(yamlContent string, externalEnv map[string]string) (*script.ScriptDefinition, error) {
+			return script.ParseScript(yamlContent, externalEnv)
+		},
 		parseScenario: script.ParseScenario,
 	}
 }

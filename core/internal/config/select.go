@@ -88,13 +88,14 @@ func SelectEnvironment(loaded *LoadedConfig, name string, hasName bool) (*Resolv
 	}
 
 	return &ResolvedEnvironment{
-		Name:     selected,
-		AppID:    app.AppID,
-		Vars:     vars,
-		Platform: app.Platform,
-		DeviceID: environment.Device,
-		Proxy:    environment.Proxy,
-		Artifact: app.Artifact,
+		Name:       selected,
+		AppID:      app.AppID,
+		Vars:       vars,
+		EnvRefVars: environment.EnvRefVars,
+		Platform:   app.Platform,
+		DeviceID:   environment.Device,
+		Proxy:      environment.Proxy,
+		Artifact:   app.Artifact,
 	}, nil
 }
 

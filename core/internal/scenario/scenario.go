@@ -126,6 +126,10 @@ type ScenarioRunnerDeps struct {
 	// own parse: it lets a host (for example a CLI's --env flag)
 	// override a value the scenario pins for every child script.
 	ExternalEnv map[string]string
+	// ExternalCommitted names the ExternalEnv entries whose value is
+	// written in a committed file, so they are not secret. Every other
+	// ExternalEnv entry is.
+	ExternalCommitted map[string]bool
 	// OnStep, when non-nil, is forwarded to every child
 	// runner.ScriptRunner this ScenarioRunner constructs.
 	OnStep                func(runner.StepEvent)
@@ -207,6 +211,7 @@ func (r *ScenarioRunner) Run(ctx context.Context, def *script.ScenarioDefinition
 	}
 
 	childEnv := mergeChildEnv(def.Env, r.deps.ExternalEnv)
+	committed := committedChildNames(def.Env, r.deps.ExternalEnv, r.deps.ExternalCommitted)
 
 	total := len(def.Scripts)
 	results := make([]ScenarioScriptResult, 0, total)
@@ -232,7 +237,7 @@ func (r *ScenarioRunner) Run(ctx context.Context, def *script.ScenarioDefinition
 		r.emit(ScenarioEvent{Type: ScriptStarted, ScriptIndex: i, ScriptPath: scriptPath})
 
 		scriptStart := r.deps.Clock.NowMs()
-		status, result, errMsg := r.runOne(ctx, i, scriptPath, childEnv)
+		status, result, errMsg := r.runOne(ctx, i, scriptPath, childEnv, committed)
 		durationMs := r.deps.Clock.NowMs() - scriptStart
 
 		var failedAtStep *int
@@ -305,13 +310,13 @@ func (r *ScenarioRunner) Run(ctx context.Context, def *script.ScenarioDefinition
 // rather than returned as a Go error, so Run's per-script loop can
 // record it, decide whether to keep going, and move to the next
 // script exactly as it would for a script that ran and failed.
-func (r *ScenarioRunner) runOne(ctx context.Context, scriptIndex int, scriptPath string, childEnv map[string]string) (ScriptRunStatus, *runner.ScriptResult, *string) {
+func (r *ScenarioRunner) runOne(ctx context.Context, scriptIndex int, scriptPath string, childEnv map[string]string, committed map[string]bool) (ScriptRunStatus, *runner.ScriptResult, *string) {
 	yaml, err := r.deps.LoadScript(scriptPath)
 	if err != nil {
 		msg := err.Error()
 		return StatusErrored, nil, &msg
 	}
-	def, err := script.ParseScript(yaml, childEnv)
+	def, err := script.ParseScript(yaml, childEnv, script.WithCommittedNames(committed))
 	if err != nil {
 		msg := err.Error()
 		return StatusErrored, nil, &msg

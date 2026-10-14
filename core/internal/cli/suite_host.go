@@ -24,6 +24,7 @@ type suiteSettings struct {
 	policy              suitePolicy
 	output              runOutput
 	externalEnv         map[string]string
+	committedEnv        map[string]bool
 	cwd                 string
 	testRoots           []string
 	label               string
@@ -54,7 +55,7 @@ func resolveSuiteSettings(flags map[string]FlagValue, positional *string) (suite
 	if err != nil {
 		return suiteSettings{}, err
 	}
-	externalEnv, err := buildExternalEnv(flags, environment)
+	externalEnv, committedEnv, err := buildExternalEnv(flags, environment)
 	if err != nil {
 		return suiteSettings{}, err
 	}
@@ -74,6 +75,7 @@ func resolveSuiteSettings(flags map[string]FlagValue, positional *string) (suite
 		policy:              policy,
 		output:              output,
 		externalEnv:         externalEnv,
+		committedEnv:        committedEnv,
 		testRoots:           testRoots,
 		label:               label,
 	}, nil
@@ -128,17 +130,18 @@ func startSuiteHost(ctx context.Context, deps Deps, cfg suiteSettings, proxyFlag
 
 	videos := newSuiteVideos(deps.videoLifecycle(videoOn), desc, record.writer)
 	suiteRunner := scenario.NewSuiteRunner(scenario.SuiteRunnerDeps{
-		Orchestra:        opened.Built().Orchestra,
-		Clock:            deps.clock(),
-		Logger:           deps.logger(),
-		RunID:            record.ID(),
-		NetworkCapture:   networkCapture,
-		Commands:         runner.DefaultCommands(),
-		CreateLoadScript: fsScenarioScriptLoader,
-		ExternalEnv:      cfg.externalEnv,
-		ChildArtifacts:   newArtifactSequence(runfolder.ArtifactsDir(record.Dir())).forTarget,
-		OnStep:           stepstream.NewSink(record.writer, deps.logger(), stepstream.WithPublisher(opened.PublishStep)),
-		OnEntryStart:     videos.start,
+		Orchestra:         opened.Built().Orchestra,
+		Clock:             deps.clock(),
+		Logger:            deps.logger(),
+		RunID:             record.ID(),
+		NetworkCapture:    networkCapture,
+		Commands:          runner.DefaultCommands(),
+		CreateLoadScript:  fsScenarioScriptLoader,
+		ExternalEnv:       cfg.externalEnv,
+		ExternalCommitted: cfg.committedEnv,
+		ChildArtifacts:    newArtifactSequence(runfolder.ArtifactsDir(record.Dir())).forTarget,
+		OnStep:            stepstream.NewSink(record.writer, deps.logger(), stepstream.WithPublisher(opened.PublishStep)),
+		OnEntryStart:      videos.start,
 	})
 	return &suiteHost{opened: opened, runCtx: runCtx, cancel: cancelRun, record: record, runner: suiteRunner, config: cfg}, nil
 }

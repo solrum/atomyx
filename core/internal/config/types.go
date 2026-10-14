@@ -50,6 +50,9 @@ type EnvironmentEntry struct {
 	Vars   *map[string]string `json:"vars,omitempty"`
 	Device *string            `json:"device,omitempty"`
 	Proxy  *string            `json:"proxy,omitempty"`
+	// EnvRefVars names the Vars entries whose value came from a
+	// `${ENV:NAME}` reference. It is empty until ResolveEnvRefs runs.
+	EnvRefVars map[string]bool `json:"-"`
 }
 
 // LaunchPolicy is the project-wide default launch policy, matching
@@ -141,13 +144,17 @@ type LoadOptions struct {
 // never from the environment. An environment has no platform
 // override.
 type ResolvedEnvironment struct {
-	Name     string            `json:"name"`
-	AppID    string            `json:"appId"`
-	Vars     map[string]string `json:"vars"`
-	Platform string            `json:"platform"`
-	DeviceID *string           `json:"deviceId,omitempty"`
-	Proxy    *string           `json:"proxy,omitempty"`
-	Artifact *string           `json:"artifact,omitempty"`
+	Name  string            `json:"name"`
+	AppID string            `json:"appId"`
+	Vars  map[string]string `json:"vars"`
+	// EnvRefVars names the Vars entries whose value came from a
+	// `${ENV:NAME}` reference. Every other entry is a literal written in
+	// the config file.
+	EnvRefVars map[string]bool `json:"-"`
+	Platform   string          `json:"platform"`
+	DeviceID   *string         `json:"deviceId,omitempty"`
+	Proxy      *string         `json:"proxy,omitempty"`
+	Artifact   *string         `json:"artifact,omitempty"`
 }
 
 // VideoOnFailure reports whether the config asks for the screen

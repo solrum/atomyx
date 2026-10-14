@@ -69,3 +69,22 @@ func TestResolveEnvRefs_ErrorsOnTheAlphabeticallyFirstMissingVariable(t *testing
 		}
 	}
 }
+
+func TestResolveEnvRefs_NamesTheVarsThatHeldAReference(t *testing.T) {
+	t.Setenv("ATOMYX_TEST_TOKEN", "secret-value")
+
+	cfg := mustValidate(t, baseConfig+"\n")
+	env := cfg.Environments["staging"]
+	vars := map[string]string{"token": "Bearer ${ENV:ATOMYX_TEST_TOKEN}", "literal": "plain"}
+	env.Vars = &vars
+	cfg.Environments = map[string]EnvironmentEntry{"staging": env}
+
+	resolved, err := ResolveEnvRefs(*cfg, "/atomyx.config.yaml")
+	if err != nil {
+		t.Fatalf("ResolveEnvRefs: %v", err)
+	}
+	fromEnv := resolved.Environments["staging"].EnvRefVars
+	if !fromEnv["token"] || fromEnv["literal"] {
+		t.Errorf("EnvRefVars = %v, want only token", fromEnv)
+	}
+}

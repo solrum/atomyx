@@ -187,35 +187,47 @@ func resolveCliPreconditionsFlag(flags map[string]FlagValue) (runner.Preconditio
 // --var-file, the selected config environment's own `vars` (plus its
 // app id, exposed as "appId"), then the script's own inline env block
 // (applied inside script.ParseScript itself, not here).
-func buildExternalEnv(flags map[string]FlagValue, env *config.ResolvedEnvironment) (map[string]string, error) {
+//
+// The second result names the entries whose value is written in the
+// project config file: its literal vars and its app id. Every other
+// entry is secret, because it comes from a flag or from the process
+// environment through a `${ENV:NAME}` reference.
+func buildExternalEnv(flags map[string]FlagValue, env *config.ResolvedEnvironment) (map[string]string, map[string]bool, error) {
 	out := map[string]string{}
+	committed := map[string]bool{}
 
 	if env != nil {
 		for k, v := range env.Vars {
 			out[k] = v
+			if !env.EnvRefVars[k] {
+				committed[k] = true
+			}
 		}
 		out["appId"] = env.AppID
+		committed["appId"] = true
 	}
 
 	if varFile, ok := flagString(flags, "--var-file"); ok {
 		fromFile, err := readVarFile(varFile)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		for k, v := range fromFile {
 			out[k] = v
+			delete(committed, k)
 		}
 	}
 
 	for _, pair := range flagStrings(flags, "--var") {
 		eqIdx := strings.IndexByte(pair, '=')
 		if eqIdx <= 0 {
-			return nil, fmt.Errorf("--var expects \"KEY=VALUE\", got %q", pair)
+			return nil, nil, fmt.Errorf("--var expects \"KEY=VALUE\", got %q", pair)
 		}
 		out[pair[:eqIdx]] = pair[eqIdx+1:]
+		delete(committed, pair[:eqIdx])
 	}
 
-	return out, nil
+	return out, committed, nil
 }
 
 func readVarFile(path string) (map[string]string, error) {

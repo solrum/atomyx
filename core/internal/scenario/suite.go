@@ -78,10 +78,13 @@ type SuiteRunnerDeps struct {
 	// ExternalEnv is forwarded to every entry the same way
 	// ScenarioRunnerDeps.ExternalEnv forwards it to every child
 	// script.
-	ExternalEnv      map[string]string
-	LaunchNoReset    *bool
-	ClearDataOnFresh bool
-	AppArtifact      *string
+	ExternalEnv map[string]string
+	// ExternalCommitted names the ExternalEnv entries whose value is
+	// written in a committed file, so they are not secret.
+	ExternalCommitted map[string]bool
+	LaunchNoReset     *bool
+	ClearDataOnFresh  bool
+	AppArtifact       *string
 	// OnStep, when non-nil, is forwarded to every script the suite runs,
 	// directly or through a scenario entry.
 	OnStep func(runner.StepEvent)
@@ -441,7 +444,7 @@ func statusFor(ok bool) SuiteEntryStatus {
 }
 
 func (r *SuiteRunner) runScriptEntry(ctx context.Context, index, attempt int, entry SuiteEntry, options *SuiteRunOptions) (runner.ScriptResult, error) {
-	def, err := script.ParseScript(entry.Content, r.deps.ExternalEnv)
+	def, err := script.ParseScript(entry.Content, r.deps.ExternalEnv, script.WithCommittedNames(r.deps.ExternalCommitted))
 	if err != nil {
 		return runner.ScriptResult{}, err
 	}
@@ -497,6 +500,7 @@ func (r *SuiteRunner) runScenarioEntry(ctx context.Context, index, attempt int, 
 		Commands:              r.deps.Commands,
 		LoadScript:            loadScript,
 		ExternalEnv:           r.deps.ExternalEnv,
+		ExternalCommitted:     r.deps.ExternalCommitted,
 		LaunchNoReset:         r.deps.LaunchNoReset,
 		ClearDataOnFresh:      r.deps.ClearDataOnFresh,
 		AppArtifact:           r.deps.AppArtifact,

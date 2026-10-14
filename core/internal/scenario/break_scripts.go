@@ -20,6 +20,24 @@ func mergeChildEnv(scenarioEnv, external map[string]string) map[string]string {
 	return merged
 }
 
+// committedChildNames names the entries of the merged child env whose
+// value is written in a committed file: the scenario's own env entries
+// that the host does not override, and the host's entries that it marks as
+// committed, such as a literal in the project config. Every other entry
+// came from outside the committed files.
+func committedChildNames(scenarioEnv, external map[string]string, externalCommitted map[string]bool) map[string]bool {
+	committed := make(map[string]bool, len(scenarioEnv)+len(externalCommitted))
+	for k := range scenarioEnv {
+		if _, overridden := external[k]; !overridden {
+			committed[k] = true
+		}
+	}
+	for k := range externalCommitted {
+		committed[k] = true
+	}
+	return committed
+}
+
 // childSourcePath is the absolute path of a child script named relative
 // to dir, or empty when the scenario has no directory.
 func childSourcePath(dir, scriptPath string) string {

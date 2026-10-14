@@ -209,7 +209,7 @@ func TestBuildExternalEnvPrecedence(t *testing.T) {
 		"--var-file": varFile,
 		"--var":      []string{"FOO=cli"},
 	}
-	env, err := buildExternalEnv(flags, nil)
+	env, _, err := buildExternalEnv(flags, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -222,9 +222,38 @@ func TestBuildExternalEnvPrecedence(t *testing.T) {
 }
 
 func TestBuildExternalEnvRejectsMalformedVar(t *testing.T) {
-	_, err := buildExternalEnv(map[string]FlagValue{"--var": []string{"NOVALUE"}}, nil)
+	_, _, err := buildExternalEnv(map[string]FlagValue{"--var": []string{"NOVALUE"}}, nil)
 	if err == nil || !strings.Contains(err.Error(), "KEY=VALUE") {
 		t.Errorf("got %v, want a KEY=VALUE error", err)
+	}
+}
+
+func TestBuildExternalEnvNamesTheEntriesWrittenInTheConfigFile(t *testing.T) {
+	varFile := filepath.Join(t.TempDir(), "vars.json")
+	if err := os.WriteFile(varFile, []byte(`{"FROM_FILE":"file","LITERAL":"file-wins"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	env := &config.ResolvedEnvironment{
+		Name:       "staging",
+		AppID:      "com.example.app",
+		Vars:       map[string]string{"LITERAL": "config", "REFERENCED": "from-process", "FLAGGED": "config", "KEPT": "config"},
+		EnvRefVars: map[string]bool{"REFERENCED": true},
+	}
+	flags := map[string]FlagValue{"--var-file": varFile, "--var": []string{"FLAGGED=cli"}}
+
+	_, committed, err := buildExternalEnv(flags, env)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := map[string]bool{"appId": true, "KEPT": true}
+	if len(committed) != len(want) {
+		t.Fatalf("committed = %v, want exactly %v", committed, want)
+	}
+	for name := range want {
+		if !committed[name] {
+			t.Errorf("committed = %v, missing %q", committed, name)
+		}
 	}
 }
 
@@ -234,7 +263,7 @@ func TestBuildExternalEnvConfigVarsBelowCliAndFile(t *testing.T) {
 		AppID: "com.example.app",
 		Vars:  map[string]string{"FOO": "config", "ONLY_CONFIG": "config-only"},
 	}
-	got, err := buildExternalEnv(map[string]FlagValue{"--var": []string{"FOO=cli"}}, env)
+	got, _, err := buildExternalEnv(map[string]FlagValue{"--var": []string{"FOO=cli"}}, env)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -9,10 +9,20 @@ import "strings"
 // `env:` block (externalEnv wins on key collision), and the result is
 // checked against every schema rule. It returns a non-nil error for
 // any structural or validation failure; externalEnv may be nil.
-func ParseScript(yamlContent string, externalEnv map[string]string) (*ScriptDefinition, error) {
+//
+// Every externalEnv entry is a secret in the returned definition's
+// SecretEnv unless options name it as committed, because a value a host
+// supplies comes from outside the script and config files. A value the
+// script's own env block declares is never secret, since it is already
+// written in the committed file.
+func ParseScript(yamlContent string, externalEnv map[string]string, options ...ParseOption) (*ScriptDefinition, error) {
 	docs, err := splitScriptDocs(yamlContent)
 	if err != nil {
 		return nil, err
+	}
+	var settings parseSettings
+	for _, option := range options {
+		option(&settings)
 	}
 
 	scriptEnv := coerceStringRecord(docs.config["env"])
@@ -20,8 +30,12 @@ func ParseScript(yamlContent string, externalEnv map[string]string) (*ScriptDefi
 	for k, v := range scriptEnv {
 		mergedEnv[k] = v
 	}
+	secretEnv := make(map[string]bool, len(externalEnv))
 	for k, v := range externalEnv {
 		mergedEnv[k] = v
+		if !settings.committed[k] {
+			secretEnv[k] = true
+		}
 	}
 
 	resolvedStepsAny := resolveVariables(any(docs.rawSteps), mergedEnv)
@@ -59,6 +73,7 @@ func ParseScript(yamlContent string, externalEnv map[string]string) (*ScriptDefi
 		AppID:       appID,
 		AppIDSource: appIDStr,
 		Env:         mergedEnv,
+		SecretEnv:   secretEnv,
 		Steps:       steps,
 	}
 
@@ -211,4 +226,18 @@ func padStepLines(lines []int, expected int) []int {
 		}
 	}
 	return out
+}
+
+// ParseOption adjusts how ParseScript treats the external env.
+type ParseOption func(*parseSettings)
+
+type parseSettings struct {
+	committed map[string]bool
+}
+
+// WithCommittedNames names the externalEnv entries whose value is written
+// in a committed file, such as a literal in a project config or in a
+// scenario, so ParseScript does not count them as secret.
+func WithCommittedNames(names map[string]bool) ParseOption {
+	return func(settings *parseSettings) { settings.committed = names }
 }
