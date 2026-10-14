@@ -21,7 +21,9 @@ print this same reference from the terminal, for example
 
 The `atomyx` binary routes to modules. Today one module ships
 commands: `driver`, for device interaction. A second module, `skills`,
-installs and updates the bundled Claude skill files.
+installs and updates the bundled Claude skill files. A third module,
+`runs`, reads the recorded runs: it lists them, reports outcome
+statistics per test, and prunes old ones.
 
 ```
 atomyx <module> <command> [flags]
@@ -38,6 +40,9 @@ atomyx <module> <command> [flags]
 | `atomyx driver version` | Prints the driver module's version. |
 | `atomyx skills init` | Copies the bundled skill and agent files into a project. |
 | `atomyx skills update-skills` | Updates an existing skills install to the bundled version. |
+| `atomyx runs list` | Lists recorded runs, newest first. |
+| `atomyx runs stats` | Reports pass, fail, and flaky statistics per test key. |
+| `atomyx runs prune` | Deletes old runs together with their worker runs. |
 
 Six shortcuts skip the `driver` module name: `atomyx run`, `atomyx
 suite`, `atomyx doctor`, `atomyx inspect`, `atomyx setup`, and `atomyx devices` map to
@@ -45,7 +50,7 @@ suite`, `atomyx doctor`, `atomyx inspect`, `atomyx setup`, and `atomyx devices` 
 `atomyx driver inspect`, `atomyx driver setup`, and `atomyx driver list-devices`. Two shortcuts skip
 the `skills` module name: `atomyx init` and `atomyx update-skills`.
 
-The CLI ships exactly two modules: `driver` and `skills`. The MCP
+The CLI ships exactly three modules: `driver`, `skills`, and `runs`. The MCP
 server is a separate stdio binary, `atomyx-mcp`, that an AI client
 launches directly instead of going through the `atomyx` binary.
 
@@ -63,6 +68,11 @@ atomyx driver help
 
 atomyx skills init [flags]
 atomyx skills update-skills [flags]
+
+atomyx runs list [flags]
+atomyx runs stats [flags]
+atomyx runs prune [flags]
+atomyx runs help
 ```
 
 `atomyx <module>` with no command prints that module's usage. `atomyx
@@ -1245,6 +1255,161 @@ Example:
 ```
 atomyx skills update-skills
 ```
+
+## runs
+
+The `runs` module reads the run folders under the storage directory,
+which is `ATOMYX_STORAGE_DIR` when set and `~/.atomyx` otherwise. It
+needs no device. A run folder whose record cannot be read is never
+listed, counted, or touched, and every command ends its text output
+with a footer that gives the number of such records when it is not
+zero. The JSON output carries the same number in a top level `skipped`
+field.
+
+`--since` takes an RFC 3339 timestamp or a `YYYY-MM-DD` date, which is
+read as midnight UTC. Every command accepts `--help` (or `-h`).
+
+### Test key
+
+A test key is the stable identity of the script or scenario a run
+executes. `atomyx run` and `atomyx suite` store it as `testKey` in
+`meta.json`, and a suite stores one per entry in `index.json`, so the
+same test keeps one key whatever directory a run starts from.
+
+The key of a file is its path relative to a project root, written with
+forward slashes. The project root is the nearest ancestor directory of
+the file, starting at the file's own directory, that holds an Atomyx
+config file (`atomyx.config.yaml` or `atomyx.config.yml`). When no
+ancestor holds one, it is the nearest ancestor that holds a `.git`
+entry. When there is none, it is the file's own directory.
+
+A run driven through the MCP server has no script file, so its key is
+`mcp:` followed by the run name. A run recorded without a key is listed
+and filtered under its script path.
+
+### runs list
+
+```
+atomyx runs list [--test <key>] [--since <date>] [--json]
+```
+
+Lists recorded runs, newest first.
+
+| Flag | Meaning | Default | Required |
+|---|---|---|---|
+| `--test <key>` | Only runs of this test key. | all runs | no |
+| `--since <date>` | Only runs started at or after this time. | no limit | no |
+| `--json` | Prints one JSON document instead of a table. | off | no |
+| `--help`, `-h` | Prints this command's usage and exits. | off | no |
+
+The table has these columns:
+
+- `RUN ID`
+- `STARTED`: the start time as an RFC 3339 timestamp in UTC
+- `KIND`: `script`, `suite`, or `mcp`
+- `TEST`: the test key, or `-` when the run has neither a key nor a script path
+- `RESULT`: `passed`, `failed`, `cancelled`, or `running` for a run that is still being written
+- `DURATION`: `-` while the run is still being written
+
+With no match the command prints `No runs found.`
+
+The JSON document has `runs` and `skipped`. `runs` is always present
+and is an empty array when nothing matches. Each run has `runId`,
+`startedAt`, `kind`, `testKey`, `result`, and, when known, `outcome`
+and `durationMs`. `testKey` holds the script path for a run recorded
+without a key.
+
+### runs stats
+
+```
+atomyx runs stats [--test <key>] [--last <n>] [--since <date>] [--json]
+```
+
+Reports outcome statistics per test key.
+
+| Flag | Meaning | Default | Required |
+|---|---|---|---|
+| `--test <key>` | Only this test key. | all keys | no |
+| `--last <n>` | Counts only the most recent `n` runs of each test. A whole number of at least 1. | all runs | no |
+| `--since <date>` | Counts only runs started at or after this time. | no limit | no |
+| `--json` | Prints one JSON document instead of a table. | off | no |
+| `--help`, `-h` | Prints this command's usage and exits. | off | no |
+
+When both `--since` and `--last` are given, the time cut applies first
+and `--last` trims what remains.
+
+A suite run counts through its index entries, one outcome per entry
+under the entry's test key, and the suite run itself is not counted. An
+entry that passed after a retry counts as flaky, and a flaky entry also
+counts as passed. A run that is unfinished, cancelled, or interrupted is
+left out.
+
+The table has one row per test key, sorted by flaky rate, then by
+failures, both highest first, then by key:
+
+- `TEST`
+- `RUNS`
+- `PASSED`: includes flaky runs
+- `FAILED`
+- `FLAKY`
+- `FLAKY RATE`: flaky runs divided by runs, as a percentage
+- `P50` and `P95`: duration percentiles, `-` when no run has a duration
+- `LAST`: up to 10 outcomes, most recent first, one letter each. `P` is passed, `F` is failed, and `K` is flaky.
+
+With no match the command prints `No finished runs found.`
+
+The JSON document has `tests` and `skipped`. `tests` is always present.
+Each test has `testKey`, `runs`, `passed`, `failed`, `flaky`,
+`flakyRate` (a fraction from 0 to 1), `lastOutcomes` (the words
+`passed`, `failed`, or `flaky`), `durationP50Ms`, and `durationP95Ms`.
+
+### runs prune
+
+```
+atomyx runs prune [--keep <n>] [--older-than <days>] [--dry-run] [--json]
+```
+
+Deletes old runs.
+
+| Flag | Meaning | Default | Required |
+|---|---|---|---|
+| `--keep <n>` | Keeps the newest `n` runs and selects the rest. A whole number of at least 1. | off | one of `--keep` and `--older-than` |
+| `--older-than <days>` | Selects runs that started more than this many days ago. A whole number of at least 1. | off | one of `--keep` and `--older-than` |
+| `--dry-run` | Reports what would be deleted and deletes nothing. | off | no |
+| `--json` | Prints one JSON document instead of a table. | off | no |
+| `--help`, `-h` | Prints this command's usage and exits. | off | no |
+
+Without `--keep` or `--older-than` the command refuses to run, so it
+never deletes every run by default.
+
+Prune rules:
+
+- When both `--keep` and `--older-than` are given, a run is deleted only if both select it.
+- A sharded suite run and its worker runs form one unit. The unit is kept or deleted as a whole, counts once toward `--keep`, and takes its age from the suite run.
+- A run that is still being written is never deleted, and neither is any unit that contains one. The unit is reported as skipped.
+- A run record that cannot be read is never touched.
+- With `--dry-run` the command classifies every unit and deletes nothing.
+
+The table has the columns `ACTION`, `RUN ID`, `STARTED`, `RUNS` (the
+number of runs in the unit), and `WHY`. `ACTION` is `deleted`, `would
+delete`, `skipped`, or `failed`. `WHY` gives the selection reason, or
+the error for a skipped or failed unit. With no selected unit the
+command prints `No runs match the prune criteria.`
+
+The JSON document has `dryRun`, `keep` and `olderThanDays` (each
+omitted when not given), `units`, `runsDeleted`, and `skipped`. `units`
+is always present. Each unit has `runId`, `startedAt`, `runs` (the
+suite run id first, then its workers), `action` (`deleted`,
+`wouldDelete`, `skippedLive`, or `failed`), `reason`, and, for a unit
+that was not deleted, `error`.
+
+### runs exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | The command succeeded. For `prune`, every selected unit was deleted or `--dry-run` was given. |
+| `1` | The storage could not be read. For `prune`, a deletion failed or was refused. |
+| `2` | The command was misused: an unknown command or flag, or a bad flag value. |
 
 ## Shortcuts
 

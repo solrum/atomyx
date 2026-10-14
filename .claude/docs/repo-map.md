@@ -86,6 +86,7 @@ atomyx/
 | `iosdriver` | Implements the Driver port over the Swift XCUITest runner's line-delimited JSON TCP protocol. |
 | `iossimdriver` | Implements the Driver port over the iOS Simulator's direct-HID input path. |
 | `flock` | The advisory file lock primitive: a non-blocking exclusive flock on an open file, unlock, a contention check, and a descriptor-versus-path identity check. Depends on the standard library only. |
+| `history` | Aggregates run outcomes per test key over run folders: pass, fail, and flaky counts and duration percentiles inside a window. A leaf over `runfolder`. |
 | `inspector` | Serves the browser inspector of a held device, releasing it after an idle timeout and taking it again on request, from a loopback-only HTTP server with a Host check, an Origin check on writes, a per-session token on every `/api/` request, a single-use bootstrap code, and a route registry that features extend with route groups. |
 | `lease` | Gives each physical device at most one driving process through a per-device flock, and probes it without writing. |
 | `logging` | The structured logging port every layer writes through, so the host chooses the destination. |
