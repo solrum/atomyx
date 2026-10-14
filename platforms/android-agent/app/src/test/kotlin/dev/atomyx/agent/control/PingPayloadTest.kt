@@ -1,5 +1,6 @@
 package dev.atomyx.agent.control
 
+import dev.atomyx.agent.BuildConfig
 import dev.atomyx.agent.control.router.pingPayload
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -14,6 +15,14 @@ class PingPayloadTest {
         @Suppress("UNCHECKED_CAST")
         val capabilities = payload["capabilities"] as Map<String, Any>
         assertEquals(true, capabilities["secureFields"])
+    }
+
+    @Test
+    fun reportsTheProtocolVersionAndTheAgentBuildVersion() {
+        val payload = pingPayload(canMultiPointer = true, canPressure = false, sdkInt = 34)
+
+        assertEquals(AgentProtocol.AGENT_PROTOCOL_VERSION, payload["protocolVersion"])
+        assertEquals(BuildConfig.VERSION_NAME, payload["agentVersion"])
     }
 
     @Test

@@ -2,6 +2,8 @@ package dev.atomyx.agent.control.router
 
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import dev.atomyx.agent.BuildConfig
+import dev.atomyx.agent.control.AgentProtocol
 import dev.atomyx.agent.control.AtomyxServices
 import dev.atomyx.agent.control.GestureRunner
 import dev.atomyx.agent.control.SystemActionDispatcher
@@ -29,6 +31,8 @@ private fun parseBody(body: String): JsonObject =
  * {
  *   "ok": true,
  *   "agent": "atomyx-android",
+ *   "protocolVersion": 1,
+ *   "agentVersion": "0.1.0",
  *   "sdkInt": 34,
  *   "mechanism": "accessibility",
  *   "capabilities": {
@@ -55,11 +59,15 @@ class PingRoute : Route {
  * `/tree` reports isPassword, so the host can tell an agent that marks
  * secret fields from one that predates the marker and would leave a
  * password unmasked. A capability only ever gets added, so an older host
- * ignores the ones it does not know.
+ * ignores the ones it does not know. `protocolVersion` is the wire
+ * contract number the host gates on, and `agentVersion` is the build's
+ * version name, reported for diagnostics.
  */
 internal fun pingPayload(canMultiPointer: Boolean, canPressure: Boolean, sdkInt: Int): Map<String, Any> = mapOf(
     "ok" to true,
     "agent" to "atomyx-android",
+    "protocolVersion" to AgentProtocol.AGENT_PROTOCOL_VERSION,
+    "agentVersion" to BuildConfig.VERSION_NAME,
     "sdkInt" to sdkInt,
     // `accessibility` names the one current mechanism: the
     // AccessibilityService gesture surface. Future backends
