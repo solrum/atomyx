@@ -53,3 +53,23 @@ func TestParseRunsArgvListFlags(t *testing.T) {
 		})
 	}
 }
+
+func TestParseRunsArgvStatsFlags(t *testing.T) {
+	argv, err := ParseRunsArgv([]string{"--last", "5", "--since=2026-03-01", "--test", "a", "--json"}, RunsCommandStats)
+	if err != nil {
+		t.Fatalf("ParseRunsArgv: %v", err)
+	}
+	for flag, want := range map[string]string{"--last": "5", "--since": "2026-03-01", "--test": "a"} {
+		if got, _ := flagString(argv.Flags, flag); got != want {
+			t.Errorf("%s = %q, want %q", flag, got, want)
+		}
+	}
+	if !flagBool(argv.Flags, "--json") {
+		t.Errorf("--json = false, want true")
+	}
+
+	var argvErr *ArgvError
+	if _, err := ParseRunsArgv([]string{"--keep", "2"}, RunsCommandStats); !errors.As(err, &argvErr) {
+		t.Errorf("--keep on stats: error = %v, want an *ArgvError", err)
+	}
+}

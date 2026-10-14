@@ -185,7 +185,7 @@ func TestRunsMisuseExitsTwo(t *testing.T) {
 }
 
 func TestRunsHelp(t *testing.T) {
-	for _, args := range [][]string{nil, {"help"}, {"list", "--help"}} {
+	for _, args := range [][]string{nil, {"help"}, {"list", "--help"}, {"stats", "--help"}} {
 		code, stdout, stderr := execRuns(t, args...)
 		if code != 0 || stderr != "" || !strings.Contains(stdout, "atomyx runs") {
 			t.Errorf("args %v: code = %d, stdout = %q, stderr = %q", args, code, stdout, stderr)
@@ -202,5 +202,151 @@ func writeUnreadableRun(t *testing.T, root string) {
 	}
 	if err := os.WriteFile(filepath.Join(dir, runfolder.MetaFileName), []byte("{not json"), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// seedSuiteRun records one finished suite run whose index holds entries.
+func seedSuiteRun(t *testing.T, root string, start time.Time, entries []runfolder.IndexEntry) string {
+	t.Helper()
+	ticks := []time.Time{start, start.Add(time.Minute)}
+	clock := func() time.Time {
+		at := ticks[0]
+		if len(ticks) > 1 {
+			ticks = ticks[1:]
+		}
+		return at
+	}
+	w, err := runfolder.NewStarter(root, clock, rand.Reader).Start("suite", runfolder.Meta{Kind: runfolder.KindSuite})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.WriteIndex(entries); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Finalize(runfolder.OutcomePassed, nil); err != nil {
+		t.Fatal(err)
+	}
+	return w.ID()
+}
+
+func seedStatsStore(t *testing.T) {
+	root := runsStorageDir(t)
+	for i, outcome := range []runfolder.Outcome{runfolder.OutcomePassed, runfolder.OutcomePassed, runfolder.OutcomeFailed} {
+		seedRecordedRun(t, root, "a", runsEpoch.Add(time.Duration(i)*time.Hour), 2*time.Second, outcome, runfolder.Meta{TestKey: "flows/a.yml"})
+	}
+	seedRecordedRun(t, root, "c", runsEpoch, time.Second, runfolder.OutcomePassed, runfolder.Meta{ScriptPath: "/abs/c.yml"})
+	seedSuiteRun(t, root, runsEpoch.Add(5*time.Hour), []runfolder.IndexEntry{
+		{Path: "x.yml", TestKey: "flows/x.yml", Status: runfolder.ResultPassed, Flaky: true},
+		{Path: "a.yml", TestKey: "flows/a.yml", Status: runfolder.ResultPassed},
+	})
+	seedRecordedRun(t, root, "cancelled", runsEpoch, time.Second, runfolder.OutcomeCancelled, runfolder.Meta{TestKey: "flows/a.yml"})
+}
+
+func TestRunsStatsTextSortedByFlakyRateThenFailures(t *testing.T) {
+	seedStatsStore(t)
+
+	code, stdout, stderr := execRuns(t, "stats")
+
+	if code != 0 || stderr != "" {
+		t.Fatalf("code = %d, stderr = %q", code, stderr)
+	}
+	lines := strings.Split(strings.TrimSpace(stdout), "\n")
+	if len(lines) != 4 {
+		t.Fatalf("lines = %d:\n%s", len(lines), stdout)
+	}
+	wantOrder := []string{"flows/x.yml", "flows/a.yml", "/abs/c.yml"}
+	for i, key := range wantOrder {
+		if !strings.HasPrefix(lines[i+1], key) {
+			t.Errorf("row %d = %q, want key %s", i, lines[i+1], key)
+		}
+	}
+	if !strings.Contains(lines[1], "100.0%") || !strings.HasSuffix(lines[1], "K") {
+		t.Errorf("flaky row = %q", lines[1])
+	}
+	if !strings.HasSuffix(lines[2], "PFPP") {
+		t.Errorf("flows/a.yml row = %q", lines[2])
+	}
+}
+
+func TestRunsStatsFilters(t *testing.T) {
+	seedStatsStore(t)
+
+	_, byTest, _ := execRuns(t, "stats", "--test", "flows/a.yml")
+	if rows := strings.Count(byTest, "\n") - 1; rows != 1 || !strings.Contains(byTest, "flows/a.yml") {
+		t.Errorf("--test output:\n%s", byTest)
+	}
+
+	_, last, _ := execRuns(t, "stats", "--test", "flows/a.yml", "--last", "2", "--json")
+	var doc runStatsJSON
+	if err := json.Unmarshal([]byte(last), &doc); err != nil || len(doc.Tests) != 1 || doc.Tests[0].Runs != 2 {
+		t.Errorf("--last json = %s, err = %v", last, err)
+	}
+
+	_, since, _ := execRuns(t, "stats", "--since", "2026-03-01T13:00:00Z", "--json")
+	doc = runStatsJSON{}
+	if err := json.Unmarshal([]byte(since), &doc); err != nil || len(doc.Tests) != 2 {
+		t.Errorf("--since json = %s, err = %v", since, err)
+	}
+}
+
+func TestRunsStatsJSON(t *testing.T) {
+	seedStatsStore(t)
+
+	_, stdout, _ := execRuns(t, "stats", "--json")
+
+	var doc runStatsJSON
+	if err := json.Unmarshal([]byte(stdout), &doc); err != nil {
+		t.Fatalf("decode: %v\n%s", err, stdout)
+	}
+	if len(doc.Tests) != 3 || doc.Skipped != 0 {
+		t.Fatalf("doc = %+v", doc)
+	}
+	a := doc.Tests[1]
+	if a.TestKey != "flows/a.yml" || a.Runs != 4 || a.Passed != 3 || a.Failed != 1 || a.Flaky != 0 ||
+		a.DurationP50Ms != 2000 || len(a.LastOutcomes) != 4 {
+		t.Errorf("flows/a.yml = %+v", a)
+	}
+	x := doc.Tests[0]
+	if x.TestKey != "flows/x.yml" || x.Flaky != 1 || x.FlakyRate != 1 || x.DurationP50Ms != 0 {
+		t.Errorf("flows/x.yml = %+v", x)
+	}
+}
+
+func TestRunsStatsEmptyStoreAndSkippedFooter(t *testing.T) {
+	root := runsStorageDir(t)
+	_, empty, _ := execRuns(t, "stats")
+	if !strings.Contains(empty, "No finished runs found.") {
+		t.Errorf("empty output = %q", empty)
+	}
+	_, emptyJSON, _ := execRuns(t, "stats", "--json")
+	if !strings.Contains(emptyJSON, `"tests": []`) {
+		t.Errorf("empty json = %s", emptyJSON)
+	}
+	writeUnreadableRun(t, root)
+	_, withSkipped, _ := execRuns(t, "stats")
+	if !strings.Contains(withSkipped, "1 run record could not be read and was skipped.") {
+		t.Errorf("output = %q", withSkipped)
+	}
+}
+
+func TestRunsStatsMisuseExitsTwo(t *testing.T) {
+	runsStorageDir(t)
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"zero last", []string{"stats", "--last", "0"}, "must be a whole number of at least 1"},
+		{"text last", []string{"stats", "--last", "many"}, "must be a whole number of at least 1"},
+		{"bad since", []string{"stats", "--since", "2026/03/01"}, "neither an RFC 3339 timestamp nor a YYYY-MM-DD date"},
+		{"unknown flag", []string{"stats", "--keep", "2"}, `does not accept "--keep"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, stdout, stderr := execRuns(t, tt.args...)
+			if code != 2 || stdout != "" || !strings.Contains(stderr, tt.want) {
+				t.Errorf("code = %d, stdout = %q, stderr = %q", code, stdout, stderr)
+			}
+		})
 	}
 }
