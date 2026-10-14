@@ -97,6 +97,12 @@ const (
 	// where the agent never answered at all: here the agent is up and
 	// the remedy is to fix its readiness, not to relaunch it.
 	CodeAgentNotReady = "AGENT_NOT_READY"
+	// CodeAgentVersionMismatch means the on-device agent speaks a
+	// protocol version the host does not support, so the two cannot be
+	// trusted to understand each other. The agent is reachable and the
+	// remedy is to rebuild and reinstall it from the same source tree
+	// as the host, not to retry.
+	CodeAgentVersionMismatch = "AGENT_VERSION_MISMATCH"
 	// CodeProxyRequired means a script declares `proxy: required` and
 	// the host running it has no network capture adapter configured,
 	// so the run was refused before any step executed.
