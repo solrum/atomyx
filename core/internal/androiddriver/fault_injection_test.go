@@ -17,6 +17,7 @@ import (
 	"dev.atomyx/internal/driver"
 	"dev.atomyx/internal/process"
 	"dev.atomyx/internal/transport"
+	"dev.atomyx/internal/version"
 	"dev.atomyx/internal/wire"
 )
 
@@ -73,7 +74,7 @@ func newFaultInjectionAgent(t *testing.T, healthyPaths ...string) *httptest.Serv
 func faultInjectionOkBody(path string) string {
 	switch path {
 	case "/ping":
-		return `{"ok":true,"agent":"fault-injection","sdkInt":1,"mechanism":"test",` +
+		return `{"ok":true,"agent":"fault-injection","protocolVersion":` + strconv.Itoa(version.AgentProtocolVersion) + `,"sdkInt":1,"mechanism":"test",` +
 			`"capabilities":{"canMultiPointer":false,"canPressure":false,"secureFields":true}}`
 	default:
 		return `{"ok":true,"accessibilityConnected":true}`

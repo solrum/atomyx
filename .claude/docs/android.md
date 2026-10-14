@@ -72,7 +72,7 @@ adb-forward lifecycle, and tree normalization
 
 | Driver port method | Wire route | Agent handler | Notes |
 |---|---|---|---|
-| `Connect()` | `GET /health` then `GET /ping` | `HttpControlServer` inline health check, then `PingRoute` | A `/ping` call that cannot reach the agent is swallowed, so `Connect` keeps conservative capability defaults. An agent that answers `/ping` without `capabilities.secureFields`, or with an error status because it predates the route, is stale: see the note below. A `/health` failure fails `Connect`, classified per the note below. |
+| `Connect()` | `GET /health` then `GET /ping` | `HttpControlServer` inline health check, then `PingRoute` | A `/ping` call that cannot reach the agent is swallowed, so `Connect` keeps conservative capability defaults. An agent whose `/ping` `protocolVersion` differs from the host's, whose `/ping` answers with an error status because it predates the route (version 0), or whose `/ping` lacks `capabilities.secureFields` is stale: see the notes below. A `/health` failure fails `Connect`, classified per the note below. |
 | `Ping()` | `GET /health` | `HttpControlServer` inline health check | Bounded to a 1s probe timeout so a caller gets a fast answer. Classified per the note below. |
 | `Hierarchy()` | `GET /tree` | `TreeRoute` then `UiTreeService.dumpTree` | Returns the hierarchical tree, then `NormalizeAndroidTree` maps it to the canonical shape. |
 | `Tap()` | `POST /actions/tap_coords` | `TapCoordsRoute` then `GestureDispatcher.tapAt` then `GestureRunner.dispatch` | |
@@ -103,17 +103,28 @@ running, while a `503` reports `AGENT_NOT_READY` with the response's
 own reason as the message and a remedy to re-enable the accessibility
 service, since the agent process answered and named what is wrong.
 
-`/ping` carries `capabilities.secureFields: true` in every agent that
-reports `isPassword` on tree nodes. The capability list only grows, so
-a host ignores capabilities it does not know and a new agent keeps
+`/ping` carries `protocolVersion` (the wire contract number declared in
+`AgentProtocol.kt`) and `agentVersion` (the build's version name), and
+`Connect` stores both for `AgentInfo()`. The host accepts only an agent
+whose `protocolVersion` equals `version.AgentProtocolVersion`. An agent
+that answers `/ping` with an error status predates the route and counts
+as version 0, while a `/ping` that cannot be reached at all is not a
+mismatch and keeps the conservative defaults.
+
+`/ping` also carries `capabilities.secureFields: true` in every agent
+that reports `isPassword` on tree nodes. The capability list only grows,
+so a host ignores capabilities it does not know and a new agent keeps
 working with an older host. `Connect` treats an agent without the
-capability as stale, because it would leave a password unmasked. When
-the driver was built with a reinstall hook, which the device factory
-supplies from its provisioner, `Connect` runs the install and
-accessibility rebind path once, ignoring the readiness probe, and pings
-again. It fails with `AGENT_NOT_READY` and a remedy to build or point
-`ATOMYX_ANDROID_APK` at a current agent when no APK can be found, when
-no hook exists, or when the agent is still stale afterwards.
+capability as stale even when the versions agree, because it would
+leave a password unmasked. When the driver was built with a reinstall
+hook, which the device factory supplies from its provisioner, `Connect`
+runs the install and accessibility rebind path once, ignoring the
+readiness probe, and pings again. It fails with a remedy to build or
+point `ATOMYX_ANDROID_APK` at a current agent when no APK can be found,
+when no hook exists, or when the agent is still stale afterwards. The
+error code is `AGENT_VERSION_MISMATCH` when the protocol versions
+differ and `AGENT_NOT_READY` when only the secret field marker is
+missing.
 
 A mutating request waits for the router lock for at most 5 seconds. A
 request still queued after that is refused with `429`

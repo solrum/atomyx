@@ -15,6 +15,7 @@ import (
 	"dev.atomyx/internal/driver/drivertest"
 	"dev.atomyx/internal/process"
 	"dev.atomyx/internal/transport"
+	"dev.atomyx/internal/version"
 	"dev.atomyx/internal/wire"
 )
 
@@ -58,7 +59,7 @@ type fakeTransport struct {
 
 func newFakeTransport() *fakeTransport {
 	return &fakeTransport{
-		pingResp:         transport.PingResponse{Ok: true, Capabilities: transport.PingCapabilities{SecureFields: true}},
+		pingResp:         currentAgentPing(),
 		clearFocusedResp: transport.ClearFocusedInputResult{Ok: true},
 		hideKeyboardResp: transport.AckResult{Ok: true},
 		forceStopResp:    transport.AckResult{Ok: true},
@@ -272,7 +273,8 @@ func TestAndroidDriver_Connect_ForwardsAdbTunnelThenHealthAndPing(t *testing.T) 
 
 	tr := newFakeTransport()
 	tr.pingResp = transport.PingResponse{
-		Ok: true,
+		Ok:              true,
+		ProtocolVersion: version.AgentProtocolVersion,
 		Capabilities: transport.PingCapabilities{
 			CanMultiPointer: true,
 			CanPressure:     true,
@@ -1072,8 +1074,141 @@ func equalArgs(got, want []string) bool {
 	return true
 }
 
+func currentAgentPing() transport.PingResponse {
+	return transport.PingResponse{
+		Ok:              true,
+		ProtocolVersion: version.AgentProtocolVersion,
+		AgentVersion:    "0.1.0",
+		Capabilities:    transport.PingCapabilities{SecureFields: true},
+	}
+}
+
 func staleAgentPing() transport.PingResponse {
-	return transport.PingResponse{Ok: true, Capabilities: transport.PingCapabilities{CanMultiPointer: true}}
+	return transport.PingResponse{
+		Ok:              true,
+		ProtocolVersion: version.AgentProtocolVersion,
+		Capabilities:    transport.PingCapabilities{CanMultiPointer: true},
+	}
+}
+
+func agentPingWithProtocol(protocolVersion int) transport.PingResponse {
+	pong := currentAgentPing()
+	pong.ProtocolVersion = protocolVersion
+	return pong
+}
+
+func TestAndroidDriver_Connect_MatchingVersion_ExposesBothValuesThroughAgentInfo(t *testing.T) {
+	tr := newFakeTransport()
+	d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{
+		Serial:         "S1",
+		ReinstallAgent: func(context.Context) error { t.Fatal("reinstalled a matching agent"); return nil },
+	})
+
+	if err := d.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+
+	want := driver.AgentInfo{ProtocolVersion: version.AgentProtocolVersion, AgentVersion: "0.1.0"}
+	if got := d.AgentInfo(); got != want {
+		t.Fatalf("AgentInfo() = %+v, want %+v", got, want)
+	}
+}
+
+func TestAndroidDriver_Connect_AgentErrorOnPing_CountsAsVersionZeroAndReinstallsOnce(t *testing.T) {
+	tr := newFakeTransport()
+	tr.pingErr = &transport.AgentError{Route: "GET /ping", StatusCode: 404, Message: "Unsupported command."}
+	reinstalls := 0
+	d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{
+		Serial: "S1",
+		ReinstallAgent: func(context.Context) error {
+			reinstalls++
+			tr.pingErr = nil
+			tr.pingResp = currentAgentPing()
+			return nil
+		},
+	})
+
+	if err := d.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	if reinstalls != 1 || !d.IsConnected() {
+		t.Fatalf("reinstalls = %d, connected = %v, want one reinstall and a connected driver", reinstalls, d.IsConnected())
+	}
+	if got := d.AgentInfo().ProtocolVersion; got != version.AgentProtocolVersion {
+		t.Fatalf("AgentInfo().ProtocolVersion = %d, want %d from the replacement agent", got, version.AgentProtocolVersion)
+	}
+}
+
+func TestAndroidDriver_Connect_PersistentVersionMismatch_FailsAfterExactlyOneReinstall(t *testing.T) {
+	tr := newFakeTransport()
+	tr.pingResp = agentPingWithProtocol(version.AgentProtocolVersion + 1)
+	reinstalls := 0
+	d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{
+		Serial:         "S1",
+		ReinstallAgent: func(context.Context) error { reinstalls++; return nil },
+	})
+
+	err := d.Connect(context.Background())
+
+	code, message, remedy := diag.Describe(err)
+	if code != diag.CodeAgentVersionMismatch || d.IsConnected() {
+		t.Fatalf("Connect() code = %q, connected = %v, want %q and a failed connect", code, d.IsConnected(), diag.CodeAgentVersionMismatch)
+	}
+	if reinstalls != 1 {
+		t.Fatalf("reinstalls = %d, want exactly one", reinstalls)
+	}
+	if !strings.Contains(message, "protocol version") || !strings.Contains(remedy, "assembleDebug") {
+		t.Fatalf("message = %q, remedy = %q, want the versions named with a build remedy", message, remedy)
+	}
+}
+
+func TestAndroidDriver_Connect_VersionMismatchWithoutAReinstallHook_ReportsVersionMismatch(t *testing.T) {
+	tr := newFakeTransport()
+	tr.pingResp = agentPingWithProtocol(0)
+	d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{Serial: "S1"})
+
+	err := d.Connect(context.Background())
+
+	if code, _, _ := diag.Describe(err); code != diag.CodeAgentVersionMismatch {
+		t.Fatalf("Connect() code = %q, want %q", code, diag.CodeAgentVersionMismatch)
+	}
+}
+
+func TestAndroidDriver_Connect_UnreachablePing_KeepsConservativeDefaultsWithoutReinstall(t *testing.T) {
+	tr := newFakeTransport()
+	tr.pingErr = errors.New("connection reset")
+	d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{
+		Serial:         "S1",
+		ReinstallAgent: func(context.Context) error { t.Fatal("reinstalled over a transport error"); return nil },
+	})
+
+	if err := d.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	if got := d.AgentInfo(); got != (driver.AgentInfo{}) {
+		t.Fatalf("AgentInfo() = %+v, want the zero value when ping was unreachable", got)
+	}
+}
+
+func TestAndroidDriver_Connect_MissingSecureFieldsWithMatchingVersion_StillReinstalls(t *testing.T) {
+	tr := newFakeTransport()
+	tr.pingResp = staleAgentPing()
+	reinstalls := 0
+	d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{
+		Serial: "S1",
+		ReinstallAgent: func(context.Context) error {
+			reinstalls++
+			tr.pingResp = currentAgentPing()
+			return nil
+		},
+	})
+
+	if err := d.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	if reinstalls != 1 {
+		t.Fatalf("reinstalls = %d, want one for an agent that does not mark secret fields", reinstalls)
+	}
 }
 
 func TestAndroidDriver_Connect_AgentWithoutSecureFields_ReinstallsOnceThenConnects(t *testing.T) {
@@ -1084,9 +1219,8 @@ func TestAndroidDriver_Connect_AgentWithoutSecureFields_ReinstallsOnceThenConnec
 		Serial: "S1",
 		ReinstallAgent: func(context.Context) error {
 			reinstalls++
-			tr.pingResp = transport.PingResponse{Ok: true, Capabilities: transport.PingCapabilities{
-				CanMultiPointer: true, SecureFields: true,
-			}}
+			tr.pingResp = currentAgentPing()
+			tr.pingResp.Capabilities.CanMultiPointer = true
 			return nil
 		},
 	})
@@ -1132,15 +1266,15 @@ func TestAndroidDriver_Connect_AgentWithoutSecureFields_FailsWhenItCannotBeRepla
 	}
 }
 
-func TestAndroidDriver_Connect_PingRouteMissing_CountsAsAStaleAgent(t *testing.T) {
+func TestAndroidDriver_Connect_PingRouteMissing_CountsAsAVersionZeroAgent(t *testing.T) {
 	tr := newFakeTransport()
 	tr.pingErr = &transport.AgentError{Route: "GET /ping", StatusCode: 404, Message: "Unsupported command."}
 	d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{Serial: "S1"})
 
 	err := d.Connect(context.Background())
 
-	if code, _, _ := diag.Describe(err); code != diag.CodeAgentNotReady {
-		t.Fatalf("Connect() code = %q, want %q for an agent that predates /ping", code, diag.CodeAgentNotReady)
+	if code, _, _ := diag.Describe(err); code != diag.CodeAgentVersionMismatch {
+		t.Fatalf("Connect() code = %q, want %q for an agent that predates /ping", code, diag.CodeAgentVersionMismatch)
 	}
 }
 

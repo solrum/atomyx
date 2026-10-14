@@ -10,12 +10,13 @@ import (
 	"testing"
 
 	"dev.atomyx/internal/process"
+	"dev.atomyx/internal/version"
 )
 
 func startHealthyAgent(t *testing.T) int {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`{"ok":true,"accessibilityConnected":true,"capabilities":{"secureFields":true}}`))
+		_, _ = w.Write([]byte(`{"ok":true,"accessibilityConnected":true,"protocolVersion":` + strconv.Itoa(version.AgentProtocolVersion) + `,"capabilities":{"secureFields":true}}`))
 	}))
 	t.Cleanup(srv.Close)
 	u, err := url.Parse(srv.URL)
@@ -57,7 +58,7 @@ func TestDriverFactory_Build_Android_TwoSerialsReachTheirOwnAllocatedPorts(t *te
 // not fix it.
 func TestDriverFactory_Build_Android_StaleAgentIsReinstalledThroughTheProvisioner(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`{"ok":true,"accessibilityConnected":true,"capabilities":{"canMultiPointer":false}}`))
+		_, _ = w.Write([]byte(`{"ok":true,"accessibilityConnected":true,"protocolVersion":` + strconv.Itoa(version.AgentProtocolVersion) + `,"capabilities":{"canMultiPointer":false}}`))
 	}))
 	t.Cleanup(srv.Close)
 	u, _ := url.Parse(srv.URL)

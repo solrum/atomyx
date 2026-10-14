@@ -12,6 +12,7 @@ import (
 	"dev.atomyx/internal/driver"
 	"dev.atomyx/internal/process"
 	"dev.atomyx/internal/transport"
+	"dev.atomyx/internal/version"
 	"dev.atomyx/internal/wire"
 )
 
@@ -258,16 +259,17 @@ func (d *AndroidDriver) finishConnect(ctx context.Context) error {
 		return d.classifyHealthFailure(fmt.Errorf("androiddriver: health check: %w", err))
 	}
 	pong, err := d.transport.Ping(ctx)
-	if agentLacksSecureFields(pong, err) {
-		if err := d.replaceStaleAgent(ctx); err != nil {
+	if agentIsStale(pong, err) {
+		if err := d.replaceStaleAgent(ctx, pong, err); err != nil {
 			return err
 		}
 		pong, err = d.transport.Ping(ctx)
-		if agentLacksSecureFields(pong, err) {
-			return d.staleAgentError(nil)
+		if agentIsStale(pong, err) {
+			return d.staleAgentError(pong, err, nil)
 		}
 	}
 	if err == nil {
+		d.agentInfo = driver.AgentInfo{ProtocolVersion: pong.ProtocolVersion, AgentVersion: pong.AgentVersion}
 		d.capabilities.CanMultiPointer = pong.Capabilities.CanMultiPointer
 		d.capabilities.CanPressure = pong.Capabilities.CanPressure
 	}
@@ -288,26 +290,58 @@ func agentLacksSecureFields(pong transport.PingResponse, err error) bool {
 	return errors.As(err, &agentErr)
 }
 
-func (d *AndroidDriver) replaceStaleAgent(ctx context.Context) error {
+// agentProtocolMismatch reports the protocol version the /ping outcome
+// shows and whether it differs from the one this host supports. An
+// agent that answered with an error status predates the route and
+// counts as version 0. A failure to reach the route at all proves
+// nothing about the agent, so it is not a mismatch.
+func agentProtocolMismatch(pong transport.PingResponse, err error) (agentVersion int, mismatch bool) {
+	if err == nil {
+		return pong.ProtocolVersion, pong.ProtocolVersion != version.AgentProtocolVersion
+	}
+	var agentErr *transport.AgentError
+	return 0, errors.As(err, &agentErr)
+}
+
+// agentIsStale reports whether the agent must be replaced: its
+// protocol version differs from the host's, or it does not mark secret
+// fields. The secure fields check stays beside the version check
+// because password masking depends on it even when the versions agree.
+func agentIsStale(pong transport.PingResponse, err error) bool {
+	if _, mismatch := agentProtocolMismatch(pong, err); mismatch {
+		return true
+	}
+	return agentLacksSecureFields(pong, err)
+}
+
+func (d *AndroidDriver) replaceStaleAgent(ctx context.Context, pong transport.PingResponse, pingErr error) error {
 	if d.opts.ReinstallAgent == nil {
-		return d.staleAgentError(nil)
+		return d.staleAgentError(pong, pingErr, nil)
 	}
 	if err := d.opts.ReinstallAgent(ctx); err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		return d.staleAgentError(err)
+		return d.staleAgentError(pong, pingErr, err)
 	}
 	return nil
 }
 
-// staleAgentRemedy is the next step reported for an agent too old to
-// mark secret fields. Connecting to it would leave a password unmasked
-// in every result, so the connection is refused instead.
+// staleAgentRemedy is the next step reported for an agent that is out
+// of date. Connecting to it could leave a password unmasked or speak a
+// wire contract the host does not, so the connection is refused instead.
 const staleAgentRemedy = "Build the agent with ./gradlew :app:assembleDebug in platforms/android-agent, " +
 	"or set ATOMYX_ANDROID_APK to a current agent APK, then connect again so the agent is reinstalled."
 
-func (d *AndroidDriver) staleAgentError(cause error) error {
+// staleAgentError reports why the agent behind the /ping outcome cannot
+// be used: AGENT_VERSION_MISMATCH when its protocol version differs
+// from the host's, AGENT_NOT_READY when only the secret field marker
+// is missing.
+func (d *AndroidDriver) staleAgentError(pong transport.PingResponse, pingErr, cause error) error {
+	if agentVersion, mismatch := agentProtocolMismatch(pong, pingErr); mismatch {
+		_, message, _ := diag.Describe(diag.NewAgentVersionMismatch(agentVersion, version.AgentProtocolVersion))
+		return diag.New(diag.CodeAgentVersionMismatch, message, staleAgentRemedy, cause)
+	}
 	return diag.New(diag.CodeAgentNotReady,
 		fmt.Sprintf("the agent on device %s is out of date and cannot mark secret fields", d.opts.Serial),
 		staleAgentRemedy,

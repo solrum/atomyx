@@ -52,11 +52,16 @@ type PingCapabilities struct {
 // correlation only; a caller must branch on Capabilities, not on
 // this string.
 type PingResponse struct {
-	Ok           bool             `json:"ok"`
-	Agent        string           `json:"agent"`
-	SdkInt       int              `json:"sdkInt"`
-	Mechanism    string           `json:"mechanism"`
-	Capabilities PingCapabilities `json:"capabilities"`
+	Ok    bool   `json:"ok"`
+	Agent string `json:"agent"`
+	// ProtocolVersion is the wire contract number the agent speaks,
+	// zero when the agent does not report one. AgentVersion is the
+	// agent build's version name, empty when not reported.
+	ProtocolVersion int              `json:"protocolVersion"`
+	AgentVersion    string           `json:"agentVersion"`
+	SdkInt          int              `json:"sdkInt"`
+	Mechanism       string           `json:"mechanism"`
+	Capabilities    PingCapabilities `json:"capabilities"`
 }
 
 // AndroidBounds is an axis-aligned rectangle in the Android agent's

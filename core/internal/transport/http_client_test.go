@@ -46,7 +46,7 @@ func TestHTTPClient_Ping_IssuesGetAndDecodesCapabilities(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotMethod, gotPath = r.Method, r.URL.Path
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"ok":true,"agent":"atomyx-android","sdkInt":34,"mechanism":"accessibility","capabilities":{"canMultiPointer":true,"canPressure":false}}`))
+		_, _ = w.Write([]byte(`{"ok":true,"agent":"atomyx-android","protocolVersion":1,"agentVersion":"0.1.0","sdkInt":34,"mechanism":"accessibility","capabilities":{"canMultiPointer":true,"canPressure":false}}`))
 	}))
 	defer server.Close()
 
@@ -59,10 +59,12 @@ func TestHTTPClient_Ping_IssuesGetAndDecodesCapabilities(t *testing.T) {
 		t.Fatalf("request = %s %s, want GET /ping", gotMethod, gotPath)
 	}
 	want := PingResponse{
-		Ok:        true,
-		Agent:     "atomyx-android",
-		SdkInt:    34,
-		Mechanism: "accessibility",
+		Ok:              true,
+		Agent:           "atomyx-android",
+		SdkInt:          34,
+		Mechanism:       "accessibility",
+		ProtocolVersion: 1,
+		AgentVersion:    "0.1.0",
 		Capabilities: PingCapabilities{
 			CanMultiPointer: true,
 			CanPressure:     false,
