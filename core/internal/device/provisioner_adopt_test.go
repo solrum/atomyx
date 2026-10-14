@@ -2,8 +2,11 @@ package device
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -12,6 +15,7 @@ import (
 
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/process"
+	"dev.atomyx/internal/version"
 )
 
 const (
@@ -235,6 +239,12 @@ func TestDriverProvisioner_ProvisionIOSAgent_EndsAndReplacesARunnerThatFailsAnAd
 		{"nothing answers on the recorded port", "does not answer", func(_ *testing.T, f *launchFixture, _ RunnerState) {
 			_ = f.farm.started("xcodebuild")[0].listener.Close()
 		}},
+		{"runner speaks another protocol version", "protocol version", func(t *testing.T, f *launchFixture, left RunnerState) {
+			f.answerWithProtocol(t, left, fmt.Sprintf(`"protocolVersion":%d`, version.AgentProtocolVersion+1))
+		}},
+		{"runner reports no protocol version", "protocol version", func(t *testing.T, f *launchFixture, left RunnerState) {
+			f.answerWithProtocol(t, left, `"protocolVersion":0`)
+		}},
 		{"product was rebuilt", "different build", func(t *testing.T, f *launchFixture, _ RunnerState) {
 			rebuilt := time.Now().Add(time.Hour)
 			if err := os.Chtimes(f.runnerApp(), rebuilt, rebuilt); err != nil {
@@ -380,4 +390,22 @@ func TestDriverProvisioner_ProvisionIOSAgent_AdoptedRunnerTakenOverByAnotherProc
 	if err != nil || kept.OwnerPid != foreignOwnerPid {
 		t.Fatalf("record = %+v (%v), want it kept with its new owner", kept, err)
 	}
+}
+
+// answerWithProtocol replaces the left runner's listener with one on the
+// same port that reports pingFields, which carry the protocol version the
+// replacement declares.
+func (f *launchFixture) answerWithProtocol(t *testing.T, left RunnerState, pingFields string) {
+	t.Helper()
+	proc := f.farm.started("xcodebuild")[0]
+	_ = proc.listener.Close()
+	listener, err := new(net.ListenConfig).Listen(context.Background(), "tcp", "127.0.0.1:"+strconv.Itoa(left.HostPort))
+	if err != nil {
+		t.Fatalf("listen on the left runner's port: %v", err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+	f.farm.mu.Lock()
+	env := append([]string(nil), f.farm.runnerEnv...)
+	f.farm.mu.Unlock()
+	go serveIdentity(listener, identityFieldsOf(env)+","+pingFields)
 }

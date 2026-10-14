@@ -97,7 +97,7 @@ runner never sees a selector: it only receives coordinates and, for
 
 | Driver port method | Wire command | Swift handler | Notes |
 |---|---|---|---|
-| `Connect()` / `Ping()` | `ping` | `PingCommand` | Populates `CanMultiPointer` and `CanPressure` from the active synthesizer's capabilities. Also reports the runner identity (`runnerId`, `targetUdid`, `simulatorUdid`). |
+| `Connect()` / `Ping()` | `ping` | `PingCommand` | Populates `CanMultiPointer` and `CanPressure` from the active synthesizer's capabilities. Also reports the runner identity (`runnerId`, `targetUdid`, `simulatorUdid`) and the versions (`protocolVersion`, `agentVersion`). `Connect()` stores the versions for `AgentInfo()` and fails with `AGENT_VERSION_MISMATCH` when `protocolVersion` differs from the host's. |
 | `Hierarchy()` | `dumpRawTree` | `DumpRawTreeCommand` | Builds the tree from one `app.snapshot()` call, walked iteratively. |
 | `Tap()` | `tapAt` | `TapAtCommand` | Always coordinates. Selector-based tap composes host-side. |
 | `LongPress()` | `longPressAt` | `LongPressAtCommand` | |
@@ -493,6 +493,11 @@ variables to the child's environment.
 The `ping` reply carries `runnerId`, `targetUdid`, and `simulatorUdid`
 beside `pong`. A field is present only when its variable was set.
 
+The reply also carries `protocolVersion`, the integer from
+`platforms/ios-agent/Tests/AgentProtocol.swift`, and `agentVersion`, the
+runner bundle's `CFBundleShortVersionString`. The version is omitted when
+the bundle declares none. A missing `protocolVersion` counts as 0.
+
 The host accepts a runner only when its reply proves it belongs to the
 requested target (`iosdriver.ExpectedRunner` in
 `core/internal/iosdriver/identity.go`):
@@ -511,6 +516,18 @@ requested target (`iosdriver.ExpectedRunner` in
   Stop it, rebuild the runner with `make build`, and start it again.
   `make serve` and `make serve-device` rebuild automatically when a Swift
   source or the project file is newer than the last build.
+
+Protocol version handshake:
+
+- Provisioner adoption: a recorded runner whose `protocolVersion` differs
+  from the host's is not adopted. The provisioner ends it under the
+  device lease and launches a runner from the current build.
+- Fixed-port path: a runner that already answers on the fixed port may
+  belong to another process, so the host never stops it. It fails with
+  `AGENT_VERSION_MISMATCH`, and the remedy is to stop that runner, rebuild
+  it with `make build` in `platforms/ios-agent`, and start it again.
+- Driver connect: `Connect()` only verifies. On a mismatch it fails with
+  `AGENT_VERSION_MISMATCH` and neither stops nor relaunches the runner.
 
 A refused runner surfaces as `IproxyErrBindConflict` from the tunnel
 launch and as `XctestErrRunnerMismatch` from the launcher. The direct

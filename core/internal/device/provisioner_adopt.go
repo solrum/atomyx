@@ -10,6 +10,7 @@ import (
 	"dev.atomyx/internal/iosdriver"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/process"
+	"dev.atomyx/internal/version"
 )
 
 // adoptedRunnerWatchPeriod is how often the process of an adopted runner
@@ -119,9 +120,12 @@ func (p *DriverProvisioner) adoptionBlocker(ctx context.Context, path string, ad
 		driverKind = iosdriver.KindDevice
 	}
 	want := iosdriver.ExpectedRunner{UDID: udid, Kind: driverKind, RunnerID: state.RunnerID}
-	found, _, idErr := iosdriver.CheckRunnerIdentity(ctx, state.HostPort, iosdriver.RunnerProbeTimeout, want)
+	got, found, _, idErr := iosdriver.CheckRunner(ctx, state.HostPort, iosdriver.RunnerProbeTimeout, want)
 	if !found || idErr != nil {
 		return "the recorded runner does not answer with its launch id"
+	}
+	if !got.SpeaksHostProtocol() {
+		return fmt.Sprintf("the recorded runner speaks protocol version %d, but this host requires version %d", got.ProtocolVersion, version.AgentProtocolVersion)
 	}
 	return ""
 }
