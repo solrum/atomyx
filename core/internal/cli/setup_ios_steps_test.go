@@ -10,9 +10,15 @@ import (
 	"dev.atomyx/internal/device"
 )
 
+// The parenthesised id in an identity name is the member id. The team
+// id lives only in the certificate subject, so the two differ here.
 const (
-	fakeIdentityLine = `  1) 0123456789ABCDEF0123456789ABCDEF01234567 "Apple Development: Test Person (AAAAA11111)"` + "\n"
-	otherIdentity    = `  2) 456789ABCDEF0123456789ABCDEF0123456789AB "Apple Development: Other Person (BBBBB22222)"` + "\n"
+	fakeIdentityName  = "Apple Development: Test Person (MMMMM11111)"
+	otherIdentityName = "Apple Development: Other Person (NNNNN22222)"
+	fakeTeam          = "TTTTT11111"
+	otherTeam         = "UUUUU22222"
+	fakeIdentityLine  = `  1) 0123456789ABCDEF0123456789ABCDEF01234567 "` + fakeIdentityName + `"` + "\n"
+	otherIdentity     = `  2) 456789ABCDEF0123456789ABCDEF0123456789AB "` + otherIdentityName + `"` + "\n"
 )
 
 var iosDevices = fixedProbe{
@@ -21,9 +27,18 @@ var iosDevices = fixedProbe{
 }
 
 // hostTools answers the host commands the iOS steps run.
-func hostTools(developerDir string, identities string, identitiesErr error) HostCommand {
+func hostTools(t *testing.T, developerDir string, identities string, identitiesErr error) HostCommand {
+	t.Helper()
+	certs := map[string]string{
+		"security find-certificate -a -c " + fakeIdentityName + " -p":  testCertificate(t, fakeIdentityName, fakeTeam),
+		"security find-certificate -a -c " + otherIdentityName + " -p": testCertificate(t, otherIdentityName, otherTeam),
+	}
 	return func(_ context.Context, name string, args ...string) (string, error) {
-		switch name + " " + strings.Join(args, " ") {
+		command := name + " " + strings.Join(args, " ")
+		if cert, ok := certs[command]; ok {
+			return cert, nil
+		}
+		switch command {
 		case "xcode-select -p":
 			return developerDir + "\n", nil
 		case "security find-identity -v -p codesigning":
@@ -48,7 +63,7 @@ func runIOSSetup(t *testing.T, flags map[string]FlagValue, tools fakeTools, host
 
 func TestIOSSetupSimulatorNeedsNoIproxyOrSigning(t *testing.T) {
 	t.Setenv("ATOMYX_DEV_TEAM", "")
-	code, report := runIOSSetup(t, map[string]FlagValue{"--device": "SIM-1"}, fakeTools{"xcrun": "/usr/bin/xcrun"}, hostTools("/Applications/Xcode.app/Contents/Developer", "", errors.New("unused")))
+	code, report := runIOSSetup(t, map[string]FlagValue{"--device": "SIM-1"}, fakeTools{"xcrun": "/usr/bin/xcrun"}, hostTools(t, "/Applications/Xcode.app/Contents/Developer", "", errors.New("unused")))
 
 	want := "ios-xcode=ok ios-iproxy=ok ios-signing-team=ok"
 	if code != 0 || statuses(report) != want {
@@ -58,21 +73,21 @@ func TestIOSSetupSimulatorNeedsNoIproxyOrSigning(t *testing.T) {
 
 func TestIOSSetupPhysicalDeviceWithoutIproxyAndTeamIsManual(t *testing.T) {
 	t.Setenv("ATOMYX_DEV_TEAM", "")
-	code, report := runIOSSetup(t, map[string]FlagValue{"--device": "PHONE-1"}, fakeTools{"xcrun": "/usr/bin/xcrun"}, hostTools("/Applications/Xcode.app/Contents/Developer", fakeIdentityLine, nil))
+	code, report := runIOSSetup(t, map[string]FlagValue{"--device": "PHONE-1"}, fakeTools{"xcrun": "/usr/bin/xcrun"}, hostTools(t, "/Applications/Xcode.app/Contents/Developer", fakeIdentityLine, nil))
 
 	want := "ios-xcode=ok ios-iproxy=manual ios-signing-team=manual"
 	if code != 1 || statuses(report) != want {
 		t.Fatalf("code = %d, steps = %s, want 1 and %s", code, statuses(report), want)
 	}
-	if !strings.Contains(report.Steps[2].Remedy, "export ATOMYX_DEV_TEAM=AAAAA11111") {
+	if !strings.Contains(report.Steps[2].Remedy, "export ATOMYX_DEV_TEAM="+fakeTeam) {
 		t.Errorf("remedy = %q", report.Steps[2].Remedy)
 	}
 }
 
 func TestIOSSetupPhysicalDeviceIsOkWhenEverythingIsPresent(t *testing.T) {
-	t.Setenv("ATOMYX_DEV_TEAM", "BBBBB22222")
+	t.Setenv("ATOMYX_DEV_TEAM", otherTeam)
 	tools := fakeTools{"xcrun": "/usr/bin/xcrun", "iproxy": "/opt/bin/iproxy"}
-	code, report := runIOSSetup(t, map[string]FlagValue{"--device": "PHONE-1"}, tools, hostTools("/Applications/Xcode.app/Contents/Developer", fakeIdentityLine+otherIdentity, nil))
+	code, report := runIOSSetup(t, map[string]FlagValue{"--device": "PHONE-1"}, tools, hostTools(t, "/Applications/Xcode.app/Contents/Developer", fakeIdentityLine+otherIdentity, nil))
 
 	if code != 0 || statuses(report) != "ios-xcode=ok ios-iproxy=ok ios-signing-team=ok" {
 		t.Fatalf("code = %d, steps = %s", code, statuses(report))
@@ -84,18 +99,18 @@ func TestIOSSetupCheckModeNeverWritesAnything(t *testing.T) {
 	var commands []string
 	host := func(ctx context.Context, name string, args ...string) (string, error) {
 		commands = append(commands, name)
-		return hostTools("/dev", fakeIdentityLine, nil)(ctx, name, args...)
+		return hostTools(t, "/dev", fakeIdentityLine, nil)(ctx, name, args...)
 	}
 	runIOSSetup(t, map[string]FlagValue{"--device": "PHONE-1", "--check": true}, fakeTools{"xcrun": "/usr/bin/xcrun"}, host)
 
-	if got := strings.Join(commands, ","); got != "xcode-select,security" {
-		t.Errorf("host commands = %s, want only the two read-only queries", got)
+	if got := strings.Join(commands, ","); got != "xcode-select,security,security" {
+		t.Errorf("host commands = %s, want only the read-only queries", got)
 	}
 }
 
 func TestIOSSetupWithoutADeviceChecksWhatAPhysicalOneNeeds(t *testing.T) {
 	t.Setenv("ATOMYX_DEV_TEAM", "")
-	code, report := runIOSSetup(t, map[string]FlagValue{}, fakeTools{"xcrun": "/usr/bin/xcrun"}, hostTools("/dev", fakeIdentityLine, nil))
+	code, report := runIOSSetup(t, map[string]FlagValue{}, fakeTools{"xcrun": "/usr/bin/xcrun"}, hostTools(t, "/dev", fakeIdentityLine, nil))
 
 	if code != 1 || report.Steps[1].Status != "manual" || report.Steps[2].Status != "manual" {
 		t.Errorf("code = %d, steps = %s", code, statuses(report))
@@ -118,5 +133,15 @@ func TestIOSTargetClassifiesLikeTheRunnerProvisioner(t *testing.T) {
 		if got != want {
 			t.Errorf("kind %q: %s, want %s", kind, got, want)
 		}
+	}
+}
+
+func TestIOSSetupTreatsTheMemberIdInTheIdentityNameAsNoTeam(t *testing.T) {
+	t.Setenv("ATOMYX_DEV_TEAM", "MMMMM11111")
+	tools := fakeTools{"xcrun": "/usr/bin/xcrun", "iproxy": "/opt/bin/iproxy"}
+	code, report := runIOSSetup(t, map[string]FlagValue{"--device": "PHONE-1"}, tools, hostTools(t, "/Applications/Xcode.app/Contents/Developer", fakeIdentityLine, nil))
+
+	if code != 1 || report.Steps[2].Status != "manual" || !strings.Contains(report.Steps[2].Remedy, "export ATOMYX_DEV_TEAM="+fakeTeam) {
+		t.Errorf("code = %d, signing step = %+v", code, report.Steps[2])
 	}
 }
