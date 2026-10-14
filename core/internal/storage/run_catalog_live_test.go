@@ -116,3 +116,48 @@ func TestRunCatalogDeleteRefusesARunAnotherProcessIsWriting(t *testing.T) {
 		t.Fatalf("run folder was touched: %v", statErr)
 	}
 }
+
+func TestDeletePruneUnitRefusesAUnitHoldingARunAnotherProcessWrites(t *testing.T) {
+	root := t.TempDir()
+	c := liveCatalog(t, root)
+	liveID := startWriterChild(t, root)
+	suite := finishedMeta("suite", 30*pruneDay)
+	writePruneRun(t, root, suite)
+	unit := PruneUnit{Root: suite, Members: []string{"suite", liveID}}
+
+	err := c.DeletePruneUnit(unit)
+
+	if !errors.Is(err, ErrRunLive) {
+		t.Fatalf("DeletePruneUnit = %v, want ErrRunLive", err)
+	}
+	if !runExists(root, "suite") || !runExists(root, liveID) {
+		t.Error("a unit holding a live run lost a member")
+	}
+}
+
+func TestPlanPruneFlagsAUnitWhoseWorkerThisProcessIsWriting(t *testing.T) {
+	root := t.TempDir()
+	c := liveCatalog(t, root)
+	writePruneRun(t, root, withKind(finishedMeta("suite", 30*pruneDay), runfolder.KindSuite))
+	w, err := runfolder.NewStarter(root, func() time.Time { return pruneNow.Add(-30 * pruneDay) }, bytes.NewReader([]byte{3, 4})).
+		Start("worker", runfolder.Meta{Kind: runfolder.KindScript, ParentRunID: "suite"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = w.Close() })
+
+	plan, err := c.PlanPrune(PruneCriteria{OlderThan: pruneDay, Now: pruneNow})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Units) != 1 || !plan.Units[0].Live {
+		t.Fatalf("units = %+v, want one live unit", plan.Units)
+	}
+	if err := c.DeletePruneUnit(plan.Units[0]); !errors.Is(err, ErrRunLive) {
+		t.Fatalf("DeletePruneUnit = %v, want ErrRunLive", err)
+	}
+	if !runExists(root, "suite") || !runExists(root, w.ID()) {
+		t.Error("a unit with a live worker lost a member")
+	}
+}
