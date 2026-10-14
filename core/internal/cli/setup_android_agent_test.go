@@ -105,10 +105,58 @@ func statuses(report setupReport) string {
 	return strings.Join(parts, " ")
 }
 
+func TestAndroidSetupRegistersTheStepsInOrder(t *testing.T) {
+	host := &fakeAndroidHost{apkFound: true, installed: true, agentEnabled: true, ready: true, axConnected: true, agentProto: 1, hostProto: 1}
+	code, report := runAndroidSetup(t, host, fakeTools{"adb": "/sdk/adb"}, map[string]FlagValue{"--platform": "android", "--device": "emulator-5554"})
+
+	want := "android-adb=ok android-device=ok android-apk=ok android-agent-installed=ok android-accessibility=ok android-agent-health=ok android-agent-protocol=ok"
+	if code != 0 || !report.OK || statuses(report) != want {
+		t.Fatalf("code = %d, steps = %s, want 0 and %s", code, statuses(report), want)
+	}
+}
+
+func TestAndroidSetupFixModeInstallsEnablesAndReinstallsOnce(t *testing.T) {
+	host := &fakeAndroidHost{apkFound: true, others: []string{"com.a/.One"}, agentProto: 0, hostProto: 1}
+	code, report := runAndroidSetup(t, host, fakeTools{"adb": "/sdk/adb"}, map[string]FlagValue{"--platform": "android", "--device": "emulator-5554"})
+
+	if code != 0 {
+		t.Fatalf("code = %d, steps = %s", code, statuses(report))
+	}
+	if got := strings.Join(host.calls, ","); got != "install,reinstall" {
+		t.Errorf("repairs = %s, want install then one reinstall", got)
+	}
+	if report.Steps[3].Status != "fixed" || report.Steps[6].Status != "fixed" {
+		t.Errorf("steps = %s", statuses(report))
+	}
+}
+
+func TestAndroidSetupCheckModeNeverRepairs(t *testing.T) {
+	host := &fakeAndroidHost{apkFound: true, others: []string{"com.a/.One"}, hostProto: 1}
+	code, report := runAndroidSetup(t, host, fakeTools{"adb": "/sdk/adb"}, map[string]FlagValue{"--platform": "android", "--device": "emulator-5554", "--check": true})
+
+	if code != 1 || len(host.calls) != 0 {
+		t.Fatalf("code = %d, repairs = %v", code, host.calls)
+	}
+	want := "android-adb=ok android-device=ok android-apk=ok android-agent-installed=manual android-accessibility=skipped android-agent-health=skipped android-agent-protocol=skipped"
+	if statuses(report) != want {
+		t.Errorf("steps = %s, want %s", statuses(report), want)
+	}
+}
+
 func TestAndroidSetupWithoutAdbSkipsEverythingThatNeedsIt(t *testing.T) {
 	code, report := runAndroidSetup(t, &fakeAndroidHost{apkFound: true, hostProto: 1}, fakeTools{}, map[string]FlagValue{"--platform": "android", "--device": "emulator-5554"})
 
-	want := "android-adb=manual android-device=skipped android-apk=skipped"
+	want := "android-adb=manual android-device=skipped android-apk=skipped android-agent-installed=skipped android-accessibility=skipped android-agent-health=skipped android-agent-protocol=skipped"
+	if code != 1 || statuses(report) != want {
+		t.Errorf("code = %d, steps = %s", code, statuses(report))
+	}
+}
+
+func TestAndroidSetupMissingApkDoesNotBlockAnInstalledAgent(t *testing.T) {
+	host := &fakeAndroidHost{installed: true, agentEnabled: true, ready: true, axConnected: true, agentProto: 1, hostProto: 1}
+	code, report := runAndroidSetup(t, host, fakeTools{"adb": "/sdk/adb"}, map[string]FlagValue{"--platform": "android", "--device": "emulator-5554"})
+
+	want := "android-adb=ok android-device=ok android-apk=manual android-agent-installed=ok android-accessibility=ok android-agent-health=ok android-agent-protocol=ok"
 	if code != 1 || statuses(report) != want {
 		t.Errorf("code = %d, steps = %s", code, statuses(report))
 	}
@@ -133,6 +181,60 @@ func TestProbeDeviceStatesMapsEveryAdbState(t *testing.T) {
 	}
 	if got := (probeDeviceStates{}).DeviceState(context.Background(), "on"); got != setup.DeviceAbsent {
 		t.Errorf("no probe: %s", got)
+	}
+}
+
+func TestAndroidSetupWithoutToolingReportsItInsteadOfPanicking(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	deps := setupDeps(t, &stdout, &stderr)
+	deps.Tools = fakeTools{"adb": "/sdk/adb"}
+	deps.Probe = fixedProbe(heldAndroid[:1])
+	flags := map[string]FlagValue{"--platform": "android", "--device": "emulator-5554", "--json": true, "--check": true}
+
+	if code := Setup(context.Background(), deps, flags); code != 1 {
+		t.Errorf("code = %d, want 1", code)
+	}
+	if !strings.Contains(stdout.String(), "no Android device tooling") {
+		t.Errorf("stdout = %s", stdout.String())
+	}
+}
+
+func TestAndroidSetupCheckReportsTheAgentStateExactly(t *testing.T) {
+	cases := []struct {
+		name    string
+		host    *fakeAndroidHost
+		stepID  string
+		message string
+	}{
+		{
+			"protocol versions keep their sides",
+			&fakeAndroidHost{apkFound: true, installed: true, agentEnabled: true, ready: true, axConnected: true, agentProto: 0, hostProto: 1},
+			"android-agent-protocol", "version 0 but this host requires version 1",
+		},
+		{
+			"ready and connected are not interchangeable",
+			&fakeAndroidHost{apkFound: true, installed: true, agentEnabled: true, ready: false, axConnected: true, agentProto: 1, hostProto: 1},
+			"android-agent-health", "not ready",
+		},
+		{
+			"other services are listed",
+			&fakeAndroidHost{apkFound: true, installed: true, others: []string{"com.a/.One"}, agentProto: 1, hostProto: 1},
+			"android-accessibility", "services: com.a/.One.",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, report := runAndroidSetup(t, tc.host, fakeTools{"adb": "/sdk/adb"}, map[string]FlagValue{"--platform": "android", "--device": "emulator-5554", "--check": true})
+			for _, step := range report.Steps {
+				if step.ID == tc.stepID {
+					if !strings.Contains(step.Message, tc.message) {
+						t.Errorf("%s message = %q, want it to contain %q", step.ID, step.Message, tc.message)
+					}
+					return
+				}
+			}
+			t.Errorf("step %s was not reported", tc.stepID)
+		})
 	}
 }
 

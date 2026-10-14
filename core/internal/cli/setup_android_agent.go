@@ -105,3 +105,32 @@ func androidAPKEntry(t setupTarget) setup.Entry {
 		Requires: []string{setup.AndroidAdbStepID},
 	}
 }
+
+func androidAgentInstalledEntry(t setupTarget) setup.Entry {
+	return setup.Entry{
+		Step:     setup.NewAndroidAgentInstalledStep(t.DeviceID, t.Deps.androidAgent()),
+		Requires: []string{setup.AndroidDeviceStepID},
+	}
+}
+
+func androidAccessibilityEntry(t setupTarget) setup.Entry {
+	return setup.Entry{
+		Step:     setup.NewAndroidAccessibilityStep(t.DeviceID, t.Deps.androidAgent()),
+		Requires: []string{setup.AndroidAgentInstalledStepID},
+	}
+}
+
+func androidAgentHealthEntry(t setupTarget) setup.Entry {
+	return setup.Entry{
+		Step:     setup.NewAndroidAgentHealthStep(t.DeviceID, t.Deps.androidAgent()),
+		Requires: []string{setup.AndroidAccessibilityStepID},
+	}
+}
+
+func androidAgentProtocolEntry(t setupTarget) setup.Entry {
+	host := t.Deps.androidAgent()
+	return setup.Entry{
+		Step:     setup.NewAndroidAgentProtocolStep(t.DeviceID, host, host),
+		Requires: []string{setup.AndroidAgentHealthStepID},
+	}
+}

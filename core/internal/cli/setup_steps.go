@@ -23,6 +23,10 @@ var setupStepsByPlatform = map[string][]setupStepFactory{
 		androidAdbEntry,
 		androidDeviceEntry,
 		androidAPKEntry,
+		androidAgentInstalledEntry,
+		androidAccessibilityEntry,
+		androidAgentHealthEntry,
+		androidAgentProtocolEntry,
 	},
 	"ios": {},
 }
