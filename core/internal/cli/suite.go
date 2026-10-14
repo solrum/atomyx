@@ -81,6 +81,8 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 		return 2
 	}
 
+	pruneToRetention(deps, cfg.loaded, cfg.output.Root)
+
 	if shardPlan != nil {
 		paths := make([]string, len(resolvedFlows))
 		for i, flow := range resolvedFlows {

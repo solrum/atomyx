@@ -111,3 +111,25 @@ func TestPruneRootIgnoresAMissingRootAndPrunesAnExistingOne(t *testing.T) {
 		t.Fatalf("result = %+v, err = %v", result, err)
 	}
 }
+
+const planCostRuns = 1000
+
+func TestPlanPruneOverAThousandRunsSelectsEveryRunOutsideKeep(t *testing.T) {
+	root := t.TempDir()
+	c := liveCatalog(t, root)
+	for i := 0; i < planCostRuns; i++ {
+		writePruneRun(t, root, finishedMeta(fmt.Sprintf("run-%04d", i), time.Duration(i+1)*time.Hour))
+	}
+
+	start := time.Now()
+	plan, err := c.PlanPrune(PruneCriteria{Keep: 50, Now: pruneNow})
+	elapsed := time.Since(start)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Units) != planCostRuns-50 {
+		t.Fatalf("units = %d, want %d", len(plan.Units), planCostRuns-50)
+	}
+	t.Logf("PlanPrune over %d runs took %s", planCostRuns, elapsed)
+}

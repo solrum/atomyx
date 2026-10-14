@@ -113,6 +113,8 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		return fail(err)
 	}
 
+	pruneToRetention(deps, loaded, output.Root)
+
 	// The device connects before the script or scenario is parsed.
 	// When both the device is unreachable and the file fails to
 	// parse, the device error is the one reported, because parsing

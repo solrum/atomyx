@@ -196,6 +196,10 @@ func run(opts options) int {
 		})
 	}()
 
+	// The prune runs off the serving path so the handshake never waits
+	// on it, and it applies only the policy the project config declares.
+	go pruneRetention(projectConfig, store.Root(), time.Now(), logger, storage.PruneRoot)
+
 	serveErr := mcp.Serve(ctx, server)
 
 	// Serve returns on a stop signal and on the client closing stdin
