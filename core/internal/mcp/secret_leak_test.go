@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,8 +21,31 @@ const (
 	// expected value built from the secret.
 	leakScript = "appId: com.example.app\nname: Leak\nsteps:\n" +
 		"  - capture: { pattern: \"GET /items/${TOKEN}\", as: req }\n" +
+		"  - screenshot: \"shot-${TOKEN}\"\n" +
 		"  - extract: { from: req, values: { fromHeader: headers.X-Auth } }\n" +
 		"  - assertApi: { from: req, body: { token: \"${TOKEN}-mismatch\" } }\n"
+
+	// leakNestedScript runs the leak steps inside a branch's inline step
+	// list, the nested path a flow file takes, because this tool has no
+	// scenario or flow-file loader.
+	leakNestedScript = "appId: com.example.app\nname: Nested\nsteps:\n" +
+		"  - capture: { pattern: \"GET /items/${TOKEN}\", as: req }\n" +
+		"  - branch:\n" +
+		"      from: req\n" +
+		"      on:\n" +
+		"        - match: { status: 200 }\n" +
+		"          do:\n" +
+		"            - screenshot: \"nested-${TOKEN}\"\n" +
+		"            - assertApi: { from: req, body: { token: \"${TOKEN}-mismatch\" } }\n"
+
+	// leakLogScript presses a key on a device that rejects it with an
+	// error quoting the secret. The command layer logs that error as a
+	// handler panic, so the secret reaches the log through the run itself.
+	leakLogScript = "appId: com.example.app\nname: Log\nsteps:\n" +
+		"  - capture: { pattern: \"GET /items/${TOKEN}\", as: req }\n" +
+		"  - pressKey: enter\n"
+
+	panicLogMessage = "command handler panicked"
 
 	// leakUnparsableScript fails while it is parsed, and the parse error
 	// quotes the interpolated value.
@@ -37,6 +61,37 @@ func leakCaptureFile(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return path
+}
+
+// requireNoFragment fails when text holds the leading part of the planted
+// secret. A file name is cut to a fixed length, so the whole secret may
+// never fit while a prefix of it still gives the value away.
+func requireNoFragment(t *testing.T, name, text string) {
+	t.Helper()
+	t.Run(name, func(t *testing.T) {
+		if strings.Contains(text, leakSecret[:leakFragmentLen]) {
+			t.Errorf("%s carries the start of the planted secret:\n%s", name, text)
+		}
+	})
+}
+
+const leakFragmentLen = 12
+
+// runFolderFileNames lists every path under root, so a secret interpolated
+// into an artifact name is found even when the file body is clean.
+func runFolderFileNames(t *testing.T, root string) string {
+	t.Helper()
+	var names []string
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err == nil {
+			names = append(names, path)
+		}
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.Join(names, "\n")
 }
 
 func requireNoSecret(t *testing.T, name, text string) {
@@ -83,19 +138,27 @@ func TestPlantedEnvArgumentNeverReachesAWriter(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			var log bytes.Buffer
+			drv := mockdriver.New()
+			drv.PressKeyErr = errors.New("key rejected for " + leakSecret)
 			r := newRunServerWith(t, func(deps *ServerDeps) {
 				deps.Logger = logging.NewStructuredLogger(&log, logging.LevelDebug)
+				deps.Factory = singleMockDriverFactory{driver: drv}
 			})
 			selectMockDevice(t, r.cs, t.Context())
 			if openRun {
 				r.call("start_run", map[string]any{"name": "leak"})
 			}
-			args := map[string]any{
-				"script": leakScript,
-				"env":    map[string]any{"TOKEN": leakSecret},
-				"proxy":  "file:" + leakCaptureFile(t),
+			call := func(script string) string {
+				result, _ := callTool(t, r.cs, t.Context(), "run_script", map[string]any{
+					"script": script,
+					"env":    map[string]any{"TOKEN": leakSecret},
+					"proxy":  "file:" + leakCaptureFile(t),
+				})
+				return textOf(t, result)
 			}
-			result, _ := callTool(t, r.cs, t.Context(), "run_script", args)
+			text := call(leakScript)
+			nested := call(leakNestedScript)
+			logged := call(leakLogScript)
 			parsed, _ := callTool(t, r.cs, t.Context(), "run_script", map[string]any{
 				"script": leakUnparsableScript,
 				"env":    map[string]any{"TOKEN": leakSecret},
@@ -104,15 +167,22 @@ func TestPlantedEnvArgumentNeverReachesAWriter(t *testing.T) {
 				r.call("finish_run", map[string]any{"verdict": "passed"})
 			}
 
-			text := textOf(t, result)
-			if !strings.Contains(text, "Captured") && !strings.Contains(text, "capture") {
-				t.Fatalf("the script never reached the capture step:\n%s", text)
+			for _, reached := range []string{text, nested, logged} {
+				if !strings.Contains(reached, "Captured") && !strings.Contains(reached, "capture") {
+					t.Fatalf("a script never reached the capture step:\n%s", reached)
+				}
+			}
+			if !strings.Contains(log.String(), panicLogMessage) {
+				t.Fatalf("no handler panic was logged, so the log check passes vacuously:\n%s", log.String())
 			}
 			steps, other := runFolderText(t, r.root)
 			requireNoSecret(t, "run_script result", text)
+			requireNoSecret(t, "nested run_script result", nested)
+			requireNoSecret(t, "logged run_script result", logged)
 			requireNoSecret(t, "parse error result", textOf(t, parsed))
 			requireNoSecret(t, "step stream", steps)
 			requireNoSecret(t, "other run folder files", other)
+			requireNoFragment(t, "run folder file names", runFolderFileNames(t, r.root))
 			requireNoSecret(t, "log output", log.String())
 		})
 	}
