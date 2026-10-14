@@ -7,6 +7,7 @@ import (
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/session"
+	"dev.atomyx/internal/setup"
 	"dev.atomyx/internal/shard"
 )
 
@@ -64,6 +65,13 @@ type Deps struct {
 	// HostCommand runs a host tool for the doctor bundle's version
 	// queries. Nil records every tool as unavailable.
 	HostCommand HostCommand
+	// Tools locates host command line tools for the setup command. A
+	// nil value searches the process search path.
+	Tools setup.ToolLocator
+	// AndroidAgent reads and repairs the Android agent for the setup
+	// command. A nil value makes every Android agent step report that
+	// the tooling is missing, which only a test wants.
+	AndroidAgent setup.AndroidAgentHost
 	// Debug, when true, appends a stack trace to an unhandled error
 	// reported on Stderr, matching ATOMYX_DEBUG=1.
 	Debug bool

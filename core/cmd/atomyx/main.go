@@ -57,19 +57,20 @@ func main() {
 	sessionDeps.Preparer = provisioner
 
 	deps := cli.Deps{
-		Probe:    probe,
-		Runners:  device.PingRunnerIdentifier{},
-		Factory:  factory,
-		Clock:    clock,
-		Logger:   logger,
-		Stdout:   os.Stdout,
-		Stderr:   os.Stderr,
-		Browser:  browseropen.New(procRunner, runtime.GOOS),
-		Stdin:    os.Stdin,
-		Session:  sessionDeps,
-		Recorder: recorder,
-		Shards:   shards,
-		Timeouts: sessionwire.ResolveTimeouts(sessionwire.LoadConfigBestEffort(logger), os.Getenv, logger),
+		Probe:        probe,
+		Runners:      device.PingRunnerIdentifier{},
+		Factory:      factory,
+		Clock:        clock,
+		Logger:       logger,
+		Stdout:       os.Stdout,
+		Stderr:       os.Stderr,
+		Browser:      browseropen.New(procRunner, runtime.GOOS),
+		Stdin:        os.Stdin,
+		Session:      sessionDeps,
+		Recorder:     recorder,
+		Shards:       shards,
+		Timeouts:     sessionwire.ResolveTimeouts(sessionwire.LoadConfigBestEffort(logger), os.Getenv, logger),
+		AndroidAgent: device.NewAndroidAgentSetup(device.AndroidAgentSetupDeps{Runner: procRunner, Clock: clock}),
 		HostCommand: func(ctx context.Context, name string, args ...string) (string, error) {
 			res, err := procRunner.Run(ctx, name, args...)
 			return res.Stdout + res.Stderr, err

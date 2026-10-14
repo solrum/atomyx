@@ -19,6 +19,10 @@ type setupStepFactory func(target setupTarget) setup.Entry
 // of each platform, in run order. Adding a step is one new file that
 // declares its factory and one line here.
 var setupStepsByPlatform = map[string][]setupStepFactory{
-	"android": {},
-	"ios":     {},
+	"android": {
+		androidAdbEntry,
+		androidDeviceEntry,
+		androidAPKEntry,
+	},
+	"ios": {},
 }

@@ -64,7 +64,7 @@ func TestSetupWithNoRegisteredStepsIsOkAndEmpty(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	deps := setupDeps(t, &stdout, &stderr)
 
-	code := Setup(context.Background(), deps, map[string]FlagValue{"--platform": "android", "--device": "emulator-5554", "--json": true})
+	code := runSetup(context.Background(), deps, map[string]FlagValue{"--platform": "android", "--device": "emulator-5554", "--json": true}, nil)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0; stderr: %s", code, stderr.String())
