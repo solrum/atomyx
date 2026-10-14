@@ -25,7 +25,7 @@ type launchAppArgs struct {
 // the property gets the default mode.
 func launchModeSchema() map[string]any {
 	schema := jsAnyOf(jsConst(string(orchestra.LaunchModeDefault)), jsConst(string(orchestra.LaunchModeFresh)), jsConst(string(orchestra.LaunchModeAttach)))
-	schema["description"] = "How to start the app. `default` (when omitted) starts it without promising anything about process state, and a second `default` launch of the same app in the same session is skipped. `fresh` stops the app and starts it clean, forcing a restart even when it was already launched. `attach` reuses a running instance, and a repeat attach launch is skipped."
+	schema["description"] = "How to start the app. `default` (when omitted) starts it without promising anything about process state, and a second `default` launch of the same app in the same session is skipped. `fresh` force-stops the app and launches it again, keeping its data, and forces that restart even when the app was already launched. `attach` reuses a running instance, and a repeat attach launch is skipped."
 	return schema
 }
 
@@ -39,7 +39,7 @@ func registerLaunchAppTool(server *mcp.Server, tc *ToolContext) {
 			"operate on its UI. Requires an active device, so call `select_device` " +
 			"first. Use `list_apps` to discover available identifiers. A second " +
 			"default launch of the same app in the same session is skipped, so " +
-			"pass mode `fresh` to force a restart.",
+			"pass mode `fresh` to force-stop and relaunch it with its data kept.",
 		InputSchema: launchAppInputSchema,
 	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		if err := validateToolArguments(launchAppSchema, req.Params.Arguments); err != nil {

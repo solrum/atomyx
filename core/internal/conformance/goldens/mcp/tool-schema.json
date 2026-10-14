@@ -425,7 +425,7 @@
     }
   },
   "launch_app": {
-    "description": "Launch an app on the connected device by its app identifier. The driver brings the app to the foreground; subsequent tool calls operate on its UI. Requires an active device, so call `select_device` first. Use `list_apps` to discover available identifiers. A second default launch of the same app in the same session is skipped, so pass mode `fresh` to force a restart.",
+    "description": "Launch an app on the connected device by its app identifier. The driver brings the app to the foreground; subsequent tool calls operate on its UI. Requires an active device, so call `select_device` first. Use `list_apps` to discover available identifiers. A second default launch of the same app in the same session is skipped, so pass mode `fresh` to force-stop and relaunch it with its data kept.",
     "inputSchema": {
       "properties": {
         "appId": {
@@ -444,7 +444,7 @@
               "const": "attach"
             }
           ],
-          "description": "How to start the app. `default` (when omitted) starts it without promising anything about process state, and a second `default` launch of the same app in the same session is skipped. `fresh` stops the app and starts it clean, forcing a restart even when it was already launched. `attach` reuses a running instance, and a repeat attach launch is skipped."
+          "description": "How to start the app. `default` (when omitted) starts it without promising anything about process state, and a second `default` launch of the same app in the same session is skipped. `fresh` force-stops the app and launches it again, keeping its data, and forces that restart even when the app was already launched. `attach` reuses a running instance, and a repeat attach launch is skipped."
         }
       },
       "required": [

@@ -349,12 +349,12 @@ Launches an app on the connected device by its app identifier and brings it to t
 | Name | Type | Required | Default | Meaning |
 |---|---|---|---|---|
 | appId | string | Yes | None | Cross-platform app identifier (bundle id or package name), as reported by list_apps |
-| mode | string | No | default | One of `default`, `fresh`, `attach`. `default` starts the app without promising anything about process state, `fresh` stops the app and starts it clean, `attach` reuses a running instance |
+| mode | string | No | default | One of `default`, `fresh`, `attach`. `default` starts the app without promising anything about process state, `fresh` force-stops the app and launches it again with its data kept, `attach` reuses a running instance |
 
 **Behavior**
 - Requires an active device. Call select_device first.
 - Confirms the app is installed before launching it, using the same installed-app list list_apps reports.
-- Within one flow (a script run or a chain of steps), calling launch_app again in `default` or `attach` mode for an app identifier that this tool already launched is a no-op: the app is left running as is, rather than being restarted. Pass mode `fresh` to force a restart, which stops the app and starts it clean even when it was already launched. A repeat launch with mode `attach` is skipped like a default launch.
+- Within one flow (a script run or a chain of steps), calling launch_app again in `default` or `attach` mode for an app identifier that this tool already launched is a no-op: the app is left running as is, rather than being restarted. Pass mode `fresh` to force a restart, which force-stops the app and launches it again with its data kept, even when it was already launched. A repeat launch with mode `attach` is skipped like a default launch.
 - Subsequent tool calls (get_ui_tree, tap, find_element, and so on) operate on the launched app's foreground UI.
 
 **Returns**

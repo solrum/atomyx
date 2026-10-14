@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/driver"
 	"dev.atomyx/internal/driver/mock"
 )
@@ -100,8 +101,9 @@ func TestLaunchAppWithMode_FreshAfterDefaultRelaunches(t *testing.T) {
 
 func TestLaunchAppWithMode_UnknownModeRejectedBeforeDevice(t *testing.T) {
 	o, d := newLaunchModeOrchestra()
-	if err := o.LaunchAppWithMode(context.Background(), launchModeAppID, LaunchMode("bogus")); err == nil {
-		t.Fatal("expected an error for an unknown mode")
+	err := o.LaunchAppWithMode(context.Background(), launchModeAppID, LaunchMode("bogus"))
+	if code, _, _ := diag.Describe(err); code != diag.CodeInvalidArgument {
+		t.Fatalf("code = %q for an unknown mode, want %q (err %v)", code, diag.CodeInvalidArgument, err)
 	}
 	if len(d.Calls) != 0 {
 		t.Fatalf("unknown mode reached the device: %v", d.Calls)
