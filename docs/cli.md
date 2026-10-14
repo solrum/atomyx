@@ -179,6 +179,31 @@ When the run drove a device whose agent reports its versions, the
 `host` object of `meta.json` carries `agentVersion` and
 `protocolVersion`. Each is omitted when the agent does not report it.
 
+### Masked values
+
+A run masks secret values with `[REDACTED]` in everything it writes
+for the run: step text, the report, the run log, and `index.json` for a
+suite. A value is secret when it comes from outside the committed
+files:
+
+- A project config value written as `${ENV:NAME}`, which is read from
+  the environment of the process.
+- A value given with `--var` or `--var-file`.
+- A value given in the `env` argument of the MCP `run_script` tool.
+- A value the run captured and recognized as secret. `extract` marks a
+  stored value secret when it looks like a token, and `read` marks the
+  value of a secure field, such as a password input.
+
+A literal written in a script's `env` block or in a project config
+stays readable, because it is already in a committed file. A value
+captured from the screen that is not recognized as secret stays
+readable too.
+
+Masking starts when a value becomes secret, so text written before a
+captured value was recognized is not rewritten. A short secret is
+masked only when it stands as a whole word, see
+[known limitations](./known-limitations.md).
+
 ### Failure artifacts
 
 When a step of a script run fails, the run folder's `artifacts/`
