@@ -35,6 +35,8 @@ type Driver struct {
 	// eventually canceled, or the call blocks forever.
 	HangOnNextHierarchy bool
 
+	foreignAutomation []driver.ForeignAutomationSession
+
 	// Screen is the screen size ScreenSize returns.
 	Screen wire.Size
 
@@ -202,6 +204,23 @@ func (d *Driver) Ping(ctx context.Context) error {
 // AgentInfo returns the Agent field and records no call, matching the
 // port contract that it never reaches a device.
 func (d *Driver) AgentInfo() driver.AgentInfo { return d.Agent }
+
+// SetForeignAutomation stages the sessions ForeignAutomation reports,
+// replacing any staged earlier. A nil or empty list reports none.
+func (d *Driver) SetForeignAutomation(sessions ...driver.ForeignAutomationSession) {
+	d.foreignAutomation = append([]driver.ForeignAutomationSession(nil), sessions...)
+}
+
+// ForeignAutomation returns a copy of the staged sessions and records
+// no call, matching the port contract that it never reaches a device.
+func (d *Driver) ForeignAutomation() []driver.ForeignAutomationSession {
+	if len(d.foreignAutomation) == 0 {
+		return nil
+	}
+	return append([]driver.ForeignAutomationSession(nil), d.foreignAutomation...)
+}
+
+var _ driver.ForeignAutomationReporter = (*Driver)(nil)
 
 // FailNextPingForContract sets err as the error Ping returns until a
 // test clears PingErr. A driver contract suite caller wires this as

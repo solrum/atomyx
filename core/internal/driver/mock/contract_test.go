@@ -42,3 +42,15 @@ func TestStreamingDriverSatisfiesContract(t *testing.T) {
 		FailPing:    func() { d.FailNextPingForContract(simulatedUnreachablePing()) },
 	})
 }
+
+func TestDriverWithForeignAutomationSatisfiesContract(t *testing.T) {
+	var d *mock.Driver
+	drivertest.Run(t, func() driver.Driver {
+		d = mock.New()
+		d.SetForeignAutomation(driver.ForeignAutomationSession{Name: "WebDriverAgentRunner-Runner", Kind: "WebDriverAgent"})
+		return d
+	}, drivertest.Hooks{
+		DeviceCalls: func() int { return len(d.Calls) },
+		FailPing:    func() { d.FailNextPingForContract(simulatedUnreachablePing()) },
+	})
+}

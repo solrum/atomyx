@@ -217,3 +217,33 @@ func testStreamingTouchOptional(t *testing.T, newDriver Factory) {
 		t.Fatalf("StreamingTouchUp: %v", err)
 	}
 }
+
+// testForeignAutomationOptional asserts driver.ForeignAutomationReporter's
+// contract when a subject implements it, and skips cleanly when it
+// does not: the interface is an optional capability a caller detects
+// via driver.As, not a required Driver method. A report must be stable
+// between calls, name every session, and be safe for the caller to
+// modify.
+func testForeignAutomationOptional(t *testing.T, newDriver Factory) {
+	d := newDriver()
+	if err := d.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	reporter, ok := driver.AsForeignAutomationReporter(d)
+	if !ok {
+		t.Skip("driver does not implement ForeignAutomationReporter")
+	}
+	first := reporter.ForeignAutomation()
+	for i, s := range first {
+		if s.Name == "" || s.Kind == "" {
+			t.Fatalf("session %d has an empty field: %+v", i, s)
+		}
+	}
+	if len(first) > 0 {
+		first[0].Name = "mutated"
+	}
+	second := reporter.ForeignAutomation()
+	if len(second) > 0 && second[0].Name == "mutated" {
+		t.Fatal("ForeignAutomation returned a slice that aliases its cache")
+	}
+}

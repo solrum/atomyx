@@ -474,3 +474,24 @@ func TestAgentInfo_ReportsTheConfiguredValueWithoutRecordingACall(t *testing.T) 
 		t.Fatalf("AgentInfo() recorded %d calls, want none", len(d.Calls))
 	}
 }
+
+func TestForeignAutomationReportsStagedSessions(t *testing.T) {
+	d := New()
+	if got := d.ForeignAutomation(); got != nil {
+		t.Fatalf("ForeignAutomation() = %v, want nil", got)
+	}
+	want := driver.ForeignAutomationSession{Name: "com.example.UITests.xctrunner", Kind: "XCUITest runner"}
+	d.SetForeignAutomation(want)
+	reporter, ok := driver.AsForeignAutomationReporter(d)
+	if !ok {
+		t.Fatal("mock driver does not implement ForeignAutomationReporter")
+	}
+	got := reporter.ForeignAutomation()
+	if len(got) != 1 || got[0] != want {
+		t.Fatalf("ForeignAutomation() = %v, want [%v]", got, want)
+	}
+	d.SetForeignAutomation()
+	if got := d.ForeignAutomation(); got != nil {
+		t.Fatalf("after clearing, ForeignAutomation() = %v, want nil", got)
+	}
+}

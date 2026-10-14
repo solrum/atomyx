@@ -100,6 +100,8 @@ func Run(t *testing.T, newDriver Factory, hooks Hooks) {
 	t.Run("press key unsupported code handled gracefully", func(t *testing.T) { testPressKeyUnsupportedCodeHandledGracefully(t, newDriver) })
 	t.Run("streaming touch is optional", func(t *testing.T) { testStreamingTouchOptional(t, newDriver) })
 
+	t.Run("foreign automation is optional", func(t *testing.T) { testForeignAutomationOptional(t, newDriver) })
+
 	t.Run("screen size is positive and stable", func(t *testing.T) { testScreenSizePositiveAndStable(t, newDriver) })
 	t.Run("hierarchy shape", func(t *testing.T) { testHierarchyShape(t, newDriver) })
 	t.Run("hierarchy attributes are canonical", func(t *testing.T) { testHierarchyAttributesAreCanonical(t, newDriver) })
