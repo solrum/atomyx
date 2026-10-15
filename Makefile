@@ -137,6 +137,7 @@ check:
 	bash scripts/check-ios-launcher-identifiers.sh
 	bash scripts/check-agent-protocol.sh
 	bash scripts/check-commit-size-hook.sh
+	bash scripts/check-e2e-skip-gate.sh
 	node scripts/lint-banned-phrases.mjs
 	node scripts/lint-doc-paths.mjs
 

@@ -347,7 +347,37 @@ ignores:
 
 - `go-test.json` holds the `go test -json` stream.
 - `summary.txt` holds the platform, the pass, fail, and skip counts for
-  tests and subtests, and the exit status.
+  tests and subtests, the skip gate verdict, and the exit status.
+
+### Skip discipline
+
+Every skip in the shared corpus and in the driver packages calls
+`drivertest.SkipBecause(t, key, detail)` with a key constant from
+`core/internal/driver/drivertest/skip.go`. A raw `t.Skip`, `t.Skipf`, or
+`t.SkipNow` in `internal/driver`, `internal/androiddriver`,
+`internal/iosdriver`, or `internal/iossimdriver` fails
+`scripts/check-e2e-skip-gate.sh`, which runs in `make check`.
+
+After the run, `scripts/e2e.sh` calls `scripts/e2e-skip-gate.sh`, which
+reads `go-test.json` and judges each skipped test by its key:
+
+- `leg-not-selected` means the test does not belong to the leg because
+  `ATOMYX_DRIVER_E2E` is unset or names another platform. The gate counts
+  these in `summary.txt` and never fails on them, so a normal run is not
+  flooded.
+- A key listed for the leg in `scripts/e2e-skip-allowlist.txt` passes.
+- Any other key, and any skip without a key, fails the leg and appears in
+  `summary.txt` as `unexpected-skip: <package> <test> <key>`.
+
+To add a skip, add a key constant to `skip.go` with a comment saying what
+it means, call `SkipBecause` with it, and decide whether a leg may
+tolerate it. Add a `[permanent]` allowlist entry only when the skip is a
+property of the platform that no fixture can remove, such as a real
+device that cannot stage a known hierarchy. A missing fixture is never a
+permanent reason. Entries under `[temporary]` name fixtures that are not
+wired yet, and wiring the fixture deletes the entry in the same change.
+Each entry is one line, `<leg> <key> <reason>`, with the leg being
+`android`, `ios`, or `iossim`.
 
 ### Scheduling
 

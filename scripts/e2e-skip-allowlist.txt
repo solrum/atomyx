@@ -1,0 +1,42 @@
+# Skip keys a device e2e leg may report without failing scripts/e2e.sh.
+#
+# Every skip in a run carries a key from core/internal/driver/drivertest/skip.go.
+# A skip whose key is not listed for the leg being run fails the leg.
+# The key leg-not-selected is never listed because the gate counts it
+# without judging it.
+#
+# Format: one entry per line, "<leg> <key> <reason>", where leg is one
+# of android, ios, iossim. Blank lines and lines starting with # are
+# ignored. The two section markers below decide whether an entry is
+# permanent or temporary.
+#
+# Add a permanent entry only when the skip is a property of the platform
+# or the leg that no fixture can remove. A missing fixture is never a
+# permanent reason, so wire the fixture instead.
+
+[permanent]
+android optional-env-unset the second-device case runs only when two serials are provided
+android no-install-fixture the install roundtrip runs only when an APK and its package name are provided
+android no-hierarchy-staging a real device cannot stage a known hierarchy
+android no-streaming-touch the Android driver does not implement streaming touch
+android no-foreign-automation the Android driver reports no foreign automation
+ios optional-env-unset the simulator runner identity case runs only when a simulator and project directory are provided
+ios no-hierarchy-staging a real device cannot stage a known hierarchy
+ios no-streaming-touch the iOS driver does not implement streaming touch
+iossim optional-env-unset the simulator runner identity case runs only when a simulator and project directory are provided
+iossim no-hierarchy-staging a simulator cannot stage a known hierarchy
+iossim no-streaming-touch the iOS driver does not implement streaming touch
+
+# Entries below name fixtures that are not wired yet. Wiring a fixture
+# must delete its entry, and the gate reports how many temporary
+# entries a run used.
+
+[temporary]
+android no-focus-input no fixture focuses a text input on the device yet
+android no-fail-ping no real-device hook makes the agent unreachable yet
+android no-fail-connect no real-device hook makes the first connect fail yet
+ios no-focus-input no fixture focuses a text input on the device yet
+ios no-fail-ping no real-device hook makes the runner unreachable yet
+ios no-fail-connect no real-device hook makes the first connect fail yet
+ios no-clearable-app no app that supports clearing is installed on the device yet
+ios no-install-fixture no installable app is provided for the device yet

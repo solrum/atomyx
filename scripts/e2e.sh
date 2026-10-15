@@ -5,14 +5,17 @@
 # Usage: scripts/e2e.sh <iossim|android|ios>
 #
 # Exit codes:
-#   0  the suite passed
-#   1  a test failed, or the runner prerequisite is not met
+#   0  the suite passed and every skip is allowlisted
+#   1  a test failed, a skip is not allowlisted, or the runner
+#      prerequisite is not met
 #   2  misuse: unknown platform or a missing required environment variable
 #
 # The report lands in e2e-results/<UTC timestamp>-<platform>/ with the
 # raw go test JSON stream in go-test.json and the pass, fail, and skip
-# counts in summary.txt. Environment variable values are never printed,
-# because they can name a specific device.
+# counts in summary.txt, followed by the skip gate verdict from
+# scripts/e2e-skip-gate.sh and one line per offending skip. Environment
+# variable values are never printed, because they can name a specific
+# device.
 set -euo pipefail
 
 readonly SIM_RUNNER_HOST="127.0.0.1"
@@ -107,11 +110,22 @@ pass_count="$(count_action pass)"
 fail_count="$(count_action fail)"
 skip_count="$(count_action skip)"
 
+# Every skip must carry a reason key that the allowlist names for this
+# platform. An unlisted or untagged skip fails an otherwise green leg.
+set +e
+gate_output="$("${repo_root}/scripts/e2e-skip-gate.sh" "$platform" "${out_dir}/go-test.json" "${repo_root}/scripts/e2e-skip-allowlist.txt")"
+gate_status="$?"
+set -e
+if [ "$gate_status" -ne 0 ] && [ "$test_status" -eq 0 ]; then
+  test_status=1
+fi
+
 {
   echo "platform: ${platform}"
   echo "pass: ${pass_count}"
   echo "fail: ${fail_count}"
   echo "skip: ${skip_count}"
+  echo "$gate_output"
   echo "exit: ${test_status}"
   if [ -n "$sim_hid_skip_note" ]; then
     echo "$sim_hid_skip_note"
