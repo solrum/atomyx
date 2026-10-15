@@ -32,13 +32,11 @@ preconditions:
 
 - type:
     into:
-      role: text-field
-      nth: 0
+      hint: "Email"
     text: ${email}
 - type:
     into:
-      role: text-field
-      nth: 1
+      hint: "Password"
     text: ${password}
 - tap: "Login"
 - waitFor:
