@@ -2,7 +2,9 @@ import Foundation
 import XCTest
 
 /// Default strategy for unknown keys. Types the raw key string into the
-/// focused field via `XCUIApplication.typeText`. Registered as the
+/// focused field via `XCUIApplication.typeText`. When no element holds
+/// keyboard focus, nothing is typed and the result reports
+/// `affordanceFound = false` with strategy `no_focused_field`. Registered as the
 /// `fallback` of `PressKeyRegistry`, where strategies registered by name
 /// win; everything else lands here.
 ///
@@ -14,7 +16,10 @@ final class FallbackTypeStrategy: PressKeyStrategy {
     let requiresApp = true
 
     func execute(key: String, app: XCUIApplication?) -> PressKeyResult {
-        app!.typeText(key)
+        guard let app, appHasKeyboardFocus(app) else {
+            return PressKeyResult(affordanceFound: false, strategy: noFocusedFieldStrategy)
+        }
+        app.typeText(key)
         return PressKeyResult(affordanceFound: true, strategy: "typed_raw")
     }
 }

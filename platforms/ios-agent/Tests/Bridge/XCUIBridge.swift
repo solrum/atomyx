@@ -224,6 +224,9 @@ final class DefaultXCUIBridge: XCUIBridge {
     }
 
     func typeText(app: XCUIApplication, text: String) {
+        // Typing with no focused element records an XCTest failure that
+        // ends the serve test, so it is skipped as a no-op instead.
+        guard appHasKeyboardFocus(app) else { return }
         app.typeText(text)
     }
 
