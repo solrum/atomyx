@@ -1048,6 +1048,7 @@ func (s *DeviceSession) resolveDescriptor(ctx context.Context, input SelectDevic
 	if err != nil {
 		return device.Descriptor{}, err
 	}
+	desc.RunnerVerified = desc.RunnerVerified && input.Port == desc.Port
 	desc.Port = input.Port
 	return desc, nil
 }

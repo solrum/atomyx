@@ -1,7 +1,9 @@
 package device
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -305,4 +307,70 @@ func TestDriverFactory_CreateDriver_HidPath_RefusesRunnerWithoutIdentity(t *test
 	if !errors.As(err, &idErr) {
 		t.Fatalf("createDriver() error = %v, want a RunnerIdentityError for a runner that proves no identity", err)
 	}
+}
+
+func TestDriverFactory_CreateDriver_ServedRunnerWithoutIdentityConnectsWhenUnverified(t *testing.T) {
+	port := serveConnectedRunner(t, `"extra":1`)
+	f := NewDriverFactory(DriverFactoryDeps{Runner: process.NewFake(), Background: process.NewFakeBackground()})
+
+	drv, err := f.createDriver(context.Background(), Descriptor{
+		ID: "sim-1", Platform: PlatformIOS, Kind: KindSimulator, Port: port,
+	})
+	if err != nil {
+		t.Fatalf("createDriver() error = %v", err)
+	}
+	if err := drv.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v, want a hand-served runner that reports no udid to connect", err)
+	}
+}
+
+func TestDriverFactory_CreateDriver_VerifiedRunnerIsRecheckedAtConnect(t *testing.T) {
+	port := serveConnectedRunner(t, `"simulatorUdid":"sim-2"`)
+	f := NewDriverFactory(DriverFactoryDeps{Runner: process.NewFake(), Background: process.NewFakeBackground()})
+
+	drv, err := f.createDriver(context.Background(), Descriptor{
+		ID: "sim-1", Platform: PlatformIOS, Kind: KindSimulator, Port: port, RunnerVerified: true,
+	})
+	if err != nil {
+		t.Fatalf("createDriver() error = %v", err)
+	}
+	var idErr *iosdriver.RunnerIdentityError
+	if err := drv.Connect(context.Background()); !errors.As(err, &idErr) {
+		t.Fatalf("Connect() error = %v, want *iosdriver.RunnerIdentityError for a swapped runner", err)
+	}
+}
+
+// serveConnectedRunner serves a persistent connection that answers every
+// request with a pong carrying identityFields and the request's own id.
+func serveConnectedRunner(t *testing.T, identityFields string) int {
+	t.Helper()
+	l, err := new(net.ListenConfig).Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	t.Cleanup(func() { _ = l.Close() })
+	go func() {
+		for {
+			c, err := l.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer func() { _ = c.Close() }()
+				r := bufio.NewReader(c)
+				for {
+					line, err := r.ReadString('\n')
+					if err != nil {
+						return
+					}
+					var req struct {
+						ID int64 `json:"id"`
+					}
+					_ = json.Unmarshal([]byte(line), &req)
+					_, _ = fmt.Fprintf(c, `{"id":%d,"ok":true,"data":{"pong":true,%s}}`+"\n", req.ID, withHostProtocol(identityFields))
+				}
+			}(c)
+		}
+	}()
+	return l.Addr().(*net.TCPAddr).Port
 }

@@ -212,8 +212,9 @@ runner that belongs to the device but speaks another protocol version
 fails with `AGENT_VERSION_MISMATCH`, and the remedy is to stop the runner
 served on port 22087 or rebuild it, so two runners never drive one device.
 
-`IosDriver.Connect` re-checks the identity of a runner the caller owns
-(`Options.ExternalRunner`), because the runner can be replaced between
+`IosDriver.Connect` re-checks the identity of a runner whose identity
+resolution proved (`Descriptor.RunnerVerified` becomes
+`Options.ExternalRunner`), because the runner can be replaced between
 resolution and connection. A runner that reports another device fails
 with `RunnerIdentityError`. A runner that reports no device identity also
 fails, with the rebuild remedy of a legacy runner.

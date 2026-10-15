@@ -42,7 +42,7 @@ func TestIOSWithoutDeviceKeysOnServedRunner(t *testing.T) {
 	if identity.HardwareID != servedSimulatorUDID {
 		t.Fatalf("HardwareID = %q, want %q reported by the served runner", identity.HardwareID, servedSimulatorUDID)
 	}
-	if desc.Kind != KindSimulator || desc.Port != iosControlPort {
+	if desc.Kind != KindSimulator || desc.Port != iosControlPort || !desc.RunnerVerified {
 		t.Fatalf("descriptor = %+v, want a simulator on the control port so nothing is provisioned", desc)
 	}
 	if len(runners.ports) != 1 || runners.ports[0] != iosControlPort {
@@ -55,7 +55,7 @@ func TestResolveDescriptor_ServedRunnerThatNamesItsTargetDevice(t *testing.T) {
 
 	desc, err := ResolveDescriptor(context.Background(), NewStaticProbe(), runners, PlatformIOS, "")
 
-	if err != nil || desc.ID != "00008101-AAAA" || desc.Kind != KindDevice || desc.Port != iosControlPort {
+	if err != nil || desc.ID != "00008101-AAAA" || desc.Kind != KindDevice || desc.Port != iosControlPort || !desc.RunnerVerified {
 		t.Fatalf("got %+v, %v, want the named physical device on the control port", desc, err)
 	}
 }
@@ -69,7 +69,7 @@ func TestResolveDescriptor_HandServedRunnerUsesTheSingleConnectedIPhone(t *testi
 
 	desc, err := ResolveDescriptor(context.Background(), probe, runners, PlatformIOS, "")
 
-	if err != nil || desc.ID != "00008101-AAAA" || desc.Kind != KindDevice || desc.Port != iosControlPort {
+	if err != nil || desc.ID != "00008101-AAAA" || desc.Kind != KindDevice || desc.Port != iosControlPort || desc.RunnerVerified {
 		t.Fatalf("got %+v, %v, want the connected iPhone on the control port", desc, err)
 	}
 }
@@ -135,7 +135,7 @@ func TestResolveDescriptor_ANamedIOSDeviceReusesOrProvisionsByServedRunner(t *te
 				}
 				return
 			}
-			if err != nil || desc.Port != c.wantPort || !strings.EqualFold(desc.ID, c.id) {
+			if err != nil || desc.Port != c.wantPort || !strings.EqualFold(desc.ID, c.id) || desc.RunnerVerified != (c.wantPort != 0) {
 				t.Fatalf("got %+v, %v, want the scanned device with port %d", desc, err, c.wantPort)
 			}
 			if len(c.runner.ports) != 1 || c.runner.ports[0] != iosControlPort {

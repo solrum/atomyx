@@ -124,9 +124,9 @@ func resolveServedRunner(ctx context.Context, probe Probe, runners RunnerIdentif
 	}
 	switch {
 	case got.SimulatorUDID != "":
-		return Descriptor{ID: got.SimulatorUDID, Platform: PlatformIOS, Kind: KindSimulator, State: StateOnline, Port: iosControlPort}, nil
+		return Descriptor{ID: got.SimulatorUDID, Platform: PlatformIOS, Kind: KindSimulator, State: StateOnline, Port: iosControlPort, RunnerVerified: true}, nil
 	case got.TargetUDID != "":
-		return Descriptor{ID: got.TargetUDID, Platform: PlatformIOS, Kind: KindDevice, State: StateOnline, Port: iosControlPort}, nil
+		return Descriptor{ID: got.TargetUDID, Platform: PlatformIOS, Kind: KindDevice, State: StateOnline, Port: iosControlPort, RunnerVerified: true}, nil
 	}
 	var phones []Descriptor
 	if probe != nil {
@@ -170,5 +170,6 @@ func reuseServedRunner(ctx context.Context, runners RunnerIdentifier, desc *Desc
 		return diag.New(diag.CodeAgentVersionMismatch, message, remedy, nil)
 	}
 	desc.Port = iosControlPort
+	desc.RunnerVerified = true
 	return nil
 }

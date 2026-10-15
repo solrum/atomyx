@@ -44,6 +44,13 @@ type Descriptor struct {
 	// for platforms whose driver exposes a caller-facing port option.
 	Port int `json:"-"`
 
+	// RunnerVerified is true when resolution confirmed that the runner
+	// on Port reported this device's own udid. A Factory then makes the
+	// driver re-check that identity at connect. It stays false for a
+	// runner that reports no udid, such as one served by hand for the
+	// single connected iPhone, and for a Port the caller chose.
+	RunnerVerified bool `json:"-"`
+
 	// HidPort is the atomyx-sim-hid helper's WebSocket handshake
 	// port. Non-zero only for an iOS simulator descriptor that has
 	// already opted into the direct-HID path and started the helper;
