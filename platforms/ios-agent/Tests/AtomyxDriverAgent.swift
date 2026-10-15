@@ -34,6 +34,16 @@ final class AtomyxDriverAgent: XCTestCase {
         continueAfterFailure = true
     }
 
+    private let issueCapture = IssueCapture()
+
+    /// Issues recorded while a command runs become that command's error
+    /// reply instead of ending the serving test. Issues recorded at any
+    /// other time follow XCTest's normal handling.
+    override func record(_ issue: XCTIssue) {
+        if issueCapture.offer(issue.compactDescription) { return }
+        super.record(issue)
+    }
+
     func testServeCommands() throws {
         let environment = RunnerEnvironment()
         let bridge = DefaultXCUIBridge()
@@ -71,8 +81,10 @@ final class AtomyxDriverAgent: XCTestCase {
 
         let server = CommandServer(
             port: environment.port,
-            handler: { request in
-                registry.dispatch(request, bridge: bridge, state: state)
+            handler: { [issueCapture] request in
+                issueCapture.guarded(request) {
+                    registry.dispatch(request, bridge: bridge, state: state)
+                }
             },
             requiresMainThread: { request in
                 registry.requiresMainThread(for: request.type)
