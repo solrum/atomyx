@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"dev.atomyx/internal/androiddriver"
 	"dev.atomyx/internal/clock"
@@ -147,5 +148,41 @@ func TestAndroidDriver_LaunchApp_AttachAlreadyForeground_SkipsWait(t *testing.T)
 	if tr.reads != 1 || len(tr.launchAppCalls) != 0 || clk.NowMs() != 0 || len(*warnings) != 0 {
 		t.Fatalf("reads = %d, launches = %v, elapsed = %d, warnings = %v, want a single read and no launch or wait",
 			tr.reads, tr.launchAppCalls, clk.NowMs(), *warnings)
+	}
+}
+
+func TestAndroidDriver_LaunchApp_DeadlineInsideWait_ReturnsNilAndWarns(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+	defer cancel()
+	tr := &scriptedForeground{fakeTransport: newFakeTransport(), answers: []string{"com.handoff"}}
+	d, clk, warnings := newWaitDriver(tr)
+
+	if err := d.LaunchApp(ctx, testPkg, driver.LaunchArgs{}); err != nil {
+		t.Fatalf("LaunchApp() error = %v, want nil because the launch succeeded", err)
+	}
+	if len(*warnings) != 1 {
+		t.Fatalf("warnings = %v, want exactly one", *warnings)
+	}
+	if clk.NowMs() > 1600 {
+		t.Fatalf("elapsed = %d ms, want the wait capped near the 1500 ms deadline", clk.NowMs())
+	}
+}
+
+func TestAndroidDriver_StopApp_DeadlineExpiresDuringRead_ReturnsNilAndWarns(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	tr := &scriptedForeground{fakeTransport: newFakeTransport(), answers: []string{testPkg}}
+	tr.onRead = func(read int) {
+		if read == 2 {
+			<-ctx.Done()
+		}
+	}
+	d, _, warnings := newWaitDriver(tr)
+
+	if err := d.StopApp(ctx, testPkg); err != nil {
+		t.Fatalf("StopApp() error = %v, want nil because the stop succeeded", err)
+	}
+	if len(*warnings) != 1 {
+		t.Fatalf("warnings = %v, want exactly one", *warnings)
 	}
 }

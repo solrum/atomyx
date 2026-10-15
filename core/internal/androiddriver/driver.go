@@ -723,17 +723,23 @@ func (d *AndroidDriver) StopApp(ctx context.Context, bundleID string) error {
 	}
 	if !androidPackageNamePattern.MatchString(bundleID) {
 		return diag.New(diag.CodeInvalidArgument,
-			fmt.Sprintf("%q is not a valid Android package name", bundleID),
+			fmt.Sprintf("%q is not a valid app id", bundleID),
 			diag.InvalidArgumentRemedy, nil)
 	}
 	res, err := d.proc.Run(ctx, "adb", "-s", d.opts.Serial, "shell", "am", "force-stop", bundleID)
 	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
 		if errCode, _, _ := diag.Describe(err); errCode == diag.CodeToolTimeout {
 			return err
 		}
 		reason := strings.TrimSpace(res.Stderr)
 		if reason == "" {
 			reason = strings.TrimSpace(res.Stdout)
+		}
+		if adbDeviceUnreachable(reason) {
+			return d.unreachable(err)
 		}
 		if reason == "" {
 			reason = err.Error()

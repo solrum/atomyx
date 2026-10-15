@@ -868,7 +868,7 @@ func TestAndroidDriver_StopApp_RunsForceStopThroughAdbShell(t *testing.T) {
 func TestAndroidDriver_StopApp_AdbFailure_ReturnsForceStopErrorWithShellReason(t *testing.T) {
 	runner := process.NewFake()
 	runner.Stub(process.ExactMatch("adb", "-s", "S1", "shell", "am", "force-stop", "com.example.app"),
-		process.Result{Stderr: "Error: device offline\n", ExitCode: 1}, errors.New("exit status 1"))
+		process.Result{Stderr: "Error: Permission denied\n", ExitCode: 1}, errors.New("exit status 1"))
 	d := androiddriver.New(newFakeTransport(), runner, androiddriver.Options{Serial: "S1"})
 
 	err := d.StopApp(context.Background(), "com.example.app")
@@ -876,10 +876,10 @@ func TestAndroidDriver_StopApp_AdbFailure_ReturnsForceStopErrorWithShellReason(t
 	if !errors.As(err, &stopErr) {
 		t.Fatalf("StopApp() error = %v (%T), want a *androiddriver.ForceStopError", err, err)
 	}
-	if stopErr.PackageName != "com.example.app" || stopErr.Reason != "Error: device offline" {
+	if stopErr.PackageName != "com.example.app" || stopErr.Reason != "Error: Permission denied" {
 		t.Fatalf("ForceStopError = %+v, want package com.example.app and the shell's stderr", stopErr)
 	}
-	if _, msg, _ := diag.Describe(err); msg != "Error: device offline" {
+	if _, msg, _ := diag.Describe(err); msg != "Error: Permission denied" {
 		t.Fatalf("surfaced message = %q, want the shell's stderr", msg)
 	}
 }
@@ -1447,5 +1447,52 @@ func TestAndroidDriver_EraseText_FailureWithoutReasonUsesNeutralMessage(t *testi
 	_, message, _ := diag.Describe(d.EraseText(context.Background(), 3))
 	if message != "the focused input could not be cleared" {
 		t.Fatalf("message = %q", message)
+	}
+}
+
+func TestAndroidDriver_StopApp_AdbDeviceGone_ReportsAgentUnreachable(t *testing.T) {
+	for _, stderr := range []string{
+		"error: device offline",
+		"error: device unauthorized.",
+		"error: device 'S1' not found",
+		"error: no devices/emulators found",
+	} {
+		runner := process.NewFake()
+		runner.Stub(process.ExactMatch("adb", "-s", "S1", "shell", "am", "force-stop", "com.example.app"),
+			process.Result{Stderr: stderr + "\n", ExitCode: 1}, errors.New("exit status 1"))
+		d := androiddriver.New(newFakeTransport(), runner, androiddriver.Options{Serial: "S1"})
+
+		err := d.StopApp(context.Background(), "com.example.app")
+
+		if code, _, _ := diag.Describe(err); code != diag.CodeAgentUnreachable {
+			t.Fatalf("StopApp() with %q code = %q, want %q (error: %v)", stderr, code, diag.CodeAgentUnreachable, err)
+		}
+	}
+}
+
+// cancellingRunner cancels the call's context from inside Run, like a
+// caller abandoning a call while adb is running.
+type cancellingRunner struct {
+	cancel context.CancelFunc
+}
+
+func (r cancellingRunner) Run(context.Context, string, ...string) (process.Result, error) {
+	r.cancel()
+	return process.Result{ExitCode: -1}, errors.New("signal: killed")
+}
+
+func TestAndroidDriver_StopApp_ContextCancelledDuringAdb_ReturnsContextError(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	d := androiddriver.New(newFakeTransport(), cancellingRunner{cancel: cancel}, androiddriver.Options{Serial: "S1"})
+
+	err := d.StopApp(ctx, "com.example.app")
+
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("StopApp() error = %v, want context.Canceled and not a ForceStopError", err)
+	}
+	var stopErr *androiddriver.ForceStopError
+	if errors.As(err, &stopErr) {
+		t.Fatalf("StopApp() error = %v, must not be a ForceStopError", err)
 	}
 }
