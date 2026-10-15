@@ -1,6 +1,7 @@
 package dev.atomyx.agent.control
 
 import android.accessibilityservice.AccessibilityService
+import android.graphics.Rect
 import android.os.Bundle
 import android.view.accessibility.AccessibilityNodeInfo
 import dev.atomyx.agent.control.clear.ClearTextChain
@@ -45,9 +46,9 @@ class KeyboardTyper(
         // Fast path: ACTION_SET_TEXT. Bypasses keyboard layout
         // entirely and is reliable on native EditText + most Flutter
         // inputs. Returns null when the action is rejected OR when
-        // verification confirms the write didn't land (obscureText
+        // a fresh read shows nothing landed (obscureText
         // drop case); we then fall through to keyboard dispatch.
-        val setTextResult = trySetText(text)
+        val setTextResult = trySetText(text, clearFirst)
         if (setTextResult != null) return setTextResult
 
         // IME readiness wait: the keyboard may still be animating in
@@ -111,10 +112,19 @@ class KeyboardTyper(
      *
      * Contract:
      *   - Returns a successful TypeResult when the action is accepted AND
-     *     verification confirms the text landed.
-     *   - Returns null when the action is rejected OR when verification
-     *     misses, signaling the caller to fall through to per-key keyboard
-     *     dispatch.
+     *     a fresh read of the same field holds the expected value.
+     *   - Returns a failed TypeResult when a fresh read shows other
+     *     content or a different focused field. The reason never carries
+     *     field contents.
+     *   - Returns null when the action is rejected, the field stays empty,
+     *     or the field cannot be read, signaling the caller to fall
+     *     through to per-key keyboard dispatch.
+     *
+     * ACTION_SET_TEXT replaces the whole value, so when [clearFirst] is
+     * false the prior content is written back in front of the requested
+     * text to keep the append contract. A secure field with prior content
+     * cannot be rebuilt that way because its text is masked, so it is left
+     * to the per-key path.
      *
      * Framework notes (expand this list when adding support):
      *
@@ -123,50 +133,60 @@ class KeyboardTyper(
      *
      *   - Flutter Semantics text fields: accept the action, but
      *     `obscureText: true` variants silently drop the write without
-     *     updating the rendered value. The explicit verification loop below
-     *     catches this case.
+     *     updating the rendered value. The verification loop below
+     *     catches this case, and masked values are compared by length.
      */
-    private fun trySetText(text: String): TypeResult? {
+    private fun trySetText(text: String, clearFirst: Boolean): TypeResult? {
         val root = service.rootInActiveWindow ?: return null
         val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return null
         try {
+            val before = snapshotOf(focused)
+            val prior = if (clearFirst) "" else before.content
+            if (before.secure && prior.isNotEmpty()) return null
+            val expected = prior + text
             val args = Bundle().apply {
-                putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
+                putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, expected)
             }
-            if (focused.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) {
-                // Verify the action actually took effect. Flutter
-                // obscureText fields accept ACTION_SET_TEXT but don't
-                // update the underlying text. Exponential backoff
-                // polling (10/20/40/80 ms, ~150ms total budget) lets
-                // the view hierarchy settle without the previous
-                // hardcoded 100ms sleep that over-waited on fast
-                // native paths and under-waited on slow custom views.
-                val delays = longArrayOf(10L, 20L, 40L, 80L)
-                var verified = false
-                for (d in delays) {
-                    try { Thread.sleep(d) } catch (_: InterruptedException) {}
-                    val refreshed = service.rootInActiveWindow
-                        ?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-                    if (refreshed != null) {
-                        val actual = refreshed.text?.toString() ?: ""
-                        try { refreshed.recycle() } catch (_: Exception) {}
-                        // Password fields render dots, so any non-empty
-                        // content counts as success. Empty target text
-                        // counts as verified by construction.
-                        if (actual.isNotEmpty() || text.isEmpty()) {
-                            verified = true
-                            break
-                        }
-                    }
+            if (!focused.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) return null
+
+            // Exponential backoff polling lets the view hierarchy settle.
+            // Each poll re-reads the focused node fresh, since nodes held
+            // across reads go stale.
+            var last: LandingVerdict? = null
+            for (d in SETTLE_DELAYS_MS) {
+                try { Thread.sleep(d) } catch (_: InterruptedException) {}
+                val refreshed = service.rootInActiveWindow
+                    ?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: continue
+                val after = try {
+                    snapshotOf(refreshed)
+                } finally {
+                    try { refreshed.recycle() } catch (_: Exception) {}
                 }
-                if (!verified) return null
-                return TypeResult(true, text.length, text.length, "ok via ACTION_SET_TEXT")
+                val verdict = verifyLanding(expected, text.length, before, after)
+                last = verdict
+                if (verdict.landing == Landing.MATCH) {
+                    return TypeResult(true, text.length, text.length, "ok via ACTION_SET_TEXT")
+                }
             }
+            val verdict = last ?: return null
+            if (verdict.landing == Landing.NOTHING_LANDED) return null
+            return TypeResult(false, verdict.landed, text.length, verdict.reason)
         } catch (_: Exception) {
         } finally {
             try { focused.recycle() } catch (_: Exception) {}
         }
         return null
+    }
+
+    private fun snapshotOf(node: AccessibilityNodeInfo): FieldSnapshot {
+        val bounds = Rect()
+        node.getBoundsInScreen(bounds)
+        return FieldSnapshot(
+            identity = "${node.viewIdResourceName}|${node.className}|${bounds.flattenToString()}",
+            text = node.text?.toString() ?: "",
+            secure = node.isPassword,
+            showingHint = node.isShowingHintText,
+        )
     }
 
     /**
@@ -308,5 +328,9 @@ class KeyboardTyper(
             }
         }
         return null
+    }
+
+    private companion object {
+        val SETTLE_DELAYS_MS = longArrayOf(10L, 20L, 40L, 80L)
     }
 }
