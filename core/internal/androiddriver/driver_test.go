@@ -277,7 +277,7 @@ func TestAndroidDriver_SatisfiesContract(t *testing.T) {
 	drivertest.Run(t, func() driver.Driver {
 		tr = newFakeTransport()
 		return androiddriver.New(tr, newContractRunner(), androiddriver.Options{Serial: "emulator-5554"})
-	}, drivertest.Hooks{
+	}, drivertest.WithSyntheticFixtures(drivertest.Hooks{
 		DeviceCalls: func() int { return int(tr.calls.Load()) },
 		FailConnect: func() {
 			tr.mu.Lock()
@@ -289,7 +289,7 @@ func TestAndroidDriver_SatisfiesContract(t *testing.T) {
 			tr.healthErr = errors.New("drivertest: simulated unreachable agent")
 			tr.mu.Unlock()
 		},
-	})
+	}))
 }
 
 func TestAndroidDriver_Connect_ForwardsAdbTunnelThenHealthAndPing(t *testing.T) {

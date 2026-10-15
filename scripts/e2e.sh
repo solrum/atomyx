@@ -21,7 +21,9 @@ readonly SIM_RUNNER_PORT="22087"
 usage() {
   echo "usage: scripts/e2e.sh <iossim|android|ios>" >&2
   echo "  iossim   requires ATOMYX_IOS_SIM_UDID and a runner on port ${SIM_RUNNER_PORT}" >&2
-  echo "  android  requires ATOMYX_ANDROID_SERIAL" >&2
+  echo "  android  requires ATOMYX_ANDROID_SERIAL and the installed dev.atomyx.demo app" >&2
+  echo "           optional: ATOMYX_ANDROID_INSTALL_APK and ATOMYX_ANDROID_INSTALL_APP_ID" >&2
+  echo "           (APK path and its package name) enable the install roundtrip case" >&2
   echo "  ios      requires ATOMYX_IOS_DEVICE_UDID" >&2
 }
 

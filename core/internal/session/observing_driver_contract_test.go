@@ -28,11 +28,11 @@ func TestObservingDriver_SatisfiesTheDriverContract_OverMock(t *testing.T) {
 	drivertest.Run(t, func() driver.Driver {
 		inner = mockdriver.New()
 		return stagedObserved{ObservedDriver: session.NewObservingDriver(inner, nil), inner: inner}
-	}, drivertest.Hooks{
+	}, drivertest.WithSyntheticFixtures(drivertest.Hooks{
 		FailPing: func() {
 			inner.FailNextPingForContract(diag.New(diag.CodeAgentUnreachable, "drivertest: simulated unreachable agent", "Confirm the agent is running on the device, then try again.", nil))
 		},
-	})
+	}))
 }
 
 type stagedStreamingObserved struct {
@@ -65,11 +65,11 @@ func TestObservingDriver_SatisfiesTheDriverContract_OverStreamingMock(t *testing
 	drivertest.Run(t, func() driver.Driver {
 		inner = mockdriver.NewStreamingTouchCapable()
 		return stagedStreamingObserved{ObservedDriver: session.NewObservingDriver(inner, nil), inner: inner}
-	}, drivertest.Hooks{
+	}, drivertest.WithSyntheticFixtures(drivertest.Hooks{
 		FailPing: func() {
 			inner.FailNextPingForContract(diag.New(diag.CodeAgentUnreachable, "drivertest: simulated unreachable agent", "Confirm the agent is running on the device, then try again.", nil))
 		},
-	})
+	}))
 }
 
 // The contract runs below cover the launched-app carrier combinations
@@ -116,11 +116,11 @@ func TestObservingDriver_SatisfiesTheDriverContract_OverCarrierMock(t *testing.T
 		inner = &carrierDriver{Driver: mockdriver.New(), bundleID: "com.example", runnerID: "run-1"}
 		wrapped := session.NewObservingDriver(inner, nil)
 		return stagedCarrierObserved{ObservedDriver: wrapped, inner: inner, carrier: carrierOf(t, wrapped)}
-	}, drivertest.Hooks{
+	}, drivertest.WithSyntheticFixtures(drivertest.Hooks{
 		FailPing: func() {
 			inner.FailNextPingForContract(diag.New(diag.CodeAgentUnreachable, "drivertest: simulated unreachable agent", "Confirm the agent is running on the device, then try again.", nil))
 		},
-	})
+	}))
 }
 
 type stagedStreamingCarrierObserved struct {
@@ -145,9 +145,9 @@ func TestObservingDriver_SatisfiesTheDriverContract_OverStreamingCarrierMock(t *
 			stagedStreamingObserved: stagedStreamingObserved{ObservedDriver: wrapped, inner: inner.StreamingDriver},
 			carrier:                 carrierOf(t, wrapped),
 		}
-	}, drivertest.Hooks{
+	}, drivertest.WithSyntheticFixtures(drivertest.Hooks{
 		FailPing: func() {
 			inner.FailNextPingForContract(diag.New(diag.CodeAgentUnreachable, "drivertest: simulated unreachable agent", "Confirm the agent is running on the device, then try again.", nil))
 		},
-	})
+	}))
 }

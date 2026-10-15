@@ -121,21 +121,26 @@ func testDispatchGestureCaptureCapability(t *testing.T, newDriver Factory) {
 // Capabilities().CanEraseText is true. A driver reporting the flag
 // false must reject the call rather than silently perform it, so a
 // caller that skips the check still fails safely instead of getting
-// an operation the driver never actually promised.
-func testEraseTextCapability(t *testing.T, newDriver Factory) {
+// an operation the driver never actually promised. The positive
+// assertion needs a focused input, so it runs only when
+// hooks.FocusInput is wired.
+func testEraseTextCapability(t *testing.T, newDriver Factory, hooks Hooks) {
 	d := newDriver()
 	ctx := context.Background()
 	if err := d.Connect(ctx); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
-	err := d.EraseText(ctx, 1)
 	if !d.Capabilities().CanEraseText {
-		if err == nil {
+		if err := d.EraseText(ctx, 1); err == nil {
 			t.Fatal("EraseText succeeded on a driver reporting CanEraseText false")
 		}
 		return
 	}
-	if err != nil {
+	if hooks.FocusInput == nil {
+		t.Skip("drivertest: no FocusInput hook wired for this driver; skipping the erase-text assertion that needs a focused input")
+	}
+	hooks.FocusInput(t, d)
+	if err := d.EraseText(ctx, 1); err != nil {
 		t.Fatalf("EraseText on a driver reporting CanEraseText true: %v", err)
 	}
 }

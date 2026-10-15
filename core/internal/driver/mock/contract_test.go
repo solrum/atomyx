@@ -26,10 +26,10 @@ func TestDriverSatisfiesContract(t *testing.T) {
 	drivertest.Run(t, func() driver.Driver {
 		d = mock.New()
 		return d
-	}, drivertest.Hooks{
+	}, drivertest.WithSyntheticFixtures(drivertest.Hooks{
 		DeviceCalls: func() int { return len(d.Calls) },
 		FailPing:    func() { d.FailNextPingForContract(simulatedUnreachablePing()) },
-	})
+	}))
 }
 
 func TestStreamingDriverSatisfiesContract(t *testing.T) {
@@ -37,10 +37,10 @@ func TestStreamingDriverSatisfiesContract(t *testing.T) {
 	drivertest.Run(t, func() driver.Driver {
 		d = mock.NewStreamingTouchCapable()
 		return d
-	}, drivertest.Hooks{
+	}, drivertest.WithSyntheticFixtures(drivertest.Hooks{
 		DeviceCalls: func() int { return len(d.Calls) },
 		FailPing:    func() { d.FailNextPingForContract(simulatedUnreachablePing()) },
-	})
+	}))
 }
 
 func TestDriverWithForeignAutomationSatisfiesContract(t *testing.T) {
@@ -49,8 +49,8 @@ func TestDriverWithForeignAutomationSatisfiesContract(t *testing.T) {
 		d = mock.New()
 		d.SetForeignAutomation(driver.ForeignAutomationSession{Name: "WebDriverAgentRunner-Runner", Kind: "WebDriverAgent"})
 		return d
-	}, drivertest.Hooks{
+	}, drivertest.WithSyntheticFixtures(drivertest.Hooks{
 		DeviceCalls: func() int { return len(d.Calls) },
 		FailPing:    func() { d.FailNextPingForContract(simulatedUnreachablePing()) },
-	})
+	}))
 }

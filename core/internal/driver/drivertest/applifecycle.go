@@ -45,28 +45,62 @@ func assertForeground(t *testing.T, d driver.Driver, foreground driver.Foregroun
 	}
 }
 
-func testLaunchAppLifecycle(t *testing.T, newDriver Factory) {
+// assertNotForeground checks that bundleID is not in front. Unlike
+// assertForeground with an empty want, it tolerates a launcher or any
+// other app in front, which is what a real device shows after an app
+// stops. A driver without foreground support is checked through
+// assertForeground so it still must return the typed unsupported error.
+func assertNotForeground(t *testing.T, d driver.Driver, foreground driver.ForegroundInfo, err error, bundleID, label string) {
+	t.Helper()
+	if !d.Capabilities().CanQueryForeground {
+		assertForeground(t, d, foreground, err, "", label)
+		return
+	}
+	if err != nil {
+		t.Fatalf("CurrentForeground %s: %v", label, err)
+	}
+	if foreground.BundleID != nil && *foreground.BundleID == bundleID {
+		t.Fatalf("CurrentForeground %s still reports %q", label, bundleID)
+	}
+}
+
+func requireLaunchable(t *testing.T, hooks Hooks) string {
+	t.Helper()
+	if hooks.LaunchableAppID == "" {
+		t.Skip("drivertest: no LaunchableAppID wired for this driver; skipping the launch case")
+	}
+	return hooks.LaunchableAppID
+}
+
+func testLaunchAppLifecycle(t *testing.T, newDriver Factory, hooks Hooks) {
+	bundleID := requireLaunchable(t, hooks)
 	d := newDriver()
 	ctx := context.Background()
 	if err := d.Connect(ctx); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
-	const bundleID = "dev.atomyx.drivertest.lifecycle"
 
-	foreground, err := d.CurrentForeground(ctx)
-	assertForeground(t, d, foreground, err, "", "before launch")
+	if hooks.NoForeground != nil {
+		hooks.NoForeground(t, d)
+		foreground, err := d.CurrentForeground(ctx)
+		assertForeground(t, d, foreground, err, "", "before launch")
+	}
 
 	if err := d.LaunchApp(ctx, bundleID, driver.LaunchArgs{}); err != nil {
 		t.Fatalf("LaunchApp: %v", err)
 	}
-	foreground, err = d.CurrentForeground(ctx)
+	foreground, err := d.CurrentForeground(ctx)
 	assertForeground(t, d, foreground, err, bundleID, "after launch")
 
 	if err := d.StopApp(ctx, bundleID); err != nil {
 		t.Fatalf("StopApp: %v", err)
 	}
 	foreground, err = d.CurrentForeground(ctx)
-	assertForeground(t, d, foreground, err, "", "after stop")
+	if hooks.NoForeground != nil {
+		assertForeground(t, d, foreground, err, "", "after stop")
+		return
+	}
+	assertNotForeground(t, d, foreground, err, bundleID, "after stop")
 }
 
 // testLaunchAppFreshStopsThenLaunches exercises the NoReset=false
@@ -74,13 +108,13 @@ func testLaunchAppLifecycle(t *testing.T, newDriver Factory) {
 // (plain) and testLaunchAppAttach (NoReset=true) do not cover: a
 // fresh launch of an already-running app stops it first, then
 // launches a clean process that still ends up foreground.
-func testLaunchAppFreshStopsThenLaunches(t *testing.T, newDriver Factory) {
+func testLaunchAppFreshStopsThenLaunches(t *testing.T, newDriver Factory, hooks Hooks) {
+	bundleID := requireLaunchable(t, hooks)
 	d := newDriver()
 	ctx := context.Background()
 	if err := d.Connect(ctx); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
-	const bundleID = "dev.atomyx.drivertest.fresh"
 
 	if err := d.LaunchApp(ctx, bundleID, driver.LaunchArgs{}); err != nil {
 		t.Fatalf("initial LaunchApp: %v", err)
@@ -93,13 +127,13 @@ func testLaunchAppFreshStopsThenLaunches(t *testing.T, newDriver Factory) {
 	assertForeground(t, d, foreground, err, bundleID, "after a fresh launch")
 }
 
-func testLaunchAppAttach(t *testing.T, newDriver Factory) {
+func testLaunchAppAttach(t *testing.T, newDriver Factory, hooks Hooks) {
+	bundleID := requireLaunchable(t, hooks)
 	d := newDriver()
 	ctx := context.Background()
 	if err := d.Connect(ctx); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
-	const bundleID = "dev.atomyx.drivertest.attach"
 	attach := true
 
 	if err := d.LaunchApp(ctx, bundleID, driver.LaunchArgs{NoReset: &attach}); err != nil {
@@ -118,40 +152,60 @@ func testLaunchAppAttach(t *testing.T, newDriver Factory) {
 // testClearAppDataSucceedsWithSource calls ClearAppData with a
 // non-empty Source, the one input every adapter accepts: Android
 // ignores Source and clears in place, iOS uninstalls and reinstalls
-// from it (see Driver.ClearAppData's platform notes). Source's
+// from it (see Driver.ClearAppData's platform notes). Source comes
+// from hooks.Install when wired and is a placeholder otherwise, so a
+// caller whose adapter reinstalls from it must wire Install. Source's
 // omitted behavior is genuinely platform-specific. iOS has no way to
 // reach a clean state without it, so it errors, while Android does
 // not need it. This case is covered by each adapter's own test instead of
 // this shared suite.
-func testClearAppDataSucceedsWithSource(t *testing.T, newDriver Factory) {
+func testClearAppDataSucceedsWithSource(t *testing.T, newDriver Factory, hooks Hooks) {
+	if hooks.ClearableAppID == "" {
+		t.Skip("drivertest: no ClearableAppID wired for this driver; skipping the clear app data case")
+	}
 	d := newDriver()
 	ctx := context.Background()
 	if err := d.Connect(ctx); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
-	const appID = "dev.atomyx.drivertest.clear"
-	if err := d.ClearAppData(ctx, appID, driver.ClearAppDataOptions{Source: "/drivertest/placeholder"}); err != nil {
+	source := "/drivertest/placeholder"
+	if hooks.Install != nil {
+		source = hooks.Install.Source
+	}
+	if err := d.ClearAppData(ctx, hooks.ClearableAppID, driver.ClearAppDataOptions{Source: source}); err != nil {
 		t.Fatalf("ClearAppData with Source set: %v", err)
 	}
 }
 
-func testInstallUninstallRoundtrip(t *testing.T, newDriver Factory) {
+func testInstallUninstallRoundtrip(t *testing.T, newDriver Factory, hooks Hooks) {
+	if hooks.Install == nil {
+		t.Skip("drivertest: no Install fixture wired for this driver; skipping the install and uninstall roundtrip")
+	}
 	d := newDriver()
 	ctx := context.Background()
 	if err := d.Connect(ctx); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
-	const appID = "dev.atomyx.drivertest.install"
+	appID := hooks.Install.AppID
 
 	installed, err := d.IsAppInstalled(ctx, appID)
 	if err != nil {
 		t.Fatalf("IsAppInstalled before install: %v", err)
 	}
 	if installed {
-		t.Fatal("IsAppInstalled before install reported true")
+		if err := d.UninstallApp(ctx, appID); err != nil {
+			t.Fatalf("UninstallApp of the already-installed fixture: %v", err)
+		}
+		installed, err = d.IsAppInstalled(ctx, appID)
+		if err != nil {
+			t.Fatalf("IsAppInstalled after clearing the fixture: %v", err)
+		}
+		if installed {
+			t.Fatal("IsAppInstalled after clearing the fixture reported true")
+		}
 	}
 
-	if err := d.InstallApp(ctx, appID); err != nil {
+	if err := d.InstallApp(ctx, hooks.Install.Source); err != nil {
 		t.Fatalf("InstallApp: %v", err)
 	}
 	installed, err = d.IsAppInstalled(ctx, appID)

@@ -64,6 +64,50 @@ type Hooks struct {
 	// Connect fail, or an end-to-end suite against a real device, leaves
 	// it nil.
 	FailConnect func()
+
+	// FocusInput, when set, must leave an editable input focused on
+	// the connected driver d, so an erase-text call has text to act
+	// on. It may call t.Skip or t.Fatalf. A nil FocusInput skips the
+	// erase-text assertion for a driver that reports CanEraseText,
+	// since a real screen has no focused input by default. The
+	// rejection check for a driver reporting CanEraseText false runs
+	// without it.
+	FocusInput func(t *testing.T, d driver.Driver)
+
+	// NoForeground, when set, must bring the connected driver d to a
+	// state where CurrentForeground reports no app. A nil
+	// NoForeground skips the exact-none assertions in the launch
+	// lifecycle case, because a real device always has some app or
+	// launcher in front. The case still asserts that the launched app
+	// is foreground after launch and no longer foreground after stop.
+	NoForeground func(t *testing.T, d driver.Driver)
+
+	// LaunchableAppID is an app id that is installed on the target
+	// and can be launched, stopped, and relaunched. An empty value
+	// skips the launch lifecycle, fresh launch, and attach launch
+	// cases.
+	LaunchableAppID string
+
+	// ClearableAppID is an app id installed on the target whose data
+	// may be wiped. An empty value skips the clear app data case.
+	ClearableAppID string
+
+	// Install describes an artifact the install and uninstall
+	// roundtrip may install and remove. A nil Install skips that
+	// case. The case removes the app first when it is already
+	// installed, so the app must not be one the rest of the run needs.
+	Install *InstallFixture
+}
+
+// InstallFixture names an installable artifact and the app id it
+// installs as.
+type InstallFixture struct {
+	// Source is the value passed to Driver.InstallApp, such as an
+	// artifact path.
+	Source string
+	// AppID is the id Driver.IsAppInstalled and Driver.UninstallApp
+	// use for the installed app.
+	AppID string
 }
 
 // tracked wraps newDriver so every driver it returns is disconnected
@@ -108,7 +152,7 @@ func Run(t *testing.T, newDriver Factory, hooks Hooks) {
 	t.Run("dispatch gesture multi-pointer capability", func(t *testing.T) { testDispatchGestureMultiPointerCapability(t, tracked(t, newDriver)) })
 	t.Run("dispatch gesture pressure capability", func(t *testing.T) { testDispatchGesturePressureCapability(t, tracked(t, newDriver)) })
 	t.Run("dispatch gesture capture capability", func(t *testing.T) { testDispatchGestureCaptureCapability(t, tracked(t, newDriver)) })
-	t.Run("erase text capability", func(t *testing.T) { testEraseTextCapability(t, tracked(t, newDriver)) })
+	t.Run("erase text capability", func(t *testing.T) { testEraseTextCapability(t, tracked(t, newDriver), hooks) })
 	t.Run("hide keyboard capability", func(t *testing.T) { testHideKeyboardCapability(t, tracked(t, newDriver)) })
 	t.Run("press key supported code", func(t *testing.T) { testPressKeySupportedCode(t, tracked(t, newDriver)) })
 	t.Run("press key unsupported code handled gracefully", func(t *testing.T) { testPressKeyUnsupportedCodeHandledGracefully(t, tracked(t, newDriver)) })
@@ -122,11 +166,11 @@ func Run(t *testing.T, newDriver Factory, hooks Hooks) {
 	t.Run("device info contract", func(t *testing.T) { testDeviceInfoContract(t, tracked(t, newDriver)) })
 	t.Run("screenshot capability", func(t *testing.T) { testScreenshotCapability(t, tracked(t, newDriver)) })
 
-	t.Run("launch app lifecycle", func(t *testing.T) { testLaunchAppLifecycle(t, tracked(t, newDriver)) })
-	t.Run("launch app fresh stops then launches", func(t *testing.T) { testLaunchAppFreshStopsThenLaunches(t, tracked(t, newDriver)) })
-	t.Run("launch app attach reuses foreground", func(t *testing.T) { testLaunchAppAttach(t, tracked(t, newDriver)) })
-	t.Run("clear app data succeeds with a source", func(t *testing.T) { testClearAppDataSucceedsWithSource(t, tracked(t, newDriver)) })
-	t.Run("install uninstall roundtrip", func(t *testing.T) { testInstallUninstallRoundtrip(t, tracked(t, newDriver)) })
+	t.Run("launch app lifecycle", func(t *testing.T) { testLaunchAppLifecycle(t, tracked(t, newDriver), hooks) })
+	t.Run("launch app fresh stops then launches", func(t *testing.T) { testLaunchAppFreshStopsThenLaunches(t, tracked(t, newDriver), hooks) })
+	t.Run("launch app attach reuses foreground", func(t *testing.T) { testLaunchAppAttach(t, tracked(t, newDriver), hooks) })
+	t.Run("clear app data succeeds with a source", func(t *testing.T) { testClearAppDataSucceedsWithSource(t, tracked(t, newDriver), hooks) })
+	t.Run("install uninstall roundtrip", func(t *testing.T) { testInstallUninstallRoundtrip(t, tracked(t, newDriver), hooks) })
 }
 
 func testPlatformNonEmpty(t *testing.T, newDriver Factory) {

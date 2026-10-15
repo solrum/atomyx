@@ -322,6 +322,16 @@ variable is unset: `ATOMYX_ANDROID_SERIAL_A` and `ATOMYX_ANDROID_SERIAL_B`
 (two attached Android devices), and `ATOMYX_E2E_IOS_SIM_UDID` with
 `ATOMYX_E2E_IOS_PROJECT_DIR` (runner identity check on a simulator).
 
+The shared driver contract cases that need a device fixture skip when
+the fixture is absent. On `android`, the installed `dev.atomyx.demo`
+app serves the launch and clear app data cases. The install and
+uninstall roundtrip needs `ATOMYX_ANDROID_INSTALL_APK` (path to an APK)
+and `ATOMYX_ANDROID_INSTALL_APP_ID` (that APK's package name), and it
+removes the package first when it is already installed, so do not point
+it at an app the run needs. The erase text case and the exact no
+foreground assertions skip on real devices, and the `ios` and `iossim`
+legs skip the launch, clear app data, and install cases.
+
 The script exits 2 on an unknown platform or a missing variable, exits
 1 when the iossim runner does not answer or a test fails, and otherwise
 exits with the `go test` status. It never prints variable values.

@@ -236,7 +236,7 @@ func TestIosSimDriver_SatisfiesContract(t *testing.T) {
 		var d driver.Driver
 		d, conn = newContractSimDriver(t)
 		return d
-	}, drivertest.Hooks{
+	}, drivertest.WithSyntheticFixtures(drivertest.Hooks{
 		DeviceCalls: func() int { return len(conn.Calls()) },
 		FailConnect: func() {
 			conn.Respond("ping", func(map[string]any) (map[string]any, error) {
@@ -248,7 +248,7 @@ func TestIosSimDriver_SatisfiesContract(t *testing.T) {
 				return nil, errors.New("drivertest: simulated unreachable agent")
 			})
 		},
-	})
+	}))
 }
 
 func TestIosSimDriver_CurrentForeground_DelegatesUnsupportedToXCUITest(t *testing.T) {

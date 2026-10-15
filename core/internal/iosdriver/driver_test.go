@@ -201,7 +201,7 @@ func TestIosDriver_SatisfiesContract(t *testing.T) {
 	drivertest.Run(t, func() driver.Driver {
 		conn = newDefaultFakeConn()
 		return iosdriver.New(conn, newIosContractRunner(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
-	}, drivertest.Hooks{
+	}, drivertest.WithSyntheticFixtures(drivertest.Hooks{
 		DeviceCalls: func() int { return len(conn.Calls()) },
 		FailConnect: func() {
 			conn.Respond("ping", func(map[string]any) (map[string]any, error) {
@@ -213,7 +213,7 @@ func TestIosDriver_SatisfiesContract(t *testing.T) {
 				return nil, errors.New("drivertest: simulated unreachable agent")
 			})
 		},
-	})
+	}))
 }
 
 func TestIosDriver_Connect_Simulator_ConnectsAndPingsWithoutIproxy(t *testing.T) {
