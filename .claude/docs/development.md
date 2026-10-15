@@ -329,8 +329,10 @@ uninstall roundtrip needs `ATOMYX_ANDROID_INSTALL_APK` (path to an APK)
 and `ATOMYX_ANDROID_INSTALL_APP_ID` (that APK's package name), and it
 removes the package first when it is already installed, so do not point
 it at an app the run needs. The erase text case and the exact no
-foreground assertions skip on real devices, and the `ios` and `iossim`
-legs skip the launch, clear app data, and install cases.
+foreground assertions skip on real devices, and the `iossim` leg skips
+the launch, clear app data, and install cases.
+The `ios` leg runs the launch cases against `com.apple.Preferences` and
+skips the clear app data and install cases.
 
 The script exits 2 on an unknown platform or a missing variable, exits
 1 when the iossim runner does not answer or a test fails, and otherwise

@@ -219,6 +219,13 @@ foreground read emits one warning through `Options.Warn` and returns
 nil, because an app may hand off to another package. The attach
 shortcut for an app already in front returns without waiting.
 
+A launch that lands on a keyguard or on a permission dialog owned by
+another package never reports the launched package in front, so the
+wait runs the full 5 s bound and emits the timeout warning even though
+the launch succeeded. The wait never outlasts the caller's deadline:
+a deadline that ends it counts as a timeout and returns nil, while an
+explicit cancellation returns the cancellation error.
+
 **A lost Android agent has no exit signal.** The host supervises no
 Android process. The control plane is an `AccessibilityService` inside
 the device's app process, reached through an `adb forward` that the

@@ -671,9 +671,9 @@ field only needs to be focused, with nothing typed into it.
   focus and that nothing was typed: retarget the field with a more
   stable selector, or tap its coordinates directly before calling
   input_text again.
-- On iOS, the coordinate path can reach the typing step with no field
-  focused. The call then fails with `AGENT_REJECTED` and nothing is
-  typed: tap the field and retry.
+- When no field has keyboard focus, for example after a coordinate tap
+  that missed the field, the call fails with `AGENT_REJECTED` and
+  nothing is typed: tap the field and retry.
 - If the field's value does not reflect clearFirst on a driver without
   erase support, verify the resulting value and clear it manually
   (for example with press_key using delete) before relying on it.
