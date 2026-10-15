@@ -225,6 +225,10 @@ type pingResponse struct {
 // LaunchApp's NoReset attach fast path skip dispatch for an app that
 // is not actually running.
 //
+// A Connect that fails closes the transport and stops the iproxy tunnel
+// this driver started, so no failure path leaves a tunnel process behind.
+// A tunnel that was already running and was reused is never stopped.
+//
 // Connect starts a background probe for foreign UI automation sessions
 // and does not wait for it, so a slow device listing never delays the
 // connection. ForeignAutomation reports the result once the probe ends.
@@ -235,6 +239,13 @@ func (d *IosDriver) Connect(ctx context.Context) error {
 	d.lastLaunchedBundleID = ""
 	d.connectedRunnerID = ""
 	d.agentInfo = driver.AgentInfo{}
+	connected := false
+	defer func() {
+		if !connected {
+			_ = d.conn.Close()
+			d.stopIproxy()
+		}
+	}()
 	if d.opts.Kind == KindDevice && !d.opts.ExternalTunnel {
 		if err := d.launchIproxy(ctx); err != nil {
 			var iproxyErr *IproxyError
@@ -262,20 +273,17 @@ func (d *IosDriver) Connect(ctx context.Context) error {
 	}
 	if d.opts.ExternalRunner {
 		if idErr := d.verifyExternalRunner(pong); idErr != nil {
-			_ = d.conn.Close()
-			d.stopIproxy()
 			return idErr
 		}
 	}
 	if pong.ProtocolVersion != version.AgentProtocolVersion {
-		_ = d.conn.Close()
-		d.stopIproxy()
 		return connectProtocolMismatchError(pong.ProtocolVersion)
 	}
 	d.agentInfo = driver.AgentInfo{ProtocolVersion: pong.ProtocolVersion, AgentVersion: pong.AgentVersion}
 	d.capabilities.CanMultiPointer = pong.Capabilities.CanMultiPointer
 	d.capabilities.CanPressure = pong.Capabilities.CanPressure
 	d.connectedRunnerID = pong.RunnerID
+	connected = true
 	d.startForeignAutomationProbe(ctx)
 	return nil
 }

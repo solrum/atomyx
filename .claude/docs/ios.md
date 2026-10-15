@@ -229,7 +229,7 @@ fails, with the rebuild remedy of a legacy runner.
 `IosDriver.Connect` (`core/internal/iosdriver/driver.go`) on a
 physical device first launches an `iproxy` USB tunnel as a background child process
 and waits for it to become reachable before dialing. `Disconnect` stops
-the tunnel. A driver built with `Options.ExternalTunnel` skips that
+the tunnel, and so does a `Connect` that fails after starting it. A driver built with `Options.ExternalTunnel` skips that
 launch, because the provisioner that started the runner already owns the
 tunnel. A driver that starts its own tunnel keeps using a listener that
 already answers as its runner and leaves it running. On a simulator the driver dials the host port directly, because
