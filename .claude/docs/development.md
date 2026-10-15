@@ -531,7 +531,8 @@ written without `soak infraFailures` contributes its rate multiplied by its
 soak runs. The results directory defaults to `e2e-results/nightly` and honors
 `ATOMYX_NIGHTLY_RESULTS_DIR`. Exit status is 0 when the report prints and 2 on
 a usage error or a missing directory. `scripts/check-e2e-trend.sh` runs in
-`make check` against fixture folders.
+`make check` against fixture folders. The thresholds the report is read
+against live in [`docs/reliability.md`](../../docs/reliability.md).
 
 ## Testing philosophy
 
