@@ -76,3 +76,16 @@ func TestRoundTrip_TreeNodeWire_TriState(t *testing.T) {
 		t.Fatalf("Focused = %v, want nil after round trip of an unset field", *out.Focused)
 	}
 }
+
+func TestIsCanonicalAttribute(t *testing.T) {
+	for _, key := range []string{"id", "text", "label", "hint", "value", "role", "class", "package", "bounds", AttrSecure} {
+		if !IsCanonicalAttribute(key) {
+			t.Errorf("IsCanonicalAttribute(%q) = false, want true", key)
+		}
+	}
+	for _, key := range []string{"ext:ios-title", "enabled", ""} {
+		if IsCanonicalAttribute(key) {
+			t.Errorf("IsCanonicalAttribute(%q) = true, want false", key)
+		}
+	}
+}

@@ -52,18 +52,6 @@ func testHierarchyShape(t *testing.T, newDriver Factory) {
 // canonicalAttributeKeys is the fixed attribute vocabulary
 // wire.TreeNodeWire documents: any other key must start with "ext:"
 // to mark itself as non-portable extension data.
-var canonicalAttributeKeys = map[string]bool{
-	"id":      true,
-	"text":    true,
-	"label":   true,
-	"hint":    true,
-	"value":   true,
-	"role":    true,
-	"class":   true,
-	"package": true,
-	"bounds":  true,
-}
-
 // testHierarchyAttributesAreCanonical calls Hierarchy without staging
 // anything, so it exercises whatever tree a connected driver produces
 // by default. A driver with no default tree to report (nothing
@@ -91,7 +79,7 @@ func assertCanonicalAttributes(t *testing.T, node wire.TreeNodeWire) {
 		t.Fatal("Hierarchy returned a node with a nil Attributes map")
 	}
 	for key := range node.Attributes {
-		if canonicalAttributeKeys[key] {
+		if wire.IsCanonicalAttribute(key) {
 			continue
 		}
 		if strings.HasPrefix(key, "ext:") {
