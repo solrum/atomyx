@@ -153,8 +153,8 @@ func Run(t *testing.T, newDriver Factory, hooks Hooks) {
 	t.Run("dispatch gesture pressure capability", func(t *testing.T) { testDispatchGesturePressureCapability(t, tracked(t, newDriver)) })
 	t.Run("dispatch gesture capture capability", func(t *testing.T) { testDispatchGestureCaptureCapability(t, tracked(t, newDriver)) })
 	t.Run("erase text capability", func(t *testing.T) { testEraseTextCapability(t, tracked(t, newDriver), hooks) })
-	t.Run("hide keyboard capability", func(t *testing.T) { testHideKeyboardCapability(t, tracked(t, newDriver)) })
-	t.Run("press key supported code", func(t *testing.T) { testPressKeySupportedCode(t, tracked(t, newDriver)) })
+	t.Run("hide keyboard capability", func(t *testing.T) { testHideKeyboardCapability(t, tracked(t, newDriver), hooks) })
+	t.Run("press key supported code", func(t *testing.T) { testPressKeySupportedCode(t, tracked(t, newDriver), hooks) })
 	t.Run("press key unsupported code handled gracefully", func(t *testing.T) { testPressKeyUnsupportedCodeHandledGracefully(t, tracked(t, newDriver)) })
 	t.Run("streaming touch is optional", func(t *testing.T) { testStreamingTouchOptional(t, tracked(t, newDriver)) })
 

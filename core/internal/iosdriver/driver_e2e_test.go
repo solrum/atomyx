@@ -21,11 +21,11 @@ const iosE2EControlPort = 22087
 // real, physically connected iOS device. It only runs under the e2e
 // build tag with ATOMYX_DRIVER_E2E selecting "ios" and a connected
 // device present; see drivertest.RequireDevice. ATOMYX_IOS_DEVICE_UDID
-// selects which device to target. It passes an empty drivertest.Hooks:
-// a real device has no on-demand way to go offline and no app id or
-// install artifact known to be present, so the cases that need those
-// fixtures skip here and run only against the fake-transport contract
-// test in driver_test.go.
+// selects which device to target. It wires Settings as the launchable
+// app, since every device ships it. A real device has no on-demand way
+// to go offline and no clearable app id or install artifact known to
+// be present, so the cases that need those fixtures skip here and run
+// only against the fake-transport contract test in driver_test.go.
 func TestIosDriver_E2E(t *testing.T) {
 	drivertest.RequireDevice(t, drivertest.E2EPlatformIOS)
 	udid := os.Getenv("ATOMYX_IOS_DEVICE_UDID")
@@ -41,5 +41,5 @@ func TestIosDriver_E2E(t *testing.T) {
 			Kind:       iosdriver.KindDevice,
 			Port:       iosE2EControlPort,
 		})
-	}, drivertest.Hooks{})
+	}, drivertest.Hooks{LaunchableAppID: "com.apple.Preferences"})
 }

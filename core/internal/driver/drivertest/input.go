@@ -145,15 +145,31 @@ func testEraseTextCapability(t *testing.T, newDriver Factory, hooks Hooks) {
 	}
 }
 
+// launchWhenWired launches hooks.LaunchableAppID when it is set, so a
+// driver that tracks the launched app internally has a target for
+// keyboard and key-press calls. It does nothing when the hook is
+// empty.
+func launchWhenWired(t *testing.T, d driver.Driver, hooks Hooks) {
+	t.Helper()
+	if hooks.LaunchableAppID == "" {
+		return
+	}
+	if err := d.LaunchApp(context.Background(), hooks.LaunchableAppID, driver.LaunchArgs{}); err != nil {
+		t.Fatalf("LaunchApp(%q): %v", hooks.LaunchableAppID, err)
+	}
+}
+
 // testHideKeyboardCapability asserts the same caller-must-check
 // contract as testEraseTextCapability, for
-// Capabilities().CanHideKeyboard.
-func testHideKeyboardCapability(t *testing.T, newDriver Factory) {
+// Capabilities().CanHideKeyboard. It launches the launchable app
+// first when that hook is set.
+func testHideKeyboardCapability(t *testing.T, newDriver Factory, hooks Hooks) {
 	d := newDriver()
 	ctx := context.Background()
 	if err := d.Connect(ctx); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
+	launchWhenWired(t, d, hooks)
 	_, err := d.HideKeyboard(ctx)
 	if !d.Capabilities().CanHideKeyboard {
 		if err == nil {
@@ -167,13 +183,15 @@ func testHideKeyboardCapability(t *testing.T, newDriver Factory) {
 }
 
 // testPressKeySupportedCode asserts that pressing the first key code
-// a driver advertises in Capabilities().SupportedKeyCodes succeeds.
-func testPressKeySupportedCode(t *testing.T, newDriver Factory) {
+// a driver advertises in Capabilities().SupportedKeyCodes succeeds,
+// launching the launchable app first when that hook is set.
+func testPressKeySupportedCode(t *testing.T, newDriver Factory, hooks Hooks) {
 	d := newDriver()
 	ctx := context.Background()
 	if err := d.Connect(ctx); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
+	launchWhenWired(t, d, hooks)
 	codes := d.Capabilities().SupportedKeyCodes
 	if len(codes) == 0 {
 		t.Skip("driver reports no supported key codes")
