@@ -55,8 +55,7 @@ corresponding area. For the high-level map see
   only clickable-or-labeled elements. Flutter elements frequently
   carry only a resourceId. `dumpCompact` is an internal helper
   consumed by the keyboard and clear-text fallbacks
-  (`platforms/android-agent/app/src/main/java/dev/atomyx/agent/control/InputDispatcher.kt`,
-  `platforms/android-agent/app/src/main/java/dev/atomyx/agent/control/KeyboardTyper.kt`,
+  (`platforms/android-agent/app/src/main/java/dev/atomyx/agent/control/KeyboardTyper.kt`
   and the strategies under
   `platforms/android-agent/app/src/main/java/dev/atomyx/agent/control/clear/`),
   not a wire route, so tightening its filter breaks those fallbacks
