@@ -150,6 +150,10 @@ protocol XCUIBridge {
     /// resolution, obscurement detection, and element filtering on the
     /// host side. The driver just returns raw `app.snapshot()` bytes.
     ///
+    /// Each node's `focused` flag reflects keyboard focus. It comes from
+    /// the snapshot when any node reports focus, otherwise from a live
+    /// keyboard-focus query that marks at most one node.
+    ///
     /// Returns `nil` when the snapshot RPC fails (simulator hung,
     /// XCUITest daemon crashed). Caller treats nil as an error.
     func dumpRawTree(app: XCUIApplication) -> [String: Any]?
@@ -258,7 +262,22 @@ final class DefaultXCUIBridge: XCUIBridge {
 
     func dumpRawTree(app: XCUIApplication) -> [String: Any]? {
         guard let root = try? app.snapshot() else { return nil }
-        return Self.buildRawTree(root: root, screen: app.frame)
+        return Self.buildRawTree(root: root, screen: app.frame) {
+            Self.keyboardFocusedFrame(in: app)
+        }
+    }
+
+    /// Frame of the text input that currently owns keyboard focus, or
+    /// nil when none does. Snapshots report no focus for some hosts
+    /// (Flutter text fields stay unfocused in the snapshot even while
+    /// the caret is visible), so the live element query is the only
+    /// reliable source for them.
+    private static func keyboardFocusedFrame(in app: XCUIApplication) -> CGRect? {
+        let element = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "hasKeyboardFocus == true"))
+            .firstMatch
+        guard element.exists else { return nil }
+        return element.frame
     }
 
     func focusedFieldValue(app: XCUIApplication) -> String? {
@@ -289,7 +308,11 @@ final class DefaultXCUIBridge: XCUIBridge {
     ///
     /// Entry 0 is always the root. `maxDepth` of 100 is a generous
     /// ceiling, since real iOS/Flutter apps rarely exceed 20 levels.
-    private static func buildRawTree(root: XCUIElementSnapshot, screen: CGRect) -> [String: Any] {
+    private static func buildRawTree(
+        root: XCUIElementSnapshot,
+        screen: CGRect,
+        keyboardFocusFrame: () -> CGRect?
+    ) -> [String: Any] {
         let maxDepth = 100
         struct WorkItem {
             let node: XCUIElementSnapshot
@@ -324,6 +347,11 @@ final class DefaultXCUIBridge: XCUIBridge {
             }
         }
 
+        if !entries.contains(where: { ($0["focused"] as? Bool) == true }),
+           let frame = keyboardFocusFrame() {
+            Self.markFocused(entries: &entries, frame: frame)
+        }
+
         // Bottom-up assembly: walk entries from last to first so every
         // child dict is already final before its parent consumes it.
         for i in (0 ..< entries.count).reversed() {
@@ -333,6 +361,37 @@ final class DefaultXCUIBridge: XCUIBridge {
         }
 
         return entries[0]
+    }
+
+    /// Marks exactly one entry as focused: the first whose integer
+    /// bounds equal `frame`, otherwise the smallest entry whose bounds
+    /// contain it. Bounds are compared as integers because `nodeDict`
+    /// truncates frames the same way.
+    private static func markFocused(entries: inout [[String: Any]], frame: CGRect) {
+        let left = Int(frame.minX)
+        let top = Int(frame.minY)
+        let right = Int(frame.maxX)
+        let bottom = Int(frame.maxY)
+
+        var containing: (index: Int, area: Int)?
+        for (index, entry) in entries.enumerated() {
+            guard let b = entry["bounds"] as? [String: Int],
+                  let l = b["left"], let t = b["top"],
+                  let r = b["right"], let bt = b["bottom"] else { continue }
+            if l == left && t == top && r == right && bt == bottom {
+                entries[index]["focused"] = true
+                return
+            }
+            if l <= left && t <= top && r >= right && bt >= bottom {
+                let area = (r - l) * (bt - t)
+                if containing == nil || area < containing!.area {
+                    containing = (index, area)
+                }
+            }
+        }
+        if let match = containing {
+            entries[match.index]["focused"] = true
+        }
     }
 
     /// Build the flat per-node `[String: Any]` (no children key yet).
