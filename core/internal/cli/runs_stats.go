@@ -17,6 +17,8 @@ type runStatsJSON struct {
 	InfraFailures    int                 `json:"infraFailures"`
 	TestFailures     int                 `json:"testFailures"`
 	InfraFailureRate float64             `json:"infraFailureRate"`
+	AbortedRuns      int                 `json:"abortedRuns"`
+	Attempts         int                 `json:"attempts"`
 }
 
 type runStatsEntryJSON struct {
@@ -29,6 +31,8 @@ type runStatsEntryJSON struct {
 	InfraFailures    int      `json:"infraFailures"`
 	TestFailures     int      `json:"testFailures"`
 	InfraFailureRate float64  `json:"infraFailureRate"`
+	AbortedRuns      int      `json:"abortedRuns"`
+	Attempts         int      `json:"attempts"`
 	LastOutcomes     []string `json:"lastOutcomes"`
 	DurationP50Ms    int64    `json:"durationP50Ms"`
 	DurationP95Ms    int64    `json:"durationP95Ms"`
@@ -79,7 +83,7 @@ func printStatsJSON(ctx context.Context, deps Deps, result history.Result) int {
 	doc := runStatsJSON{
 		Tests: make([]runStatsEntryJSON, 0, len(result.Tests)), Skipped: result.Skipped,
 		InfraFailures: result.Totals.InfraFailures, TestFailures: result.Totals.TestFailures,
-		InfraFailureRate: result.Totals.InfraFailureRate,
+		InfraFailureRate: result.Totals.InfraFailureRate, AbortedRuns: result.Totals.AbortedRuns, Attempts: result.Totals.Attempts,
 	}
 	for _, s := range result.Tests {
 		last := make([]string, len(s.LastOutcomes))
@@ -89,7 +93,7 @@ func printStatsJSON(ctx context.Context, deps Deps, result history.Result) int {
 		doc.Tests = append(doc.Tests, runStatsEntryJSON{
 			TestKey: s.Key, Runs: s.Runs, Passed: s.Passed, Failed: s.Failed, Flaky: s.Flaky,
 			FlakyRate: s.FlakyRate, LastOutcomes: last,
-			InfraFailures: s.InfraFailures, TestFailures: s.TestFailures, InfraFailureRate: s.InfraFailureRate,
+			InfraFailures: s.InfraFailures, TestFailures: s.TestFailures, InfraFailureRate: s.InfraFailureRate, AbortedRuns: s.AbortedRuns, Attempts: s.Attempts,
 			DurationP50Ms: s.DurationP50Ms, DurationP95Ms: s.DurationP95Ms,
 		})
 	}

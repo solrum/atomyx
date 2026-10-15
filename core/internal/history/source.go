@@ -23,9 +23,12 @@ type Source interface {
 //
 // Rules:
 //
-//   - A run that has not completed, or that ended cancelled, device lost,
-//     or interrupted, says nothing about the test and yields no record.
-//     This holds for a suite run too, even when it has an index.
+//   - A run that has not completed or that ended cancelled says nothing
+//     about the test and yields no record, and so does a suite entry of
+//     such a run. A cancelled run is an operator decision, not a fault.
+//   - A run that ended device lost or interrupted yields one aborted
+//     record under its own key, with no verdict, even for a suite run. It
+//     counts as an infrastructure failure and nothing else.
 //   - A suite run with an index contributes one record per index entry
 //     and none for its own meta, so a suite is never counted twice.
 //   - A worker run whose sharding parent is also present contributes
@@ -54,7 +57,16 @@ func collect(source Source) ([]Record, int, error) {
 	}
 	var records []Record
 	for _, m := range metas {
-		if m.CompletedAt == nil || m.ParentRunID != "" && present[m.ParentRunID] {
+		if m.ParentRunID != "" && present[m.ParentRunID] {
+			continue
+		}
+		if m.Outcome == runfolder.OutcomeDeviceLost || m.Outcome == runfolder.OutcomeInterrupted {
+			if key := keyOf(m.TestKey, m.ScriptPath); key != "" {
+				records = append(records, Record{Key: key, RunID: m.RunID, StartedAtMs: m.StartedAt, Aborted: true, Class: ClassInfra})
+			}
+			continue
+		}
+		if m.CompletedAt == nil {
 			continue
 		}
 		if m.Result != runfolder.ResultPassed && m.Result != runfolder.ResultFailed {

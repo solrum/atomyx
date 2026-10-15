@@ -1398,8 +1398,9 @@ and `--last` trims what remains.
 A suite run counts through its index entries, one outcome per entry
 under the entry's test key, and the suite run itself is not counted. An
 entry that passed after a retry counts as flaky, and a flaky entry also
-counts as passed. A run that is unfinished, cancelled, or interrupted is
-left out, and so are the entries of such a suite. An entry that was never
+counts as passed. A run that is unfinished or cancelled is
+left out, and so are the entries of such a suite. An interrupted or
+device-lost run counts only as an aborted run, described below. An entry that was never
 run, such as one a shard worker did not reach, is left out too.
 
 The table has one row per test key, sorted by flaky rate, then by
@@ -1409,11 +1410,11 @@ failures, both highest first, then by key:
 - `RUNS`
 - `PASSED`: includes flaky runs
 - `FAILED`
-- `INFRA FAILS`: failed runs blamed on the infrastructure
-- `TEST FAILS`: failed runs blamed on the test, so `INFRA FAILS` plus `TEST FAILS` equals `FAILED`
+- `INFRA FAILS`: infrastructure failures, which are the failed runs blamed on the infrastructure plus the aborted runs
+- `TEST FAILS`: failed runs blamed on the test
 - `FLAKY`
 - `FLAKY RATE`: flaky runs divided by runs, as a percentage
-- `INFRA RATE`: infrastructure failures divided by runs, as a percentage
+- `INFRA RATE`: infrastructure failures divided by attempts, as a percentage
 - `P50` and `P95`: duration percentiles, `-` when no run has a duration
 - `LAST`: up to 10 outcomes, most recent first, one letter each. `P` is passed, `F` is failed, and `K` is flaky.
 
@@ -1422,17 +1423,20 @@ With no match the command prints `No finished runs found.`
 The JSON document has `tests` and `skipped`. `tests` is always present.
 Each test has `testKey`, `runs`, `passed`, `failed`, `flaky`,
 `flakyRate` (a fraction from 0 to 1), `infraFailures`, `testFailures`,
-`infraFailureRate` (a fraction from 0 to 1), `lastOutcomes` (the words
+`abortedRuns`, `attempts`, `infraFailureRate` (a fraction from 0 to 1), `lastOutcomes` (the words
 `passed`, `failed`, or `flaky`), `durationP50Ms`, and `durationP95Ms`.
 The top level also carries `infraFailures`, `testFailures`, and
-`infraFailureRate` summed over all tests.
+`infraFailureRate` summed over all tests, with `abortedRuns` and `attempts`.
 
 A failed run is an infrastructure failure when its outcome is `error`, or
 when it ended `failed` with an error code that names the device, the agent,
 a timeout, or the host tooling, such as `AGENT_UNREACHABLE`,
 `AGENT_NOT_READY`, `TOOL_TIMEOUT`, or `DEVICE_HELD`. Every other failed run
-is a test failure, including a run with no error code. Runs that lost their
-device or were interrupted are not counted, so they are in neither rate.
+is a test failure, including a run with no error code. A run that lost its
+device or was interrupted is an aborted run. It is not in `runs`, `passed`,
+`failed`, or `lastOutcomes`, but it counts in `infraFailures`, and `attempts`
+is `runs` plus `abortedRuns`, the denominator of `infraFailureRate`. A
+cancelled run is an operator decision and is in no count.
 
 ### runs prune
 

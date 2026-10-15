@@ -29,6 +29,9 @@ type Record struct {
 	// Class says who a failed record is blamed on. Empty for a record that
 	// did not fail, and for a suite entry, whose failure carries no code.
 	Class Class
+	// Aborted marks a run that ended device lost or interrupted. It has no
+	// pass or fail verdict, and counts only as an infrastructure failure.
+	Aborted bool
 	// EntryIndex is the position of the entry inside its suite index, and
 	// zero for a script run. It orders records of one run deterministically.
 	EntryIndex int

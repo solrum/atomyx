@@ -56,6 +56,7 @@ func TestGetTestStatsReportsPerTestStatisticsFlakiestFirst(t *testing.T) {
 		"testKey": "checkout.yml", "runs": float64(3), "passed": float64(2), "failed": float64(1),
 		"flaky": float64(0), "flakyRate": float64(0),
 		"infraFailures": float64(0), "testFailures": float64(1), "infraFailureRate": float64(0),
+		"abortedRuns": float64(0), "attempts": float64(3),
 		"lastOutcomes":  []any{"passed", "passed", "failed"},
 		"durationP50Ms": float64(2000), "durationP95Ms": float64(3000),
 	}

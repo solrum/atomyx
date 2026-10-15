@@ -1124,7 +1124,9 @@ Contract:
   that stopped the run, never from message text. It is absent on a pass,
   on a failure that carries no code, and on a run written without it.
   `history.Classify` maps outcome and code to an infrastructure or test
-  failure for run stats.
+  failure for run stats. A run that ended `deviceLost` or `interrupted`
+  counts there as an aborted run, an infrastructure failure outside the
+  pass and fail counts.
 - **Run id.** The schema puts no pattern on it, because a migrated run
   keeps its legacy id. A run written by `runfolder.Starter` gets
   `<yyyymmdd-hhmmss>-<label>-<4 hex>`. The time is UTC. The label is

@@ -24,10 +24,12 @@ type Result struct {
 }
 
 // Totals is the sum of the failure counts across the tests of a Result.
-// InfraFailureRate is InfraFailures divided by Runs, and zero when Runs is
-// zero.
+// InfraFailureRate is InfraFailures divided by Attempts, the finished runs
+// plus the aborted ones, and zero when Attempts is zero.
 type Totals struct {
 	Runs             int
+	Attempts         int
+	AbortedRuns      int
 	InfraFailures    int
 	TestFailures     int
 	InfraFailureRate float64
@@ -70,11 +72,13 @@ func Query(source Source, filter Filter) (Result, error) {
 	var totals Totals
 	for _, s := range stats {
 		totals.Runs += s.Runs
+		totals.Attempts += s.Attempts
+		totals.AbortedRuns += s.AbortedRuns
 		totals.InfraFailures += s.InfraFailures
 		totals.TestFailures += s.TestFailures
 	}
-	if totals.Runs > 0 {
-		totals.InfraFailureRate = float64(totals.InfraFailures) / float64(totals.Runs)
+	if totals.Attempts > 0 {
+		totals.InfraFailureRate = float64(totals.InfraFailures) / float64(totals.Attempts)
 	}
 	return Result{Tests: stats, Skipped: skipped, Totals: totals}, nil
 }

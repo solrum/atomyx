@@ -27,9 +27,13 @@ type Window struct {
 //
 // Runs counts every record in the window. Passed includes flaky records,
 // because a flaky record passed in the end, and Failed counts the rest.
-// InfraFailures and TestFailures split Failed by who the failure is blamed
-// on, so Failed is their sum, and a failed record with no class counts as a
-// test failure. InfraFailureRate is InfraFailures divided by Runs.
+// InfraFailures and TestFailures split the failures by who they are blamed
+// on. A failed record with no class counts as a test failure. AbortedRuns
+// counts the runs that ended device lost or interrupted. They are not in
+// Runs, Passed, Failed, or LastOutcomes, but each counts as an
+// infrastructure failure, so Failed plus AbortedRuns equals InfraFailures
+// plus TestFailures. Attempts is Runs plus AbortedRuns, and
+// InfraFailureRate is InfraFailures divided by Attempts.
 // FlakyRate is Flaky divided by Runs. LastOutcomes lists up to
 // LastOutcomesCap outcomes, most recent first. The duration percentiles
 // use the nearest-rank method over records with a known duration and are
@@ -44,6 +48,8 @@ type TestStats struct {
 	InfraFailures    int
 	TestFailures     int
 	InfraFailureRate float64
+	AbortedRuns      int
+	Attempts         int
 	LastOutcomes     []Outcome
 	DurationP50Ms    int64
 	DurationP95Ms    int64
@@ -71,18 +77,19 @@ func Aggregate(records []Record, window Window) []TestStats {
 			}
 			return group[i].EntryIndex > group[j].EntryIndex
 		})
-		if window.LastN > 0 && len(group) > window.LastN {
-			group = group[:window.LastN]
-		}
-		stats = append(stats, statsOf(key, group))
+		finished, aborted := splitAborted(group)
+		finished, aborted = trimToLast(finished, aborted, window.LastN)
+		stats = append(stats, statsOf(key, finished, aborted))
 	}
 	sort.Slice(stats, func(i, j int) bool { return stats[i].Key < stats[j].Key })
 	return stats
 }
 
 // statsOf computes the stats of group, which is sorted most recent first.
-func statsOf(key string, group []Record) TestStats {
-	s := TestStats{Key: key, Runs: len(group)}
+func statsOf(key string, group []Record, aborted []Record) TestStats {
+	s := TestStats{Key: key, Runs: len(group), AbortedRuns: len(aborted)}
+	s.InfraFailures = len(aborted)
+	s.Attempts = s.Runs + s.AbortedRuns
 	var durations []int64
 	for i, r := range group {
 		switch r.Outcome {
@@ -106,8 +113,12 @@ func statsOf(key string, group []Record) TestStats {
 			durations = append(durations, r.DurationMs)
 		}
 	}
-	s.FlakyRate = float64(s.Flaky) / float64(s.Runs)
-	s.InfraFailureRate = float64(s.InfraFailures) / float64(s.Runs)
+	if s.Runs > 0 {
+		s.FlakyRate = float64(s.Flaky) / float64(s.Runs)
+	}
+	if s.Attempts > 0 {
+		s.InfraFailureRate = float64(s.InfraFailures) / float64(s.Attempts)
+	}
 	slices.Sort(durations)
 	s.DurationP50Ms = nearestRank(durations, percentile50)
 	s.DurationP95Ms = nearestRank(durations, percentile95)
@@ -122,4 +133,42 @@ func nearestRank(sorted []int64, p float64) int64 {
 	}
 	rank := int(math.Ceil(p * float64(len(sorted))))
 	return sorted[max(rank, 1)-1]
+}
+
+// splitAborted separates the records of runs that were aborted by the
+// infrastructure from the finished ones, keeping the order of group.
+func splitAborted(group []Record) (finished, aborted []Record) {
+	for _, r := range group {
+		if r.Aborted {
+			aborted = append(aborted, r)
+		} else {
+			finished = append(finished, r)
+		}
+	}
+	return finished, aborted
+}
+
+// trimToLast keeps the most recent n finished records, and the aborted
+// records that started at or after the oldest kept finished record, so
+// the cut by count never changes which finished runs are reported. With
+// no finished record to anchor on, it keeps the most recent n aborted
+// ones. Both inputs are sorted most recent first, and n of zero keeps all.
+func trimToLast(finished, aborted []Record, n int) ([]Record, []Record) {
+	if n <= 0 {
+		return finished, aborted
+	}
+	if len(finished) == 0 {
+		return finished, aborted[:min(n, len(aborted))]
+	}
+	if len(finished) > n {
+		finished = finished[:n]
+	}
+	cutoff := finished[len(finished)-1].StartedAtMs
+	kept := aborted[:0:0]
+	for _, r := range aborted {
+		if r.StartedAtMs >= cutoff {
+			kept = append(kept, r)
+		}
+	}
+	return finished, kept
 }
