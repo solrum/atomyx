@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd job template for the nightly device matrix.
+
+  The repository never installs this job. The owner copies it, replaces
+  every value in angle brackets, and loads it:
+
+    cp scripts/nightly.launchd.plist.template ~/Library/LaunchAgents/dev.atomyx.nightly.plist
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.atomyx.nightly.plist
+
+  Remove it with:
+
+    launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/dev.atomyx.nightly.plist
+
+  Placeholders:
+    REPO_PATH     absolute path of the repository checkout
+    MATRIX_PATH   absolute path of the matrix file, a copy of scripts/matrix.example
+    Hour          the integer below is the local hour of day to start, 0 to 23
+    TOOL_PATH     PATH entries that hold adb, emulator, flutter and the Xcode
+                  command line tools, because launchd starts jobs with a
+                  minimal PATH
+
+  The job runs in a user session, which Xcode device and simulator tooling
+  needs. stdout and stderr go under e2e-results/nightly/ next to the
+  per-run result directories.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>dev.atomyx.nightly</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>REPO_PATH/scripts/nightly.sh</string>
+    <string>MATRIX_PATH</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>REPO_PATH</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>TOOL_PATH:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>3</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>REPO_PATH/e2e-results/nightly/launchd.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>REPO_PATH/e2e-results/nightly/launchd.err.log</string>
+</dict>
+</plist>

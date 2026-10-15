@@ -469,53 +469,52 @@ every run in the storage root.
 failures, and asserts the summary counts, the rate, the exit codes, and the reset calls per
 platform, with fake `adb` and `xcrun` tools in front of the real ones.
 
-### Scheduling
+### Nightly matrix
 
-The repository does not install a schedule. An operator who wants a
-nightly run on a lab Mac can save the following as
-`~/Library/LaunchAgents/dev.atomyx.e2e.plist`, replace the angle
-bracket values, and load it with `launchctl load`:
+`scripts/nightly.sh` runs the e2e suite and a short soak on every device in
+a matrix file, one entry at a time, and tears down only what it started.
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>dev.atomyx.e2e</string>
-  <key>WorkingDirectory</key>
-  <string>/path/to/atomyx</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/usr/bin/make</string>
-    <string>e2e</string>
-    <string>PLATFORM=iossim</string>
-  </array>
-  <key>EnvironmentVariables</key>
-  <dict>
-    <key>PATH</key>
-    <string>/usr/local/go/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
-    <key>ATOMYX_IOS_SIM_UDID</key>
-    <string>SIMULATOR-UDID</string>
-  </dict>
-  <key>StartCalendarInterval</key>
-  <dict>
-    <key>Hour</key>
-    <integer>2</integer>
-    <key>Minute</key>
-    <integer>0</integer>
-  </dict>
-  <key>StandardOutPath</key>
-  <string>/path/to/atomyx/e2e-results/launchd.out.log</string>
-  <key>StandardErrorPath</key>
-  <string>/path/to/atomyx/e2e-results/launchd.err.log</string>
-</dict>
-</plist>
+```bash
+cp scripts/matrix.example scripts/matrix.local   # then edit the ids
+scripts/nightly.sh --dry-run scripts/matrix.local
+scripts/nightly.sh scripts/matrix.local
 ```
 
-The simulator must be booted and the runner served before the
-scheduled time, because the script fails fast when port 22087 does not
-answer.
+`scripts/matrix.local` is gitignored. A matrix line is
+`<kind> <id> <soak-count>`, and blank lines and lines starting with a hash are
+ignored:
+
+- `android`: the id is an adb serial, used as is.
+- `android-emulator`: the id is an AVD name. The script boots it headless on a
+  free console port, waits for `sys.boot_completed`, and kills that emulator at
+  the end of the entry.
+- `iossim`: the id is a simulator UDID. The script boots it only when it is not
+  booted, and shuts it down at the end only if it booted it.
+- `ios`: the id is a physical device UDID.
+
+A soak count of 0 skips the soak. For each entry the script prepares the
+device (`atomyx setup` and the demo APK on Android, the runner served on port
+22087 on iOS, the demo app on a simulator when built), runs `make e2e` with the
+environment the platform needs, runs `scripts/soak.sh`, and stops the runner,
+emulator, or simulator it started. Build the demo app first with the `demo-*`
+targets so the install fixtures exist. An iOS entry is skipped, and reported as
+skipped, when something already listens on port 22087. A failing entry never
+stops the next one, and `SIGINT` or `SIGTERM` tears down the entry in flight.
+
+`--dry-run` validates the matrix and prints the commands per entry without
+touching any device. A malformed matrix exits 2 before any entry runs.
+
+Results land in `e2e-results/nightly/<UTC date-time>/<index>-<kind>/` with
+`setup.log`, `e2e.log`, `soak.log`, and `result.txt` (kind, id, e2e exit, e2e
+pass, fail, and skip counts, soak exit, passed, failed, and infraFailureRate,
+and status), plus `summary.txt` with one status line per entry. Run storage is
+kept under each entry directory, never in `~/.atomyx`. The exit status is 0
+only when every entry is ok.
+
+To schedule it, the owner copies `scripts/nightly.launchd.plist.template`,
+replaces the placeholders, and loads it with `launchctl bootstrap`. The
+repository never installs the job. `scripts/check-nightly.sh` runs in
+`make check` and covers the dry run and matrix validation with no device.
 
 ## Testing philosophy
 

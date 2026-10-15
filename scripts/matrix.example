@@ -1,0 +1,17 @@
+# Nightly device matrix. Copy this file to scripts/matrix.local, replace
+# the placeholder ids, and pass the copy to scripts/nightly.sh.
+#
+# One entry per line: <kind> <id> <soak-count>
+#
+#   android           id is an adb serial from 'adb devices'
+#   android-emulator  id is an AVD name from 'emulator -list-avds'
+#   iossim            id is a simulator UDID from 'xcrun simctl list devices'
+#   ios               id is a physical device UDID from 'xcrun xctrace list devices'
+#
+# soak-count is the number of soak iterations after the e2e leg, and 0
+# skips the soak. Entries run strictly one after another.
+
+android            ANDROID-SERIAL-PLACEHOLDER  20
+android-emulator   AVD-NAME-PLACEHOLDER        20
+iossim             SIM-UDID-PLACEHOLDER        20
+ios                DEVICE-UDID-PLACEHOLDER     20

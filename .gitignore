@@ -158,3 +158,6 @@ Cargo.lock.bak
 
 # Device-lab end-to-end reports written by scripts/e2e.sh.
 e2e-results/
+
+# Local nightly device matrix (copy of scripts/matrix.example)
+scripts/matrix.local
