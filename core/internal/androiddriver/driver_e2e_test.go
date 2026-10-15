@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"sync"
 	"testing"
@@ -59,6 +60,7 @@ const (
 	androidE2EFocusLink   = "atomyxdemo://open/focus"
 	androidE2EFocusInput  = "focus-input"
 	androidE2EAdbDeadline = 30 * time.Second
+	androidE2EHTTPTimeout = 10 * time.Second
 )
 
 // androidE2EInstance is one driver the suite built, with the command
@@ -67,6 +69,10 @@ const (
 type androidE2EInstance struct {
 	runner    *recordingRunner
 	transport *faultTransport
+	// http is the connection pool behind the driver's client. A removed
+	// adb forward leaves already established connections open, so a
+	// fault that must be seen by the next call also drops idle ones.
+	http *http.Transport
 }
 
 // androidE2EFixture builds drivers for the corpus and remembers the
@@ -81,11 +87,14 @@ type androidE2EFixture struct {
 
 func (f *androidE2EFixture) newDriver() driver.Driver {
 	hostPort := freeLocalPort()
+	pool := http.DefaultTransport.(*http.Transport).Clone()
 	inst := &androidE2EInstance{
 		runner: &recordingRunner{inner: process.NewExec()},
 		transport: &faultTransport{
-			Transport: transport.NewHTTPClient("127.0.0.1", hostPort),
+			Transport: transport.NewHTTPClient("127.0.0.1", hostPort,
+				transport.WithHTTPClient(&http.Client{Transport: pool, Timeout: androidE2EHTTPTimeout})),
 		},
+		http: pool,
 	}
 	f.mu.Lock()
 	f.instances = append(f.instances, inst)
@@ -108,8 +117,12 @@ func (f *androidE2EFixture) hooks() drivertest.Hooks {
 		LaunchableAppID: androidE2EDemoAppID,
 		ClearableAppID:  androidE2EDemoAppID,
 		FailConnect:     func() { f.current().transport.breakHealth() },
-		FailPing:        func() { f.removeForwards(f.current()) },
-		FocusInput:      f.focusInput,
+		FailPing: func() {
+			inst := f.current()
+			f.removeForwards(inst)
+			inst.http.CloseIdleConnections()
+		},
+		FocusInput: f.focusInput,
 	}
 	apk := os.Getenv("ATOMYX_ANDROID_INSTALL_APK")
 	appID := os.Getenv("ATOMYX_ANDROID_INSTALL_APP_ID")
