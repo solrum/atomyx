@@ -346,9 +346,9 @@ The fault and focus hooks are wired on the legs that can support them:
 
 - `FocusInput` restarts the demo app on the `/focus` route and waits until
   the `focus-input` field reports focus. `android` uses `adb shell am start`
-  with a `route` extra, and `iossim` uses `xcrun simctl launch` with a
-  `--route` argument, which avoids the confirmation prompt a custom URL
-  scheme raises on iOS.
+  with a `route` extra. `iossim` leaves it unwired, because the driver
+  passes no launch arguments to the runner and a launch outside the driver
+  leaves the runner tracking a stale app.
 - `FailConnect` aims the next connect at a closed local port, on every
   leg.
 - `FailPing` removes the adb forward the test's own driver created on
@@ -357,7 +357,7 @@ The fault and focus hooks are wired on the legs that can support them:
 
 The `iossim` leg installs the app at `ATOMYX_IOS_INSTALL_APP` before the
 suite and uses `ATOMYX_IOS_INSTALL_APP_ID` for the launch, clear app
-data, and install cases. iOS clears app data by uninstalling and
+data, and install cases. The erase text case skips on `iossim`. iOS clears app data by uninstalling and
 reinstalling from that app. The `ios` leg runs the launch cases against
 `com.apple.Preferences` and skips the clear app data, install, and focus
 cases until a signed demo build is installed on the device.

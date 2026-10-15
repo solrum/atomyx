@@ -36,8 +36,8 @@ func TestIosDriver_E2E(t *testing.T) {
 // TestIosDriver_E2E_Simulator runs the same suite against a booted
 // simulator with a runner served on the control port. The demo app is
 // the launchable, clearable, and install fixture, installed from
-// ATOMYX_IOS_INSTALL_APP, and FocusInput opens its focus route with
-// the app's "--route" launch argument. ATOMYX_IOS_SIM_UDID selects the simulator.
+// ATOMYX_IOS_INSTALL_APP. FocusInput is unwired until the driver can
+// launch with arguments. ATOMYX_IOS_SIM_UDID selects the simulator.
 func TestIosDriver_E2E_Simulator(t *testing.T) {
 	drivertest.RequireDevice(t, drivertest.E2EPlatformIOSSim)
 	udid := os.Getenv("ATOMYX_IOS_SIM_UDID")

@@ -20,8 +20,6 @@ import (
 
 const (
 	iosE2EDemoAppID    = "dev.atomyx.demo"
-	iosE2EFocusRoute   = "/focus"
-	iosE2EFocusInput   = "focus-input"
 	iosE2ECommandLimit = 60 * time.Second
 )
 
@@ -123,9 +121,9 @@ func freeLocalPort() int {
 // simulatorDemoHooks wires the demo app fixtures for the simulator leg:
 // launchable, install from ATOMYX_IOS_INSTALL_APP and
 // ATOMYX_IOS_INSTALL_APP_ID, clearable (iOS clears by uninstalling and
-// reinstalling from the install source), and FocusInput through the
-// app's "--route" launch argument, which avoids the system prompt a
-// custom URL scheme raises.
+// reinstalling from the install source). FocusInput stays unwired,
+// because the runner's launch command passes no launch arguments and a
+// relaunch outside the driver leaves the runner tracking a stale app.
 func simulatorDemoHooks(t *testing.T, udid string) drivertest.Hooks {
 	t.Helper()
 	app := os.Getenv("ATOMYX_IOS_INSTALL_APP")
@@ -141,18 +139,6 @@ func simulatorDemoHooks(t *testing.T, udid string) drivertest.Hooks {
 		LaunchableAppID: appID,
 		ClearableAppID:  appID,
 		Install:         &drivertest.InstallFixture{Source: app, AppID: appID},
-		FocusInput: func(t *testing.T, d driver.Driver) {
-			t.Helper()
-			ctx, cancel := context.WithTimeout(context.Background(), iosE2ECommandLimit)
-			defer cancel()
-			if err := d.LaunchApp(ctx, appID, driver.LaunchArgs{}); err != nil {
-				t.Fatalf("launch %s before opening the link: %v", appID, err)
-			}
-			if _, err := runSimctl(t, "launch", "--terminate-running-process", udid, appID, "--route", iosE2EFocusRoute); err != nil {
-				t.Fatalf("relaunch %s on %s: %v", appID, iosE2EFocusRoute, err)
-			}
-			drivertest.AwaitFocusedInput(t, d, iosE2EFocusInput)
-		},
 	}
 }
 

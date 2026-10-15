@@ -26,7 +26,7 @@ usage() {
   echo "  iossim   requires ATOMYX_IOS_SIM_UDID and a runner on port ${SIM_RUNNER_PORT}" >&2
   echo "           also requires ATOMYX_IOS_INSTALL_APP (the built demo Runner.app path) and" >&2
   echo "           ATOMYX_IOS_INSTALL_APP_ID (its bundle id, dev.atomyx.demo), which the leg" >&2
-  echo "           installs and uses as the launchable, install, clearable, and focus fixture" >&2
+  echo "           installs and uses as the launchable, install, and clearable fixture" >&2
   echo "           example: examples/atomyx-demo/build/ios-sim/Build/Products/Debug-iphonesimulator/Runner.app" >&2
   echo "           (make demo-ios-sim)" >&2
   echo "  android  requires ATOMYX_ANDROID_SERIAL and the installed dev.atomyx.demo app" >&2

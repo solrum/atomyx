@@ -35,3 +35,4 @@ iossim no-streaming-touch the iOS driver does not implement streaming touch
 ios no-clearable-app needs the signed demo build on the device
 ios no-install-fixture needs the signed demo build on the device
 ios no-focus-input needs the signed demo build on the device
+iossim no-focus-input needs launch arguments through the driver
