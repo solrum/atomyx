@@ -148,80 +148,14 @@ func waitForKeyboard(
 	)
 }
 
-// WaitForFocus and WaitForInputReady below gate Orchestra's type
-// actions: InputText waits on WaitForFocus so text lands only once the
-// tapped target actually holds focus, and TypeText waits on
+// WaitForTargetFocus and WaitForInputReady below gate Orchestra's type
+// actions: InputText waits on WaitForTargetFocus so text lands only once
+// the tapped target actually holds focus, and TypeText waits on
 // WaitForInputReady so it dispatches only once a field is ready. The
 // remaining primitives (WaitForInputCommitted, WaitForText,
 // WaitForTreeStable) have no Orchestra caller yet; they exist so this
 // package's observation-driven wait surface stays complete for callers
 // that compose their own post-action verification.
-
-// WaitForFocusOptions configures WaitForFocus.
-type WaitForFocusOptions struct {
-	Driver   HierarchyDriver
-	Selector Selector
-	Clock    Clock
-	// TimeoutMs is the wait's hard deadline. Zero selects the
-	// default of 1500ms.
-	TimeoutMs int
-	// IntervalMs is the delay between polls. Zero selects the
-	// default of 50ms.
-	IntervalMs int
-}
-
-// WaitForFocus polls Driver's hierarchy until the element matching
-// Selector has input focus, returning the matching cursor from the
-// selector's own candidate list rather than the raw focused node, since
-// callers typically need the selector-resolved node for downstream
-// actions like bounds-to-tap-coordinate, not the tree's internal
-// focus target.
-//
-// A candidate is considered focused when its bounds intersect the
-// focused node's bounds, rather than requiring node identity. A
-// cross-platform semantics tree can merge nodes, so the node
-// reporting focus may be a descendant of the element Selector
-// resolves (the underlying native input versus the semantics
-// wrapper around it) whose bounds fully coincide with the wrapper's.
-// Intersection also tolerates minor rounding between the two.
-func WaitForFocus(ctx context.Context, opts WaitForFocusOptions) (*TreeCursor, error) {
-	timeoutMs := opts.TimeoutMs
-	if timeoutMs == 0 {
-		timeoutMs = 1500
-	}
-	intervalMs := opts.IntervalMs
-	if intervalMs == 0 {
-		intervalMs = 50
-	}
-	filter := CompileSelector(opts.Selector)
-	return WaitUntil(ctx, opts.Clock, timeoutMs, intervalMs, "waitForFocus",
-		func(ctx context.Context) (*TreeCursor, error) {
-			tree, err := opts.Driver.Hierarchy(ctx)
-			if err != nil {
-				return nil, err
-			}
-			focused, ok := findFocusedNode(tree)
-			if !ok {
-				return nil, nil
-			}
-			focusedBounds, ok := ParseBounds(focused.Node.Attributes[AttrBounds])
-			if !ok {
-				return nil, nil
-			}
-			for _, c := range filter(FromTree(tree)) {
-				cb, ok := ParseBounds(c.Node.Attributes[AttrBounds])
-				if !ok {
-					continue
-				}
-				if cb == focusedBounds || BoundsIntersect(cb, focusedBounds) {
-					return c, nil
-				}
-			}
-			return nil, nil
-		},
-		func(c *TreeCursor) bool { return c != nil },
-	)
-}
 
 // focusLayoutShiftMaxPx bounds how far a field may move vertically
 // between the pre-tap snapshot and the moment it takes focus. Opening
@@ -315,7 +249,7 @@ type WaitForTargetFocusOptions struct {
 
 // WaitForTargetFocus polls Driver's hierarchy until the node captured
 // in Target holds input focus, returning WaitTimeoutError when it never
-// does. Unlike WaitForFocus it does not re-run a selector, so a field
+// does. It does not re-run a selector, so a field
 // whose label or hint changes when focused is still recognized, and a
 // different field taking focus is not mistaken for the target.
 func WaitForTargetFocus(ctx context.Context, opts WaitForTargetFocusOptions) error {
@@ -350,9 +284,9 @@ type WaitForInputReadyOptions struct {
 }
 
 // WaitForInputReady polls Driver's hierarchy until the input field
-// matching Selector is ready to receive text. Broader than
-// WaitForFocus: it also accepts platforms where a custom text input
-// doesn't expose input focus through the accessibility tree at all.
+// matching Selector is ready to receive text. It accepts platforms
+// where a custom text input doesn't expose input focus through the
+// accessibility tree at all.
 //
 // Either signal below satisfies the wait:
 //

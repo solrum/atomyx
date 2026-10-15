@@ -632,7 +632,7 @@ corresponding area. For the high-level map see
 - **`InputText` taps the selector, then waits for focus, before typing
   or erasing.** `Orchestra.InputText`
   (`core/internal/orchestra/orchestra.go`) dispatches a focus-settling
-  tap, then calls `WaitForFocus` so a following erase and type land in
+  tap, then calls `WaitForTargetFocus` so a following erase and type land in
   the field the caller aimed at rather than whichever field held focus
   before the tap. A focus that never reaches the target returns an
   `*InputFocusError` instead of typing into the wrong field. A new
@@ -653,7 +653,7 @@ corresponding area. For the high-level map see
   step where positional selection matters must keep the `Nth` in
   place.
 - **Waits live in `core/internal/orchestra/wait.go`, not inline in
-  Orchestra.** `WaitForFocus`, `WaitForInputReady`, and
+  Orchestra.** `WaitForTargetFocus`, `WaitForInputReady`, and
   `WaitForInputCommitted` take a `Clock` for deterministic tests. Add
   a new wait here, following the same signature pattern, rather than
   inline inside an Orchestra method.

@@ -10,13 +10,12 @@ import (
 	"dev.atomyx/internal/wire"
 )
 
-// This file unit-tests the five wait primitives directly over an
-// injected FakeClock and mock.Driver: WaitForFocus, WaitForInputReady,
-// WaitForInputCommitted, WaitForText, and WaitForTreeStable.
-// WaitForFocus and WaitForInputReady also gate Orchestra's InputText
-// and TypeText, covered by the Orchestra tests; the other three have no
-// Orchestra caller yet. There is no differential oracle for any of
-// them, so these unit tests are the verification bar for this file.
+// This file unit-tests the wait primitives directly over an injected
+// FakeClock and mock.Driver: WaitForInputReady, WaitForInputCommitted,
+// WaitForText, and WaitForTreeStable. WaitForInputReady also gates
+// Orchestra's TypeText, covered by the Orchestra tests; the other three
+// have no Orchestra caller yet. There is no differential oracle for any
+// of them, so these unit tests are the verification bar for this file.
 
 func nodeWithRole(id, text, role, bounds string, children ...wire.TreeNodeWire) wire.TreeNodeWire {
 	return wire.TreeNodeWire{
@@ -143,42 +142,6 @@ func TestHashTreeSignature_SameForStructurallyIdenticalTrees(t *testing.T) {
 	b := node("root", "", "0,0,100,100", node("child", "hi", "0,0,50,50"))
 	if hashTreeSignature(a) != hashTreeSignature(b) {
 		t.Fatal("expected identical signatures for structurally identical trees")
-	}
-}
-
-// ── WaitForFocus ─────────────────────────────────────────────────
-
-func TestWaitForFocus_ResolvesWhenBoundsIntersectFocusedNode(t *testing.T) {
-	d := mock.New()
-	d.StageHierarchy(node("root", "", "0,0,430,932", node("field", "", "10,10,110,50")))
-	d.StageHierarchy(node("root", "", "0,0,430,932", focusedNode("field", "", "10,10,110,50")))
-	clock := NewFakeClock(0)
-
-	cursor, err := WaitForFocus(context.Background(), WaitForFocusOptions{
-		Driver: d, Selector: Selector{ID: lit("field")}, Clock: clock, TimeoutMs: 500, IntervalMs: 50,
-	})
-	if err != nil {
-		t.Fatalf("WaitForFocus returned error: %v", err)
-	}
-	if cursor.Node.Attributes[AttrID] != "field" {
-		t.Fatalf("got cursor id %q, want %q", cursor.Node.Attributes[AttrID], "field")
-	}
-}
-
-func TestWaitForFocus_TimesOutWhenNeverFocused(t *testing.T) {
-	d := mock.New()
-	d.StageHierarchy(node("root", "", "0,0,430,932", node("field", "", "10,10,110,50")))
-	clock := NewFakeClock(0)
-
-	_, err := WaitForFocus(context.Background(), WaitForFocusOptions{
-		Driver: d, Selector: Selector{ID: lit("field")}, Clock: clock, TimeoutMs: 120, IntervalMs: 50,
-	})
-	var timeout *WaitTimeoutError
-	if !errors.As(err, &timeout) {
-		t.Fatalf("got error %v (%T), want *WaitTimeoutError", err, err)
-	}
-	if timeout.Kind != "waitForFocus" {
-		t.Fatalf("got kind %q, want %q", timeout.Kind, "waitForFocus")
 	}
 }
 
