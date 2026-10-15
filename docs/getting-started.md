@@ -112,8 +112,8 @@ atomyx doctor --platform ios
 
 Without `--device`, the command targets the device of the runner you are
 serving on its default port, so only one device is involved. With
-`--device <UDID>`, the CLI starts a runner of its own instead, see
-step 5.
+`--device <UDID>`, the CLI uses that runner when it belongs to the device
+and otherwise starts a runner of its own, see step 5.
 
 Stop the driver with Ctrl-C in the terminal running
 `make ready-ios-sim`. Stopping only the `make` process itself, for
@@ -146,8 +146,8 @@ atomyx doctor --platform ios
 
 Without `--device`, the command targets the device of the runner you are
 serving on its default port, so only one device is involved. With
-`--device <UDID>`, the CLI starts a runner of its own instead, see
-step 5.
+`--device <UDID>`, the CLI uses that runner when it belongs to the device
+and otherwise starts a runner of its own, see step 5.
 
 Stop it with Ctrl-C in that terminal, the same way as the simulator.
 
@@ -195,7 +195,10 @@ atomyx run --file test.yml --platform android --device <serial>
 
 For iOS with `--device`, `atomyx` starts the driver itself and stops it
 when the command ends, so you do not need `make ready-ios-sim` or
-`make ready-ios` for it. Without `--device` it does not start one. It asks
+`make ready-ios` for it. When a driver you serve yourself on the default
+port, 22087, already belongs to that device and matches the host
+protocol, `atomyx` uses it instead and never stops it. Without `--device`
+it does not start one. It asks
 the driver you serve yourself on the default port, 22087, which device it
 belongs to, and runs against that device. A driver that names no device
 is taken to serve the one connected iPhone. When no driver answers, or

@@ -319,6 +319,7 @@ func (f *DriverFactory) createDriverWatched(ctx context.Context, desc Descriptor
 	adopted := false
 	if desc.Port != 0 && desc.ID != "" {
 		f.logger.Info("using the runner served on the control port, and Atomyx will not stop it", logging.LogContext{"udid": desc.ID, "port": desc.Port})
+		iosOpts.ExternalRunner = true
 	}
 	if f.provisioner != nil && desc.Port == 0 && desc.ID != "" {
 		agent, err := f.provisioner.ProvisionIOSAgent(ctx, desc.ID, agentKind, onLost, opts)

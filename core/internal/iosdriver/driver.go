@@ -80,6 +80,14 @@ type Options struct {
 	// leaves it false and starts and stops its own tunnel.
 	ExternalTunnel bool
 
+	// ExternalRunner states that the caller owns the runner on Port and
+	// this driver did not launch it. Connect then confirms the answering
+	// runner belongs to UDID, because the runner can be replaced between
+	// the caller's own check and the connection. A runner that reports
+	// no identity, or one that belongs to another target, fails Connect
+	// with a *RunnerIdentityError.
+	ExternalRunner bool
+
 	// OwnRunnerBundleID and OwnRunnerAppName identify the Atomyx
 	// runner, so the foreign automation probe never reports it. The
 	// bundle id is matched against simulator job labels and the app name
@@ -186,6 +194,10 @@ type pingCapabilities struct {
 type pingResponse struct {
 	Capabilities pingCapabilities `json:"capabilities"`
 	RunnerID     string           `json:"runnerId"`
+	// TargetUDID and SimulatorUDID are the target identities the runner
+	// reports, empty when it reports none.
+	TargetUDID    string `json:"targetUdid"`
+	SimulatorUDID string `json:"simulatorUdid"`
 	// ProtocolVersion is zero when the runner reports none.
 	ProtocolVersion int    `json:"protocolVersion"`
 	AgentVersion    string `json:"agentVersion"`
@@ -237,6 +249,13 @@ func (d *IosDriver) Connect(ctx context.Context) error {
 	if err := d.conn.CallInto(ctx, "ping", map[string]any{}, &pong); err != nil {
 		return d.fail(err)
 	}
+	if d.opts.ExternalRunner {
+		if idErr := d.verifyExternalRunner(pong); idErr != nil {
+			_ = d.conn.Close()
+			d.stopIproxy()
+			return idErr
+		}
+	}
 	if pong.ProtocolVersion != version.AgentProtocolVersion {
 		_ = d.conn.Close()
 		d.stopIproxy()
@@ -247,6 +266,24 @@ func (d *IosDriver) Connect(ctx context.Context) error {
 	d.capabilities.CanPressure = pong.Capabilities.CanPressure
 	d.connectedRunnerID = pong.RunnerID
 	d.startForeignAutomationProbe(ctx)
+	return nil
+}
+
+// verifyExternalRunner applies the identity rule to the ping reply of a
+// runner the caller owns. A nil result means the runner is acceptable.
+func (d *IosDriver) verifyExternalRunner(pong pingResponse) *RunnerIdentityError {
+	want := ExpectedRunner{UDID: d.opts.UDID, Kind: d.opts.Kind, RunnerID: d.opts.RunnerID}
+	got := RunnerIdentity{
+		RunnerID:        pong.RunnerID,
+		TargetUDID:      pong.TargetUDID,
+		SimulatorUDID:   pong.SimulatorUDID,
+		ProtocolVersion: pong.ProtocolVersion,
+		AgentVersion:    pong.AgentVersion,
+	}
+	verdict, reason := want.Verify(got)
+	if verdict == IdentityMismatch || verdict == IdentityLegacy {
+		return &RunnerIdentityError{Port: d.opts.Port, Expect: want, Got: got, Reason: reason, Legacy: verdict == IdentityLegacy}
+	}
 	return nil
 }
 

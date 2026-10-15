@@ -1186,8 +1186,13 @@ to, and takes ownership of that device like any other run. A runner
 that names no device is taken to serve the single connected iPhone. When
 no runner answers, or a runner that names no device is served while the
 number of connected iPhones is not exactly one, the command fails with
-DEVICE_NOT_FOUND. Serve the runner or pass `--device` for an
-automatically launched runner.
+DEVICE_NOT_FOUND. Serve the runner or pass `--device`.
+
+With `--device <udid>`, a runner already served on port 22087 is used
+when it belongs to that device and speaks the host protocol, and Atomyx
+never stops it. Otherwise the CLI launches its own runner. A served runner
+of that device with another protocol version fails with
+AGENT_VERSION_MISMATCH, and the remedy is to stop it or rebuild it.
 
 ## driver list-devices
 

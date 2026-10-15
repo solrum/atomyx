@@ -198,8 +198,25 @@ port, which is every descriptor resolved this way, does not reap a
 recorded runner either. The next managed acquire, a descriptor with no
 port, adopts or reaps the record. No answering runner, or a runner that
 names no device while the number of connected iPhones is not exactly
-one, fails with `DEVICE_NOT_FOUND` and a remedy. Pass `--device` to have
-the CLI launch its own runner.
+one, fails with `DEVICE_NOT_FOUND` and a remedy. Pass `--device` to name
+the device explicitly.
+
+A named device reuses a runner already served on port 22087 when that
+runner belongs to the device and speaks the host protocol. The match is on
+`simulatorUdid` for a simulator and `targetUdid` for a physical device,
+case-insensitive. The descriptor then carries port 22087, the CLI logs
+that it uses the served runner, and Atomyx never stops it. A runner that
+belongs to another device, reports no device, or does not answer is
+ignored, and the CLI launches its own runner on an allocated port. A
+runner that belongs to the device but speaks another protocol version
+fails with `AGENT_VERSION_MISMATCH`, and the remedy is to stop the runner
+served on port 22087 or rebuild it, so two runners never drive one device.
+
+`IosDriver.Connect` re-checks the identity of a runner the caller owns
+(`Options.ExternalRunner`), because the runner can be replaced between
+resolution and connection. A runner that reports another device fails
+with `RunnerIdentityError`. A runner that reports no device identity also
+fails, with the rebuild remedy of a legacy runner.
 
 `IosDriver.Connect` (`core/internal/iosdriver/driver.go`) on a
 physical device first launches an `iproxy` USB tunnel as a background child process
