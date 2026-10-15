@@ -283,6 +283,10 @@ func (f *DriverFactory) createDriverWatched(ctx context.Context, desc Descriptor
 			AllocateHostPort:    true,
 			DevicePort:          androidControlPort,
 			OwnAnsweringForward: f.ownAndroidForwards,
+			Clock:               f.clock,
+			Warn: func(message string) {
+				f.logger.Warn(message, logging.LogContext{"serial": desc.ID})
+			},
 			NewTransport: func(hostPort int) androiddriver.Transport {
 				return transport.NewHTTPClient("127.0.0.1", hostPort, transport.WithHTTPLogger(f.logger))
 			},

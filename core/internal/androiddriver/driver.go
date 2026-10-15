@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/driver"
 	"dev.atomyx/internal/process"
@@ -77,6 +78,15 @@ type Options struct {
 	// ErrCodeNoAPK when no agent APK can be found. Nil means the driver
 	// cannot reinstall, so Connect fails for such an agent instead.
 	ReinstallAgent func(ctx context.Context) error
+
+	// Clock is the time source the post-launch and post-stop
+	// foreground waits poll and time out against. Defaults to
+	// clock.SystemClock{} when nil.
+	Clock clock.Clock
+
+	// Warn receives a one-line warning when a foreground wait gives up
+	// without observing the expected package. Nil discards it.
+	Warn func(message string)
 }
 
 // AndroidDriver implements driver.Driver over the Android agent's
@@ -120,6 +130,9 @@ func New(t Transport, proc process.Runner, opts Options) *AndroidDriver {
 	}
 	if opts.DevicePort == 0 {
 		opts.DevicePort = defaultAndroidPort
+	}
+	if opts.Clock == nil {
+		opts.Clock = clock.SystemClock{}
 	}
 	return &AndroidDriver{
 		hostPort:  opts.HostPort,
@@ -663,7 +676,8 @@ func (d *AndroidDriver) HideKeyboard(ctx context.Context) (driver.KeyResult, err
 	return driver.KeyResult{Ok: res.Ok, Reason: res.Reason}, nil
 }
 
-// LaunchApp launches bundleID. When args.NoReset is explicitly false,
+// LaunchApp launches bundleID, then waits briefly for the device to
+// report it in front (see awaitForeground). When args.NoReset is explicitly false,
 // it force-stops the package first so the launch starts from a clean
 // process; if that stop is refused, LaunchApp returns the
 // *ForceStopError from StopApp instead of relaunching, since relaunching
@@ -687,8 +701,10 @@ func (d *AndroidDriver) LaunchApp(ctx context.Context, bundleID string, args dri
 			return d.fail(err)
 		}
 	}
-	_, err := d.transport.LaunchApp(ctx, transport.LaunchRequest{PackageName: bundleID})
-	return d.fail(err)
+	if _, err := d.transport.LaunchApp(ctx, transport.LaunchRequest{PackageName: bundleID}); err != nil {
+		return d.fail(err)
+	}
+	return d.awaitForeground(ctx, bundleID, "in front", func(current string) bool { return current == bundleID })
 }
 
 // StopApp force-stops bundleID through the device shell, which holds
@@ -697,7 +713,8 @@ func (d *AndroidDriver) LaunchApp(ctx context.Context, bundleID string, args dri
 // it reaches the shell. It returns a *ForceStopError, not nil, when
 // the shell command fails, since the package's process may still be
 // alive and a caller must treat this the same as a stop that never
-// happened. Stopping a package that is installed but not running, or
+// happened. On success it waits briefly for the device to stop reporting
+// bundleID in front. Stopping a package that is installed but not running, or
 // not installed at all, succeeds because the shell command exits 0
 // for both.
 func (d *AndroidDriver) StopApp(ctx context.Context, bundleID string) error {
@@ -723,7 +740,7 @@ func (d *AndroidDriver) StopApp(ctx context.Context, bundleID string) error {
 		}
 		return d.fail(&ForceStopError{PackageName: bundleID, Reason: reason})
 	}
-	return nil
+	return d.awaitForeground(ctx, bundleID, "gone from the front", func(current string) bool { return current != bundleID })
 }
 
 // KillApp behaves exactly like StopApp: a force-stop already kills

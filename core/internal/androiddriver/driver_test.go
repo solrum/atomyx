@@ -860,8 +860,8 @@ func TestAndroidDriver_StopApp_RunsForceStopThroughAdbShell(t *testing.T) {
 	if len(got) != 1 || !reflect.DeepEqual(got[0], forceStopInvocation("com.example.app")) {
 		t.Fatalf("StopApp() invocations = %+v, want one adb shell am force-stop", got)
 	}
-	if calls := tr.calls.Load(); calls != 0 {
-		t.Fatalf("StopApp() made %d agent calls, want 0", calls)
+	if calls := tr.calls.Load(); calls != 1 {
+		t.Fatalf("StopApp() made %d agent calls, want 1 (the foreground read)", calls)
 	}
 }
 
