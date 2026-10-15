@@ -3,7 +3,6 @@ package dev.atomyx.agent.control.clear
 import android.accessibilityservice.AccessibilityService
 import android.view.accessibility.AccessibilityNodeInfo
 import dev.atomyx.agent.control.GestureDispatcher
-import dev.atomyx.agent.control.TapResult
 import dev.atomyx.agent.control.UiTreeService
 
 /**
@@ -29,11 +28,11 @@ class ClearTextChain(
         KeypadBackspaceStrategy(),
     )
 
-    fun clear(): TapResult {
+    fun clear(): ClearOutcome {
         val root = service.rootInActiveWindow
-            ?: return TapResult(false, "no active window")
+            ?: return failedBeforeAnyStrategy("no active window")
         val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-            ?: return TapResult(false, "no input-focused node, so tap the target field first")
+            ?: return failedBeforeAnyStrategy("no input-focused node, so tap the target field first")
 
         val initialText: String
         val hintText: CharSequence?
@@ -45,7 +44,7 @@ class ClearTextChain(
         }
 
         if (initialText.isEmpty() || (!hintText.isNullOrEmpty() && initialText == hintText.toString())) {
-            return TapResult(true, "ok (already empty)")
+            return ClearOutcome.succeeded("ok (already empty)")
         }
 
         val ctx = ClearContext(service, uiTree, gestures, hintText, initialText)
@@ -58,13 +57,13 @@ class ClearTextChain(
                 is ClearResult.Failed -> {
                     tried.add(strategy.name)
                     if (verifyCleared(hintText)) {
-                        return TapResult(true, "ok via ${strategy.name} (verify passed after failure report)")
+                        return ClearOutcome.succeeded("ok via ${strategy.name} (verify passed after failure report)")
                     }
                     continue
                 }
                 is ClearResult.Success -> {
                     tried.add(strategy.name)
-                    if (verifyCleared(hintText)) return TapResult(true, "ok via ${strategy.name}")
+                    if (verifyCleared(hintText)) return ClearOutcome.succeeded("ok via ${strategy.name}")
                     continue
                 }
             }
@@ -72,8 +71,10 @@ class ClearTextChain(
 
         val lastValue = readFocusedText() ?: ""
         val focusedDesc = describeFocused() ?: "unknown"
-        val diagnostic = ClearDiagnostic(tried, lastValue, focusedDesc, 0, 0)
-        return TapResult(false, buildDiagnosticMessage(diagnostic))
+        val diagnostic = ClearDiagnostic(
+            tried, lastValue, focusedDesc, screenWidthPx(), screenHeightPx(),
+        )
+        return ClearOutcome.failed(buildFailureReason(tried.size), diagnostic)
     }
 
     fun clearBestEffort(@Suppress("UNUSED_PARAMETER") perKeyDelayMs: Long) {
@@ -112,8 +113,16 @@ class ClearTextChain(
         }
     }
 
-    private fun buildDiagnosticMessage(d: ClearDiagnostic): String =
-        "clear_failed: all ${d.strategiesTried.size} strategies failed. " +
-        "tried=[${d.strategiesTried.joinToString(",")}] " +
-        "lastValue=\"${d.lastValue}\" focusedNode=${d.focusedNodeDesc}"
+    private fun failedBeforeAnyStrategy(reason: String): ClearOutcome =
+        ClearOutcome.failed(
+            reason,
+            ClearDiagnostic(emptyList(), "", "none", screenWidthPx(), screenHeightPx()),
+        )
+
+    private fun screenWidthPx(): Int = service.resources.displayMetrics.widthPixels
+
+    private fun screenHeightPx(): Int = service.resources.displayMetrics.heightPixels
+
+    private fun buildFailureReason(strategyCount: Int): String =
+        "clear_failed: all $strategyCount strategies left the field non-empty"
 }

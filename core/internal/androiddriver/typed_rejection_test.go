@@ -122,3 +122,39 @@ func TestForceStopError_BlankReason_FallsBackToFixedDescription(t *testing.T) {
 		t.Fatal("remedy is empty")
 	}
 }
+
+func TestAndroidDriver_EraseText_FailureNamesStrategiesTried(t *testing.T) {
+	tr := newFakeTransport()
+	tr.clearFocusedResp = transport.ClearFocusedInputResult{
+		Ok:              false,
+		Reason:          "clear_failed: all 2 strategies left the field non-empty",
+		StrategiesTried: []string{"set_text", "select_all_cut"},
+		LastValue:       "secret-value",
+	}
+	d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{Serial: "S1"})
+
+	_, msg, _ := diag.Describe(d.EraseText(context.Background(), 3))
+
+	want := "clear_failed: all 2 strategies left the field non-empty (strategies tried: set_text, select_all_cut)"
+	if msg != want {
+		t.Fatalf("message = %q, want %q", msg, want)
+	}
+	if strings.Contains(msg, "secret-value") {
+		t.Fatalf("message %q leaks the remaining field value", msg)
+	}
+}
+
+func TestClearTextError_ReportsOnlyPlainShortCappedStrategyNames(t *testing.T) {
+	e := &androiddriver.ClearTextError{
+		Diagnostic: androiddriver.ClearTextDiagnostic{
+			StrategiesTried: []string{"a", "http://127.0.0.1:8765/x", "b", "c", "d", "e", "f", "g"},
+		},
+	}
+
+	reason, _ := e.AgentRejection()
+
+	want := "the focused input could not be cleared (strategies tried: a, b, c, d, e, f)"
+	if reason != want {
+		t.Fatalf("reason = %q, want %q", reason, want)
+	}
+}

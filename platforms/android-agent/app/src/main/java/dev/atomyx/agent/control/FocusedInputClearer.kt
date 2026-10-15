@@ -1,6 +1,7 @@
 package dev.atomyx.agent.control
 
 import android.accessibilityservice.AccessibilityService
+import dev.atomyx.agent.control.clear.ClearOutcome
 import dev.atomyx.agent.control.clear.ClearTextChain
 
 /**
@@ -18,6 +19,6 @@ class FocusedInputClearer(
     private val gestures: GestureDispatcher,
 ) {
 
-    fun clearFocusedInput(): TapResult =
+    fun clearFocusedInput(): ClearOutcome =
         ClearTextChain(service, uiTree, gestures).clear()
 }

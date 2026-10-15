@@ -2,6 +2,7 @@ package androiddriver
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -33,12 +34,38 @@ const (
 )
 
 // AgentRejection reports the agent's own reason, or a fixed
-// description when the agent gave none.
+// description when the agent gave none. When the agent tried clear
+// strategies, their names are appended so the caller sees what was
+// attempted.
 func (e *ClearTextError) AgentRejection() (string, string) {
-	if strings.TrimSpace(e.Reason) == "" {
-		return clearTextFailedReason, clearTextFailedRemedy
+	reason := clearTextFailedReason
+	if strings.TrimSpace(e.Reason) != "" {
+		reason = e.Reason
 	}
-	return e.Reason, clearTextFailedRemedy
+	if tried := safeStrategyNames(e.Diagnostic.StrategiesTried); len(tried) > 0 {
+		reason += " (strategies tried: " + strings.Join(tried, ", ") + ")"
+	}
+	return reason, clearTextFailedRemedy
+}
+
+const maxReportedStrategies = 6
+
+var strategyNamePattern = regexp.MustCompile(`^[A-Za-z0-9_]{1,40}$`)
+
+// safeStrategyNames keeps the leading strategy names that are plain
+// identifiers, capped at maxReportedStrategies, so an unexpected agent
+// string never reaches the caller-facing message.
+func safeStrategyNames(names []string) []string {
+	out := make([]string, 0, len(names))
+	for _, name := range names {
+		if len(out) == maxReportedStrategies {
+			break
+		}
+		if strategyNamePattern.MatchString(name) {
+			out = append(out, name)
+		}
+	}
+	return out
 }
 
 var _ agentRejection = (*ClearTextError)(nil)

@@ -7,6 +7,7 @@ import dev.atomyx.agent.control.AgentProtocol
 import dev.atomyx.agent.control.AtomyxServices
 import dev.atomyx.agent.control.GestureRunner
 import dev.atomyx.agent.control.SystemActionDispatcher
+import dev.atomyx.agent.control.clear.clearReplyPayload
 import fi.iki.elonen.NanoHTTPD
 
 private val gson = Gson()
@@ -232,7 +233,7 @@ class ClearFocusedInputRoute : Route {
     override val path = "/actions/clear_focused_input"
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
         val result = services.focusedInputClearer.clearFocusedInput()
-        return RouteResponse.ok(toJson(mapOf("ok" to result.success, "reason" to result.reason)))
+        return RouteResponse.ok(toJson(clearReplyPayload(result)))
     }
 }
 
