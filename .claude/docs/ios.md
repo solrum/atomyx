@@ -211,6 +211,13 @@ ignored, and the CLI launches its own runner on an allocated port. A
 runner that belongs to the device but speaks another protocol version
 fails with `AGENT_VERSION_MISMATCH`, and the remedy is to stop the runner
 served on port 22087 or rebuild it, so two runners never drive one device.
+The MCP `select_device` tool resolves the same way when it omits `port`.
+An explicit `port` replaces the resolved one, and the runner is then
+re-verified only when that port is 22087.
+
+The served runner accepts one client at a time. When another client holds
+it, a named-device resolve waits for the probe timeout and then launches
+its own runner.
 
 `IosDriver.Connect` re-checks the identity of a runner whose identity
 resolution proved (`Descriptor.RunnerVerified` becomes

@@ -200,7 +200,7 @@ Bind the session to one device so every other device-driving tool operates on it
 | platform | string, one of "ios", "android" | Yes | none | The platform the device belongs to |
 | id | string, non-empty | Yes | none | Device identifier, exactly as reported by list_devices |
 | kind | string, one of "simulator", "device" | No | none | Accepted for compatibility and ignored. The device kind is resolved from the id, so the hint cannot change which device is bound |
-| port | integer, positive | No | the platform's default control connection | Overrides the device's control connection port. Only honored on platforms whose driver exposes a configurable port, and ignored otherwise |
+| port | integer, positive | No | the platform's default control connection | Overrides the device's control connection port. Only honored on platforms whose driver exposes a configurable port, and ignored otherwise. When omitted, an agent already running for the device on the default connection is reused and left running when the session ends |
 
 **Behavior**
 - Calling select_device again, whether or not a device is already bound, resolves, prepares and opens the new device first, and only then releases the previously-bound device. A failed selection therefore leaves the previously-bound device bound and working. A failure disconnecting the previous device is logged but does not block the new selection.

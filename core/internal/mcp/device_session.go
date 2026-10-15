@@ -1033,7 +1033,10 @@ func (s *DeviceSession) Disconnect(ctx context.Context) error {
 // the same path the CLI uses, so the device kind comes from the
 // device's identity as the probe sees it. input.Kind is a legacy hint
 // that is accepted on the wire and deliberately not consulted. An iOS
-// id no scan finds is reported as DEVICE_NOT_FOUND with a remedy.
+// id no scan finds is reported as DEVICE_NOT_FOUND with a remedy. A zero
+// input.Port keeps the resolved port and its verification. A non-zero
+// input.Port replaces the resolved port, and the verification survives
+// only when it names the port resolution verified.
 func (s *DeviceSession) resolveDescriptor(ctx context.Context, input SelectDeviceInput) (device.Descriptor, error) {
 	desc, err := device.ResolveDescriptor(ctx, s.probe, s.runners, input.Platform, input.ID)
 	var notFound *device.DeviceNotFoundError
@@ -1048,8 +1051,10 @@ func (s *DeviceSession) resolveDescriptor(ctx context.Context, input SelectDevic
 	if err != nil {
 		return device.Descriptor{}, err
 	}
-	desc.RunnerVerified = desc.RunnerVerified && input.Port == desc.Port
-	desc.Port = input.Port
+	if input.Port != 0 {
+		desc.RunnerVerified = desc.RunnerVerified && input.Port == desc.Port
+		desc.Port = input.Port
+	}
 	return desc, nil
 }
 
