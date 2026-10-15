@@ -151,10 +151,16 @@ ID > Label > Text > Value > Hint
 ```
 
 The first field that produces a non-empty match wins, so broadening
-stops there. When the caller supplies `Text` but not `Label`, a
-`Label` match against the same pattern is tried right after `Text`,
-because a cross-platform text query against an element that only
-carries an accessibility label still needs to resolve. `Role`,
+stops there. Only the fields the caller supplied are tried, plus one
+extension, the Text fallback chain. When the caller supplies `Text`,
+a `Label` match and then a `Hint` match against the same pattern are
+tried right after `Text`, each skipped when the caller set that field
+itself. A text-only selector therefore runs `Text`, then `Label`,
+then `Hint`, and an earlier entry always wins. A cross-platform text
+query needs this because one element carries only an accessibility
+label, and a Flutter text field exposes its name as a hint on Android
+and as a label on iOS. A selector that sets `Label` or `Hint`
+explicitly gets no extra fallback. `Role`,
 `Enabled`, `Clickable`, and `Focused` are not part of the priority
 chain: every candidate filter AND-s them in as constraints. `Nth`
 skips ranking entirely and selects positionally from the winning
@@ -178,8 +184,8 @@ This is the mechanism that lets an agent write `{text: "Login"}`
 without knowing whether Android exposes that string through
 `contentDesc` or iOS through `label`: both adapters normalize onto
 the same canonical attribute keys at the `Driver` boundary, and
-`CompileSelector` tries whichever fields the caller supplied in
-priority order.
+`CompileSelector` tries the fields the caller supplied in priority
+order, followed by the Text fallback chain.
 
 `core/internal/orchestra/selector_suggest.go` runs the same policy in
 reverse: `SuggestSelectors` takes a tree and a node path (child indexes

@@ -237,7 +237,11 @@ Tap an element on screen.
 A bare string shorthand sets both `text` and `label` to that value,
 so it matches an element by either its visible text or its
 accessibility label. Setting `text` explicitly without `label`
-mirrors the same value into `label`. Every selector field
+mirrors the same value into `label`. A `text` value is also tried
+against the element's `hint` when no element matches by `label` or
+`text`, so `text: "Email"` finds an input field whose name is exposed
+as a hint on one platform and as a label on another. A selector that
+sets `hint` itself gets no such fallback. Every selector field
 (`text`, `id`, `label`, `hint`, `role`, `nth`) is optional, and every
 command that takes a selector (`tap`, `waitFor`, `assertVisible`,
 `assertNotVisible`, `assertExists`, `read`, and pointer targets)

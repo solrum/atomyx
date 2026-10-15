@@ -151,10 +151,12 @@ Every change must respect:
    point is the canonical fallback, not a hack.
 3. **Priority broadening.** The downstream agent should not need to
    know platform conventions. `CompileSelector` in
-   `core/internal/orchestra/priority_broadening.go` tries each content
-   field in a fixed priority order (id, then label, then text, then
-   value, then hint) and returns the first field that matches,
-   regardless of which field the caller populated.
+   `core/internal/orchestra/priority_broadening.go` tries the content
+   fields the caller provided, in a fixed priority order (id, then
+   label, then text, then value, then hint), and returns the first
+   field that matches. The one extension is the Text fallback chain:
+   a caller who sets Text also gets Label and then Hint tried with the
+   same pattern, skipping any of those the caller set itself.
 4. **Strategy and registry patterns.** Step handlers, driver
    implementers, selector filters, and wait primitives all use the
    strategy or registry pattern. Adding a new variant means adding a
