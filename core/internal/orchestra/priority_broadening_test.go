@@ -194,3 +194,68 @@ func regexPatternFromJS(source, flags string) (Pattern, error) {
 	}
 	return RegexPattern(re), nil
 }
+
+func hintChainTree() wire.TreeNodeWire {
+	byHint := testNode(map[string]string{AttrRole: "text-field", AttrID: "by_hint", AttrHint: "Email"}, nil, nil, nil)
+	byHintSegment := testNode(map[string]string{AttrRole: "text-field", AttrID: "by_hint_segment", AttrHint: "Email\nEnter email"}, nil, nil, nil)
+	byLabel := testNode(map[string]string{AttrRole: "text-field", AttrID: "by_label", AttrLabel: "Email"}, nil, nil, nil)
+	byText := testNode(map[string]string{AttrRole: "text", AttrID: "by_text", AttrText: "Email"}, nil, nil, nil)
+	return testNode(map[string]string{AttrRole: "container"}, nil, nil, nil, byHint, byHintSegment, byLabel, byText)
+}
+
+func matchIDs(t *testing.T, s Selector, nodes ...wire.TreeNodeWire) []string {
+	t.Helper()
+	root := testNode(map[string]string{AttrRole: "container"}, nil, nil, nil, nodes...)
+	var ids []string
+	for _, c := range CompileSelector(s)(FromTree(root)) {
+		ids = append(ids, idOf(c))
+	}
+	return ids
+}
+
+func TestCompileSelector_TextFallsBackToHint(t *testing.T) {
+	node := testNode(map[string]string{AttrID: "f", AttrHint: "Email"}, nil, nil, nil)
+	if got := matchIDs(t, Selector{Text: lit("Email")}, node); len(got) != 1 || got[0] != "f" {
+		t.Fatalf("got %v, want [f]", got)
+	}
+}
+
+func TestCompileSelector_TextFallsBackToHintSegment(t *testing.T) {
+	node := testNode(map[string]string{AttrID: "f", AttrHint: "Email\nEnter email"}, nil, nil, nil)
+	if got := matchIDs(t, Selector{Text: lit("Email")}, node); len(got) != 1 || got[0] != "f" {
+		t.Fatalf("got %v, want [f]", got)
+	}
+}
+
+func TestCompileSelector_TextLabelWinsOverHint(t *testing.T) {
+	hint := testNode(map[string]string{AttrID: "by_hint", AttrHint: "Email"}, nil, nil, nil)
+	label := testNode(map[string]string{AttrID: "by_label", AttrLabel: "Email"}, nil, nil, nil)
+	if got := matchIDs(t, Selector{Text: lit("Email")}, hint, label); len(got) != 1 || got[0] != "by_label" {
+		t.Fatalf("got %v, want [by_label]", got)
+	}
+}
+
+func TestCompileSelector_TextWinsOverLabelAndHint(t *testing.T) {
+	got := matchIDs(t, Selector{Text: lit("Email")}, hintChainTree().Children...)
+	if len(got) != 1 || got[0] != "by_text" {
+		t.Fatalf("got %v, want [by_text]", got)
+	}
+}
+
+func TestCompileSelector_HintWholeValueBeatsSegmentInChain(t *testing.T) {
+	got := matchIDs(t, Selector{Text: lit("Email")},
+		testNode(map[string]string{AttrID: "segment", AttrHint: "Email\nEnter email"}, nil, nil, nil),
+		testNode(map[string]string{AttrID: "whole", AttrHint: "Email"}, nil, nil, nil),
+	)
+	if len(got) != 1 || got[0] != "whole" {
+		t.Fatalf("got %v, want [whole]", got)
+	}
+}
+
+func TestCompileSelector_ExplicitHintGetsNoTextFallbackToHint(t *testing.T) {
+	hint := testNode(map[string]string{AttrID: "by_hint", AttrHint: "Email"}, nil, nil, nil)
+	got := matchIDs(t, Selector{Text: lit("Email"), Hint: lit("Other")}, hint)
+	if len(got) != 0 {
+		t.Fatalf("got %v, want no match", got)
+	}
+}

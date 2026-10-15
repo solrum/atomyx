@@ -8,11 +8,15 @@ import "sort"
 // field that resolves to a non-empty match.
 //
 // Priority order (most specific to most fuzzy): ID, Label, Text,
-// Value, Hint. When the caller provides Text but not Label, Text's
-// match attempt is followed by a Label match attempt against the
-// same pattern, because a cross-platform Text query against an
-// element that only carries an accessibility label needs a fallback
-// to match.
+// Value, Hint. Only the fields the caller provided are tried, with
+// one extension, the Text fallback chain: when the caller provides
+// Text, Text's match attempt is followed by a Label attempt and then
+// a Hint attempt against the same pattern, each skipped when the
+// caller set that field itself. A Text-only selector therefore tries
+// Text, then Label, then Hint, and an earlier entry always wins. The
+// chain exists because one element may carry its name only as an
+// accessibility label, and a text input exposes its name as a hint on
+// one platform and as a label on another.
 //
 // Segment matching: for Label, Text, Value, and Hint, a literal that
 // equals one whole newline-separated segment of an attribute value is
@@ -62,6 +66,9 @@ func CompileSelector(s Selector) ElementFilter {
 		addContent(AttrText, *s.Text)
 		if s.Label == nil {
 			addContent(AttrLabel, *s.Text)
+		}
+		if s.Hint == nil {
+			addContent(AttrHint, *s.Text)
 		}
 	}
 	if s.Value != nil {

@@ -1,0 +1,16 @@
+{
+  "name": "compile-selector-text-falls-back-to-hint",
+  "description": "when the caller provides text, a text query also tries the hint attribute after label, because a text field may expose its name only as a hint",
+  "function": "compileSelector",
+  "selector": { "text": "Email" },
+  "tree": {
+    "attributes": { "role": "container" },
+    "children": [
+      {
+        "attributes": { "role": "text-field", "id": "email", "hint": "Email" },
+        "children": [],
+        "enabled": true
+      }
+    ]
+  }
+}
