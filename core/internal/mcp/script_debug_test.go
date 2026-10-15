@@ -381,7 +381,7 @@ func TestScriptDebug_EveryOtherRequestIsRefusedBetweenScripts(t *testing.T) {
 func TestScriptDebug_APausedCallDoesNotTimeOutAndKeepsReportingProgress(t *testing.T) {
 	h := newDebugHarness(t)
 	h.pauseBeforeLine(debugScript, "5")
-	h.clk.AwaitSleepers(1)
+	h.clk.AwaitSleeperAt(h.clk.NowMs() + pauseProgressIntervalMs)
 
 	h.clk.Advance(pauseProgressIntervalMs)
 	select {
@@ -444,7 +444,7 @@ func TestScriptDebug_ThePauseTimeoutResumesTheRun(t *testing.T) {
 	h.pauseBeforeLine(debugScript, "5")
 
 	for range 3 {
-		h.clk.AwaitSleepers(1)
+		h.clk.AwaitSleeperAt(h.clk.NowMs() + pauseProgressIntervalMs)
 		h.clk.Advance(pauseProgressIntervalMs)
 	}
 	if got := h.awaitResult(); got["ok"] != true {
@@ -678,9 +678,10 @@ func TestScriptDebug_ACallKeepsWhatWasLeftOfItsBudgetAcrossAPause(t *testing.T) 
 	const secondStepCall = 3
 	h.drv.holdAt = secondStepCall
 	t.Cleanup(func() { h.clk.Advance(2 * defaultToolTimeoutMs) })
+	startMs := h.clk.NowMs()
 	h.startScript(debugScript)
 	h.awaitEntered()
-	h.clk.AwaitSleepers(1)
+	h.clk.AwaitSleeperAt(startMs + defaultToolTimeoutMs)
 	h.clk.Advance(beforePauseMs)
 	if err := h.viewer.SetBreakpoints([]string{"inline:5"}); err != nil {
 		t.Fatal(err)
@@ -688,7 +689,7 @@ func TestScriptDebug_ACallKeepsWhatWasLeftOfItsBudgetAcrossAPause(t *testing.T) 
 	close(h.drv.release)
 	eventually(t, "the run to pause", func() bool { _, paused := h.held().Paused(); return paused })
 
-	h.clk.AwaitSleepers(1)
+	h.clk.AwaitSleeperAt(h.clk.NowMs() + pauseProgressIntervalMs)
 	h.clk.Advance(pausedMs)
 	if _, err := h.held().Resume(h.ctx, session.ResumeOptions{}); err != nil {
 		t.Fatal(err)
@@ -698,7 +699,7 @@ func TestScriptDebug_ACallKeepsWhatWasLeftOfItsBudgetAcrossAPause(t *testing.T) 
 	case <-time.After(yieldWait):
 		t.Fatal("the second step never started")
 	}
-	h.clk.AwaitSleepers(1)
+	h.clk.AwaitSleeperAt(h.clk.NowMs() + defaultToolTimeoutMs - beforePauseMs)
 
 	h.clk.Advance(defaultToolTimeoutMs - beforePauseMs - 1)
 	select {

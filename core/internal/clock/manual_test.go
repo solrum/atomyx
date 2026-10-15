@@ -61,3 +61,29 @@ func TestManualClock_ACanceledSleeperIsNotCountedAndIsNotWoken(t *testing.T) {
 	}
 	c.AwaitIdle()
 }
+
+func TestManualClock_AwaitSleeperAtIgnoresASleeperWithAnotherDeadline(t *testing.T) {
+	c := NewManualClock(100)
+	go func() { _ = c.Sleep(context.Background(), 50) }()
+	c.AwaitSleepers(1)
+
+	reached := make(chan struct{})
+	go func() {
+		c.AwaitSleeperAt(300)
+		close(reached)
+	}()
+	select {
+	case <-reached:
+		t.Fatal("AwaitSleeperAt returned for a sleeper with a different deadline")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	go func() { _ = c.Sleep(context.Background(), 200) }()
+	select {
+	case <-reached:
+	case <-time.After(10 * time.Second):
+		t.Fatal("AwaitSleeperAt did not return once a sleeper with the deadline existed")
+	}
+	c.Advance(1000)
+	c.AwaitIdle()
+}

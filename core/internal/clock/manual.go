@@ -82,6 +82,31 @@ func (c *ManualClock) AwaitSleepers(n int) {
 	}
 }
 
+// AwaitSleeperAt blocks until a goroutine with a still-live context is
+// inside Sleep with exactly the given deadline, in clock milliseconds.
+// Unlike AwaitSleepers it cannot be satisfied by a different sleeper,
+// so a test that depends on one specific timer being armed, such as a
+// budget timer or a progress ticker, advances time only after that
+// timer exists. A sleeper's deadline is the clock reading when Sleep
+// was called plus its duration, so the caller must not advance the
+// clock between arming the timer and waiting for it.
+func (c *ManualClock) AwaitSleeperAt(deadlineMs int64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for !c.hasLiveSleeperAtLocked(deadlineMs) {
+		c.cond.Wait()
+	}
+}
+
+func (c *ManualClock) hasLiveSleeperAtLocked(deadlineMs int64) bool {
+	for _, s := range c.sleepers {
+		if s.deadline == deadlineMs && s.ctx.Err() == nil {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *ManualClock) liveSleepersLocked() int {
 	live := 0
 	for _, s := range c.sleepers {
