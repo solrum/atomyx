@@ -1,6 +1,9 @@
 package androiddriver
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // ClearTextDiagnostic carries the Android agent's own diagnosis for
 // why the focused field's value would not clear: every strategy it
@@ -23,6 +26,22 @@ type ClearTextError struct {
 	Reason     string
 	Diagnostic ClearTextDiagnostic
 }
+
+const (
+	clearTextFailedReason = "the focused input could not be cleared"
+	clearTextFailedRemedy = "Focus an input field that holds text, then call again."
+)
+
+// AgentRejection reports the agent's own reason, or a fixed
+// description when the agent gave none.
+func (e *ClearTextError) AgentRejection() (string, string) {
+	if strings.TrimSpace(e.Reason) == "" {
+		return clearTextFailedReason, clearTextFailedRemedy
+	}
+	return e.Reason, clearTextFailedRemedy
+}
+
+var _ agentRejection = (*ClearTextError)(nil)
 
 func (e *ClearTextError) Error() string {
 	return fmt.Sprintf(
