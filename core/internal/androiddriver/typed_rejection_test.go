@@ -12,6 +12,22 @@ import (
 	"dev.atomyx/internal/transport"
 )
 
+func failingRunner(stderr string) *process.Fake {
+	runner := process.NewFake()
+	runner.Default = process.Result{Stderr: stderr, ExitCode: 1}
+	runner.DefaultErr = errors.New("exit status 1")
+	return runner
+}
+
+// forceStopCall returns a call that stops a package while the device
+// shell fails with stderr as its output.
+func forceStopCall(stderr string) func(d *androiddriver.AndroidDriver) error {
+	return func(*androiddriver.AndroidDriver) error {
+		d := androiddriver.New(newFakeTransport(), failingRunner(stderr), androiddriver.Options{Serial: "S1"})
+		return d.StopApp(context.Background(), "com.example.app")
+	}
+}
+
 func TestAndroidDriver_TypedRejections_KeepReasonAndRemedy(t *testing.T) {
 	const leakingReason = "failed calling http://127.0.0.1:8765/actions/force_stop"
 	cases := []struct {
@@ -50,10 +66,7 @@ func TestAndroidDriver_TypedRejections_KeepReasonAndRemedy(t *testing.T) {
 		},
 		{
 			name: "force stop with reason",
-			configure: func(tr *fakeTransport) {
-				tr.forceStopResp = transport.AckResult{Ok: false, Reason: "not permitted to stop com.example.app"}
-			},
-			call: func(d *androiddriver.AndroidDriver) error { return d.StopApp(context.Background(), "com.example.app") },
+			call: forceStopCall("not permitted to stop com.example.app"),
 			original: func(err error) bool {
 				var e *androiddriver.ForceStopError
 				return errors.As(err, &e)
@@ -61,24 +74,13 @@ func TestAndroidDriver_TypedRejections_KeepReasonAndRemedy(t *testing.T) {
 			wantMsg:    "not permitted to stop com.example.app",
 			wantRemedy: "Confirm the app is installed and the device is connected, then call again. The app was not stopped.",
 		},
-		{
-			name: "force stop without reason",
-			configure: func(tr *fakeTransport) {
-				tr.forceStopResp = transport.AckResult{Ok: false}
-			},
-			call: func(d *androiddriver.AndroidDriver) error { return d.StopApp(context.Background(), "com.example.app") },
-			original: func(err error) bool {
-				var e *androiddriver.ForceStopError
-				return errors.As(err, &e)
-			},
-			wantMsg:    "the app could not be force-stopped",
-			wantRemedy: "Confirm the app is installed and the device is connected, then call again. The app was not stopped.",
-		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			tr := newFakeTransport()
-			tc.configure(tr)
+			if tc.configure != nil {
+				tc.configure(tr)
+			}
 			d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{Serial: "S1"})
 
 			err := tc.call(d)
@@ -102,13 +104,21 @@ func TestAndroidDriver_TypedRejections_KeepReasonAndRemedy(t *testing.T) {
 	}
 
 	t.Run("leaking reason is sanitized", func(t *testing.T) {
-		tr := newFakeTransport()
-		tr.forceStopResp = transport.AckResult{Ok: false, Reason: leakingReason}
-		d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{Serial: "S1"})
+		d := androiddriver.New(newFakeTransport(), failingRunner(leakingReason), androiddriver.Options{Serial: "S1"})
 
 		_, msg, _ := diag.Describe(d.StopApp(context.Background(), "com.example.app"))
 		if strings.Contains(msg, "127.0.0.1") || strings.Contains(msg, "/actions/") {
 			t.Fatalf("message %q leaks transport detail", msg)
 		}
 	})
+}
+
+func TestForceStopError_BlankReason_FallsBackToFixedDescription(t *testing.T) {
+	reason, remedy := (&androiddriver.ForceStopError{PackageName: "com.example.app", Reason: "  "}).AgentRejection()
+	if reason != "the app could not be force-stopped" {
+		t.Fatalf("reason = %q, want the fixed description", reason)
+	}
+	if remedy == "" {
+		t.Fatal("remedy is empty")
+	}
 }

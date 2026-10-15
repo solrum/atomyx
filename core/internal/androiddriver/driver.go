@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -23,6 +24,13 @@ import (
 // the agent's own structured timeout response rather than a generic
 // transport timeout racing it.
 const gestureRequestTimeout = 35 * time.Second
+
+// androidPackageNamePattern accepts the characters an Android package
+// name may carry: dot-separated segments of letters, digits, and
+// underscores, the first starting with a letter. It excludes every
+// shell metacharacter, so a name that matches is safe to pass as an
+// argument to the device shell.
+var androidPackageNamePattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)*$`)
 
 const defaultAndroidPort = 8765
 
@@ -683,27 +691,43 @@ func (d *AndroidDriver) LaunchApp(ctx context.Context, bundleID string, args dri
 	return d.fail(err)
 }
 
-// StopApp force-stops bundleID. It returns a *ForceStopError, not
-// nil, when the agent reports the stop was refused: an ok:false
-// response here means the package's process is still alive, so a
-// caller must treat this the same as a stop that never happened.
+// StopApp force-stops bundleID through the device shell, which holds
+// the force-stop permission a non-privileged agent process lacks. A
+// bundleID that is not a well-formed package name is rejected before
+// it reaches the shell. It returns a *ForceStopError, not nil, when
+// the shell command fails, since the package's process may still be
+// alive and a caller must treat this the same as a stop that never
+// happened. Stopping a package that is installed but not running, or
+// not installed at all, succeeds because the shell command exits 0
+// for both.
 func (d *AndroidDriver) StopApp(ctx context.Context, bundleID string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	res, err := d.transport.ForceStopApp(ctx, transport.ForceStopRequest{PackageName: bundleID})
-	if err != nil {
-		return d.fail(err)
+	if !androidPackageNamePattern.MatchString(bundleID) {
+		return diag.New(diag.CodeInvalidArgument,
+			fmt.Sprintf("%q is not a valid Android package name", bundleID),
+			diag.InvalidArgumentRemedy, nil)
 	}
-	if !res.Ok {
-		return d.fail(&ForceStopError{PackageName: bundleID, Reason: res.Reason})
+	res, err := d.proc.Run(ctx, "adb", "-s", d.opts.Serial, "shell", "am", "force-stop", bundleID)
+	if err != nil {
+		if errCode, _, _ := diag.Describe(err); errCode == diag.CodeToolTimeout {
+			return err
+		}
+		reason := strings.TrimSpace(res.Stderr)
+		if reason == "" {
+			reason = strings.TrimSpace(res.Stdout)
+		}
+		if reason == "" {
+			reason = err.Error()
+		}
+		return d.fail(&ForceStopError{PackageName: bundleID, Reason: reason})
 	}
 	return nil
 }
 
-// KillApp forces the same route as StopApp: the agent's
-// AccessibilityService surface draws no distinction between a
-// graceful stop and a forced kill.
+// KillApp behaves exactly like StopApp: a force-stop already kills
+// the package's processes, so there is no separate forced kill.
 func (d *AndroidDriver) KillApp(ctx context.Context, bundleID string) error {
 	return d.StopApp(ctx, bundleID)
 }

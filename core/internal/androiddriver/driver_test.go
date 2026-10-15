@@ -21,7 +21,7 @@ import (
 )
 
 // fakeTransport implements androiddriver.Transport with
-// stateful, in-memory behavior: LaunchApp and ForceStopApp update a
+// stateful, in-memory behavior: LaunchApp updates a
 // tracked foreground app so CurrentActivity reflects it, matching how
 // a real device behaves across the same sequence of calls.
 type fakeTransport struct {
@@ -42,13 +42,6 @@ type fakeTransport struct {
 	clearFocusedErr  error
 	hideKeyboardResp transport.AckResult
 
-	// forceStopResp overrides ForceStopApp's response. Zero value
-	// (Ok: false, no Reason) is never sent to a test: newFakeTransport
-	// seeds it to {Ok: true} so ForceStopApp's default behavior stays
-	// the happy-path stop-and-clear-foreground it had before refusal
-	// became reportable.
-	forceStopResp transport.AckResult
-
 	lastTap        transport.TapCoordsRequest
 	lastLongPres   transport.LongPressRequest
 	lastSwipe      transport.SwipeRequest
@@ -65,7 +58,6 @@ func newFakeTransport() *fakeTransport {
 		pingResp:         currentAgentPing(),
 		clearFocusedResp: transport.ClearFocusedInputResult{Ok: true},
 		hideKeyboardResp: transport.AckResult{Ok: true},
-		forceStopResp:    transport.AckResult{Ok: true},
 		treeResp: transport.AndroidTreeNode{
 			ElementID: "root",
 			Children: []transport.AndroidTreeNode{
@@ -200,17 +192,14 @@ func (f *fakeTransport) LaunchApp(_ context.Context, req transport.LaunchRequest
 	return transport.OkResponse{Ok: true}, nil
 }
 
-func (f *fakeTransport) ForceStopApp(_ context.Context, req transport.ForceStopRequest) (transport.AckResult, error) {
-	f.calls.Add(1)
+// clearForeground simulates the device dropping pkg from the
+// foreground after a shell force-stop.
+func (f *fakeTransport) clearForeground(pkg string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if !f.forceStopResp.Ok {
-		return f.forceStopResp, nil
-	}
-	if f.foreground != nil && *f.foreground == req.PackageName {
+	if f.foreground != nil && *f.foreground == pkg {
 		f.foreground = nil
 	}
-	return f.forceStopResp, nil
 }
 
 func (f *fakeTransport) CurrentActivity(context.Context) (transport.CurrentActivityResponse, error) {
@@ -243,6 +232,9 @@ var _ androiddriver.Transport = (*fakeTransport)(nil)
 type contractRunner struct {
 	mu        sync.Mutex
 	installed map[string]bool
+	// onForceStop, when set, observes each package passed to
+	// "am force-stop".
+	onForceStop func(pkg string)
 }
 
 func newContractRunner() *contractRunner {
@@ -256,6 +248,10 @@ func (r *contractRunner) Run(ctx context.Context, name string, args ...string) (
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	switch {
+	case len(args) == 6 && args[2] == "shell" && args[3] == "am" && args[4] == "force-stop":
+		if r.onForceStop != nil {
+			r.onForceStop(args[5])
+		}
 	case len(args) == 5 && args[2] == "install":
 		r.installed[args[4]] = true
 	case len(args) == 4 && args[2] == "uninstall":
@@ -276,7 +272,9 @@ func TestAndroidDriver_SatisfiesContract(t *testing.T) {
 	var tr *fakeTransport
 	drivertest.Run(t, func() driver.Driver {
 		tr = newFakeTransport()
-		return androiddriver.New(tr, newContractRunner(), androiddriver.Options{Serial: "emulator-5554"})
+		runner := newContractRunner()
+		runner.onForceStop = tr.clearForeground
+		return androiddriver.New(tr, runner, androiddriver.Options{Serial: "emulator-5554"})
 	}, drivertest.WithSyntheticFixtures(drivertest.Hooks{
 		DeviceCalls: func() int { return int(tr.calls.Load()) },
 		FailConnect: func() {
@@ -846,37 +844,77 @@ func TestAndroidDriver_EraseText_FailureFillsDefaultsWhenAgentOmitsDiagnostic(t 
 	}
 }
 
-func TestAndroidDriver_StopApp_AgentRefusesStop_ReturnsForceStopError(t *testing.T) {
+func forceStopInvocation(pkg string) process.Invocation {
+	return process.Invocation{Name: "adb", Args: []string{"-s", "S1", "shell", "am", "force-stop", pkg}}
+}
+
+func TestAndroidDriver_StopApp_RunsForceStopThroughAdbShell(t *testing.T) {
 	tr := newFakeTransport()
-	tr.forceStopResp = transport.AckResult{Ok: false, Reason: "not permitted to force-stop com.example.app"}
-	d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{Serial: "S1"})
+	runner := process.NewFake()
+	d := androiddriver.New(tr, runner, androiddriver.Options{Serial: "S1"})
+
+	if err := d.StopApp(context.Background(), "com.example.app"); err != nil {
+		t.Fatalf("StopApp() error = %v, want nil", err)
+	}
+	got := runner.Invocations()
+	if len(got) != 1 || !reflect.DeepEqual(got[0], forceStopInvocation("com.example.app")) {
+		t.Fatalf("StopApp() invocations = %+v, want one adb shell am force-stop", got)
+	}
+	if calls := tr.calls.Load(); calls != 0 {
+		t.Fatalf("StopApp() made %d agent calls, want 0", calls)
+	}
+}
+
+func TestAndroidDriver_StopApp_AdbFailure_ReturnsForceStopErrorWithShellReason(t *testing.T) {
+	runner := process.NewFake()
+	runner.Stub(process.ExactMatch("adb", "-s", "S1", "shell", "am", "force-stop", "com.example.app"),
+		process.Result{Stderr: "Error: device offline\n", ExitCode: 1}, errors.New("exit status 1"))
+	d := androiddriver.New(newFakeTransport(), runner, androiddriver.Options{Serial: "S1"})
 
 	err := d.StopApp(context.Background(), "com.example.app")
 	var stopErr *androiddriver.ForceStopError
 	if !errors.As(err, &stopErr) {
 		t.Fatalf("StopApp() error = %v (%T), want a *androiddriver.ForceStopError", err, err)
 	}
-	if stopErr.PackageName != "com.example.app" {
-		t.Fatalf("ForceStopError.PackageName = %q, want %q", stopErr.PackageName, "com.example.app")
+	if stopErr.PackageName != "com.example.app" || stopErr.Reason != "Error: device offline" {
+		t.Fatalf("ForceStopError = %+v, want package com.example.app and the shell's stderr", stopErr)
 	}
-	if stopErr.Reason != "not permitted to force-stop com.example.app" {
-		t.Fatalf("ForceStopError.Reason = %q, want the agent's refusal reason", stopErr.Reason)
-	}
-}
-
-func TestAndroidDriver_StopApp_AgentStopsSuccessfully_ReturnsNil(t *testing.T) {
-	tr := newFakeTransport()
-	d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{Serial: "S1"})
-
-	if err := d.StopApp(context.Background(), "com.example.app"); err != nil {
-		t.Fatalf("StopApp() error = %v, want nil", err)
+	if _, msg, _ := diag.Describe(err); msg != "Error: device offline" {
+		t.Fatalf("surfaced message = %q, want the shell's stderr", msg)
 	}
 }
 
-func TestAndroidDriver_LaunchApp_ResetRefusedByAgent_ReturnsForceStopErrorAndSkipsRelaunch(t *testing.T) {
+func TestAndroidDriver_StopApp_RunnerErrorWithoutOutput_UsesErrorTextAsReason(t *testing.T) {
+	runner := process.NewFake()
+	runner.DefaultErr = errors.New("adb not found")
+	d := androiddriver.New(newFakeTransport(), runner, androiddriver.Options{Serial: "S1"})
+
+	var stopErr *androiddriver.ForceStopError
+	if err := d.StopApp(context.Background(), "com.example.app"); !errors.As(err, &stopErr) || stopErr.Reason != "adb not found" {
+		t.Fatalf("StopApp() error = %v, want a *ForceStopError with reason %q", err, "adb not found")
+	}
+}
+
+func TestAndroidDriver_StopApp_InvalidPackageName_RejectedBeforeShell(t *testing.T) {
+	for _, name := range []string{"", "com.example; reboot", "com.example app", "$(id)", "-f", "com..", "1com.example"} {
+		runner := process.NewFake()
+		d := androiddriver.New(newFakeTransport(), runner, androiddriver.Options{Serial: "S1"})
+
+		err := d.StopApp(context.Background(), name)
+		if code, _, _ := diag.Describe(err); code != diag.CodeInvalidArgument {
+			t.Fatalf("StopApp(%q) code = %q, want %q (error: %v)", name, code, diag.CodeInvalidArgument, err)
+		}
+		if n := len(runner.Invocations()); n != 0 {
+			t.Fatalf("StopApp(%q) ran %d shell commands, want 0", name, n)
+		}
+	}
+}
+
+func TestAndroidDriver_LaunchApp_ResetRefusedByShell_ReturnsForceStopErrorAndSkipsRelaunch(t *testing.T) {
 	tr := newFakeTransport()
-	tr.forceStopResp = transport.AckResult{Ok: false, Reason: "not permitted to force-stop com.example.app"}
-	d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{Serial: "S1"})
+	runner := process.NewFake()
+	runner.DefaultErr = errors.New("exit status 1")
+	d := androiddriver.New(tr, runner, androiddriver.Options{Serial: "S1"})
 	fresh := false
 
 	err := d.LaunchApp(context.Background(), "com.example.app", driver.LaunchArgs{NoReset: &fresh})

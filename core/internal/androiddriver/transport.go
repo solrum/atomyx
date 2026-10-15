@@ -23,7 +23,6 @@ type Transport interface {
 	HideKeyboard(ctx context.Context) (transport.AckResult, error)
 	PressKey(ctx context.Context, req transport.KeyRequest) (transport.OkResponse, error)
 	LaunchApp(ctx context.Context, req transport.LaunchRequest) (transport.OkResponse, error)
-	ForceStopApp(ctx context.Context, req transport.ForceStopRequest) (transport.AckResult, error)
 	CurrentActivity(ctx context.Context) (transport.CurrentActivityResponse, error)
 	Apps(ctx context.Context) ([]transport.InstalledApp, error)
 	Screenshot(ctx context.Context) (transport.ScreenshotResponse, error)

@@ -174,12 +174,6 @@ var wireCallMethodCases = []struct {
 	{"LaunchApp", func(ctx context.Context, d driver.Driver) error {
 		return d.LaunchApp(ctx, "dev.atomyx.faultinjection", driver.LaunchArgs{})
 	}},
-	{"StopApp", func(ctx context.Context, d driver.Driver) error {
-		return d.StopApp(ctx, "dev.atomyx.faultinjection")
-	}},
-	{"KillApp", func(ctx context.Context, d driver.Driver) error {
-		return d.KillApp(ctx, "dev.atomyx.faultinjection")
-	}},
 	{"CurrentForeground", func(ctx context.Context, d driver.Driver) error {
 		_, err := d.CurrentForeground(ctx)
 		return err
@@ -291,6 +285,8 @@ var boundaryTranslationSkipped = map[string]string{
 	"UninstallApp":   "issues a host subprocess call through process.Runner (adb), not the HTTP transport this boundary classifies",
 	"ClearAppData":   "issues a host subprocess call through process.Runner (adb), not the HTTP transport this boundary classifies",
 	"IsAppInstalled": "issues a host subprocess call through process.Runner (adb), not the HTTP transport this boundary classifies",
+	"StopApp":        "issues a host subprocess call through process.Runner (adb), not the HTTP transport this boundary classifies",
+	"KillApp":        "issues a host subprocess call through process.Runner (adb), not the HTTP transport this boundary classifies",
 }
 
 // TestAndroidDriver_BoundaryTranslation_CoversEveryDriverMethod proves

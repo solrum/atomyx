@@ -6,12 +6,9 @@ import (
 )
 
 // ForceStopError is returned by StopApp, and by LaunchApp's reset
-// path, when the Android agent could not actually stop the target
-// package. A non-privileged agent process holds neither the
-// signature-level permission to force-stop another app's process nor
-// the permission to kill its background processes, so a refusal here
-// means the app's process and state were left untouched, not that the
-// request merely failed to reach the device.
+// path, when the device shell command that force-stops the target
+// package failed. Reason carries the shell's own output, and the
+// app's process and state may have been left untouched.
 type ForceStopError struct {
 	PackageName string
 	Reason      string
