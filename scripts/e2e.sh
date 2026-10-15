@@ -24,13 +24,18 @@ readonly SIM_RUNNER_PORT="22087"
 usage() {
   echo "usage: scripts/e2e.sh <iossim|android|ios>" >&2
   echo "  iossim   requires ATOMYX_IOS_SIM_UDID and a runner on port ${SIM_RUNNER_PORT}" >&2
+  echo "           also requires ATOMYX_IOS_INSTALL_APP (the built demo Runner.app path) and" >&2
+  echo "           ATOMYX_IOS_INSTALL_APP_ID (its bundle id, dev.atomyx.demo), which the leg" >&2
+  echo "           installs and uses as the launchable, install, clearable, and focus fixture" >&2
+  echo "           example: examples/atomyx-demo/build/ios-sim/Build/Products/Debug-iphonesimulator/Runner.app" >&2
+  echo "           (make demo-ios-sim)" >&2
   echo "  android  requires ATOMYX_ANDROID_SERIAL and the installed dev.atomyx.demo app" >&2
   echo "           optional: ATOMYX_ANDROID_INSTALL_APK and ATOMYX_ANDROID_INSTALL_APP_ID" >&2
   echo "           (APK path and its package name) enable the install roundtrip case" >&2
   echo "           the app may already be installed and is restored after the case" >&2
   echo "           example: examples/atomyx-demo/build/app/outputs/flutter-apk/app-debug.apk" >&2
   echo "           with app id dev.atomyx.demo (flutter build apk --debug in examples/atomyx-demo)" >&2
-  echo "  ios      requires ATOMYX_IOS_DEVICE_UDID" >&2
+  echo "  ios      requires ATOMYX_IOS_DEVICE_UDID, and uses Settings as the launchable app" >&2
 }
 
 platform="${1:-}"
@@ -62,6 +67,13 @@ if [ -z "${!required_var:-}" ]; then
 fi
 
 if [ "$platform" = "iossim" ]; then
+  for demo_var in ATOMYX_IOS_INSTALL_APP ATOMYX_IOS_INSTALL_APP_ID; do
+    if [ -z "${!demo_var:-}" ]; then
+      echo "error: ${demo_var} is not set for platform iossim." >&2
+      usage
+      exit 2
+    fi
+  done
   if ! nc -z "$SIM_RUNNER_HOST" "$SIM_RUNNER_PORT" >/dev/null 2>&1; then
     echo "error: no iOS runner answers on ${SIM_RUNNER_HOST}:${SIM_RUNNER_PORT}." >&2
     echo "Start it with 'make serve' in platforms/ios-agent against the booted simulator, then run again." >&2

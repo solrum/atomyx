@@ -32,11 +32,6 @@ iossim no-streaming-touch the iOS driver does not implement streaming touch
 # entries a run used.
 
 [temporary]
-android no-focus-input no fixture focuses a text input on the device yet
-android no-fail-ping no real-device hook makes the agent unreachable yet
-android no-fail-connect no real-device hook makes the first connect fail yet
-ios no-focus-input no fixture focuses a text input on the device yet
-ios no-fail-ping no real-device hook makes the runner unreachable yet
-ios no-fail-connect no real-device hook makes the first connect fail yet
-ios no-clearable-app no app that supports clearing is installed on the device yet
-ios no-install-fixture no installable app is provided for the device yet
+ios no-clearable-app needs the signed demo build on the device
+ios no-install-fixture needs the signed demo build on the device
+ios no-focus-input needs the signed demo build on the device

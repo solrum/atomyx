@@ -54,11 +54,11 @@ s="$work/pass.json"
 {
   skip_stream p TestA/streaming leg-not-selected
   skip_stream p TestB/hier no-hierarchy-staging
-  skip_stream p TestC/ping no-fail-ping
+  skip_stream p TestC/focus no-focus-input
 } > "$s"
-expect "allowlisted and not-selected skips pass" 0 android "$s" "skip-gate: pass"
-expect "temporary entries are counted" 0 android "$s" "skip-allowlisted-temporary: 1"
-expect "not-selected skips are counted" 0 android "$s" "skip-not-selected: 1"
+expect "allowlisted and not-selected skips pass" 0 ios "$s" "skip-gate: pass"
+expect "temporary entries are counted" 0 ios "$s" "skip-allowlisted-temporary: 1"
+expect "not-selected skips are counted" 0 ios "$s" "skip-not-selected: 1"
 
 s="$work/unlisted.json"
 {

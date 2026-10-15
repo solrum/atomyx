@@ -297,7 +297,9 @@ The suite is separate from `make check`, which only compiles and lints
 the e2e files.
 
 ```bash
-ATOMYX_IOS_SIM_UDID=<booted simulator UDID> make e2e PLATFORM=iossim
+ATOMYX_IOS_SIM_UDID=<booted simulator UDID> \
+  ATOMYX_IOS_INSTALL_APP=<path to the built demo Runner.app> \
+  ATOMYX_IOS_INSTALL_APP_ID=dev.atomyx.demo make e2e PLATFORM=iossim
 ATOMYX_ANDROID_SERIAL=<adb serial> make e2e PLATFORM=android
 ATOMYX_IOS_DEVICE_UDID=<device UDID> make e2e PLATFORM=ios
 ```
@@ -307,7 +309,7 @@ environment variable per platform:
 
 | Platform | Required variable | Extra prerequisite |
 |---|---|---|
-| `iossim` | `ATOMYX_IOS_SIM_UDID` | A runner answering on `127.0.0.1:22087` (`make serve` in `platforms/ios-agent`) |
+| `iossim` | `ATOMYX_IOS_SIM_UDID`, `ATOMYX_IOS_INSTALL_APP`, `ATOMYX_IOS_INSTALL_APP_ID` | The demo app built with `make demo-ios-sim`, and a runner answering on `127.0.0.1:22087` (`make serve` in `platforms/ios-agent`) |
 | `android` | `ATOMYX_ANDROID_SERIAL` | The Android agent running on the device |
 | `ios` | `ATOMYX_IOS_DEVICE_UDID` | The runner served and tunneled to the device |
 
@@ -338,10 +340,25 @@ its output path. `demo-ios-device` signs with `DEV_TEAM` from
 `platforms/ios-agent/device.env`. The demo app also serves deep link
 `atomyxdemo://open/<route>`, with the routes listed in
 `examples/atomyx-demo/README.md`. The erase text case and the exact no
-foreground assertions skip on real devices, and the `iossim` leg skips
-the launch, clear app data, and install cases.
-The `ios` leg runs the launch cases against `com.apple.Preferences` and
-skips the clear app data and install cases.
+foreground assertions skip on real devices.
+
+The fault and focus hooks are wired on the legs that can support them:
+
+- `FocusInput` opens `atomyxdemo://open/focus` and waits until the
+  `focus-input` field reports focus. `android` uses `adb shell am start`
+  and `iossim` uses `xcrun simctl openurl` after launching the demo app.
+- `FailConnect` aims the next connect at a closed local port, on every
+  leg.
+- `FailPing` removes the adb forward the test's own driver created on
+  `android`, and closes the test's own client on `ios` and `iossim`. No
+  leg touches a forward, tunnel, or runner it did not start.
+
+The `iossim` leg installs the app at `ATOMYX_IOS_INSTALL_APP` before the
+suite and uses `ATOMYX_IOS_INSTALL_APP_ID` for the launch, clear app
+data, and install cases. iOS clears app data by uninstalling and
+reinstalling from that app. The `ios` leg runs the launch cases against
+`com.apple.Preferences` and skips the clear app data, install, and focus
+cases until a signed demo build is installed on the device.
 
 The script exits 2 on an unknown platform or a missing variable, exits
 1 when the iossim runner does not answer or a test fails, and otherwise
