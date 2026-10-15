@@ -501,6 +501,95 @@ final class CommandHandlerUnitTests: XCTestCase {
         XCTAssertEqual(resp.data["height"] as? Int, 932)
     }
 
+    func testGetScreenSizeFallsBackToSpringboardWhenTrackedAppExited() {
+        let cmd = GetScreenSizeCommand()
+        let bridge = MockXCUIBridge()
+        bridge.appStateBehavior = { .notRunning }
+        let req = Request(id: 1, type: "getScreenSize", args: [:])
+        let resp = cmd.handle(req, bridge: bridge, state: mockState())
+
+        XCTAssertTrue(resp.ok)
+        XCTAssertEqual(resp.data["width"] as? Int, 430)
+        XCTAssertEqual(bridge.appStateCallCount, 1)
+    }
+
+    func testGetScreenSizeQueriesStateOncePerCommand() {
+        let bridge = MockXCUIBridge()
+        _ = GetScreenSizeCommand().handle(
+            Request(id: 1, type: "getScreenSize", args: [:]), bridge: bridge, state: mockState())
+        XCTAssertEqual(bridge.appStateCallCount, 1)
+    }
+
+    func testGetScreenSizeSkipsStateQueryWithoutTrackedApp() {
+        let bridge = MockXCUIBridge()
+        _ = GetScreenSizeCommand().handle(
+            Request(id: 1, type: "getScreenSize", args: [:]), bridge: bridge, state: DriverState())
+        XCTAssertEqual(bridge.appStateCallCount, 0)
+    }
+
+    // MARK: - Tracked app resolution
+
+    func testResolveTrackedAppClassifiesStates() {
+        let bridge = MockXCUIBridge()
+        let state = mockState()
+
+        bridge.appStateBehavior = { .runningForeground }
+        if case .running = state.resolveTrackedApp(bridge: bridge) {} else { XCTFail("foreground") }
+        bridge.appStateBehavior = { .runningBackground }
+        if case .running = state.resolveTrackedApp(bridge: bridge) {} else { XCTFail("background") }
+        bridge.appStateBehavior = { .notRunning }
+        if case .notRunning = state.resolveTrackedApp(bridge: bridge) {} else { XCTFail("exited") }
+        if case .none = DriverState().resolveTrackedApp(bridge: bridge) {} else { XCTFail("none") }
+    }
+
+    func testResolveTrackedAppKeepsReferenceWhenAppExited() {
+        let bridge = MockXCUIBridge()
+        bridge.appStateBehavior = { .notRunning }
+        let state = mockState()
+        _ = state.resolveTrackedApp(bridge: bridge)
+        XCTAssertNotNil(state.currentApp)
+    }
+
+    func testActingCommandsReportExitedApp() {
+        let bridge = MockXCUIBridge()
+        bridge.appStateBehavior = { .notRunning }
+        let state = mockState()
+        let handlers: [(CommandHandler, [String: Any])] = [
+            (TypeTextCommand(), ["text": "x"]),
+            (HideKeyboardCommand(), [:]),
+            (GetKeyboardCommand(), [:]),
+            (ClearFocusedInputCommand(), [:]),
+        ]
+        for (handler, args) in handlers {
+            let resp = handler.handle(Request(id: 1, type: handler.type, args: args), bridge: bridge, state: state)
+            XCTAssertFalse(resp.ok, handler.type)
+            XCTAssertEqual(resp.error, "the app is not running, launch it first", handler.type)
+        }
+    }
+
+    func testLaunchWithNoResetRelaunchesWhenTrackedAppExited() {
+        let bridge = MockXCUIBridge()
+        bridge.appStateBehavior = { .notRunning }
+        let state = mockState(bundleId: "com.example.mock")
+        let req = Request(id: 1, type: "launchApp", args: ["bundleId": "com.example.mock", "noReset": true])
+        let resp = LaunchAppCommand().handle(req, bridge: bridge, state: state)
+
+        XCTAssertTrue(resp.ok)
+        XCTAssertEqual(resp.data["attached"] as? Bool, false)
+        XCTAssertEqual(bridge.launchCalls, ["com.example.mock"])
+    }
+
+    func testLaunchWithNoResetAttachesToRunningApp() {
+        let bridge = MockXCUIBridge()
+        bridge.appStateBehavior = { .runningBackground }
+        let state = mockState(bundleId: "com.example.mock")
+        let req = Request(id: 1, type: "launchApp", args: ["bundleId": "com.example.mock", "noReset": true])
+        let resp = LaunchAppCommand().handle(req, bridge: bridge, state: state)
+
+        XCTAssertEqual(resp.data["attached"] as? Bool, true)
+        XCTAssertTrue(bridge.launchCalls.isEmpty)
+    }
+
     // MARK: - ClearFocusedInputCommand
 
     func testClearFocusedInputRequiresTrackedApp() {
@@ -618,6 +707,18 @@ final class CommandHandlerUnitTests: XCTestCase {
 
         XCTAssertFalse(resp.ok)
         XCTAssertTrue(resp.error?.contains("no app bound") == true)
+    }
+
+    func testDumpRawTreeFallsBackToSpringboardWhenTrackedAppExited() {
+        let bridge = MockXCUIBridge()
+        bridge.appStateBehavior = { .notRunning }
+        bridge.rawTreeBehavior = { ["elementType": "application", "label": "SpringBoard"] }
+        let req = Request(id: 1, type: "dumpRawTree", args: [:])
+        let resp = DumpRawTreeCommand().handle(req, bridge: bridge, state: mockState())
+
+        XCTAssertTrue(resp.ok)
+        XCTAssertEqual((resp.data["root"] as? [String: Any])?["label"] as? String, "SpringBoard")
+        XCTAssertEqual(bridge.appStateCallCount, 1)
     }
 
     func testDumpRawTreeReportsSnapshotFailure() {
@@ -1247,6 +1348,16 @@ final class MockXCUIBridge: XCUIBridge {
     /// Override to simulate the focused field's value. Default is nil,
     /// meaning no element reports keyboard focus.
     var focusedFieldBehavior: () -> String? = { nil }
+
+    /// Override to simulate the tracked app's process state. Default is
+    /// a foreground app. `appStateCallCount` counts queries.
+    var appStateBehavior: () -> XCUIApplication.State = { .runningForeground }
+    var appStateCallCount = 0
+
+    func appState(app _: XCUIApplication) -> XCUIApplication.State {
+        appStateCallCount += 1
+        return appStateBehavior()
+    }
 
     func launchApp(bundleId: String) -> XCUIApplication {
         launchCalls.append(bundleId)

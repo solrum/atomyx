@@ -55,6 +55,10 @@ protocol XCUIBridge {
     /// activates it.
     func launchApp(bundleId: String) -> XCUIApplication
 
+    /// Current process state of `app`. One call costs one query to the
+    /// app proxy, so callers read it once per command.
+    func appState(app: XCUIApplication) -> XCUIApplication.State
+
     /// Terminate an app by bundle id. Creates a fresh reference
     /// internally, so the caller does not need to hold one. Safe to call
     /// on an app that isn't running.
@@ -242,6 +246,10 @@ final class DefaultXCUIBridge: XCUIBridge {
         guard appHasKeyboardFocus(app) else { return false }
         app.typeKey(key, modifierFlags: modifiers)
         return true
+    }
+
+    func appState(app: XCUIApplication) -> XCUIApplication.State {
+        return app.state
     }
 
     func getScreenSize(app: XCUIApplication) -> CGSize {

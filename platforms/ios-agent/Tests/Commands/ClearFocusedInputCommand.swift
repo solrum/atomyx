@@ -33,9 +33,8 @@ final class ClearFocusedInputCommand: CommandHandler {
     let type = "clearFocusedInput"
 
     func handle(_ request: Request, bridge: XCUIBridge, state: DriverState) -> Response {
-        guard let app = state.currentApp else {
-            return .error(id: request.id, message: "no app launched, call launchApp first")
-        }
+        let resolved = requireRunningApp(request, bridge: bridge, state: state)
+        guard let app = resolved.app else { return resolved.failure! }
 
         let hardCap = max(0, min((request.args["maxDeletes"] as? Int) ?? 500, 500))
         let chain = ClearTextChain(strategies: [

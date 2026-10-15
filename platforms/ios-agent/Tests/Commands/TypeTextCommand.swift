@@ -39,9 +39,8 @@ final class TypeTextCommand: CommandHandler {
         guard let text = request.args["text"] as? String else {
             return .error(id: request.id, message: "missing text")
         }
-        guard let app = state.currentApp else {
-            return .error(id: request.id, message: "no app launched, call launchApp first")
-        }
+        let resolved = requireRunningApp(request, bridge: bridge, state: state)
+        guard let app = resolved.app else { return resolved.failure! }
         guard bridge.typeText(app: app, text: text) else {
             return .ok(id: request.id, data: [
                 "success": false,

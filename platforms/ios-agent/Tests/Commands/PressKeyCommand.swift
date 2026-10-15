@@ -28,7 +28,7 @@ final class PressKeyCommand: CommandHandler {
         self.registry = registry
     }
 
-    func handle(_ request: Request, bridge _: XCUIBridge, state: DriverState) -> Response {
+    func handle(_ request: Request, bridge: XCUIBridge, state: DriverState) -> Response {
         guard let key = request.args["key"] as? String, !key.isEmpty else {
             return .error(id: request.id, message: "missing key")
         }
@@ -37,9 +37,8 @@ final class PressKeyCommand: CommandHandler {
 
         let app: XCUIApplication?
         if strategy.requiresApp {
-            guard let tracked = state.currentApp else {
-                return .error(id: request.id, message: "no app launched, call launchApp first")
-            }
+            let resolved = requireRunningApp(request, bridge: bridge, state: state)
+            guard let tracked = resolved.app else { return resolved.failure! }
             app = tracked
         } else {
             app = nil

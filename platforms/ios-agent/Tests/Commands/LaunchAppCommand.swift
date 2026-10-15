@@ -25,11 +25,14 @@ final class LaunchAppCommand: CommandHandler {
         }
         let noReset = (request.args["noReset"] as? Bool) ?? false
         if noReset, state.currentBundleId == bundleId, let existing = state.currentApp {
-            return .ok(id: request.id, data: [
-                "bundleId": bundleId,
-                "state": existing.state.rawValue,
-                "attached": true,
-            ])
+            let current = bridge.appState(app: existing)
+            if current == .runningForeground || current == .runningBackground {
+                return .ok(id: request.id, data: [
+                    "bundleId": bundleId,
+                    "state": current.rawValue,
+                    "attached": true,
+                ])
+            }
         }
         let app = bridge.launchApp(bundleId: bundleId)
         state.currentApp = app

@@ -24,9 +24,8 @@ final class HideKeyboardCommand: CommandHandler {
     let type = "hideKeyboard"
 
     func handle(_ request: Request, bridge: XCUIBridge, state: DriverState) -> Response {
-        guard let app = state.currentApp else {
-            return .error(id: request.id, message: "no app launched, call launchApp first")
-        }
+        let resolved = requireRunningApp(request, bridge: bridge, state: state)
+        guard let app = resolved.app else { return resolved.failure! }
         let result = bridge.hideKeyboard(app: app)
         return .ok(id: request.id, data: [
             "ok": result.ok,

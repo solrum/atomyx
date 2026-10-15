@@ -98,7 +98,7 @@ runner never sees a selector: it only receives coordinates and, for
 | Driver port method | Wire command | Swift handler | Notes |
 |---|---|---|---|
 | `Connect()` / `Ping()` | `ping` | `PingCommand` | Populates `CanMultiPointer` and `CanPressure` from the active synthesizer's capabilities. Also reports the runner identity (`runnerId`, `targetUdid`, `simulatorUdid`) and the versions (`protocolVersion`, `agentVersion`). `Connect()` stores the versions for `AgentInfo()` and fails with `AGENT_VERSION_MISMATCH` when `protocolVersion` differs from the host's. |
-| `Hierarchy()` | `dumpRawTree` | `DumpRawTreeCommand` | Builds the tree from one `app.snapshot()` call, walked iteratively. |
+| `Hierarchy()` | `dumpRawTree` | `DumpRawTreeCommand` | Builds the tree from one `app.snapshot()` call, walked iteratively. Dumps the Springboard when the tracked app is not running and no candidate is given. |
 | `Tap()` | `tapAt` | `TapAtCommand` | Always coordinates. Selector-based tap composes host-side. |
 | `LongPress()` | `longPressAt` | `LongPressAtCommand` | |
 | `Swipe()` | `swipe` | `SwipeCommand` | |
@@ -110,7 +110,7 @@ runner never sees a selector: it only receives coordinates and, for
 | `PressKey()` | `pressKey` | `PressKeyCommand` plus `PressKey/*` | Returns whether a verifiable affordance was used. |
 | `HideKeyboard()` | `hideKeyboard` | `HideKeyboardCommand` | |
 | `Screenshot()` | `screenshot` | `ScreenshotCommand` | PNG, base64-encoded. |
-| `ScreenSize()` | `getScreenSize` | `GetScreenSizeCommand` | Points, not pixels. Falls back to the Springboard proxy's frame when no app is tracked. |
+| `ScreenSize()` | `getScreenSize` | `GetScreenSizeCommand` | Points, not pixels. Falls back to the Springboard proxy's frame when no app is tracked or the tracked app is not running. |
 | `CurrentForeground()` | none | none | Always returns a typed unsupported error, see quirks below. |
 | `ListApps()` / `InstallApp()` / `UninstallApp()` / `ClearAppData()` / `IsAppInstalled()` | none (host-only) | none | `xcrun simctl` (simulator) or `xcrun devicectl` (device), invoked directly by the Go adapter. |
 | `WaitForIdle()` | none | none | Always reports `true` without waiting, so a caller must fall back to tree-diff polling. |
@@ -692,6 +692,25 @@ gesture desyncs the tracked state. A following `Hierarchy` call on a
 simulator can recover by probing candidate bundle ids currently in
 `.runningForeground`, passed by the host as `bundleIdCandidates`.
 
+**Tracked app liveness.** Each command reads the tracked app's
+process state once, through `XCUIBridge.appState`. The tracked
+reference is never cleared by that check, so a crash, an uninstall, or
+an external termination leaves it in place. The contract per command:
+
+- `getScreenSize` and `dumpRawTree` use the tracked app only while it
+  is `.runningForeground` or `.runningBackground`. Otherwise they use
+  the Springboard proxy, and `dumpRawTree` tries `bundleIdCandidates`
+  first. A `dumpRawTree` with no tracked app and no candidates still
+  fails with "no app bound".
+- `typeText`, `pressKey` (strategies that need an app), `hideKeyboard`,
+  `getKeyboard`, and `clearFocusedInput` act on the app, so they reply
+  "the app is not running, launch it first" when the tracked app has
+  exited, and "no app launched, call launchApp first" when none was
+  ever tracked.
+- `launchApp` with `noReset` attaches only to a running tracked app.
+  When the tracked app has exited, it launches a fresh instance and
+  replaces the tracked reference.
+
 **Gesture synthesizer selection is fully automatic, with no runtime
 override.** `EventSynthesizerFactory.make()` picks
 `EventRecordSynthesizer` (multi-pointer, pressure) when its dry-run
@@ -742,7 +761,7 @@ interactive-elementType whitelist (`button`, `cell`, `textField`,
 
 **Bounds are in points and include safe-area insets.** `getScreenSize`
 returns `app.frame` (or the Springboard proxy's frame when no app is
-tracked), which includes the status bar and home indicator. A caller
+tracked or the tracked app is not running), which includes the status bar and home indicator. A caller
 computing "middle of screen" or checking whether a point sits inside
 the visible viewport must not assume the reported bounds equal the
 device's nominal logical size.

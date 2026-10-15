@@ -7,9 +7,11 @@ import XCTest
 /// sibling lookups, layout-aware matchers) can operate on it.
 ///
 /// Request args:
-///   - none: dump the tracked `currentApp` (set by `launchApp`).
-///   - `bundleIdCandidates: [String]`: when `currentApp` is not
-///     bound, the host can hand the runner a shortlist of bundle
+///   - none: dump the tracked `currentApp` (set by `launchApp`) while
+///     it is running. When the tracked app has exited, the dump falls
+///     back to the Springboard proxy.
+///   - `bundleIdCandidates: [String]`: when no live app is
+///     tracked, the host can hand the runner a shortlist of bundle
 ///     ids that are currently running on the simulator. The
 ///     runner queries each one's `XCUIApplication.state` and
 ///     picks the first whose state is `.runningForeground`. This
@@ -36,7 +38,8 @@ final class DumpRawTreeCommand: CommandHandler {
         var attachedBundleId: String? = nil
         let app: XCUIApplication
 
-        if let bound = state.currentApp {
+        let tracked = state.resolveTrackedApp(bridge: bridge)
+        if case .running(let bound) = tracked {
             app = bound
         } else if let candidates = request.args["bundleIdCandidates"] as? [String], !candidates.isEmpty {
             guard let resolved = Self.firstForegroundCandidate(candidates) else {
@@ -51,6 +54,8 @@ final class DumpRawTreeCommand: CommandHandler {
             state.currentBundleId = resolved.bundleId
             attachedBundleId = resolved.bundleId
             app = resolved.app
+        } else if case .notRunning = tracked {
+            app = DriverState.springboard()
         } else {
             return .error(
                 id: request.id,
