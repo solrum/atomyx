@@ -37,7 +37,7 @@ func TestAndroidDriver_E2E(t *testing.T) {
 	drivertest.RequireDevice(t, drivertest.E2EPlatformAndroid)
 	serial := os.Getenv("ATOMYX_ANDROID_SERIAL")
 	if serial == "" {
-		t.Skip("skipping: set ATOMYX_ANDROID_SERIAL to the target device's adb serial")
+		drivertest.SkipBecause(t, drivertest.SkipRequiredEnvUnset, "set ATOMYX_ANDROID_SERIAL to the target device's adb serial")
 	}
 
 	drivertest.Run(t, func() driver.Driver {

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"dev.atomyx/internal/driver/drivertest"
 	"dev.atomyx/internal/process"
 )
 
@@ -195,7 +196,7 @@ func TestBuildDigest_ToleratesMissingSourceDirectories(t *testing.T) {
 
 func TestBuildDigest_ReportsAnUnreadableSource(t *testing.T) {
 	if os.Geteuid() == 0 {
-		t.Skip("file permissions do not stop root")
+		drivertest.SkipBecause(t, drivertest.SkipHostPrecondition, "file permissions do not stop root")
 	}
 	dir := newDigestTree(t)
 	path := filepath.Join(dir, "Tests/Runner.swift")

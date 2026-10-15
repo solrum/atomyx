@@ -67,7 +67,7 @@ func assertNotForeground(t *testing.T, d driver.Driver, foreground driver.Foregr
 func requireLaunchable(t *testing.T, hooks Hooks) string {
 	t.Helper()
 	if hooks.LaunchableAppID == "" {
-		t.Skip("drivertest: no LaunchableAppID wired for this driver; skipping the launch case")
+		SkipBecause(t, SkipNoLaunchableApp, "no LaunchableAppID wired for this driver")
 	}
 	return hooks.LaunchableAppID
 }
@@ -161,7 +161,7 @@ func testLaunchAppAttach(t *testing.T, newDriver Factory, hooks Hooks) {
 // this shared suite.
 func testClearAppDataSucceedsWithSource(t *testing.T, newDriver Factory, hooks Hooks) {
 	if hooks.ClearableAppID == "" {
-		t.Skip("drivertest: no ClearableAppID wired for this driver; skipping the clear app data case")
+		SkipBecause(t, SkipNoClearableApp, "no ClearableAppID wired for this driver")
 	}
 	d := newDriver()
 	ctx := context.Background()
@@ -179,7 +179,7 @@ func testClearAppDataSucceedsWithSource(t *testing.T, newDriver Factory, hooks H
 
 func testInstallUninstallRoundtrip(t *testing.T, newDriver Factory, hooks Hooks) {
 	if hooks.Install == nil {
-		t.Skip("drivertest: no Install fixture wired for this driver; skipping the install and uninstall roundtrip")
+		SkipBecause(t, SkipNoInstallFixture, "no Install fixture wired for this driver")
 	}
 	d := newDriver()
 	ctx := context.Background()

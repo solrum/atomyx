@@ -34,7 +34,7 @@ func TestIosSimDriver_E2E_TimeoutRecovery_HeldReplyIsToolTimeoutAndNextCallSucce
 	drivertest.RequireDevice(t, drivertest.E2EPlatformIOSSim)
 	udid := os.Getenv("ATOMYX_IOS_SIM_UDID")
 	if udid == "" {
-		t.Skip("skipping: set ATOMYX_IOS_SIM_UDID to the target simulator's UDID")
+		drivertest.SkipBecause(t, drivertest.SkipRequiredEnvUnset, "set ATOMYX_IOS_SIM_UDID to the target simulator's UDID")
 	}
 
 	proxyPort, delivered := drivertest.NewLineDelayProxy(t, fmt.Sprintf("127.0.0.1:%d", iosSimE2EControlPort), "getScreenSize", e2eHoldDuration)

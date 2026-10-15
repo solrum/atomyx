@@ -38,7 +38,7 @@ func testHierarchyShape(t *testing.T, newDriver Factory) {
 		t.Fatalf("Connect: %v", err)
 	}
 	if !stageMinimalHierarchy(d, wire.TreeNodeWire{Attributes: map[string]string{}}) {
-		t.Skip("driver offers no way to stage a hierarchy for this suite")
+		SkipBecause(t, SkipNoHierarchyStaging, "driver offers no way to stage a hierarchy for this suite")
 	}
 	tree, err := d.Hierarchy(ctx)
 	if err != nil {
@@ -80,7 +80,7 @@ func testHierarchyAttributesAreCanonical(t *testing.T, newDriver Factory) {
 	}
 	tree, err := d.Hierarchy(ctx)
 	if err != nil {
-		t.Skip("driver has no default hierarchy to inspect without staging one")
+		SkipBecause(t, SkipNoDefaultHierarchy, "driver has no default hierarchy to inspect without staging one")
 	}
 	assertCanonicalAttributes(t, tree)
 }

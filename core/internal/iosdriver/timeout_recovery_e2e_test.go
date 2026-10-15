@@ -31,7 +31,7 @@ func TestIosDriver_E2E_TimeoutRecovery_HeldReplyIsToolTimeoutAndNextCallSucceeds
 	drivertest.RequireDevice(t, drivertest.E2EPlatformIOS)
 	udid := os.Getenv("ATOMYX_IOS_DEVICE_UDID")
 	if udid == "" {
-		t.Skip("skipping: set ATOMYX_IOS_DEVICE_UDID to the target device's UDID")
+		drivertest.SkipBecause(t, drivertest.SkipRequiredEnvUnset, "set ATOMYX_IOS_DEVICE_UDID to the target device's UDID")
 	}
 	requireTimeoutRecovery(t, udid, iosdriver.KindDevice)
 }
@@ -44,7 +44,7 @@ func TestIosDriver_E2E_SimulatorTimeoutRecovery_HeldReplyIsToolTimeoutAndNextCal
 	drivertest.RequireDevice(t, drivertest.E2EPlatformIOSSim)
 	udid := os.Getenv("ATOMYX_IOS_SIM_UDID")
 	if udid == "" {
-		t.Skip("skipping: set ATOMYX_IOS_SIM_UDID to the target simulator's UDID")
+		drivertest.SkipBecause(t, drivertest.SkipRequiredEnvUnset, "set ATOMYX_IOS_SIM_UDID to the target simulator's UDID")
 	}
 	requireTimeoutRecovery(t, udid, iosdriver.KindSimulator)
 }

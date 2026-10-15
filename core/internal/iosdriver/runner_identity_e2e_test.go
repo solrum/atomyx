@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"dev.atomyx/internal/clock"
+	"dev.atomyx/internal/driver/drivertest"
 	"dev.atomyx/internal/iosdriver"
 	"dev.atomyx/internal/process"
 )
@@ -27,7 +28,7 @@ func TestXctestLauncher_E2E_SimulatorRunnerReportsItsLaunchIdentity(t *testing.T
 	udid := os.Getenv("ATOMYX_E2E_IOS_SIM_UDID")
 	projectDir := os.Getenv("ATOMYX_E2E_IOS_PROJECT_DIR")
 	if udid == "" || projectDir == "" {
-		t.Skip("skipping: set ATOMYX_E2E_IOS_SIM_UDID and ATOMYX_E2E_IOS_PROJECT_DIR")
+		drivertest.SkipBecause(t, drivertest.SkipOptionalEnvUnset, "set ATOMYX_E2E_IOS_SIM_UDID and ATOMYX_E2E_IOS_PROJECT_DIR")
 	}
 	projectDir, err := filepath.Abs(projectDir)
 	if err != nil {

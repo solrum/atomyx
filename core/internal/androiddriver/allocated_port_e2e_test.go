@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"dev.atomyx/internal/androiddriver"
+	"dev.atomyx/internal/driver/drivertest"
 	"dev.atomyx/internal/process"
 	"dev.atomyx/internal/transport"
 )
@@ -22,7 +23,7 @@ func TestAndroidDriver_E2E_AllocateHostPort_TwoSerialsDistinctPortsAndReuse(t *t
 	serialA := os.Getenv("ATOMYX_ANDROID_SERIAL_A")
 	serialB := os.Getenv("ATOMYX_ANDROID_SERIAL_B")
 	if serialA == "" || serialB == "" {
-		t.Skip("skipping: set ATOMYX_ANDROID_SERIAL_A and ATOMYX_ANDROID_SERIAL_B to two attached devices")
+		drivertest.SkipBecause(t, drivertest.SkipOptionalEnvUnset, "set ATOMYX_ANDROID_SERIAL_A and ATOMYX_ANDROID_SERIAL_B to two attached devices")
 	}
 	runner := process.NewExec()
 	newDriver := func(serial string, ports *[]int) *androiddriver.AndroidDriver {

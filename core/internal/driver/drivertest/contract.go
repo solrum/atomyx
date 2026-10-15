@@ -244,7 +244,7 @@ func testPingReportsLiveness(t *testing.T, newDriver Factory, hooks Hooks) {
 	}
 
 	if hooks.FailPing == nil {
-		t.Skip("drivertest: no FailPing hook wired for this driver; skipping the unreachable-ping assertion")
+		SkipBecause(t, SkipNoFailPing, "no FailPing hook wired for this driver")
 	}
 	hooks.FailPing()
 	err := d.Ping(context.Background())
@@ -291,7 +291,7 @@ func testAgentInfoIsLocalAndStable(t *testing.T, newDriver Factory, hooks Hooks)
 // Connect on the same instance reported versions.
 func testAgentInfoZeroAfterFailedConnect(t *testing.T, newDriver Factory, hooks Hooks) {
 	if hooks.FailConnect == nil {
-		t.Skip("drivertest: no FailConnect hook wired for this driver; skipping the failed-connect assertion")
+		SkipBecause(t, SkipNoFailConnect, "no FailConnect hook wired for this driver")
 	}
 	d := newDriver()
 	if err := d.Connect(context.Background()); err != nil {

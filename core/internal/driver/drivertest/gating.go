@@ -2,6 +2,7 @@ package drivertest
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -48,10 +49,10 @@ func RequireDevice(t *testing.T, platform string) {
 	t.Helper()
 	selected := os.Getenv(e2eEnvVar)
 	if selected == "" {
-		t.Skipf("skipping device-gated e2e test: set %s=%s (or %s=all) to run it", e2eEnvVar, platform, e2eEnvVar)
+		SkipBecause(t, SkipLegNotSelected, fmt.Sprintf("set %s=%s (or %s=all) to run this device-gated test", e2eEnvVar, platform, e2eEnvVar))
 	}
 	if selected != "all" && !selectsPlatform(selected, platform) {
-		t.Skipf("skipping device-gated e2e test: %s=%q does not select %q", e2eEnvVar, selected, platform)
+		SkipBecause(t, SkipLegNotSelected, fmt.Sprintf("%s=%q does not select %q", e2eEnvVar, selected, platform))
 	}
 	switch platform {
 	case E2EPlatformAndroid:
@@ -77,16 +78,16 @@ func selectsPlatform(list, platform string) bool {
 func requireAndroidDevice(t *testing.T) {
 	t.Helper()
 	if _, err := exec.LookPath("adb"); err != nil {
-		t.Skip("skipping: adb not found on PATH, install the Android SDK platform-tools")
+		SkipBecause(t, SkipHostToolMissing, "adb not found on PATH, install the Android SDK platform-tools")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), discoveryTimeout)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, "adb", "devices").Output()
 	if err != nil {
-		t.Skipf("skipping: adb devices failed: %v", err)
+		SkipBecause(t, SkipDeviceDiscoveryFailed, fmt.Sprintf("adb devices failed: %v", err))
 	}
 	if !hasConnectedAndroidDevice(string(out)) {
-		t.Skip("skipping: no Android device or emulator is connected (adb devices reported none)")
+		SkipBecause(t, SkipDeviceNotFound, "no Android device or emulator is connected (adb devices reported none)")
 	}
 }
 
@@ -111,31 +112,31 @@ func hasConnectedAndroidDevice(raw string) bool {
 func requireIOSSimulator(t *testing.T) {
 	t.Helper()
 	if _, err := exec.LookPath("xcrun"); err != nil {
-		t.Skip("skipping: xcrun not found on PATH, install the Xcode command line tools")
+		SkipBecause(t, SkipHostToolMissing, "xcrun not found on PATH, install the Xcode command line tools")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), discoveryTimeout)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, "xcrun", "simctl", "list", "devices", "booted").Output()
 	if err != nil {
-		t.Skipf("skipping: xcrun simctl list devices failed: %v", err)
+		SkipBecause(t, SkipDeviceDiscoveryFailed, fmt.Sprintf("xcrun simctl list devices failed: %v", err))
 	}
 	if !strings.Contains(string(out), "Booted") {
-		t.Skip("skipping: no booted iOS simulator found (xcrun simctl list devices booted reported none)")
+		SkipBecause(t, SkipDeviceNotFound, "no booted iOS simulator found (xcrun simctl list devices booted reported none)")
 	}
 }
 
 func requireIOSDevice(t *testing.T) {
 	t.Helper()
 	if _, err := exec.LookPath("xcrun"); err != nil {
-		t.Skip("skipping: xcrun not found on PATH, install the Xcode command line tools")
+		SkipBecause(t, SkipHostToolMissing, "xcrun not found on PATH, install the Xcode command line tools")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), discoveryTimeout)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, "xcrun", "devicectl", "list", "devices").Output()
 	if err != nil {
-		t.Skipf("skipping: xcrun devicectl list devices failed: %v", err)
+		SkipBecause(t, SkipDeviceDiscoveryFailed, fmt.Sprintf("xcrun devicectl list devices failed: %v", err))
 	}
 	if !strings.Contains(string(out), "connected") {
-		t.Skip("skipping: no physical iOS device is connected (xcrun devicectl list devices reported none)")
+		SkipBecause(t, SkipDeviceNotFound, "no physical iOS device is connected (xcrun devicectl list devices reported none)")
 	}
 }

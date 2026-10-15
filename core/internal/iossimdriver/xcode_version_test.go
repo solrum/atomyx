@@ -6,13 +6,14 @@ import (
 	"runtime"
 	"testing"
 
+	"dev.atomyx/internal/driver/drivertest"
 	"dev.atomyx/internal/iossimdriver"
 	"dev.atomyx/internal/process"
 )
 
 func TestIsSimDirectSupported_NonArm64ReturnsFalseWithoutRunningAnything(t *testing.T) {
 	if runtime.GOARCH == "arm64" {
-		t.Skip("this host is arm64; the arch guard short-circuits before any Runner call only on non-arm64 hosts")
+		drivertest.SkipBecause(t, drivertest.SkipHostPrecondition, "this host is arm64; the arch guard short-circuits before any Runner call only on non-arm64 hosts")
 	}
 	iossimdriver.ResetSimDirectCacheForTests()
 	runner := process.NewFake()
@@ -26,7 +27,7 @@ func TestIsSimDirectSupported_NonArm64ReturnsFalseWithoutRunningAnything(t *test
 
 func TestIsSimDirectSupported_VerifiedXcodeMajorReturnsTrue(t *testing.T) {
 	if runtime.GOARCH != "arm64" {
-		t.Skip("requires an arm64 host to reach the Xcode version probe")
+		drivertest.SkipBecause(t, drivertest.SkipHostPrecondition, "requires an arm64 host to reach the Xcode version probe")
 	}
 	iossimdriver.ResetSimDirectCacheForTests()
 	runner := process.NewFake()
@@ -43,7 +44,7 @@ func TestIsSimDirectSupported_VerifiedXcodeMajorReturnsTrue(t *testing.T) {
 
 func TestIsSimDirectSupported_BelowFloorReturnsFalse(t *testing.T) {
 	if runtime.GOARCH != "arm64" {
-		t.Skip("requires an arm64 host to reach the Xcode version probe")
+		drivertest.SkipBecause(t, drivertest.SkipHostPrecondition, "requires an arm64 host to reach the Xcode version probe")
 	}
 	iossimdriver.ResetSimDirectCacheForTests()
 	runner := process.NewFake()
@@ -60,7 +61,7 @@ func TestIsSimDirectSupported_BelowFloorReturnsFalse(t *testing.T) {
 
 func TestIsSimDirectSupported_XcodeSelectFailureReturnsFalse(t *testing.T) {
 	if runtime.GOARCH != "arm64" {
-		t.Skip("requires an arm64 host to reach the Xcode version probe")
+		drivertest.SkipBecause(t, drivertest.SkipHostPrecondition, "requires an arm64 host to reach the Xcode version probe")
 	}
 	iossimdriver.ResetSimDirectCacheForTests()
 	runner := process.NewFake()
@@ -72,7 +73,7 @@ func TestIsSimDirectSupported_XcodeSelectFailureReturnsFalse(t *testing.T) {
 
 func TestIsSimDirectSupported_MalformedPlistValueReturnsFalse(t *testing.T) {
 	if runtime.GOARCH != "arm64" {
-		t.Skip("requires an arm64 host to reach the Xcode version probe")
+		drivertest.SkipBecause(t, drivertest.SkipHostPrecondition, "requires an arm64 host to reach the Xcode version probe")
 	}
 	iossimdriver.ResetSimDirectCacheForTests()
 	runner := process.NewFake()
@@ -89,7 +90,7 @@ func TestIsSimDirectSupported_MalformedPlistValueReturnsFalse(t *testing.T) {
 
 func TestIsSimDirectSupported_MemoizesAcrossCalls(t *testing.T) {
 	if runtime.GOARCH != "arm64" {
-		t.Skip("requires an arm64 host to reach the Xcode version probe")
+		drivertest.SkipBecause(t, drivertest.SkipHostPrecondition, "requires an arm64 host to reach the Xcode version probe")
 	}
 	iossimdriver.ResetSimDirectCacheForTests()
 	runner := process.NewFake()

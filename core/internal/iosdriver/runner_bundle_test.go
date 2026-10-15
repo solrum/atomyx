@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"dev.atomyx/internal/driver/drivertest"
 	"dev.atomyx/internal/process"
 )
 
@@ -92,7 +93,7 @@ func TestParseRunnerBundleID_HandlesAnXMLPlistConvertedToJSON(t *testing.T) {
 func requirePlutil(t *testing.T) {
 	t.Helper()
 	if _, err := exec.LookPath("plutil"); err != nil {
-		t.Skip("plutil is not available on this host")
+		drivertest.SkipBecause(t, drivertest.SkipHostToolMissing, "plutil is not available on this host")
 	}
 }
 

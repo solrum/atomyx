@@ -137,7 +137,7 @@ func testEraseTextCapability(t *testing.T, newDriver Factory, hooks Hooks) {
 		return
 	}
 	if hooks.FocusInput == nil {
-		t.Skip("drivertest: no FocusInput hook wired for this driver; skipping the erase-text assertion that needs a focused input")
+		SkipBecause(t, SkipNoFocusInput, "no FocusInput hook wired for this driver")
 	}
 	hooks.FocusInput(t, d)
 	if err := d.EraseText(ctx, 1); err != nil {
@@ -194,7 +194,7 @@ func testPressKeySupportedCode(t *testing.T, newDriver Factory, hooks Hooks) {
 	launchWhenWired(t, d, hooks)
 	codes := d.Capabilities().SupportedKeyCodes
 	if len(codes) == 0 {
-		t.Skip("driver reports no supported key codes")
+		SkipBecause(t, SkipNoKeyCodes, "driver reports no supported key codes")
 	}
 	if _, err := d.PressKey(ctx, codes[0]); err != nil {
 		t.Fatalf("PressKey(%q): %v", codes[0], err)
@@ -228,7 +228,7 @@ func testStreamingTouchOptional(t *testing.T, newDriver Factory) {
 	}
 	streaming, ok := driver.AsStreamingTouchCapable(d)
 	if !ok {
-		t.Skip("driver does not implement StreamingTouchCapable")
+		SkipBecause(t, SkipNoStreamingTouch, "driver does not implement StreamingTouchCapable")
 	}
 	if err := streaming.StreamingTouchDown(ctx, wire.Point{X: 1, Y: 1}, 1); err != nil {
 		t.Fatalf("StreamingTouchDown: %v", err)
@@ -254,7 +254,7 @@ func testForeignAutomationOptional(t *testing.T, newDriver Factory) {
 	}
 	reporter, ok := driver.AsForeignAutomationReporter(d)
 	if !ok {
-		t.Skip("driver does not implement ForeignAutomationReporter")
+		SkipBecause(t, SkipNoForeignAutomation, "driver does not implement ForeignAutomationReporter")
 	}
 	first := reporter.ForeignAutomation()
 	for i, s := range first {
