@@ -506,8 +506,8 @@ touching any device. A malformed matrix exits 2 before any entry runs.
 
 Results land in `e2e-results/nightly/<UTC date-time>/<index>-<kind>/` with
 `setup.log`, `e2e.log`, `soak.log`, and `result.txt` (kind, id, e2e exit, e2e
-pass, fail, and skip counts, soak exit, passed, failed, and infraFailureRate,
-and status), plus `summary.txt` with one status line per entry. Run storage is
+pass, fail, skip, and unexpectedSkips counts, soak exit, passed, failed,
+infraFailures, and infraFailureRate, and status), plus `summary.txt` with one status line per entry. Run storage is
 kept under each entry directory, never in `~/.atomyx`. The exit status is 0
 only when every entry is ok.
 
@@ -515,6 +515,23 @@ To schedule it, the owner copies `scripts/nightly.launchd.plist.template`,
 replaces the placeholders, and loads it with `launchctl bootstrap`. The
 repository never installs the job. `scripts/check-nightly.sh` runs in
 `make check` and covers the dry run and matrix validation with no device.
+
+#### Trend report
+
+`scripts/e2e-trend.sh [--nights N] [--results-dir DIR]` reads the last N run
+folders (default 14, the length of two weeks) and prints one table per device,
+identified by kind and id. Each row is one night with the e2e pass, fail,
+skip, and unexpected skip counts, the soak passed and failed counts, the
+infrastructure failure rate, and the status. A summary line follows each table
+with the green nights out of the nights shown, the total soak runs, and the
+pooled infrastructure failure rate, which is the sum of infrastructure
+failures over the sum of soak runs. A night where a device is absent adds no
+row for it, and a value the night did not record prints as `n/a`. A result
+written without `soak infraFailures` contributes its rate multiplied by its
+soak runs. The results directory defaults to `e2e-results/nightly` and honors
+`ATOMYX_NIGHTLY_RESULTS_DIR`. Exit status is 0 when the report prints and 2 on
+a usage error or a missing directory. `scripts/check-e2e-trend.sh` runs in
+`make check` against fixture folders.
 
 ## Testing philosophy
 

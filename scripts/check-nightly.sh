@@ -142,7 +142,7 @@ echo "make $*" >> "$FAKE_LOG"
 case "$*" in
   *" e2e "* | *" e2e")
     echo "env ATOMYX_ANDROID_SERIAL=${ATOMYX_ANDROID_SERIAL:-} ATOMYX_IOS_SIM_UDID=${ATOMYX_IOS_SIM_UDID:-}" >> "$FAKE_LOG"
-    echo "pass: 7"; echo "fail: 0"; echo "skip: 2"
+    echo "pass: 7"; echo "fail: 0"; echo "skip: 2"; echo "skip-gate: pass"
     ;;
   *serve*)
     echo 4242 > "$FAKE_RUNNER_FLAG"
@@ -156,7 +156,7 @@ cat > "$fakes/soak.sh" <<'FAKE'
 #!/usr/bin/env bash
 echo "soak $*" >> "$FAKE_LOG"
 mkdir -p "$ATOMYX_SOAK_RESULTS_DIR/r"
-printf 'passed: 3\nfailed: 0\ninfraFailureRate: 0.000000\n' > "$ATOMYX_SOAK_RESULTS_DIR/r/summary.txt"
+printf 'passed: 3\nfailed: 0\ninfraFailures: 0\ninfraFailureRate: 0.000000\n' > "$ATOMYX_SOAK_RESULTS_DIR/r/summary.txt"
 FAKE
 chmod +x "$fakes"/*
 export FAKE_RUNNER_FLAG="$work/runner.flag"
@@ -186,7 +186,7 @@ run_real android $'android SERIAL-A 2\n'
 expect_log "real android" "env ATOMYX_ANDROID_SERIAL=SERIAL-A"
 expect_log "real android" "soak android SERIAL-A 2"
 expect_log "real android" "atomyx setup --platform android --device SERIAL-A"
-for line in "e2e exit: 0" "e2e pass: 7" "e2e skip: 2" "soak passed: 3" "status: ok"; do
+for line in "e2e exit: 0" "e2e pass: 7" "e2e skip: 2" "e2e unexpectedSkips: 0" "soak passed: 3" "soak infraFailures: 0" "status: ok"; do
   grep -qx -- "$line" "${real_dir}1-android/result.txt" || fail "real android: result.txt lacks '$line'"
 done
 

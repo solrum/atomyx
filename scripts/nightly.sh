@@ -414,6 +414,16 @@ count_of() {
   echo "${n:-n/a}"
 }
 
+# Counts the offenders the skip gate printed. A log without a gate verdict
+# line means the leg never reached the gate, so the count is unknown.
+unexpected_skips_of() {
+  if grep -q "^skip-gate: " "$1" 2>/dev/null; then
+    grep -c "^unexpected-skip: " "$1" || true
+  else
+    echo "n/a"
+  fi
+}
+
 all_ok=1
 for i in "${!kinds[@]}"; do
   kind="${kinds[$i]}"
@@ -490,9 +500,11 @@ for i in "${!kinds[@]}"; do
     echo "e2e pass: $(count_of pass "$e2e_log")"
     echo "e2e fail: $(count_of fail "$e2e_log")"
     echo "e2e skip: $(count_of skip "$e2e_log")"
+    echo "e2e unexpectedSkips: $(unexpected_skips_of "$e2e_log")"
     echo "soak exit: ${soak_exit}"
     echo "soak passed: $(count_of passed "${soak_summary:-/dev/null}")"
     echo "soak failed: $(count_of failed "${soak_summary:-/dev/null}")"
+    echo "soak infraFailures: $(count_of infraFailures "${soak_summary:-/dev/null}")"
     echo "soak infraFailureRate: $(count_of infraFailureRate "${soak_summary:-/dev/null}")"
     echo "status: ${status}"
     [ -z "$reason" ] || echo "reason: ${reason}"

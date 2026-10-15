@@ -157,6 +157,7 @@ check:
 	bash scripts/check-e2e-skip-gate.sh
 	bash scripts/check-soak.sh
 	bash scripts/check-nightly.sh
+	bash scripts/check-e2e-trend.sh
 	node scripts/lint-banned-phrases.mjs
 	node scripts/lint-doc-paths.mjs
 
