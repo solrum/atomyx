@@ -41,6 +41,40 @@ func (p Pattern) Matches(value string) bool {
 	return value == p.literal
 }
 
+// segmentSeparator joins the parts of a value that a cross-platform
+// semantics tree merged into one attribute, such as a title and its
+// subtitle.
+const segmentSeparator = "\n"
+
+// MatchesSegment reports whether value holds newline-separated
+// segments and one of them equals the literal exactly. It is always
+// false for a regex pattern, an empty literal, and a value without a
+// newline, so the common single-line value costs one byte scan and no
+// allocation. Segments are compared with the same exact equality
+// Matches uses for a whole value.
+func (p Pattern) MatchesSegment(value string) bool {
+	if p.regex != nil || p.literal == "" || !strings.Contains(value, segmentSeparator) {
+		return false
+	}
+	rest := value
+	for {
+		segment, tail, more := strings.Cut(rest, segmentSeparator)
+		if segment == p.literal {
+			return true
+		}
+		if !more {
+			return false
+		}
+		rest = tail
+	}
+}
+
+// segmentCapable reports whether the pattern can ever match a
+// segment: a non-empty literal.
+func (p Pattern) segmentCapable() bool {
+	return p.regex == nil && p.literal != ""
+}
+
 // UnmarshalJSON decodes either a JSON string (a literal pattern) or
 // an object {"regex": string, "flags"?: string} (a regex pattern
 // compiled through compileJSRegex).

@@ -18,6 +18,20 @@ func byAttr(key string, p Pattern) ElementFilter {
 	}
 }
 
+// bySegment filters cursors whose attribute holds newline-separated
+// segments, one of which equals p exactly.
+func bySegment(key string, p Pattern) ElementFilter {
+	return func(cursors []*TreeCursor) []*TreeCursor {
+		out := make([]*TreeCursor, 0)
+		for _, c := range cursors {
+			if v, ok := c.Node.Attributes[key]; ok && p.MatchesSegment(v) {
+				out = append(out, c)
+			}
+		}
+		return out
+	}
+}
+
 // IDMatches filters cursors whose "id" attribute matches p.
 func IDMatches(p Pattern) ElementFilter { return byAttr(AttrID, p) }
 

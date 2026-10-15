@@ -14,6 +14,13 @@ import "sort"
 // element that only carries an accessibility label needs a fallback
 // to match.
 //
+// Segment matching: for Label, Text, Value, and Hint, a literal that
+// equals one whole newline-separated segment of an attribute value is
+// tried immediately after the whole-value match of the same field, so
+// a whole-value match always wins over a segment match. A literal ID
+// that matched no node id is tried against label segments as the last
+// entry, to reach an identifier folded into a parent's merged label.
+//
 // Role, Enabled, Clickable, and Focused are not part of the priority
 // chain: they are AND-ed onto every content field's filter as
 // additional constraints. When the caller provides no content field,
@@ -39,23 +46,32 @@ func CompileSelector(s Selector) ElementFilter {
 	}
 
 	var priorityFilters []ElementFilter
+	addContent := func(key string, p Pattern) {
+		priorityFilters = append(priorityFilters, byAttr(key, p))
+		if p.segmentCapable() {
+			priorityFilters = append(priorityFilters, bySegment(key, p))
+		}
+	}
 	if s.ID != nil {
 		priorityFilters = append(priorityFilters, IDMatches(*s.ID))
 	}
 	if s.Label != nil {
-		priorityFilters = append(priorityFilters, LabelMatches(*s.Label))
+		addContent(AttrLabel, *s.Label)
 	}
 	if s.Text != nil {
-		priorityFilters = append(priorityFilters, TextMatches(*s.Text))
+		addContent(AttrText, *s.Text)
 		if s.Label == nil {
-			priorityFilters = append(priorityFilters, LabelMatches(*s.Text))
+			addContent(AttrLabel, *s.Text)
 		}
 	}
 	if s.Value != nil {
-		priorityFilters = append(priorityFilters, ValueMatches(*s.Value))
+		addContent(AttrValue, *s.Value)
 	}
 	if s.Hint != nil {
-		priorityFilters = append(priorityFilters, HintMatches(*s.Hint))
+		addContent(AttrHint, *s.Hint)
+	}
+	if s.ID != nil && s.ID.segmentCapable() {
+		priorityFilters = append(priorityFilters, bySegment(AttrLabel, *s.ID))
 	}
 
 	if len(priorityFilters) == 0 {
