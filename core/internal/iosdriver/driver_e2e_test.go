@@ -37,7 +37,7 @@ func TestIosDriver_E2E(t *testing.T) {
 // simulator with a runner served on the control port. The demo app is
 // the launchable, clearable, and install fixture, installed from
 // ATOMYX_IOS_INSTALL_APP, and FocusInput opens its focus route with
-// "xcrun simctl openurl". ATOMYX_IOS_SIM_UDID selects the simulator.
+// the app's "--route" launch argument. ATOMYX_IOS_SIM_UDID selects the simulator.
 func TestIosDriver_E2E_Simulator(t *testing.T) {
 	drivertest.RequireDevice(t, drivertest.E2EPlatformIOSSim)
 	udid := os.Getenv("ATOMYX_IOS_SIM_UDID")
@@ -46,5 +46,7 @@ func TestIosDriver_E2E_Simulator(t *testing.T) {
 	}
 
 	fx := &iosE2EFixture{udid: udid, kind: iosdriver.KindSimulator}
-	drivertest.Run(t, fx.newDriver, fx.faultHooks(simulatorDemoHooks(t, udid)))
+	hooks := simulatorDemoHooks(t, udid)
+	t.Cleanup(func() { fx.releaseTrackedApp(hooks.LaunchableAppID) })
+	drivertest.Run(t, fx.newDriver, fx.faultHooks(hooks))
 }

@@ -344,9 +344,11 @@ foreground assertions skip on real devices.
 
 The fault and focus hooks are wired on the legs that can support them:
 
-- `FocusInput` opens `atomyxdemo://open/focus` and waits until the
-  `focus-input` field reports focus. `android` uses `adb shell am start`
-  and `iossim` uses `xcrun simctl openurl` after launching the demo app.
+- `FocusInput` restarts the demo app on the `/focus` route and waits until
+  the `focus-input` field reports focus. `android` uses `adb shell am start`
+  with a `route` extra, and `iossim` uses `xcrun simctl launch` with a
+  `--route` argument, which avoids the confirmation prompt a custom URL
+  scheme raises on iOS.
 - `FailConnect` aims the next connect at a closed local port, on every
   leg.
 - `FailPing` removes the adb forward the test's own driver created on

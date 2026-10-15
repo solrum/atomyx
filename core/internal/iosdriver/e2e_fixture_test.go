@@ -20,7 +20,7 @@ import (
 
 const (
 	iosE2EDemoAppID    = "dev.atomyx.demo"
-	iosE2EFocusLink    = "atomyxdemo://open/focus"
+	iosE2EFocusRoute   = "/focus"
 	iosE2EFocusInput   = "focus-input"
 	iosE2ECommandLimit = 60 * time.Second
 )
@@ -67,6 +67,21 @@ func (f *iosE2EFixture) faultHooks(hooks drivertest.Hooks) drivertest.Hooks {
 	return hooks
 }
 
+// releaseTrackedApp makes the shared runner forget appID. The runner
+// keeps the last launched app as its target across connections, and the
+// suite's install cases remove that app, so a later test that needs no
+// app would otherwise fail on the dead target.
+func (f *iosE2EFixture) releaseTrackedApp(appID string) {
+	d := f.newDriver()
+	ctx, cancel := context.WithTimeout(context.Background(), iosE2ECommandLimit)
+	defer cancel()
+	if err := d.Connect(ctx); err != nil {
+		return
+	}
+	defer func() { _ = d.Disconnect() }()
+	_ = d.StopApp(ctx, appID)
+}
+
 // faultConn is the client the driver talks through. It embeds the real
 // client and, after aimAtClosedPort, redirects Connect to a client
 // whose port has no listener.
@@ -109,7 +124,8 @@ func freeLocalPort() int {
 // launchable, install from ATOMYX_IOS_INSTALL_APP and
 // ATOMYX_IOS_INSTALL_APP_ID, clearable (iOS clears by uninstalling and
 // reinstalling from the install source), and FocusInput through the
-// demo deep link.
+// app's "--route" launch argument, which avoids the system prompt a
+// custom URL scheme raises.
 func simulatorDemoHooks(t *testing.T, udid string) drivertest.Hooks {
 	t.Helper()
 	app := os.Getenv("ATOMYX_IOS_INSTALL_APP")
@@ -132,8 +148,8 @@ func simulatorDemoHooks(t *testing.T, udid string) drivertest.Hooks {
 			if err := d.LaunchApp(ctx, appID, driver.LaunchArgs{}); err != nil {
 				t.Fatalf("launch %s before opening the link: %v", appID, err)
 			}
-			if _, err := runSimctl(t, "openurl", udid, iosE2EFocusLink); err != nil {
-				t.Fatalf("open %s on the simulator: %v", iosE2EFocusLink, err)
+			if _, err := runSimctl(t, "launch", "--terminate-running-process", udid, appID, "--route", iosE2EFocusRoute); err != nil {
+				t.Fatalf("relaunch %s on %s: %v", appID, iosE2EFocusRoute, err)
 			}
 			drivertest.AwaitFocusedInput(t, d, iosE2EFocusInput)
 		},

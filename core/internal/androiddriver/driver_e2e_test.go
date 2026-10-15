@@ -56,11 +56,12 @@ func TestAndroidDriver_E2E(t *testing.T) {
 }
 
 const (
-	androidE2EDemoAppID   = "dev.atomyx.demo"
-	androidE2EFocusLink   = "atomyxdemo://open/focus"
-	androidE2EFocusInput  = "focus-input"
-	androidE2EAdbDeadline = 30 * time.Second
-	androidE2EHTTPTimeout = 10 * time.Second
+	androidE2EDemoAppID    = "dev.atomyx.demo"
+	androidE2EFocusRoute   = "/focus"
+	androidE2EMainActivity = "dev.atomyx.demo/.MainActivity"
+	androidE2EFocusInput   = "focus-input"
+	androidE2EAdbDeadline  = 30 * time.Second
+	androidE2EHTTPTimeout  = 10 * time.Second
 )
 
 // androidE2EInstance is one driver the suite built, with the command
@@ -132,17 +133,21 @@ func (f *androidE2EFixture) hooks() drivertest.Hooks {
 	return hooks
 }
 
-// focusInput opens the demo app's focus route through its deep link,
-// using adb directly because the driver exposes no URL-open call, then
-// waits until the field reports focus.
+// focusInput restarts the demo app on its focus route through the
+// "route" intent extra, using adb directly because the driver exposes no
+// route-aware launch, then waits until the field reports focus. The
+// force stop makes the extra take effect even when the app is running.
 func (f *androidE2EFixture) focusInput(t *testing.T, d driver.Driver) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), androidE2EAdbDeadline)
 	defer cancel()
-	_, err := process.NewExec().Run(ctx, "adb", "-s", f.serial, "shell", "am", "start",
-		"-a", "android.intent.action.VIEW", "-d", androidE2EFocusLink, "-p", androidE2EDemoAppID)
-	if err != nil {
-		t.Fatalf("open %s through adb: %v", androidE2EFocusLink, err)
+	exec := process.NewExec()
+	if _, err := exec.Run(ctx, "adb", "-s", f.serial, "shell", "am", "force-stop", androidE2EDemoAppID); err != nil {
+		t.Fatalf("stop %s through adb: %v", androidE2EDemoAppID, err)
+	}
+	if _, err := exec.Run(ctx, "adb", "-s", f.serial, "shell", "am", "start",
+		"-n", androidE2EMainActivity, "--es", "route", androidE2EFocusRoute); err != nil {
+		t.Fatalf("start the demo app on %s through adb: %v", androidE2EFocusRoute, err)
 	}
 	drivertest.AwaitFocusedInput(t, d, androidE2EFocusInput)
 }
