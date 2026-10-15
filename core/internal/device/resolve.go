@@ -165,7 +165,7 @@ func reuseServedRunner(ctx context.Context, runners RunnerIdentifier, desc *Desc
 		return nil
 	}
 	if got.ProtocolVersion != version.AgentProtocolVersion {
-		_, message, _ := diag.Describe(diag.NewAgentVersionMismatch(got.ProtocolVersion, version.AgentProtocolVersion))
+		message := fmt.Sprintf("the on-device agent speaks protocol version %d, but this host requires version %d", got.ProtocolVersion, version.AgentProtocolVersion)
 		remedy := fmt.Sprintf("Stop the runner served on port %d or rebuild it.", iosControlPort)
 		return diag.New(diag.CodeAgentVersionMismatch, message, remedy, nil)
 	}
