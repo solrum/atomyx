@@ -131,6 +131,11 @@ cat > "$fakes/nc" <<'FAKE'
 #!/usr/bin/env bash
 [ -e "$FAKE_RUNNER_FLAG" ]
 FAKE
+cat > "$fakes/lsof" <<'FAKE'
+#!/usr/bin/env bash
+[ -e "$FAKE_RUNNER_FLAG" ] && cat "$FAKE_RUNNER_FLAG"
+exit 0
+FAKE
 cat > "$fakes/make" <<'FAKE'
 #!/usr/bin/env bash
 echo "make $*" >> "$FAKE_LOG"
@@ -140,7 +145,7 @@ case "$*" in
     echo "pass: 7"; echo "fail: 0"; echo "skip: 2"
     ;;
   *serve*)
-    touch "$FAKE_RUNNER_FLAG"
+    echo 4242 > "$FAKE_RUNNER_FLAG"
     trap 'rm -f "$FAKE_RUNNER_FLAG"; exit 0' TERM
     sleep 600 &
     wait

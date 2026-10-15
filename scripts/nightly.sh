@@ -209,6 +209,7 @@ runner_pid=""
 emulator_pid=""
 emulator_serial=""
 booted_sim=""
+runner_listener=""
 device_id=""
 fail_reason=""
 
@@ -220,22 +221,27 @@ kill_tree() {
   kill "$pid" 2>/dev/null || true
 }
 
-# Confirms the runner port is free after a teardown. A process that
-# survived its parent's death and still holds the port is a descendant of
-# the runner this script started, so it is stopped by its listening pid.
+listening_pid() {
+  lsof -ti "tcp:${RUNNER_PORT}" -sTCP:LISTEN 2>/dev/null | head -1 || true
+}
+
+# Confirms the runner port is free after a teardown. The runner inside a
+# simulator is started by the simulator's own launchd, so it can outlive
+# the process tree this script started. The listener recorded right after
+# this entry's runner came up is the only process stopped here, and only
+# while it still holds the port. Any other listener belongs to someone
+# else and only produces a warning.
 release_runner_port() {
-  local waited=0 pid
-  while runner_listening; do
-    if [ "$waited" -ge "$RUNNER_RELEASE_WAIT_S" ]; then
-      for pid in $(lsof -ti "tcp:${RUNNER_PORT}" -sTCP:LISTEN 2>/dev/null || true); do
-        kill "$pid" 2>/dev/null || true
-      done
-      sleep 2
-      break
-    fi
+  local waited=0
+  while runner_listening && [ "$waited" -lt "$RUNNER_RELEASE_WAIT_S" ]; do
     sleep 1
     waited=$((waited + 1))
   done
+  if runner_listening && [ -n "$runner_listener" ] && [ "$(listening_pid)" = "$runner_listener" ]; then
+    kill "$runner_listener" 2>/dev/null || true
+    sleep 2
+  fi
+  runner_listener=""
   if runner_listening; then
     echo "warning: port ${RUNNER_PORT} is still in use after teardown" >&2
   fi
@@ -385,6 +391,7 @@ prepare_entry() {
       make -C "${repo_root}/platforms/ios-agent" serve UDID="$device_id" >> "$log" 2>&1 &
       runner_pid=$!
       wait_for_runner || return 1
+      runner_listener="$(listening_pid)"
       if [ -d "${repo_root}/${DEMO_REL_SIM_APP}" ]; then
         xcrun simctl install "$device_id" "${repo_root}/${DEMO_REL_SIM_APP}" >> "$log" 2>&1 || {
           fail_reason="demo app install failed"
@@ -396,6 +403,7 @@ prepare_entry() {
       make -C "${repo_root}/platforms/ios-agent" serve-device DEVICE_UDID="$device_id" >> "$log" 2>&1 &
       runner_pid=$!
       wait_for_runner || return 1
+      runner_listener="$(listening_pid)"
       ;;
   esac
 }
