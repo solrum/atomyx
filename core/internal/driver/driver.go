@@ -146,7 +146,8 @@ type Driver interface {
 	//     launch when bundleID is not currently foreground.
 	LaunchApp(ctx context.Context, bundleID string, args LaunchArgs) error
 
-	// StopApp stops bundleID.
+	// StopApp stops bundleID. See CurrentForeground for what the
+	// foreground report guarantees once StopApp returns nil.
 	StopApp(ctx context.Context, bundleID string) error
 
 	// KillApp forcibly terminates bundleID.
@@ -159,6 +160,14 @@ type Driver interface {
 	// adapter has no way to query the device for the true foreground
 	// app. A caller must check CanQueryForeground before relying on
 	// the returned ForegroundInfo.
+	//
+	// The report reflects the device with a short delay. When
+	// LaunchApp returns nil, CurrentForeground reports bundleID in
+	// front, and when StopApp returns nil it no longer does, except
+	// that the adapter bounds its wait for this, so an app that
+	// handed off to another package can leave the report different.
+	// A caller that reads the foreground right after any other
+	// device action must poll with its own bound, not trust one read.
 	CurrentForeground(ctx context.Context) (ForegroundInfo, error)
 
 	// ListApps lists the apps installed on the device.

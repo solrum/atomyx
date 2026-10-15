@@ -89,13 +89,13 @@ func testLaunchAppLifecycle(t *testing.T, newDriver Factory, hooks Hooks) {
 	if err := d.LaunchApp(ctx, bundleID, driver.LaunchArgs{}); err != nil {
 		t.Fatalf("LaunchApp: %v", err)
 	}
-	foreground, err := d.CurrentForeground(ctx)
+	foreground, err := awaitForeground(ctx, d, bundleID, true)
 	assertForeground(t, d, foreground, err, bundleID, "after launch")
 
 	if err := d.StopApp(ctx, bundleID); err != nil {
 		t.Fatalf("StopApp: %v", err)
 	}
-	foreground, err = d.CurrentForeground(ctx)
+	foreground, err = awaitForeground(ctx, d, bundleID, false)
 	if hooks.NoForeground != nil {
 		assertForeground(t, d, foreground, err, "", "after stop")
 		return
@@ -123,7 +123,7 @@ func testLaunchAppFreshStopsThenLaunches(t *testing.T, newDriver Factory, hooks 
 	if err := d.LaunchApp(ctx, bundleID, driver.LaunchArgs{NoReset: &fresh}); err != nil {
 		t.Fatalf("fresh LaunchApp: %v", err)
 	}
-	foreground, err := d.CurrentForeground(ctx)
+	foreground, err := awaitForeground(ctx, d, bundleID, true)
 	assertForeground(t, d, foreground, err, bundleID, "after a fresh launch")
 }
 
@@ -139,13 +139,13 @@ func testLaunchAppAttach(t *testing.T, newDriver Factory, hooks Hooks) {
 	if err := d.LaunchApp(ctx, bundleID, driver.LaunchArgs{NoReset: &attach}); err != nil {
 		t.Fatalf("attach launch on a cold app: %v", err)
 	}
-	foreground, err := d.CurrentForeground(ctx)
+	foreground, err := awaitForeground(ctx, d, bundleID, true)
 	assertForeground(t, d, foreground, err, bundleID, "after an attach launch on a cold app")
 
 	if err := d.LaunchApp(ctx, bundleID, driver.LaunchArgs{NoReset: &attach}); err != nil {
 		t.Fatalf("attach launch while already foreground: %v", err)
 	}
-	foreground, err = d.CurrentForeground(ctx)
+	foreground, err = awaitForeground(ctx, d, bundleID, true)
 	assertForeground(t, d, foreground, err, bundleID, "after an attach launch while already foreground")
 }
 

@@ -83,9 +83,9 @@ adb-forward lifecycle, and tree normalization
 | `EraseText()` | `POST /actions/clear_focused_input` | `ClearFocusedInputRoute` then `FocusedInputClearer.clearFocusedInput` | One call regardless of `count`, always clearing the field's entire value. Failure returns an `AGENT_REJECTED` error carrying the agent's sanitized reason and a remedy to focus an input field first, wrapping a `*ClearTextError` with the agent's full diagnosis. |
 | `PressKey()` | `POST /actions/key` | `KeyRoute` then `SystemActionDispatcher.pressKey` | Supports `back` and `home`. `enter` is rejected, because no accessibility or app-scope action synthesizes a hardware Enter on a non-rooted device. |
 | `HideKeyboard()` | `POST /actions/hide_keyboard` | `HideKeyboardRoute` then `KeyboardHider.hideKeyboard` | |
-| `LaunchApp()` | `POST /actions/launch` | `LaunchRoute` then `SystemActionDispatcher.launchApp` | `Context.startActivity` via the package's launch intent. |
-| `StopApp()` / `KillApp()` | none (host `adb shell am force-stop <package>`) | the device shell | Runs through the host process runner because the shell user holds the force-stop permission that the agent process lacks, so reset works on non-rooted devices. The package name is validated against the Android package-name grammar before it reaches the shell. A non-zero exit returns a `*ForceStopError` carrying the shell's stderr, and a reset `LaunchApp` propagates it instead of relaunching over an unstopped process. The command exits 0 for a package that is installed but not running or not installed, so stopping an absent app is a no-op. The agent keeps `POST /actions/force_stop` (`ForceStopRoute`), but the driver does not call it. |
-| `CurrentForeground()` | `GET /current-activity` | `CurrentActivityRoute` | |
+| `LaunchApp()` | `POST /actions/launch` | `LaunchRoute` then `SystemActionDispatcher.launchApp` | `Context.startActivity` via the package's launch intent. After the intent is sent, the driver polls `CurrentForeground` until the package equals the launched one (the attach shortcut for an app already in front returns without waiting). |
+| `StopApp()` / `KillApp()` | none (host `adb shell am force-stop <package>`) | the device shell | Runs through the host process runner because the shell user holds the force-stop permission that the agent process lacks, so reset works on non-rooted devices. The package name is validated against the Android package-name grammar before it reaches the shell. A non-zero exit returns a `*ForceStopError` carrying the shell's stderr, and a reset `LaunchApp` propagates it instead of relaunching over an unstopped process. The command exits 0 for a package that is installed but not running or not installed, so stopping an absent app is a no-op. The agent keeps `POST /actions/force_stop` (`ForceStopRoute`), but the driver does not call it. After the shell command exits 0, the driver polls `CurrentForeground` until the package differs from the stopped one. |
+| `CurrentForeground()` | `GET /current-activity` | `CurrentActivityRoute` | The agent answers from a cache fed by window state change events, so the package trails the system by about 0.3 to 1 s after a stop, and the activity class can stay a placeholder such as `android.widget.FrameLayout` for up to about 3 s after a launch while the package is already right. Callers compare the package only. |
 | `ListApps()` | `GET /apps` | `AppsRoute` | Reads `PackageManager.getInstalledApplications`. |
 | `Screenshot()` | `GET /screenshot` | `ScreenshotRoute` | JPEG, base64-encoded. |
 | `InstallApp()` / `UninstallApp()` / `ClearAppData()` / `IsAppInstalled()` | none (host-only) | `adb install` / `adb uninstall` / `adb shell pm clear` / `adb shell pm list packages` | No HTTP route: the driver shells out directly. |
@@ -207,6 +207,17 @@ Proxy, certificate, and screen-lock setup for a physical device are
 covered in `android-device-setup.md`, not here.
 
 ## Platform-specific quirks
+
+**The foreground report trails the system.** `LaunchApp` and `StopApp`
+succeed once the intent or the shell command is accepted, but the
+agent reports the foreground from window state change events. The
+driver therefore polls `CurrentForeground` after a launch until the
+package equals the launched one, and after a stop until it differs
+from the stopped one. It compares the package only, polls every
+100 ms for at most 5 s on `Options.Clock`, and on timeout or a failed
+foreground read emits one warning through `Options.Warn` and returns
+nil, because an app may hand off to another package. The attach
+shortcut for an app already in front returns without waiting.
 
 **A lost Android agent has no exit signal.** The host supervises no
 Android process. The control plane is an `AccessibilityService` inside
