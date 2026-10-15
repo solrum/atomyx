@@ -18,6 +18,19 @@ type Filter struct {
 type Result struct {
 	Tests   []TestStats
 	Skipped int
+	// Totals sums the counts of Tests, including the infrastructure failure
+	// rate over all their runs.
+	Totals Totals
+}
+
+// Totals is the sum of the failure counts across the tests of a Result.
+// InfraFailureRate is InfraFailures divided by Runs, and zero when Runs is
+// zero.
+type Totals struct {
+	Runs             int
+	InfraFailures    int
+	TestFailures     int
+	InfraFailureRate float64
 }
 
 // Query reads every finished test run from source and returns the
@@ -54,5 +67,14 @@ func Query(source Source, filter Filter) (Result, error) {
 	if stats == nil {
 		stats = []TestStats{}
 	}
-	return Result{Tests: stats, Skipped: skipped}, nil
+	var totals Totals
+	for _, s := range stats {
+		totals.Runs += s.Runs
+		totals.InfraFailures += s.InfraFailures
+		totals.TestFailures += s.TestFailures
+	}
+	if totals.Runs > 0 {
+		totals.InfraFailureRate = float64(totals.InfraFailures) / float64(totals.Runs)
+	}
+	return Result{Tests: stats, Skipped: skipped, Totals: totals}, nil
 }

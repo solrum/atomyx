@@ -124,11 +124,13 @@ func runRecord(m runfolder.Meta) (Record, bool) {
 		return Record{}, false
 	}
 	var outcome Outcome
+	var class Class
 	switch m.Result {
 	case runfolder.ResultPassed:
 		outcome = OutcomePassed
 	case runfolder.ResultFailed:
 		outcome = OutcomeFailed
+		class, _ = Classify(m.Outcome, m.ErrorCode)
 	default:
 		return Record{}, false
 	}
@@ -139,6 +141,7 @@ func runRecord(m runfolder.Meta) (Record, bool) {
 		Outcome:     outcome,
 		DurationMs:  *m.CompletedAt - m.StartedAt,
 		HasDuration: true,
+		Class:       class,
 	}, true
 }
 

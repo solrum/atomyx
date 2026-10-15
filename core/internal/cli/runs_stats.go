@@ -12,20 +12,26 @@ import (
 // runStatsJSON is the --json shape of runs stats. Tests is present and
 // never null.
 type runStatsJSON struct {
-	Tests   []runStatsEntryJSON `json:"tests"`
-	Skipped int                 `json:"skipped"`
+	Tests            []runStatsEntryJSON `json:"tests"`
+	Skipped          int                 `json:"skipped"`
+	InfraFailures    int                 `json:"infraFailures"`
+	TestFailures     int                 `json:"testFailures"`
+	InfraFailureRate float64             `json:"infraFailureRate"`
 }
 
 type runStatsEntryJSON struct {
-	TestKey       string   `json:"testKey"`
-	Runs          int      `json:"runs"`
-	Passed        int      `json:"passed"`
-	Failed        int      `json:"failed"`
-	Flaky         int      `json:"flaky"`
-	FlakyRate     float64  `json:"flakyRate"`
-	LastOutcomes  []string `json:"lastOutcomes"`
-	DurationP50Ms int64    `json:"durationP50Ms"`
-	DurationP95Ms int64    `json:"durationP95Ms"`
+	TestKey          string   `json:"testKey"`
+	Runs             int      `json:"runs"`
+	Passed           int      `json:"passed"`
+	Failed           int      `json:"failed"`
+	Flaky            int      `json:"flaky"`
+	FlakyRate        float64  `json:"flakyRate"`
+	InfraFailures    int      `json:"infraFailures"`
+	TestFailures     int      `json:"testFailures"`
+	InfraFailureRate float64  `json:"infraFailureRate"`
+	LastOutcomes     []string `json:"lastOutcomes"`
+	DurationP50Ms    int64    `json:"durationP50Ms"`
+	DurationP95Ms    int64    `json:"durationP95Ms"`
 }
 
 // runsStats prints the outcome statistics of every test key in the
@@ -47,7 +53,7 @@ func runsStats(ctx context.Context, deps Deps, env runsEnv, flags map[string]Fla
 		return reportUncaught(ctx, deps.stderr(), deps.Debug, err)
 	}
 	if flagBool(flags, "--json") {
-		return printStatsJSON(ctx, deps, result.Tests, result.Skipped)
+		return printStatsJSON(ctx, deps, result)
 	}
 	return printStatsTable(deps, result.Tests, result.Skipped)
 }
@@ -69,9 +75,13 @@ func statsWindow(flags map[string]FlagValue) (history.Window, error) {
 	return window, nil
 }
 
-func printStatsJSON(ctx context.Context, deps Deps, stats []history.TestStats, skipped int) int {
-	doc := runStatsJSON{Tests: make([]runStatsEntryJSON, 0, len(stats)), Skipped: skipped}
-	for _, s := range stats {
+func printStatsJSON(ctx context.Context, deps Deps, result history.Result) int {
+	doc := runStatsJSON{
+		Tests: make([]runStatsEntryJSON, 0, len(result.Tests)), Skipped: result.Skipped,
+		InfraFailures: result.Totals.InfraFailures, TestFailures: result.Totals.TestFailures,
+		InfraFailureRate: result.Totals.InfraFailureRate,
+	}
+	for _, s := range result.Tests {
 		last := make([]string, len(s.LastOutcomes))
 		for i, o := range s.LastOutcomes {
 			last[i] = string(o)
@@ -79,6 +89,7 @@ func printStatsJSON(ctx context.Context, deps Deps, stats []history.TestStats, s
 		doc.Tests = append(doc.Tests, runStatsEntryJSON{
 			TestKey: s.Key, Runs: s.Runs, Passed: s.Passed, Failed: s.Failed, Flaky: s.Flaky,
 			FlakyRate: s.FlakyRate, LastOutcomes: last,
+			InfraFailures: s.InfraFailures, TestFailures: s.TestFailures, InfraFailureRate: s.InfraFailureRate,
 			DurationP50Ms: s.DurationP50Ms, DurationP95Ms: s.DurationP95Ms,
 		})
 	}
@@ -94,10 +105,10 @@ func printStatsTable(deps Deps, stats []history.TestStats, skipped int) int {
 		_, _ = fmt.Fprintln(out, "No finished runs found.")
 	} else {
 		table := newTable(out)
-		_, _ = fmt.Fprintln(table, "TEST\tRUNS\tPASSED\tFAILED\tFLAKY\tFLAKY RATE\tP50\tP95\tLAST")
+		_, _ = fmt.Fprintln(table, "TEST\tRUNS\tPASSED\tFAILED\tINFRA FAILS\tTEST FAILS\tFLAKY\tFLAKY RATE\tINFRA RATE\tP50\tP95\tLAST")
 		for _, s := range stats {
-			_, _ = fmt.Fprintf(table, "%s\t%d\t%d\t%d\t%d\t%.1f%%\t%s\t%s\t%s\n",
-				s.Key, s.Runs, s.Passed, s.Failed, s.Flaky, s.FlakyRate*100,
+			_, _ = fmt.Fprintf(table, "%s\t%d\t%d\t%d\t%d\t%d\t%d\t%.1f%%\t%.1f%%\t%s\t%s\t%s\n",
+				s.Key, s.Runs, s.Passed, s.Failed, s.InfraFailures, s.TestFailures, s.Flaky, s.FlakyRate*100, s.InfraFailureRate*100,
 				durationOrDash(s.DurationP50Ms), durationOrDash(s.DurationP95Ms), lastOutcomeLetters(s.LastOutcomes))
 		}
 		_ = table.Flush()

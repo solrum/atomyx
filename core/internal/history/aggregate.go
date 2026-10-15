@@ -27,20 +27,26 @@ type Window struct {
 //
 // Runs counts every record in the window. Passed includes flaky records,
 // because a flaky record passed in the end, and Failed counts the rest.
+// InfraFailures and TestFailures split Failed by who the failure is blamed
+// on, so Failed is their sum, and a failed record with no class counts as a
+// test failure. InfraFailureRate is InfraFailures divided by Runs.
 // FlakyRate is Flaky divided by Runs. LastOutcomes lists up to
 // LastOutcomesCap outcomes, most recent first. The duration percentiles
 // use the nearest-rank method over records with a known duration and are
 // zero when none has one.
 type TestStats struct {
-	Key           string
-	Runs          int
-	Passed        int
-	Failed        int
-	Flaky         int
-	FlakyRate     float64
-	LastOutcomes  []Outcome
-	DurationP50Ms int64
-	DurationP95Ms int64
+	Key              string
+	Runs             int
+	Passed           int
+	Failed           int
+	Flaky            int
+	FlakyRate        float64
+	InfraFailures    int
+	TestFailures     int
+	InfraFailureRate float64
+	LastOutcomes     []Outcome
+	DurationP50Ms    int64
+	DurationP95Ms    int64
 }
 
 // Aggregate groups records by test key and computes the stats of each key
@@ -82,6 +88,11 @@ func statsOf(key string, group []Record) TestStats {
 		switch r.Outcome {
 		case OutcomeFailed:
 			s.Failed++
+			if r.Class == ClassInfra {
+				s.InfraFailures++
+			} else {
+				s.TestFailures++
+			}
 		case OutcomeFlaky:
 			s.Flaky++
 			s.Passed++
@@ -96,6 +107,7 @@ func statsOf(key string, group []Record) TestStats {
 		}
 	}
 	s.FlakyRate = float64(s.Flaky) / float64(s.Runs)
+	s.InfraFailureRate = float64(s.InfraFailures) / float64(s.Runs)
 	slices.Sort(durations)
 	s.DurationP50Ms = nearestRank(durations, percentile50)
 	s.DurationP95Ms = nearestRank(durations, percentile95)
