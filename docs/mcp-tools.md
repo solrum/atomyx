@@ -775,7 +775,7 @@ equivalent on the current platform.
 
 | Key | Android | iOS |
 |---|---|---|
-| back | Dispatches the system back action. Always reports success, regardless of whether the foreground app handled it. | Taps the navigation bar's back button when one is present, reporting success. Otherwise performs a left-edge swipe gesture as a best-effort fallback, reporting no confirmable effect and naming an on-screen affordance to try instead. |
+| back | Dispatches the system back action. Always reports success, regardless of whether the foreground app handled it. | Taps the navigation bar's back button when one is present, reporting success. Otherwise taps a button labelled or identified "Back" in the top band of the screen, reporting success. Otherwise performs a left-edge swipe gesture as a best-effort fallback, reporting no confirmable effect and naming an on-screen affordance to try instead. |
 | home | Dispatches the system home action. Always reports success. | Presses the device's home control. Always reports success. |
 | enter | Not recognized. Rejected with a tool error listing the keys the device build accepts. | Types a newline into the focused field. Always reports success. |
 | tab | Not recognized. Rejected with a tool error listing the keys the device build accepts. | Not recognized as a distinct key. Types the literal text "tab" into the focused field and reports success. |

@@ -80,7 +80,7 @@ Runner-side files under `platforms/ios-agent/Tests`:
 | `platforms/ios-agent/Tests/Bridge/EventSynthesizerFactory.swift` | Picks `EventRecordSynthesizer` when its probe passes, `CoordinateSynthesizer` otherwise. Selection is fully internal, with no caller-facing knob. |
 | `platforms/ios-agent/Tests/Commands` (directory) | One `CommandHandler` per wire command |
 | `platforms/ios-agent/Tests/Commands/DispatchPointerCommand.swift` | Accepts a raw waypoint list, routes it through the active synthesizer |
-| `platforms/ios-agent/Tests/PressKey` (directory) | `pressKey` strategy chain (nav bar back, then edge swipe, then a fallback strategy) |
+| `platforms/ios-agent/Tests/PressKey` (directory) | `pressKey` strategy chain (nav bar back, then top bar back, then edge swipe, then a fallback strategy) |
 | `platforms/ios-agent/Tests/Commands/Clear`, `platforms/ios-agent/Tests/Commands/Clear/Strategies` (directories) | `clearFocusedInput` strategy chain |
 | `platforms/ios-agent/Tests/CommandHandlerUnitTests.swift` | Runs without a simulator via a mock bridge plus classifier unit tests |
 
@@ -768,9 +768,11 @@ device's nominal logical size.
 
 **`pressKey` is not a system primitive.** Android dispatches a BACK
 intent regardless of app handling, but iOS only has per-screen
-affordances. `BackKeyStrategy` tries the nav bar back button first
-(verifiable, returns `affordanceFound: true`) and falls back to an
-edge-swipe gesture (unverifiable, returns `affordanceFound: false`
+affordances. `BackKeyStrategy` tries the nav bar back button first, then a
+button labelled or identified "Back" inside the top 15 percent of the
+window (strategy `top_bar_back`, for apps such as Flutter that draw
+their own app bar). Both are verifiable and return
+`affordanceFound: true`. It then falls back to an edge-swipe gesture (unverifiable, returns `affordanceFound: false`
 with a hint to try a screen-specific Cancel, Done, or Close
 affordance instead).
 

@@ -589,7 +589,7 @@ type pressKeyResponse struct {
 }
 
 // PressKey reports the runner's affordanceFound flag as KeyResult.Ok:
-// true means a verifiable control was used (nav bar back, a home
+// true means a verifiable control was used (nav bar back, top bar back, a home
 // device press, enter into a focused field); false means a
 // best-effort gesture was dispatched with no confirmable effect (for
 // example the iOS back-gesture fallback). Strategy is surfaced as

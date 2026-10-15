@@ -743,9 +743,10 @@ first.
   intent regardless of app handling, but iOS only has per-screen
   affordances. `BackKeyStrategy`
   (`platforms/ios-agent/Tests/PressKey/BackKeyStrategy.swift`) tries
-  the nav bar back button first (verifiable, reports
-  `affordanceFound: true`) then an edge-swipe fallback (unverifiable,
-  reports `affordanceFound: false`). A caller must check that field
+  the nav bar back button first, then a button labelled or identified
+  "Back" inside the top 15 percent of the window (both verifiable,
+  report `affordanceFound: true`), then an edge-swipe fallback
+  (unverifiable, reports `affordanceFound: false`). A caller must check that field
   and fall back to a screen-specific Cancel, Done, or Close affordance
   when it is false, never treat `PressKey(back)` as guaranteed the way
   Android allows.

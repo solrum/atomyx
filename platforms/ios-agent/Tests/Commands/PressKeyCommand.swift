@@ -18,7 +18,7 @@ import XCTest
 /// Response data:
 ///   - `key`: echoed back for correlation
 ///   - `affordanceFound`: true iff a verifiable control was used
-///   - `strategy`: which path was taken (nav_bar_back | edge_swipe_best_effort
+///   - `strategy`: which path was taken (nav_bar_back | top_bar_back | edge_swipe_best_effort
 ///                 | home | enter | typed_raw | ...)
 final class PressKeyCommand: CommandHandler {
     let type = "pressKey"

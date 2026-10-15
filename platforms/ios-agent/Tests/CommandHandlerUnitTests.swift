@@ -400,6 +400,22 @@ final class CommandHandlerUnitTests: XCTestCase {
         XCTAssertEqual(byKey["back"]?.lastAppWasNonNil, true)
     }
 
+    func testPressKeyForwardsTopBarBackStrategy() {
+        let back = FakePressKeyStrategy(
+            key: "back",
+            requiresApp: true,
+            result: PressKeyResult(affordanceFound: true, strategy: "top_bar_back")
+        )
+        let (cmd, _) = makePressKeyCommand(strategies: [back])
+
+        let req = Request(id: 1, type: "pressKey", args: ["key": "back"])
+        let resp = cmd.handle(req, bridge: MockXCUIBridge(), state: mockState())
+
+        XCTAssertTrue(resp.ok)
+        XCTAssertEqual(resp.data["affordanceFound"] as? Bool, true)
+        XCTAssertEqual(resp.data["strategy"] as? String, "top_bar_back")
+    }
+
     func testPressKeyForwardsAffordanceFalseForEdgeSwipeFallback() {
         // Exercises the `affordanceFound=false` wire response path.
         let back = FakePressKeyStrategy(
