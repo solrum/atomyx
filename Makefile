@@ -155,6 +155,7 @@ check:
 	bash scripts/check-agent-protocol.sh
 	bash scripts/check-commit-size-hook.sh
 	bash scripts/check-e2e-skip-gate.sh
+	bash scripts/check-soak.sh
 	node scripts/lint-banned-phrases.mjs
 	node scripts/lint-doc-paths.mjs
 

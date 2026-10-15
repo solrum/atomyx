@@ -403,6 +403,56 @@ wired yet, and wiring the fixture deletes the entry in the same change.
 Each entry is one line, `<leg> <key> <reason>`, with the leg being
 `android`, `ios`, or `iossim`.
 
+### Soak
+
+A soak repeats one short demo flow many times on one device to measure how
+often the infrastructure fails, as opposed to the app under test.
+`examples/soak/demo-soak.yml` launches `dev.atomyx.demo`, signs in, opens
+Products and scrolls, opens Gestures for a long press and a swipe, and ends
+on the home screen, with waits and visibility assertions between screens. The
+script language has no erase, reset, or stop step, so the flow signs out through
+a precondition and ends with the home key. One run takes well under a minute.
+
+```bash
+scripts/soak.sh <android|ios|iossim> <device-id> <count> [max-infra-rate]
+```
+
+Prerequisites per platform:
+
+- `android`: the Atomyx agent is ready on the device (`atomyx doctor`
+  reports healthy) and `dev.atomyx.demo` is installed (`make demo-android`
+  builds the APK).
+- `ios`: the runner is served for the device and the signed demo build is
+  installed (`make demo-ios-device`).
+- `iossim`: the runner is served for the booted simulator and the demo is
+  installed (`make demo-ios-sim`). The script passes the simulator UDID as the
+  device id.
+
+The script uses `core/bin/atomyx` (`ATOMYX_BIN` overrides it, `make build-core`
+builds it), runs the flow `count` times, and keeps going after a failed
+iteration. Results land in `e2e-results/soak/<UTC timestamp>-<platform>/`:
+
+- `iter-NNNN.log` holds the output of each run.
+- `iterations.txt` holds one line per run with the iteration number and exit
+  code.
+- `storage/` holds the run folders, unless `ATOMYX_STORAGE_DIR` is set, so a
+  soak never writes into `~/.atomyx`.
+- `summary.txt` holds the platform, the total, passed, and failed counts, and
+  `infraFailures`, `attempts`, and `infraFailureRate` read from
+  `atomyx runs stats --json`.
+
+The exit status is 0 when the infrastructure failure rate is at or below the
+limit and 1 when it is above, or when the statistics cannot be read. The limit
+is the fourth argument, then `ATOMYX_SOAK_MAX_INFRA_RATE`, then 0.005. A test
+failure counts as failed in the summary but not toward the rate. Ctrl-C stops
+after the current run, writes a partial summary with `interrupted: yes`, and
+exits 130. Use a fresh storage directory per soak, because the rate covers
+every run in the storage root.
+
+`scripts/check-soak.sh` runs in `make check`. It drives the script with a fake
+`atomyx` binary that replays passes, test failures, and infrastructure
+failures, and asserts the summary counts, the rate, and the exit codes.
+
 ### Scheduling
 
 The repository does not install a schedule. An operator who wants a
