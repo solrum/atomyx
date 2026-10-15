@@ -80,9 +80,14 @@ func DefaultScrollControllerOptions() ScrollControllerOptions {
 // when the target element cannot be found via scroll-search, or
 // cannot be centered within the iteration budget. FinalBounds is the
 // last known bounds of the element when available.
+//
+// NotFound is true when the element never appeared in the tree during
+// the search, as opposed to appearing and then failing to reach the
+// viewport.
 type ScrollUnreachableError struct {
 	Message     string
 	FinalBounds *wire.Bounds
+	NotFound    bool
 }
 
 func (e *ScrollUnreachableError) Error() string { return e.Message }
@@ -148,7 +153,8 @@ func (s *ScrollController) EnsureVisible(ctx context.Context, filter ElementFilt
 		}
 		if found == nil {
 			return nil, &ScrollUnreachableError{
-				Message: "element not found after scroll-search (UP + DOWN budgets exhausted)",
+				Message:  "element not found after scrolling",
+				NotFound: true,
 			}
 		}
 		match = found

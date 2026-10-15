@@ -187,6 +187,12 @@ func TestOrchestra_EnsureVisible_ScrollSearchExhaustedFailsAction(t *testing.T) 
 	if result.Reason == "" {
 		t.Fatal("expected a non-empty failure reason")
 	}
+	if result.Code != diag.CodeElementNotFound {
+		t.Fatalf("got Code %q, want %q", result.Code, diag.CodeElementNotFound)
+	}
+	if want := "could not scroll element into view: element not found after scrolling"; result.Reason != want {
+		t.Fatalf("got Reason %q, want %q", result.Reason, want)
+	}
 
 	for _, c := range d.Calls {
 		if c.Method == "Tap" {
@@ -411,6 +417,9 @@ func TestOrchestra_InputText_RefusesToTypeIntoWrongFocusedField(t *testing.T) {
 	}
 	if focusErr.Target != "id" {
 		t.Fatalf("got Target %q, want %q", focusErr.Target, "id")
+	}
+	if code, _, remedy := diag.Describe(err); code != diag.CodeInputNotFocused || remedy == "" {
+		t.Fatalf("got code %q remedy %q, want code %q with a remedy", code, remedy, diag.CodeInputNotFocused)
 	}
 	for _, c := range d.Calls {
 		if c.Method == "InputText" || c.Method == "EraseText" {

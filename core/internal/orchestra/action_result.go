@@ -31,6 +31,7 @@ type ActionResult struct {
 	ResolvedBy string        `json:"resolvedBy,omitempty"`
 	Detail     string        `json:"detail,omitempty"`
 	Reason     string        `json:"reason,omitempty"`
+	Code       string        `json:"code,omitempty"`
 	Obscurer   *ObscurerInfo `json:"obscurer,omitempty"`
 }
 

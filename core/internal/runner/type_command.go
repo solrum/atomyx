@@ -32,7 +32,7 @@ func (TypeCommand) Execute(step script.ScriptStep, ctx *CommandContext) CommandR
 			panic(err)
 		}
 		if !result.Ok {
-			return CommandResult{Ok: false, Detail: strPtr(actionFailureDetail(result))}
+			return actionFailure(result)
 		}
 		return CommandResult{Ok: true, Detail: strPtr(typedDetail(ctx, s.Text, ""))}
 	}

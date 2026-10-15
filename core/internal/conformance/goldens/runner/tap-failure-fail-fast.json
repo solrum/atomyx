@@ -132,7 +132,7 @@
     {
       "command": "tap",
       "depth": 0,
-      "detail": "could not scroll element into view: element not found after scroll-search (UP + DOWN budgets exhausted)",
+      "detail": "could not scroll element into view: element not found after scrolling",
       "durationMs": 1000,
       "line": 6,
       "ok": false,
@@ -186,7 +186,7 @@
     },
     {
       "command": "tap",
-      "detail": "could not scroll element into view: element not found after scroll-search (UP + DOWN budgets exhausted)",
+      "detail": "could not scroll element into view: element not found after scrolling",
       "durationMs": 1000,
       "ok": false,
       "stepIndex": 1

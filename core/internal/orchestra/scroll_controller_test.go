@@ -72,6 +72,9 @@ func TestScrollController_ThinTreeCapsScrollSearchBudget(t *testing.T) {
 	if !errors.As(err, &unreachable) {
 		t.Fatalf("got error %v (%T), want *ScrollUnreachableError", err, err)
 	}
+	if !unreachable.NotFound {
+		t.Fatal("an element that never appeared must report NotFound")
+	}
 
 	// Configured budget is 6 (12 total swipes), but the thin-tree
 	// pre-check caps it to thinTreeBudget=2 per direction (4 total).

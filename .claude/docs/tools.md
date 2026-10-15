@@ -179,6 +179,12 @@ above). Registration is never auto-discovered, so adding a file under
   `select_device` as the fix. Tools where "no device yet" is itself a meaningful outcome
   (`report_bug`, `disconnect_device`) read
   `tc.Session.Current()` directly instead.
+- **Failure codes from selector actions**: an `ActionResult` with
+  `ok: false` carries `code` `ELEMENT_NOT_FOUND` when scroll-search
+  never found the target. `input_text` fails with `INPUT_NOT_FOCUSED`
+  when the tapped field never took input focus. Both are test
+  failures in run history, unlike `TOOL_TIMEOUT`, which blames the
+  infrastructure.
 - **Input schema helpers** (`core/internal/mcp/schema_helpers.go`):
   the `js*` functions (`jsObject`, `jsString`, `jsStringDesc`,
   `jsNumber`, `jsBoolean`, `jsArray`, `jsAnyOf`, `jsConst`,

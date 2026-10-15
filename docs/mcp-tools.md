@@ -530,7 +530,9 @@ result.
 **Errors and recovery**
 - `ok: false` with a "not found" or "could not scroll element into
   view" reason: widen the selector, or confirm the element exists
-  with get_ui_tree or find_element first.
+  with get_ui_tree or find_element first. When the element never
+  appeared after scrolling, the result also carries `code`
+  `ELEMENT_NOT_FOUND`.
 - `ok: false` with an `obscurer`: dismiss the named obscuring element,
   or tap it directly, then retry the original tap.
 - `ok: false` with a "no bounds attribute" reason: the element
@@ -646,8 +648,8 @@ field only needs to be focused, with nothing typed into it.
   reflow or a field swap that can leave focus on a different field for
   a moment after the tap.
 - If the target field never reports focus in time, the call fails
-  without typing anything, so text is never sent into the wrong
-  field.
+  with code `INPUT_NOT_FOCUSED` without typing anything, so text is
+  never sent into the wrong field.
 - clearFirst true (the default) erases the field's existing content
   before typing, but only when the current driver supports erasing
   text. On a driver without that support, the field is left uncleared
@@ -667,8 +669,8 @@ field only needs to be focused, with nothing typed into it.
 **Errors and recovery**
 - `ok: false` with a "not found", "could not scroll", or obscurement
   reason: same recovery as tap.
-- A focus-timeout failure reports that the field never took input
-  focus and that nothing was typed: retarget the field with a more
+- A failure with code `INPUT_NOT_FOCUSED` reports that the field never
+  took input focus and that nothing was typed: retarget the field with a more
   stable selector, or tap its coordinates directly before calling
   input_text again.
 - When no field has keyboard focus, for example after a coordinate tap

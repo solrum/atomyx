@@ -328,11 +328,11 @@ func (e *InputFocusError) Error() string {
 func (e *InputFocusError) Unwrap() error { return e.cause }
 
 // Code implements diag.Coded.
-func (e *InputFocusError) Code() string { return diag.CodeToolTimeout }
+func (e *InputFocusError) Code() string { return diag.CodeInputNotFocused }
 
 // Remedy implements diag.Coded.
 func (e *InputFocusError) Remedy() string {
-	return "Confirm the field can take focus (tap it and check it holds focus), then retry; if it never reports focus, target it by a stable id or tap its coordinates directly."
+	return "Tap the field and check that it holds focus, then retry. If it never reports focus, target it by a stable id or tap its coordinates directly."
 }
 
 var _ diag.Coded = (*InputFocusError)(nil)
@@ -874,9 +874,13 @@ func (o *Orchestra) prepareSelectorForAction(ctx context.Context, selector Selec
 		if err != nil {
 			var unreachable *ScrollUnreachableError
 			if errors.As(err, &unreachable) {
-				return preparedAction{result: ActionFail(
+				failed := ActionFail(
 					fmt.Sprintf("could not scroll element into view: %s", unreachable.Message), nil,
-				)}, nil
+				)
+				if unreachable.NotFound {
+					failed.Code = diag.CodeElementNotFound
+				}
+				return preparedAction{result: failed}, nil
 			}
 			return preparedAction{}, err
 		}

@@ -139,6 +139,14 @@ const (
 	// screen. The condition is permanent for that device, so a run that
 	// asked for a video continues without one.
 	CodeRecordingUnsupported = "RECORDING_UNSUPPORTED"
+	// CodeInputNotFocused means a type action found its field but the
+	// field never took input focus, so nothing was typed. The screen
+	// did not offer the field in a focusable state, which is a property
+	// of the app under test, not of the device.
+	CodeInputNotFocused = "INPUT_NOT_FOCUSED"
+	// CodeElementNotFound means a selector matched no element on screen,
+	// even after the screen was scrolled to look for it.
+	CodeElementNotFound = "ELEMENT_NOT_FOUND"
 )
 
 // Coded is implemented by an error that carries a stable code and an

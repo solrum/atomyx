@@ -96,6 +96,13 @@ func commandFailureFor(err error) (CommandResult, bool) {
 // only that the target is covered.
 const obscuredDetail = "element is visually obscured by another element"
 
+// actionFailure builds the failed CommandResult for a failed action,
+// carrying the stable code the action reported so a run history can
+// tell a missing element from an infrastructure fault.
+func actionFailure(result orchestra.ActionResult) CommandResult {
+	return CommandResult{Ok: false, Detail: strPtr(actionFailureDetail(result)), Code: result.Code}
+}
+
 // actionFailureDetail returns the step detail for a failed action.
 func actionFailureDetail(result orchestra.ActionResult) string {
 	if result.Obscurer != nil {
