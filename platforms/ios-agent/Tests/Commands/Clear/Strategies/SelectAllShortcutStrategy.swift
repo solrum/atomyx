@@ -14,8 +14,9 @@ struct SelectAllShortcutStrategy: ClearTextStrategy {
         if value.isEmpty {
             return .success(strategy: "already-empty")
         }
-        context.app.typeKey("a", modifierFlags: .command)
-        context.app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
+        guard context.bridge.typeKey(app: context.app, key: "a", modifiers: .command),
+              context.bridge.typeKey(app: context.app, key: XCUIKeyboardKey.delete.rawValue, modifiers: [])
+        else { return .skipped }
         return .attempted
     }
 }

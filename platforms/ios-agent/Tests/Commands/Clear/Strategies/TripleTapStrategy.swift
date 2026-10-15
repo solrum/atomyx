@@ -12,7 +12,8 @@ struct TripleTapStrategy: ClearTextStrategy {
         let element = context.app.descendants(matching: .any).matching(predicate).firstMatch
         guard element.exists else { return .skipped }
         element.tap(withNumberOfTaps: 3, numberOfTouches: 1)
-        context.app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
+        guard context.bridge.typeKey(app: context.app, key: XCUIKeyboardKey.delete.rawValue, modifiers: [])
+        else { return .skipped }
         return .attempted
     }
 }

@@ -22,8 +22,7 @@ struct LongPressMenuStrategy: ClearTextStrategy {
         while Date() < deadline {
             if context.app.menuItems["Select All"].exists {
                 context.app.menuItems["Select All"].tap()
-                context.app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
-                return .attempted
+                return deleteSelection(context)
             }
             // Locale fallback: Vietnamese system label.
             let selectAllButtons = context.app.buttons.matching(
@@ -31,8 +30,7 @@ struct LongPressMenuStrategy: ClearTextStrategy {
             )
             if selectAllButtons.firstMatch.exists {
                 selectAllButtons.firstMatch.tap()
-                context.app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
-                return .attempted
+                return deleteSelection(context)
             }
             // "Cut" selects and removes all content in one action.
             if context.app.menuItems["Cut"].exists {
@@ -44,5 +42,11 @@ struct LongPressMenuStrategy: ClearTextStrategy {
         // No menu appeared, so dismiss any partial interaction state and skip.
         context.app.tap()
         return .skipped
+    }
+
+    /// The menu action can drop focus, so the delete key is guarded.
+    private func deleteSelection(_ context: ClearContext) -> ClearResult {
+        context.bridge.typeKey(app: context.app, key: XCUIKeyboardKey.delete.rawValue, modifiers: [])
+            ? .attempted : .skipped
     }
 }

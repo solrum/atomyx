@@ -109,10 +109,10 @@ protocol XCUIBridge {
     /// silently dropped by the software keyboard and the key is
     /// typed as a plain character.
     ///
-    /// Returns true when the dispatch is accepted, false when the
-    /// XCUITest API throws, most commonly because no element has
-    /// keyboard focus or the simulator keyboard configuration
-    /// rejects the modifier combo.
+    /// Returns `false` without dispatching when no element holds
+    /// keyboard focus, `true` once the key was dispatched. A missing
+    /// hardware keyboard on the simulator is not detected and still
+    /// returns `true`, so callers verify by reading post-call state.
     func typeKey(app: XCUIApplication, key: String, modifiers: XCUIElement.KeyModifierFlags) -> Bool
 
     /// Query the system keyboard state. Returns `visible=false` when
@@ -235,11 +235,11 @@ final class DefaultXCUIBridge: XCUIBridge {
     }
 
     func typeKey(app: XCUIApplication, key: String, modifiers: XCUIElement.KeyModifierFlags) -> Bool {
-        // `typeKey` is non-throwing in the XCUI API; a missing focus
-        // or a disabled simulator hardware keyboard produces a
-        // silent no-op rather than a failure. Caller verifies by
-        // reading post-call state, so we just forward and return
-        // true unconditionally.
+        // Same rule as `typeText`: a key event with no focused element
+        // records an XCTest failure that ends the serve test. This is
+        // the single guard point for every key event, so callers must
+        // not invoke `XCUIApplication.typeKey` directly.
+        guard appHasKeyboardFocus(app) else { return false }
         app.typeKey(key, modifierFlags: modifiers)
         return true
     }
