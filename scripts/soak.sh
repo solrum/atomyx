@@ -17,6 +17,12 @@
 #   2    misuse: bad arguments, or the atomyx binary is missing
 #   130  interrupted, after writing a partial summary
 #
+# Before every iteration the harness force-stops the demo app on the
+# device (android and iossim), so a failed iteration cannot leave the app
+# on a screen that breaks the next one. A stop that fails counts as an
+# infrastructure failure of that iteration, is recorded with exit code
+# 125, and no run is attempted. The ios leg has no host tool that stops an
+# app by bundle id, so it relies on the flow's own precondition alone.
 # A failed iteration never stops the loop. The report lands in
 # <results dir>/<UTC timestamp>-<platform>/ with one log per iteration,
 # iterations.txt (iteration number and exit code per line), and
@@ -66,6 +72,11 @@ fi
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 bin="${ATOMYX_BIN:-${repo_root}/core/bin/atomyx}"
 flow="${repo_root}/examples/soak/demo-soak.yml"
+app_id="$(sed -n 's/^appId:[[:space:]]*//p' "$flow" | head -n 1 | tr -d '"[:space:]')"
+if [ -z "$app_id" ]; then
+  echo "error: no appId found in ${flow}." >&2
+  exit 2
+fi
 
 if [ ! -x "$bin" ]; then
   echo "error: atomyx binary not found at ${bin}." >&2
@@ -88,12 +99,52 @@ trap on_signal INT TERM
 total=0
 passed=0
 failed=0
+reset_failures=0
+readonly RESET_FAILED_CODE=125
+
+# Stops the app under test so the next run starts from a cold launch.
+# Returns non-zero when the stop itself failed. An app that was not
+# running is not a failure.
+reset_app() {
+  local out status
+  case "$platform" in
+    android)
+      adb -s "$device" shell am force-stop "$app_id" > "$1" 2>&1
+      ;;
+    iossim)
+      set +e
+      out="$(xcrun simctl terminate "$device" "$app_id" 2>&1)"
+      status=$?
+      set -e
+      printf '%s\n' "$out" > "$1"
+      if [ "$status" -ne 0 ] && ! printf '%s\n' "$out" | grep -qi "nothing to terminate"; then
+        return 1
+      fi
+      ;;
+    *)
+      : > "$1"
+      ;;
+  esac
+}
 
 echo "Soak: ${count} runs on ${platform}, report in ${out_dir}"
 
 i=1
 while [ "$i" -le "$count" ] && [ "$interrupted" -eq 0 ]; do
   log="${out_dir}/iter-$(printf '%04d' "$i").log"
+  set +e
+  reset_app "${out_dir}/reset-$(printf '%04d' "$i").log"
+  reset_status=$?
+  set -e
+  if [ "$reset_status" -ne 0 ]; then
+    reset_failures=$((reset_failures + 1))
+    failed=$((failed + 1))
+    total=$((total + 1))
+    echo "${i} ${RESET_FAILED_CODE}" >> "${out_dir}/iterations.txt"
+    echo "run ${i}/${count}: app reset failed"
+    i=$((i + 1))
+    continue
+  fi
   set +e
   "$bin" run --file "$flow" --platform "$cli_platform" --device "$device" > "$log" 2>&1
   code=$?
@@ -135,7 +186,12 @@ if [ -z "$infra" ] || [ -z "$attempts" ] || [ -z "$rate" ]; then
 fi
 
 over_limit=0
+# Reset failures never reach atomyx, so they are added to both the
+# numerator and the denominator of the rate.
 if [ "$stats_ok" -eq 1 ]; then
+  infra=$((infra + reset_failures))
+  attempts=$((attempts + reset_failures))
+  rate="$(awk -v i="$infra" -v a="$attempts" 'BEGIN { printf "%.6f", (a > 0) ? i / a : 0 }')"
   over_limit="$(awk -v r="$rate" -v m="$max_rate" 'BEGIN { print (r + 0 > m + 0) ? 1 : 0 }')"
 fi
 
@@ -162,6 +218,7 @@ fi
     echo "attempts: unavailable"
     echo "infraFailureRate: unavailable"
   fi
+  echo "resetFailures: ${reset_failures}"
   echo "maxInfraFailureRate: ${max_rate}"
   if [ "$interrupted" -eq 1 ]; then
     echo "interrupted: yes"

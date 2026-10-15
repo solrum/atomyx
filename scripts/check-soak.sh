@@ -69,12 +69,36 @@ esac
 FAKE
 chmod +x "$fake"
 
+# Fake host tools, found through PATH. Each call is appended to
+# tools.log. FAKE_RESET_FAIL makes the tools fail, and FAKE_SIM_IDLE
+# makes xcrun report that nothing was running.
+mkdir -p "$work/bin"
+cat > "$work/bin/adb" <<'TOOL'
+#!/usr/bin/env bash
+echo "adb $*" >> "${FAKE_TOOLS_LOG:?}"
+[ -z "${FAKE_RESET_FAIL:-}" ]
+TOOL
+cat > "$work/bin/xcrun" <<'TOOL'
+#!/usr/bin/env bash
+echo "xcrun $*" >> "${FAKE_TOOLS_LOG:?}"
+if [ -n "${FAKE_SIM_IDLE:-}" ]; then
+  echo "An error was encountered processing the command: found nothing to terminate" >&2
+  exit 163
+fi
+[ -z "${FAKE_RESET_FAIL:-}" ]
+TOOL
+chmod +x "$work/bin/adb" "$work/bin/xcrun"
+export PATH="$work/bin:$PATH"
+export FAKE_TOOLS_LOG="$work/tools.log"
+: > "$FAKE_TOOLS_LOG"
+
 # run_soak NAME OUTCOMES COUNT [extra env assignments are exported by the caller]
 # Leaves the exit status in $status and the summary text in $summary.
 run_soak() {
   local name="$1" outcomes="$2" count="$3" max="${4:-}" results
   results="$work/results-$name"
   rm -f "$work/state.history" "$work/state.storage"
+  : > "$FAKE_TOOLS_LOG"
   set +e
   FAKE_STATE="$work/state" FAKE_OUTCOMES="$outcomes" ATOMYX_BIN="$fake" \
     ATOMYX_SOAK_RESULTS_DIR="$results" \
@@ -171,6 +195,59 @@ nostats_status=$?
 set -e
 if [ "$nostats_status" -ne 1 ]; then
   fail "unreadable statistics: exit $nostats_status, want 1"
+fi
+
+# Reset: every iteration force-stops the app named by the flow.
+run_soak resetcalls "pass pass pass" 3
+expect_status "reset happy path" 0
+expect_line "reset happy path" "resetFailures: 0"
+if [ "$(grep -c '^adb -s serial-1 shell am force-stop dev.atomyx.demo$' "$FAKE_TOOLS_LOG")" -ne 3 ]; then
+  fail "android reset did not run once per iteration with the flow's app id"
+fi
+
+# A reset that fails is an infrastructure failure and skips the run.
+rm -f "$work/state.history"
+set +e
+FAKE_RESET_FAIL=1 FAKE_STATE="$work/state" FAKE_OUTCOMES="pass pass" ATOMYX_BIN="$fake" \
+  ATOMYX_SOAK_RESULTS_DIR="$work/results-resetfail" \
+  "$soak" android serial-1 2 > /dev/null 2>&1
+resetfail_status=$?
+set -e
+summary="$(cat "$work"/results-resetfail/*/summary.txt)"
+[ "$resetfail_status" -eq 1 ] || fail "reset failure: exit $resetfail_status, want 1"
+expect_line "reset failure" "total: 2"
+expect_line "reset failure" "failed: 2"
+expect_line "reset failure" "resetFailures: 2"
+expect_line "reset failure" "infraFailures: 2"
+expect_line "reset failure" "attempts: 2"
+expect_line "reset failure" "infraFailureRate: 1.000000"
+if [ -s "$work/state.history" ]; then
+  fail "a run was attempted after a failed reset"
+fi
+if ! grep -qx '1 125' "$work"/results-resetfail/*/iterations.txt; then
+  fail "iterations.txt lacks the reset failure code"
+fi
+
+# Simulator: terminate by udid, and an app that was not running is fine.
+rm -f "$work/state.history"; : > "$FAKE_TOOLS_LOG"
+set +e
+FAKE_SIM_IDLE=1 FAKE_STATE="$work/state" FAKE_OUTCOMES="pass pass" ATOMYX_BIN="$fake" \
+  ATOMYX_SOAK_RESULTS_DIR="$work/results-sim" \
+  "$soak" iossim SIM-UDID 2 > /dev/null 2>&1
+sim_status=$?
+set -e
+[ "$sim_status" -eq 0 ] || fail "simulator with nothing to terminate: exit $sim_status, want 0"
+if [ "$(grep -c '^xcrun simctl terminate SIM-UDID dev.atomyx.demo$' "$FAKE_TOOLS_LOG")" -ne 2 ]; then
+  fail "simulator reset did not call simctl terminate per iteration"
+fi
+
+# Physical iOS has no reset tool, so no host tool is called.
+rm -f "$work/state.history"; : > "$FAKE_TOOLS_LOG"
+FAKE_STATE="$work/state" FAKE_OUTCOMES="pass" ATOMYX_BIN="$fake" \
+  ATOMYX_SOAK_RESULTS_DIR="$work/results-ios" \
+  "$soak" ios DEVICE-UDID 1 > /dev/null 2>&1
+if [ -s "$FAKE_TOOLS_LOG" ]; then
+  fail "physical ios leg called a host reset tool"
 fi
 
 # Interruption: the fake sleeps so the signal lands during run 1, the

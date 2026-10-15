@@ -12,18 +12,23 @@ env:
   email: soak@example.com
   password: secret123
 
-# The demo app keeps its navigation state across a relaunch, so a
-# previous iteration that ended on the Dashboard would skip the Sign in
-# screen. Signing out first makes every iteration start from the same
-# screen.
+# A relaunch can restore a signed-in session, so the flow must start
+# from Sign in whatever the app shows. When Sign in is not on screen,
+# the setup launches the app and signs out if the Dashboard is showing.
 preconditions:
   - check:
-      notVisible: "Dashboard"
+      visible: "Sign in"
     setup:
-      - tap: "Sign out"
-      - waitFor: "Confirm"
-      - tap: "Confirm"
-      - waitFor: "Sign in"
+      - launchApp
+      - handle:
+          - when:
+              visible: "Dashboard"
+            do:
+              - tap: "Sign out"
+              - waitFor: "Confirm"
+              - tap: "Confirm"
+              - waitFor: "Sign in"
+          - otherwise: skip
 ---
 - launchApp
 - waitFor:

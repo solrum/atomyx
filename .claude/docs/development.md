@@ -411,7 +411,8 @@ often the infrastructure fails, as opposed to the app under test.
 Products and scrolls, opens Gestures for a long press and a swipe, and ends
 on the home screen, with waits and visibility assertions between screens. The
 script language has no erase, reset, or stop step, so the flow signs out through
-a precondition and ends with the home key. One run takes well under a minute.
+a precondition that runs whenever Sign in is not on screen after a launch, and
+ends with the home key. One run takes well under a minute.
 
 ```bash
 scripts/soak.sh <android|ios|iossim> <device-id> <count> [max-infra-rate]
@@ -428,6 +429,20 @@ Prerequisites per platform:
   installed (`make demo-ios-sim`). The script passes the simulator UDID as the
   device id.
 
+Before every iteration the script force-stops the demo app, using the `appId`
+of the flow, so a failed iteration cannot leave the app on a screen that breaks
+the next one:
+
+- `android`: `adb -s <device-id> shell am force-stop <appId>`.
+- `iossim`: `xcrun simctl terminate <device-id> <appId>`, where an app that is
+  not running is not an error.
+- `ios`: no reset. `devicectl` can only terminate by process id, so the flow's
+  own precondition is the only protection on a physical iPhone.
+
+A stop that fails counts as an infrastructure failure of that iteration, is
+recorded in `iterations.txt` with exit code 125, skips the run, and is counted
+in `resetFailures`, `infraFailures`, and `attempts` of the summary.
+
 The script uses `core/bin/atomyx` (`ATOMYX_BIN` overrides it, `make build-core`
 builds it), runs the flow `count` times, and keeps going after a failed
 iteration. Results land in `e2e-results/soak/<UTC timestamp>-<platform>/`:
@@ -439,7 +454,7 @@ iteration. Results land in `e2e-results/soak/<UTC timestamp>-<platform>/`:
   soak never writes into `~/.atomyx`.
 - `summary.txt` holds the platform, the total, passed, and failed counts, and
   `infraFailures`, `attempts`, and `infraFailureRate` read from
-  `atomyx runs stats --json`.
+  `atomyx runs stats --json` plus the reset failures, and `resetFailures`.
 
 The exit status is 0 when the infrastructure failure rate is at or below the
 limit and 1 when it is above, or when the statistics cannot be read. The limit
@@ -451,7 +466,8 @@ every run in the storage root.
 
 `scripts/check-soak.sh` runs in `make check`. It drives the script with a fake
 `atomyx` binary that replays passes, test failures, and infrastructure
-failures, and asserts the summary counts, the rate, and the exit codes.
+failures, and asserts the summary counts, the rate, the exit codes, and the reset calls per
+platform, with fake `adb` and `xcrun` tools in front of the real ones.
 
 ### Scheduling
 
