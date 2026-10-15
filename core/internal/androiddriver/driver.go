@@ -511,28 +511,37 @@ func (d *AndroidDriver) Tap(ctx context.Context, point wire.Point) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	_, err := d.transport.TapCoords(ctx, transport.TapCoordsRequest{X: point.X, Y: point.Y})
-	return d.fail(err)
+	res, err := d.transport.TapCoords(ctx, transport.TapCoordsRequest{X: point.X, Y: point.Y})
+	if err != nil {
+		return d.fail(err)
+	}
+	return d.fail(gestureRejection(res.Ok, res.Reason, res.Code))
 }
 
 func (d *AndroidDriver) LongPress(ctx context.Context, point wire.Point, durationMs int) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	_, err := d.transport.LongPress(ctx, transport.LongPressRequest{
+	res, err := d.transport.LongPress(ctx, transport.LongPressRequest{
 		X: point.X, Y: point.Y, DurationMs: int64(durationMs),
 	})
-	return d.fail(err)
+	if err != nil {
+		return d.fail(err)
+	}
+	return d.fail(gestureRejection(res.Ok, res.Reason, res.Code))
 }
 
 func (d *AndroidDriver) Swipe(ctx context.Context, from, to wire.Point, durationMs int) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	_, err := d.transport.Swipe(ctx, transport.SwipeRequest{
+	res, err := d.transport.Swipe(ctx, transport.SwipeRequest{
 		FromX: from.X, FromY: from.Y, ToX: to.X, ToY: to.Y, DurationMs: int64(durationMs),
 	})
-	return d.fail(err)
+	if err != nil {
+		return d.fail(err)
+	}
+	return d.fail(gestureRejection(res.Ok, res.Reason, res.Code))
 }
 
 // DispatchGesture rejects a gesture the agent's active backend cannot
@@ -587,6 +596,9 @@ func (d *AndroidDriver) DispatchGesture(ctx context.Context, gesture driver.Gest
 	if err != nil {
 		return driver.GestureResult{}, d.fail(err)
 	}
+	if err := gestureRejection(resp.Ok, resp.Reason, resp.Code); err != nil {
+		return driver.GestureResult{}, d.fail(err)
+	}
 	if len(resp.CapturedImages) == 0 {
 		return driver.GestureResult{}, nil
 	}
@@ -605,14 +617,19 @@ func (d *AndroidDriver) DispatchGesture(ctx context.Context, gesture driver.Gest
 // defaults ClearFirst to true when the field is absent from the
 // request, so it is sent explicitly false here to honor the
 // Driver.InputText append contract; a caller that wants to clear
-// first drives EraseText as its own step.
+// first drives EraseText as its own step. It returns an AGENT_REJECTED
+// error when the agent reports that it entered fewer characters than
+// requested. A reply that carries no verdict is accepted.
 func (d *AndroidDriver) InputText(ctx context.Context, text string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	clearFirst := false
-	_, err := d.transport.TypeKeyboard(ctx, transport.TypeKeyboardRequest{Text: text, ClearFirst: &clearFirst})
-	return d.fail(err)
+	res, err := d.transport.TypeKeyboard(ctx, transport.TypeKeyboardRequest{Text: text, ClearFirst: &clearFirst})
+	if err != nil {
+		return d.fail(err)
+	}
+	return d.fail(typeRejection(res))
 }
 
 // EraseText ignores count: the agent's clear-focused-input route
