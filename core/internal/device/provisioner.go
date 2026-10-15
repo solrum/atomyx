@@ -171,6 +171,9 @@ type DriverProvisioner struct {
 	// ownPid reports the pid recorded as the owner of every runner this
 	// provisioner launches or adopts.
 	ownPid func() int
+	// controlPort is the runner control port every launch uses when
+	// FixedIosPort is set.
+	controlPort int
 	// awaitWatchTick blocks until the next check of an adopted runner's
 	// process is due, and fails once ctx ends.
 	awaitWatchTick func(ctx context.Context) error
@@ -205,7 +208,7 @@ func NewDriverProvisioner(deps DriverProvisionerDeps) *DriverProvisioner {
 	p := &DriverProvisioner{
 		runner: deps.Runner, background: background, clock: clock, logger: logger, inspector: inspector, deps: deps,
 		xcode:    iosdriver.NewXcodeIdentity(),
-		freePort: operatingSystemFreePort, newRunnerID: randomRunnerID, now: time.Now, ownPid: os.Getpid,
+		freePort: operatingSystemFreePort, newRunnerID: randomRunnerID, now: time.Now, ownPid: os.Getpid, controlPort: iosControlPort,
 		reserved: make(map[int]struct{}),
 	}
 	p.awaitWatchTick = p.defaultWatchTick
@@ -513,7 +516,7 @@ func (p *DriverProvisioner) iosLaunchConfig(udid string, kind IosAgentKind) iosd
 	cfg := iosdriver.LaunchConfig{
 		Xcode:                        p.xcode,
 		ProjectDir:                   projectDir,
-		Port:                         iosControlPort,
+		Port:                         p.controlPort,
 		Kind:                         driverKind,
 		UDID:                         udid,
 		DevTeam:                      devTeam,

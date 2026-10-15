@@ -117,6 +117,11 @@ func TestDriverProvisioner_EnsureIOSAgent_FixedPortModeNeverReaps(t *testing.T) 
 	signals := fx.orphanedRunner("SIM-1")
 	p := fx.reapingProvisioner(nil, signals)
 	p.deps.FixedIosPort = true
+	port, err := operatingSystemFreePort()
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.controlPort = port
 
 	_, kill, err := p.EnsureIOSAgent(context.Background(), "SIM-1", IosAgentKindSimulator)
 	if err != nil {

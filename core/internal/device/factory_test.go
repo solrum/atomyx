@@ -107,7 +107,7 @@ func TestDriverFactory_CreateDriver_SimHidOptInSetAndSupported_StartsHelperAndBu
 	starter := &fakeSimHidStarter{port: 19876}
 	f := NewDriverFactory(DriverFactoryDeps{Runner: runner, Background: process.NewFakeBackground(), SimHid: starter})
 
-	drv, err := f.createDriver(context.Background(), Descriptor{ID: "sim-1", Platform: PlatformIOS, Kind: KindSimulator})
+	drv, err := f.createDriver(context.Background(), Descriptor{ID: "sim-1", Platform: PlatformIOS, Kind: KindSimulator, Port: unusedPort(t)})
 	if err != nil {
 		t.Fatalf("createDriver() error = %v", err)
 	}
@@ -159,7 +159,7 @@ func TestDriverFactory_CreateDriver_ExplicitHidPort_BuildsIosSimDriverWithoutSta
 	starter := &fakeSimHidStarter{}
 	f := NewDriverFactory(DriverFactoryDeps{Runner: process.NewFake(), Background: process.NewFakeBackground(), SimHid: starter})
 
-	drv, err := f.createDriver(context.Background(), Descriptor{ID: "sim-1", Platform: PlatformIOS, Kind: KindSimulator, HidPort: 7777})
+	drv, err := f.createDriver(context.Background(), Descriptor{ID: "sim-1", Platform: PlatformIOS, Kind: KindSimulator, Port: unusedPort(t), HidPort: 7777})
 	if err != nil {
 		t.Fatalf("createDriver() error = %v", err)
 	}
