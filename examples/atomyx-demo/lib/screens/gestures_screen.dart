@@ -114,6 +114,7 @@ class _GesturesScreenState extends State<GesturesScreen> {
             const SizedBox(height: 12),
             Semantics(
               identifier: 'gesture-tap-target',
+              container: true,
               child: SizedBox(
                 height: 64,
                 child: FilledButton.icon(
@@ -161,6 +162,7 @@ class _GesturesScreenState extends State<GesturesScreen> {
             const SizedBox(height: 12),
             Semantics(
               identifier: 'gesture-longpress-target',
+              container: true,
               child: GestureDetector(
                 onTapDown: (_) => setState(() => _longPressDown = true),
                 onTapUp: (_) => setState(() => _longPressDown = false),
@@ -226,6 +228,7 @@ class _GesturesScreenState extends State<GesturesScreen> {
             const SizedBox(height: 12),
             Semantics(
               identifier: 'gesture-drag-target',
+              container: true,
               child: GestureDetector(
                 onPanStart: (_) => setState(() => _dragStatus = 'dragging'),
                 onPanUpdate: (d) => setState(() => _dragOffset += d.delta),
@@ -390,6 +393,7 @@ class _GesturesScreenState extends State<GesturesScreen> {
             const SizedBox(height: 12),
             Semantics(
               identifier: 'gesture-pinch-target',
+              container: true,
               child: GestureDetector(
                 onDoubleTap: _resetPinch,
                 child: SizedBox(
@@ -482,6 +486,7 @@ class _GesturesScreenState extends State<GesturesScreen> {
             const SizedBox(height: 12),
             Semantics(
               identifier: 'gesture-pressure-target',
+              container: true,
               child: Listener(
                 onPointerDown: _capturePressure,
                 onPointerMove: _capturePressure,
