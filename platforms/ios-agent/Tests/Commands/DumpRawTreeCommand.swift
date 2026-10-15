@@ -17,7 +17,10 @@ import XCTest
 ///     picks the first whose state is `.runningForeground`. This
 ///     unblocks an inspector that wants to dump whatever the user
 ///     is looking at, without forcing an explicit `launchApp`
-///     call.
+///     call. When no candidate is in the foreground, the dump is
+///     the Springboard tree and nothing is cached as `currentApp`,
+///     so a visibility check after the app was terminated
+///     externally sees the home screen instead of an error.
 ///
 /// `XCUIApplication()` with no bundle id is intentionally not
 /// used here, because the runner is a standalone XCTest bundle with no
@@ -42,18 +45,18 @@ final class DumpRawTreeCommand: CommandHandler {
         if case .running(let bound) = tracked {
             app = bound
         } else if let candidates = request.args["bundleIdCandidates"] as? [String], !candidates.isEmpty {
-            guard let resolved = Self.firstForegroundCandidate(candidates) else {
-                return .error(
-                    id: request.id,
-                    message: "no candidate bundle id is currently running in the foreground (\(candidates.count) tried)"
-                )
+            if let resolved = Self.firstForegroundCandidate(candidates) {
+                // Cache for subsequent calls, so the host saves a roundtrip
+                // and we keep snapshot/touch routing consistent.
+                state.currentApp = resolved.app
+                state.currentBundleId = resolved.bundleId
+                attachedBundleId = resolved.bundleId
+                app = resolved.app
+            } else {
+                // Not cached: the home screen is not an app the host asked
+                // to drive, and binding it would hide a later launch.
+                app = DriverState.springboard()
             }
-            // Cache for subsequent calls, so the host saves a roundtrip
-            // and we keep snapshot/touch routing consistent.
-            state.currentApp = resolved.app
-            state.currentBundleId = resolved.bundleId
-            attachedBundleId = resolved.bundleId
-            app = resolved.app
         } else if case .notRunning = tracked {
             app = DriverState.springboard()
         } else {
