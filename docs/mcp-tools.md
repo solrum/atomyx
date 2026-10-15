@@ -1122,14 +1122,22 @@ individual runs instead.
   `last` trims what remains.
 - Entries are sorted by flaky rate, then by failures, both highest
   first, then by key.
+- A failed run is an infrastructure failure when its outcome is `error`,
+  or when it ended `failed` with an error code that names the device, the
+  agent, a timeout, or the host tooling, such as `AGENT_UNREACHABLE` or
+  `TOOL_TIMEOUT`. Every other failed run is a test failure, including a run
+  with no error code. Runs lost with the device are not counted.
 
 **Returns**
 - `ok`: whether the call completed.
 - `tests`: array that is always present. Each entry has `testKey`,
   `runs`, `passed` (includes flaky runs), `failed`, `flaky`, `flakyRate`
-  (a fraction from 0 to 1), `lastOutcomes` (up to 10 of `passed`,
+  (a fraction from 0 to 1), `infraFailures`, `testFailures` (together
+  they equal `failed`), `infraFailureRate` (a fraction from 0 to 1), `lastOutcomes` (up to 10 of `passed`,
   `failed`, or `flaky`, most recent first), `durationP50Ms`, and
   `durationP95Ms` (0 when no run has a duration).
+- `infraFailures`, `testFailures`, `infraFailureRate`: the same three
+  values summed over every entry.
 - `skipped`: number of stored runs that could not be read and are not
   counted. Always present, and zero when every stored run was readable.
 

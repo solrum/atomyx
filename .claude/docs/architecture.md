@@ -1071,7 +1071,7 @@ Contract:
 - **Meta.** `meta.json` carries `schemaVersion`, `runId`, `kind`
   (`script`, `suite`, or `mcp`), optional script and device fields,
   `startedAt` and `completedAt` as epoch milliseconds, `result`,
-  `outcome`, `failedAtStep`, `totalSteps`, an optional `testKey`, and an
+  `outcome`, `failedAtStep`, `totalSteps`, an optional `errorCode`, an optional `testKey`, and an
   optional `mcp` block
   for the fields only an MCP run has.
   A run that drove a connected agent also carries a `host` block with
@@ -1119,6 +1119,12 @@ Contract:
 - **Failed step.** `failedAtStep` is the zero-based index of the
   failed step, matching `ScriptResult.FailedAtStep` in the runner.
   Display code adds one.
+- **Error code.** `errorCode` is the diag code of the failure that
+  ended the run, taken from the abort, the failing step, or the error
+  that stopped the run, never from message text. It is absent on a pass,
+  on a failure that carries no code, and on a run written without it.
+  `history.Classify` maps outcome and code to an infrastructure or test
+  failure for run stats.
 - **Run id.** The schema puts no pattern on it, because a migrated run
   keeps its legacy id. A run written by `runfolder.Starter` gets
   `<yyyymmdd-hhmmss>-<label>-<4 hex>`. The time is UTC. The label is

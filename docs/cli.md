@@ -355,6 +355,11 @@ exits with code `1`, and
 a run stopped by SIGINT or SIGTERM is `cancelled`. The meta is
 finalized before the process exits.
 
+A run that ended in failure also records `errorCode` in `meta.json`, the
+stable error code of the failure that ended it, such as `AGENT_UNREACHABLE`
+or `TOOL_TIMEOUT`. It is absent on a pass, on a failure that carries no
+code such as a failed assertion, and on a run recorded without the field.
+
 ## driver suite
 
 Runs a named suite declared in the project config, or an ad-hoc suite
@@ -1404,8 +1409,11 @@ failures, both highest first, then by key:
 - `RUNS`
 - `PASSED`: includes flaky runs
 - `FAILED`
+- `INFRA FAILS`: failed runs blamed on the infrastructure
+- `TEST FAILS`: failed runs blamed on the test, so `INFRA FAILS` plus `TEST FAILS` equals `FAILED`
 - `FLAKY`
 - `FLAKY RATE`: flaky runs divided by runs, as a percentage
+- `INFRA RATE`: infrastructure failures divided by runs, as a percentage
 - `P50` and `P95`: duration percentiles, `-` when no run has a duration
 - `LAST`: up to 10 outcomes, most recent first, one letter each. `P` is passed, `F` is failed, and `K` is flaky.
 
@@ -1413,8 +1421,18 @@ With no match the command prints `No finished runs found.`
 
 The JSON document has `tests` and `skipped`. `tests` is always present.
 Each test has `testKey`, `runs`, `passed`, `failed`, `flaky`,
-`flakyRate` (a fraction from 0 to 1), `lastOutcomes` (the words
+`flakyRate` (a fraction from 0 to 1), `infraFailures`, `testFailures`,
+`infraFailureRate` (a fraction from 0 to 1), `lastOutcomes` (the words
 `passed`, `failed`, or `flaky`), `durationP50Ms`, and `durationP95Ms`.
+The top level also carries `infraFailures`, `testFailures`, and
+`infraFailureRate` summed over all tests.
+
+A failed run is an infrastructure failure when its outcome is `error`, or
+when it ended `failed` with an error code that names the device, the agent,
+a timeout, or the host tooling, such as `AGENT_UNREACHABLE`,
+`AGENT_NOT_READY`, `TOOL_TIMEOUT`, or `DEVICE_HELD`. Every other failed run
+is a test failure, including a run with no error code. Runs that lost their
+device or were interrupted are not counted, so they are in neither rate.
 
 ### runs prune
 
