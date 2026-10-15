@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -135,20 +136,49 @@ func (e ExpectedRunner) verifyDevice(got RunnerIdentity) (IdentityVerdict, strin
 // nothing answers a valid ping, so a caller can tell "no runner" apart
 // from "a different runner".
 func ProbeRunnerIdentity(ctx context.Context, port int, timeout time.Duration) (id RunnerIdentity, ok bool) {
+	id, outcome := probeRunner(ctx, port, timeout)
+	return id, outcome == probeAnswered
+}
+
+// probeOutcome classifies how a listener reacted to the ping handshake.
+type probeOutcome int
+
+const (
+	// probeAnswered means the listener replied with a valid pong.
+	probeAnswered probeOutcome = iota
+	// probeSilent means the listener accepted the connection but gave no
+	// reply before the deadline, which is how a runner that serves one
+	// client at a time looks to a second client.
+	probeSilent
+	// probeRejected means the listener refused, closed the connection, or
+	// replied with something that is not the runner protocol.
+	probeRejected
+)
+
+func silentIfTimeout(err error) probeOutcome {
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return probeSilent
+	}
+	return probeRejected
+}
+
+// probeRunner is ProbeRunnerIdentity with the reason a probe failed.
+func probeRunner(ctx context.Context, port int, timeout time.Duration) (RunnerIdentity, probeOutcome) {
 	dialCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	conn, err := new(net.Dialer).DialContext(dialCtx, "tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
 	if err != nil {
-		return RunnerIdentity{}, false
+		return RunnerIdentity{}, silentIfTimeout(err)
 	}
 	defer func() { _ = conn.Close() }()
 	_ = conn.SetDeadline(time.Now().Add(timeout))
 	if _, err := conn.Write([]byte(`{"id":0,"type":"ping","args":{}}` + "\n")); err != nil {
-		return RunnerIdentity{}, false
+		return RunnerIdentity{}, silentIfTimeout(err)
 	}
 	line, err := bufio.NewReader(conn).ReadString('\n')
 	if err != nil {
-		return RunnerIdentity{}, false
+		return RunnerIdentity{}, silentIfTimeout(err)
 	}
 	var frame struct {
 		Ok   *bool `json:"ok"`
@@ -162,10 +192,10 @@ func ProbeRunnerIdentity(ctx context.Context, port int, timeout time.Duration) (
 		} `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(line), &frame); err != nil {
-		return RunnerIdentity{}, false
+		return RunnerIdentity{}, probeRejected
 	}
 	if frame.Ok == nil || !*frame.Ok || !frame.Data.Pong {
-		return RunnerIdentity{}, false
+		return RunnerIdentity{}, probeRejected
 	}
 	return RunnerIdentity{
 		RunnerID:        frame.Data.RunnerID,
@@ -173,7 +203,7 @@ func ProbeRunnerIdentity(ctx context.Context, port int, timeout time.Duration) (
 		SimulatorUDID:   frame.Data.SimulatorUDID,
 		ProtocolVersion: frame.Data.ProtocolVersion,
 		AgentVersion:    frame.Data.AgentVersion,
-	}, true
+	}, probeAnswered
 }
 
 // RunnerIdentityError reports a runner answering on a port that is
@@ -221,11 +251,18 @@ func CheckRunner(ctx context.Context, port int, timeout time.Duration, want Expe
 	if !ok {
 		return RunnerIdentity{}, false, false, nil
 	}
+	found, unmanaged, err = judgeRunner(port, got, want)
+	return got, found, unmanaged, err
+}
+
+// judgeRunner applies the identity rule to the identity an answering
+// runner reported.
+func judgeRunner(port int, got RunnerIdentity, want ExpectedRunner) (found, unmanaged bool, err *RunnerIdentityError) {
 	verdict, reason := want.Verify(got)
 	if verdict == IdentityMismatch || verdict == IdentityLegacy {
-		return got, true, false, &RunnerIdentityError{Port: port, Expect: want, Got: got, Reason: reason, Legacy: verdict == IdentityLegacy}
+		return true, false, &RunnerIdentityError{Port: port, Expect: want, Got: got, Reason: reason, Legacy: verdict == IdentityLegacy}
 	}
-	return got, true, verdict == IdentityUnmanaged, nil
+	return true, verdict == IdentityUnmanaged, nil
 }
 
 // RunnerProbeTimeout bounds one identity probe of a runner port.

@@ -21,6 +21,10 @@ import (
 
 const defaultIosPort = 22087
 
+// runnerBusyRemedy is the next step reported when the agent accepts a
+// connection but does not answer because another client holds it.
+const runnerBusyRemedy = "Close the other Atomyx session or client that is using the device, or restart the runner, then try again."
+
 // pingProbeTimeout bounds a single Ping round trip to the runner, so
 // a caller gets a fast answer instead of waiting on the request's
 // full context deadline.
@@ -233,6 +237,13 @@ func (d *IosDriver) Connect(ctx context.Context) error {
 	d.agentInfo = driver.AgentInfo{}
 	if d.opts.Kind == KindDevice && !d.opts.ExternalTunnel {
 		if err := d.launchIproxy(ctx); err != nil {
+			var iproxyErr *IproxyError
+			if errors.As(err, &iproxyErr) && iproxyErr.Code == IproxyErrRunnerBusy {
+				return diag.New(diag.CodeAgentNotReady,
+					fmt.Sprintf("the agent on device %s is busy or held by another client", d.opts.UDID),
+					runnerBusyRemedy,
+					err)
+			}
 			return diag.New(diag.CodeAgentUnreachable,
 				fmt.Sprintf("could not reach the agent on device %s", d.opts.UDID),
 				"Confirm the device is connected and unlocked, then try again.",

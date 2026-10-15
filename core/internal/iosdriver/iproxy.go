@@ -29,6 +29,16 @@ const (
 	// iproxyTunnelUpTimeout is the total budget for a freshly spawned
 	// iproxy tunnel to become reachable.
 	iproxyTunnelUpTimeout = 5 * time.Second
+	// iproxyBusyProbeAttempts is how many ping probes a listener that accepts
+	// but stays silent gets before the runner is reported busy. The runner
+	// serves one client at a time and notices a closed client on its next
+	// read, which lands within about a second, so three probes spaced by
+	// iproxyBusyRetryPause ride out a client that just closed while a
+	// client that stays connected is reported within about four seconds.
+	iproxyBusyProbeAttempts = 3
+	// iproxyBusyRetryPause is the wait between two probes of a silent
+	// listener.
+	iproxyBusyRetryPause = 500 * time.Millisecond
 )
 
 // deviceRunnerPort is the port the runner listens on inside a physical
@@ -52,6 +62,10 @@ const (
 	// IproxyErrBindConflict means 127.0.0.1:port is already held by a
 	// listener that does not answer the Atomyx ping handshake.
 	IproxyErrBindConflict IproxyErrorCode = "bind-conflict"
+	// IproxyErrRunnerBusy means 127.0.0.1:port accepts connections but the
+	// runner behind it did not answer the ping handshake within the retry
+	// budget, because another client holds it.
+	IproxyErrRunnerBusy IproxyErrorCode = "runner-busy"
 	// IproxyErrTunnelTimeout means a freshly spawned iproxy never made
 	// the port reachable within its budget.
 	IproxyErrTunnelTimeout IproxyErrorCode = "tunnel-timeout"
@@ -123,9 +137,12 @@ type TunnelConfig struct {
 //     the expected runner (see ExpectedRunner) is an existing Atomyx
 //     driver tunnel and is reused without spawning a second iproxy, but
 //     only when cfg.Reuse accounts for it. A listener that does not
-//     answer, answers as a different runner, or is not accounted for is
-//     refused with IproxyErrBindConflict instead of racing whatever else
-//     is bound there.
+//     answer in a non-runner way, answers as a different runner, or is not
+//     accounted for is refused with IproxyErrBindConflict instead of
+//     racing whatever else is bound there. A listener that accepts but
+//     stays silent is probed up to iproxyBusyProbeAttempts times, then
+//     refused with IproxyErrRunnerBusy, because the runner serves one
+//     client at a time and is most likely held by another.
 //   - Poll for real tunnel connectivity after spawn. iproxy emits no
 //     "ready" signal on stdout or stderr, so this polls the port on
 //     iproxyTunnelPollInterval until a fresh TCP connect succeeds,
@@ -143,9 +160,23 @@ type TunnelConfig struct {
 func StartTunnel(ctx context.Context, bg process.BackgroundRunner, clk clock.Clock, cfg TunnelConfig) (stop func(), pid int, err error) {
 	if canConnectTCP(ctx, cfg.HostPort, iproxyPortProbeTimeout) {
 		want := ExpectedRunner{UDID: cfg.UDID, Kind: KindDevice, RunnerID: cfg.RunnerID}
-		found, unmanaged, idErr := CheckRunnerIdentity(ctx, cfg.HostPort, iproxyPingProbeTimeout, want)
-		if idErr != nil {
-			return nil, 0, &IproxyError{Code: IproxyErrBindConflict, Message: idErr.Error()}
+		got, outcome := probeListener(ctx, clk, cfg.HostPort)
+		if outcome == probeSilent {
+			return nil, 0, &IproxyError{
+				Code: IproxyErrRunnerBusy,
+				Message: fmt.Sprintf(
+					"the runner on 127.0.0.1:%d did not answer: it is busy or held by another client",
+					cfg.HostPort,
+				),
+			}
+		}
+		found, unmanaged := false, false
+		if outcome == probeAnswered {
+			var idErr *RunnerIdentityError
+			found, unmanaged, idErr = judgeRunner(cfg.HostPort, got, want)
+			if idErr != nil {
+				return nil, 0, &IproxyError{Code: IproxyErrBindConflict, Message: idErr.Error()}
+			}
 		}
 		if found {
 			if unmanaged && cfg.Warn != nil {
@@ -293,4 +324,22 @@ func (d *IosDriver) stopIproxy() {
 	}
 	d.iproxyStop()
 	d.iproxyStop = nil
+}
+
+// tunnelPingTimeout bounds one identity probe made by StartTunnel.
+var tunnelPingTimeout = iproxyPingProbeTimeout
+
+// probeListener pings the listener on port, retrying while it accepts
+// but stays silent, up to iproxyBusyProbeAttempts probes. Any other
+// outcome ends the loop at once.
+func probeListener(ctx context.Context, clk clock.Clock, port int) (RunnerIdentity, probeOutcome) {
+	for attempt := 1; ; attempt++ {
+		got, outcome := probeRunner(ctx, port, tunnelPingTimeout)
+		if outcome != probeSilent || attempt >= iproxyBusyProbeAttempts {
+			return got, outcome
+		}
+		if err := clk.Sleep(ctx, iproxyBusyRetryPause.Milliseconds()); err != nil {
+			return got, probeRejected
+		}
+	}
 }

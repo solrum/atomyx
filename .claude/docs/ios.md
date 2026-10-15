@@ -593,6 +593,14 @@ HID path (`DriverFactory.createDriver`) runs the same check against the
 runner it is about to use, so a runner left behind by a different
 simulator is never adopted.
 
+A runner that accepts the connection but does not answer the ping is
+probed up to three times, 500 milliseconds apart. If it stays silent,
+because the runner serves one client at a time and another client holds
+it, the tunnel launch fails with `IproxyErrRunnerBusy` and `Connect`
+returns `AGENT_NOT_READY` with a remedy to close the other client or
+restart the runner. A listener that closes the connection or answers
+with something else is still refused as `IproxyErrBindConflict`.
+
 Ports differ by target:
 
 - Simulator: the runner binds the host port itself, so `ATOMYX_PORT`
