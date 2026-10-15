@@ -36,12 +36,10 @@ preconditions:
     timeout: 10000
 
 - type:
-    into:
-      hint: "Email"
+    into: "Email"
     text: ${email}
 - type:
-    into:
-      hint: "Password"
+    into: "Password"
     text: ${password}
 - tap: "Login"
 - waitFor:
