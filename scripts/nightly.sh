@@ -28,6 +28,8 @@
 #
 # Environment:
 #   ATOMYX_NIGHTLY_RESULTS_DIR  parent of the run directory, default e2e-results/nightly
+#   ATOMYX_BIN                  atomyx binary used for setup, default core/bin/atomyx
+#   ATOMYX_SOAK_BIN             soak script, default scripts/soak.sh
 #
 # Exit codes:
 #   0  every entry is ok
@@ -43,6 +45,7 @@ set -euo pipefail
 readonly RUNNER_HOST="127.0.0.1"
 readonly RUNNER_PORT="22087"
 readonly RUNNER_WAIT_S=600
+readonly RUNNER_RELEASE_WAIT_S=15
 readonly EMULATOR_BOOT_WAIT_S=300
 readonly EMULATOR_FIRST_PORT=5554
 readonly EMULATOR_LAST_PORT=5584
@@ -84,7 +87,8 @@ if [ ! -f "$matrix" ]; then
 fi
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-atomyx_bin="${repo_root}/core/bin/atomyx"
+atomyx_bin="${ATOMYX_BIN:-${repo_root}/core/bin/atomyx}"
+soak_bin="${ATOMYX_SOAK_BIN:-${repo_root}/scripts/soak.sh}"
 
 kinds=()
 ids=()
@@ -148,7 +152,6 @@ if [ "$dry_run" -eq 1 ]; then
     kind="${kinds[$i]}"
     id="${ids[$i]}"
     count="${counts[$i]}"
-    platform="$(platform_of "$kind")"
     echo "entry $((i + 1)): ${kind} ${id} soak=${count}"
     case "$kind" in
       android-emulator)
@@ -184,7 +187,6 @@ if [ "$dry_run" -eq 1 ]; then
         echo "  teardown: stop the runner and its children"
         ;;
     esac
-    : "$platform"
   done
   exit 0
 fi
@@ -207,6 +209,8 @@ runner_pid=""
 emulator_pid=""
 emulator_serial=""
 booted_sim=""
+device_id=""
+fail_reason=""
 
 kill_tree() {
   local pid="$1" child
@@ -216,11 +220,33 @@ kill_tree() {
   kill "$pid" 2>/dev/null || true
 }
 
+# Confirms the runner port is free after a teardown. A process that
+# survived its parent's death and still holds the port is a descendant of
+# the runner this script started, so it is stopped by its listening pid.
+release_runner_port() {
+  local waited=0 pid
+  while runner_listening; do
+    if [ "$waited" -ge "$RUNNER_RELEASE_WAIT_S" ]; then
+      for pid in $(lsof -ti "tcp:${RUNNER_PORT}" -sTCP:LISTEN 2>/dev/null || true); do
+        kill "$pid" 2>/dev/null || true
+      done
+      sleep 2
+      break
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  if runner_listening; then
+    echo "warning: port ${RUNNER_PORT} is still in use after teardown" >&2
+  fi
+}
+
 cleanup() {
   if [ -n "$runner_pid" ]; then
     kill_tree "$runner_pid"
     wait "$runner_pid" 2>/dev/null || true
     runner_pid=""
+    release_runner_port
   fi
   if [ -n "$emulator_serial" ]; then
     adb -s "$emulator_serial" emu kill >/dev/null 2>&1 || true
@@ -255,11 +281,11 @@ wait_for_runner() {
   local waited=0
   while ! runner_listening; do
     if ! kill -0 "$runner_pid" 2>/dev/null; then
-      echo "the runner process exited before it listened on ${RUNNER_HOST}:${RUNNER_PORT}"
+      fail_reason="the runner process exited before it listened on ${RUNNER_HOST}:${RUNNER_PORT}"
       return 1
     fi
     if [ "$waited" -ge "$RUNNER_WAIT_S" ]; then
-      echo "the runner did not listen on ${RUNNER_HOST}:${RUNNER_PORT} within ${RUNNER_WAIT_S}s"
+      fail_reason="the runner did not listen on ${RUNNER_HOST}:${RUNNER_PORT} within ${RUNNER_WAIT_S}s"
       return 1
     fi
     sleep 2
@@ -285,16 +311,16 @@ free_emulator_port() {
 boot_emulator() {
   local avd="$1" log="$2" port waited=0
   if ! port="$(free_emulator_port)"; then
-    echo "no free emulator console port between ${EMULATOR_FIRST_PORT} and ${EMULATOR_LAST_PORT}"
+    fail_reason="no free emulator console port between ${EMULATOR_FIRST_PORT} and ${EMULATOR_LAST_PORT}"
     return 1
   fi
   emulator -avd "$avd" -no-window -no-snapshot-save -port "$port" >> "$log" 2>&1 &
   emulator_pid=$!
   emulator_serial="emulator-${port}"
-  adb -s "$emulator_serial" wait-for-device
+  adb -s "$emulator_serial" wait-for-device || return 1
   until [ "$(adb -s "$emulator_serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; do
     if [ "$waited" -ge "$EMULATOR_BOOT_WAIT_S" ]; then
-      echo "the emulator did not finish booting within ${EMULATOR_BOOT_WAIT_S}s"
+      fail_reason="the emulator did not finish booting within ${EMULATOR_BOOT_WAIT_S}s"
       return 1
     fi
     sleep 3
@@ -302,8 +328,22 @@ boot_emulator() {
   done
 }
 
+# A streamed install over a wireless adb link fails transiently now and
+# then, so one retry separates a flaky link from a real rejection.
+install_with_retry() {
+  local serial="$1" log="$2" attempt
+  for attempt in 1 2; do
+    if adb -s "$serial" install -r "${repo_root}/${DEMO_REL_APK}" >> "$log" 2>&1; then
+      return 0
+    fi
+    sleep 3
+  done
+  return 1
+}
+
 # Sets the device up and leaves the identifiers the later steps need in
-# device_id. Returns non-zero with a reason on stdout when it cannot.
+# device_id. Returns non-zero and sets fail_reason when it cannot. It must
+# run in the current shell, because it records the processes it starts.
 prepare_entry() {
   local kind="$1" id="$2" log="$3"
   case "$kind" in
@@ -314,9 +354,15 @@ prepare_entry() {
     iossim)
       device_id="$id"
       if ! xcrun simctl list devices | grep "$id" | grep -q "(Booted)"; then
-        xcrun simctl boot "$id" >> "$log" 2>&1
+        if ! xcrun simctl boot "$id" >> "$log" 2>&1; then
+          fail_reason="simulator boot failed"
+          return 1
+        fi
         booted_sim="$id"
-        xcrun simctl bootstatus "$id" -b >> "$log" 2>&1
+        if ! xcrun simctl bootstatus "$id" -b >> "$log" 2>&1; then
+          fail_reason="simulator did not finish booting"
+          return 1
+        fi
       fi
       ;;
     *) device_id="$id" ;;
@@ -325,12 +371,12 @@ prepare_entry() {
   case "$kind" in
     android | android-emulator)
       "$atomyx_bin" setup --platform android --device "$device_id" >> "$log" 2>&1 || {
-        echo "atomyx setup failed"
+        fail_reason="atomyx setup failed"
         return 1
       }
       if [ -f "${repo_root}/${DEMO_REL_APK}" ]; then
-        adb -s "$device_id" install -r "${repo_root}/${DEMO_REL_APK}" >> "$log" 2>&1 || {
-          echo "demo app install failed"
+        install_with_retry "$device_id" "$log" || {
+          fail_reason="demo app install failed"
           return 1
         }
       fi
@@ -341,7 +387,7 @@ prepare_entry() {
       wait_for_runner || return 1
       if [ -d "${repo_root}/${DEMO_REL_SIM_APP}" ]; then
         xcrun simctl install "$device_id" "${repo_root}/${DEMO_REL_SIM_APP}" >> "$log" 2>&1 || {
-          echo "demo app install failed"
+          fail_reason="demo app install failed"
           return 1
         }
       fi
@@ -382,6 +428,7 @@ for i in "${!kinds[@]}"; do
   e2e_exit="n/a"
   soak_exit="n/a"
   device_id=""
+  fail_reason=""
 
   echo "entry ${index}: ${kind} ${id} soak=${count}"
 
@@ -389,11 +436,9 @@ for i in "${!kinds[@]}"; do
     status="skipped"
     reason="port ${RUNNER_PORT} is already in use by another runner"
   else
-    if reason="$(prepare_entry "$kind" "$id" "$setup_log")"; then
-      reason=""
-    else
+    if ! prepare_entry "$kind" "$id" "$setup_log"; then
       status="failed"
-      [ -n "$reason" ] || reason="device setup failed"
+      reason="${fail_reason:-device setup failed}"
     fi
   fi
 
@@ -420,7 +465,7 @@ for i in "${!kinds[@]}"; do
     e2e_exit=$?
     if [ "$count" -gt 0 ]; then
       ATOMYX_SOAK_RESULTS_DIR="${entry_dir}/soak" \
-        "${repo_root}/scripts/soak.sh" "$platform" "$device_id" "$count" > "$soak_log" 2>&1
+        "$soak_bin" "$platform" "$device_id" "$count" > "$soak_log" 2>&1
       soak_exit=$?
     fi
     set -e

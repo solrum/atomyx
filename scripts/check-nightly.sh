@@ -109,6 +109,104 @@ status=$?
 set -e
 [ "$status" -eq 2 ] || fail "unknown option: exit $status, want 2"
 
+# Real runs against fake tools. The fakes record their argv and the
+# device variables they receive, so a lost device id fails the check.
+fakes="$work/fakes"
+mkdir -p "$fakes"
+export FAKE_LOG="$work/fake.log"
+cat > "$fakes/atomyx" <<'FAKE'
+#!/usr/bin/env bash
+echo "atomyx $*" >> "$FAKE_LOG"
+FAKE
+cat > "$fakes/adb" <<'FAKE'
+#!/usr/bin/env bash
+echo "adb $*" >> "$FAKE_LOG"
+FAKE
+cat > "$fakes/xcrun" <<'FAKE'
+#!/usr/bin/env bash
+echo "xcrun $*" >> "$FAKE_LOG"
+if [ "$2" = "list" ]; then echo "    Fake (SIM-1) (Booted)"; fi
+FAKE
+cat > "$fakes/nc" <<'FAKE'
+#!/usr/bin/env bash
+[ -e "$FAKE_RUNNER_FLAG" ]
+FAKE
+cat > "$fakes/make" <<'FAKE'
+#!/usr/bin/env bash
+echo "make $*" >> "$FAKE_LOG"
+case "$*" in
+  *" e2e "* | *" e2e")
+    echo "env ATOMYX_ANDROID_SERIAL=${ATOMYX_ANDROID_SERIAL:-} ATOMYX_IOS_SIM_UDID=${ATOMYX_IOS_SIM_UDID:-}" >> "$FAKE_LOG"
+    echo "pass: 7"; echo "fail: 0"; echo "skip: 2"
+    ;;
+  *serve*)
+    touch "$FAKE_RUNNER_FLAG"
+    trap 'rm -f "$FAKE_RUNNER_FLAG"; exit 0' TERM
+    sleep 600 &
+    wait
+    ;;
+esac
+FAKE
+cat > "$fakes/soak.sh" <<'FAKE'
+#!/usr/bin/env bash
+echo "soak $*" >> "$FAKE_LOG"
+mkdir -p "$ATOMYX_SOAK_RESULTS_DIR/r"
+printf 'passed: 3\nfailed: 0\ninfraFailureRate: 0.000000\n' > "$ATOMYX_SOAK_RESULTS_DIR/r/summary.txt"
+FAKE
+chmod +x "$fakes"/*
+export FAKE_RUNNER_FLAG="$work/runner.flag"
+
+run_real() {
+  local name="$1" content="$2"
+  printf '%s' "$content" > "$work/$name.matrix"
+  : > "$FAKE_LOG"
+  rm -f "$FAKE_RUNNER_FLAG"
+  set +e
+  PATH="$fakes:$PATH" ATOMYX_BIN="$fakes/atomyx" ATOMYX_SOAK_BIN="$fakes/soak.sh" \
+    ATOMYX_NIGHTLY_RESULTS_DIR="$work/real-$name" \
+    "$nightly" "$work/$name.matrix" > "$work/real-$name.out" 2>&1
+  real_status=$?
+  set -e
+  real_dir="$(ls -d "$work/real-$name"/*/ 2>/dev/null | head -1)"
+}
+
+expect_log() {
+  if ! grep -qF -- "$2" "$FAKE_LOG"; then
+    fail "$1: fake log lacks '$2'"
+  fi
+}
+
+run_real android $'android SERIAL-A 2\n'
+[ "$real_status" -eq 0 ] || fail "real android: exit $real_status, want 0"
+expect_log "real android" "env ATOMYX_ANDROID_SERIAL=SERIAL-A"
+expect_log "real android" "soak android SERIAL-A 2"
+expect_log "real android" "atomyx setup --platform android --device SERIAL-A"
+for line in "e2e exit: 0" "e2e pass: 7" "e2e skip: 2" "soak passed: 3" "status: ok"; do
+  grep -qx -- "$line" "${real_dir}1-android/result.txt" || fail "real android: result.txt lacks '$line'"
+done
+
+run_real iossim $'iossim SIM-1 1\n'
+[ "$real_status" -eq 0 ] || fail "real iossim: exit $real_status, want 0"
+expect_log "real iossim" "env ATOMYX_ANDROID_SERIAL= ATOMYX_IOS_SIM_UDID=SIM-1"
+expect_log "real iossim" "soak iossim SIM-1 1"
+if [ -e "$FAKE_RUNNER_FLAG" ]; then
+  fail "real iossim: the runner was not torn down"
+fi
+
+# A runner that already listens makes the iOS entry skipped, and a
+# failing e2e leg is recorded without stopping the next entry.
+: > "$FAKE_LOG"
+touch "$FAKE_RUNNER_FLAG"
+printf 'iossim SIM-1 0\n' > "$work/busy.matrix"
+set +e
+PATH="$fakes:$PATH" ATOMYX_BIN="$fakes/atomyx" ATOMYX_SOAK_BIN="$fakes/soak.sh" \
+  ATOMYX_NIGHTLY_RESULTS_DIR="$work/real-busy" "$nightly" "$work/busy.matrix" > "$work/real-busy.out" 2>&1
+busy_status=$?
+set -e
+rm -f "$FAKE_RUNNER_FLAG"
+[ "$busy_status" -eq 1 ] || fail "busy runner: exit $busy_status, want 1"
+grep -q 'skipped' "$work/real-busy.out" || fail "busy runner: entry not reported as skipped"
+
 if [ "$failures" -ne 0 ]; then
   echo "nightly check: $failures failure(s)" >&2
   exit 1
