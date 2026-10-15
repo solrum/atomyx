@@ -228,6 +228,10 @@
         "deviceId": {
           "type": "string"
         },
+        "errorCode": {
+          "description": "The diag code of the failure that ended the run. Absent on a pass, on a failure with no code, and on a run written before the field existed.",
+          "type": "string"
+        },
         "failedAtStep": {
           "minimum": 0,
           "type": "integer"

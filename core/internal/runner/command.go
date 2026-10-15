@@ -98,6 +98,9 @@ type CommandResult struct {
 	// when Ok is false, or informational context when Ok is true.
 	// Nil when the command has nothing to add.
 	Detail *string
+	// Code is the diag code of the failure when Ok is false and the failure
+	// carries one. Empty otherwise.
+	Code string
 }
 
 // CommandContext is passed to every command during script execution.

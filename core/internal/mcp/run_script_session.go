@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"dev.atomyx/internal/device"
+	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/runfolder"
 	"dev.atomyx/internal/runner"
@@ -120,6 +121,7 @@ func (s *runSession) runAsOwnRun(
 	finalizeErr := w.Finalize(outcome, func(m *runfolder.Meta) {
 		m.TotalSteps = result.TotalSteps
 		m.FailedAtStep = result.FailedAtStep
+		m.ErrorCode = failureCodeOf(outcome, result, execErr)
 		info := *m.MCP
 		info.DurationMs = result.DurationMs
 		m.MCP = &info
@@ -228,4 +230,24 @@ func (a *scriptArtifacts) WriteEvidence(name string, data []byte) error {
 	prefix := a.evidencePrefix
 	a.mu.Unlock()
 	return os.WriteFile(filepath.Join(a.dir, prefix+name), data, artifactFileMode)
+}
+
+// failureCodeOf returns the diag code to record for a script run that
+// ended in outcome: the code carried by execErr when the run errored,
+// otherwise the code of the failing step. It is empty for a run that
+// passed or was cancelled, and for a failure that carries no code.
+func failureCodeOf(outcome runfolder.Outcome, result runner.ScriptResult, execErr error) string {
+	if outcome == runfolder.OutcomePassed || outcome == runfolder.OutcomeCancelled {
+		return ""
+	}
+	if code := result.FailureCode(); code != "" {
+		return code
+	}
+	if execErr == nil {
+		return ""
+	}
+	if code, _, _ := diag.Describe(execErr); code != diag.CodeUnknown {
+		return code
+	}
+	return ""
 }

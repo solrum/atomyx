@@ -104,10 +104,13 @@ type ScriptRunnerDeps struct {
 
 // StepResult is the outcome of one executed top-level step.
 type StepResult struct {
-	StepIndex  int
-	Command    string
-	Ok         bool
-	Detail     *string
+	StepIndex int
+	Command   string
+	Ok        bool
+	Detail    *string
+	// Code is the diag code of the failure, empty when the step passed or
+	// failed without one, as an assertion does.
+	Code       string
 	DurationMs int64
 }
 
@@ -408,6 +411,7 @@ func (r *ScriptRunner) Run(ctx context.Context, def *script.ScriptDefinition) (S
 			Command:    step.StepCommand(),
 			Ok:         result.Ok,
 			Detail:     result.Detail,
+			Code:       result.Code,
 			DurationMs: durationMs,
 		})
 		r.emitStep(StepEvent{
@@ -1086,3 +1090,23 @@ func (a *inMemoryArtifacts) Screenshots() []Screenshot {
 
 func strPtr(s string) *string { return &s }
 func intPtr(i int) *int       { return &i }
+
+// FailureCode returns the diag code of the failure that ended the run:
+// the abort code when the run stopped for a reason beyond a step
+// failure, otherwise the code of the failed top-level step. It is empty
+// for a passing run and for a failure that carries no code, such as a
+// failed assertion.
+func (r ScriptResult) FailureCode() string {
+	if r.Abort != nil {
+		return r.Abort.Code
+	}
+	if r.FailedAtStep == nil {
+		return ""
+	}
+	for _, s := range r.Steps {
+		if s.StepIndex == *r.FailedAtStep {
+			return s.Code
+		}
+	}
+	return ""
+}

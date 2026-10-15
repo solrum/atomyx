@@ -116,6 +116,7 @@ func metaSchema() map[string]any {
 		"result":               enum(Results(), "Coarse verdict."),
 		"outcome":              enum(Outcomes(), "Precise reason the run ended."),
 		"failedAtStep":         map[string]any{"type": "integer", "minimum": 0},
+		"errorCode":            map[string]any{"type": "string", "description": "The diag code of the failure that ended the run. Absent on a pass, on a failure with no code, and on a run written before the field existed."},
 		"totalSteps":           map[string]any{"type": "integer", "minimum": 0},
 		"mcp":                  ref("MCPInfo"),
 		"importedFrom":         map[string]any{"type": "string", "description": "Id of the record of another store this folder was imported from. Absent for a run written natively."},

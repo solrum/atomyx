@@ -141,6 +141,7 @@ func RunSuite(ctx context.Context, deps Deps, flags map[string]FlagValue, positi
 		return 1
 	}
 	if err != nil {
+		record.setErrorFrom(err)
 		record.setOutcome(runfolder.OutcomeError, counts)
 		return reportUncaughtMasked(ctx, stderr, deps.Debug, record.secrets.String, err)
 	}

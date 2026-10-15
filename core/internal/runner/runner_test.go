@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/driver"
 	"dev.atomyx/internal/driver/mock"
 	"dev.atomyx/internal/logging"
@@ -824,5 +825,24 @@ func TestDeviceLostDetail(t *testing.T) {
 				t.Fatalf("got %q, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestScriptResultFailureCode(t *testing.T) {
+	failed := 1
+	cases := []struct {
+		name   string
+		result ScriptResult
+		want   string
+	}{
+		{"passed", ScriptResult{Ok: true}, ""},
+		{"step without code", ScriptResult{FailedAtStep: &failed, Steps: []StepResult{{StepIndex: 0, Ok: true}, {StepIndex: 1}}}, ""},
+		{"step with code", ScriptResult{FailedAtStep: &failed, Steps: []StepResult{{StepIndex: 0, Ok: true}, {StepIndex: 1, Code: diag.CodeToolTimeout}}}, diag.CodeToolTimeout},
+		{"abort wins", ScriptResult{FailedAtStep: &failed, Abort: &RunAbort{Code: diag.CodeAgentUnreachable}, Steps: []StepResult{{StepIndex: 1, Code: diag.CodeToolTimeout}}}, diag.CodeAgentUnreachable},
+	}
+	for _, c := range cases {
+		if got := c.result.FailureCode(); got != c.want {
+			t.Errorf("%s: FailureCode() = %q, want %q", c.name, got, c.want)
+		}
 	}
 }

@@ -140,15 +140,19 @@ type Meta struct {
 	// script or scenario path relative to its project root, or mcp: and
 	// the run name for an MCP run. Absent on a run recorded without one,
 	// which readers key by scriptPath.
-	TestKey      string   `json:"testKey,omitempty"`
-	DeviceID     string   `json:"deviceId,omitempty"`
-	Device       *Device  `json:"device,omitempty"`
-	Host         *Host    `json:"host,omitempty"`
-	StartedAt    int64    `json:"startedAt"`
-	CompletedAt  *int64   `json:"completedAt,omitempty"`
-	Result       Result   `json:"result,omitempty"`
-	Outcome      Outcome  `json:"outcome,omitempty"`
-	FailedAtStep *int     `json:"failedAtStep,omitempty"`
+	TestKey      string  `json:"testKey,omitempty"`
+	DeviceID     string  `json:"deviceId,omitempty"`
+	Device       *Device `json:"device,omitempty"`
+	Host         *Host   `json:"host,omitempty"`
+	StartedAt    int64   `json:"startedAt"`
+	CompletedAt  *int64  `json:"completedAt,omitempty"`
+	Result       Result  `json:"result,omitempty"`
+	Outcome      Outcome `json:"outcome,omitempty"`
+	FailedAtStep *int    `json:"failedAtStep,omitempty"`
+	// ErrorCode is the diag code of the failure that ended the run. Absent
+	// on a run that passed, on a failure that carries no code such as a
+	// failed assertion, and on a run written before the field existed.
+	ErrorCode    string   `json:"errorCode,omitempty"`
 	TotalSteps   int      `json:"totalSteps,omitempty"`
 	MCP          *MCPInfo `json:"mcp,omitempty"`
 	ImportedFrom string   `json:"importedFrom,omitempty"`

@@ -212,6 +212,7 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 			return 1
 		}
 		if err != nil {
+			record.setErrorFrom(err)
 			return fail(err)
 		}
 		record.setOutcome(outcomeForResult(result.Ok), nil)
@@ -296,9 +297,11 @@ func RunScript(ctx context.Context, deps Deps, flags map[string]FlagValue) int {
 		return 1
 	}
 	if err != nil {
+		record.setErrorFrom(err)
 		return fail(err)
 	}
 	record.setOutcome(outcomeForScript(result), scriptMeta(result.TotalSteps, result.FailedAtStep))
+	record.setErrorCode(result.FailureCode())
 	kept := record.finishVideo(ctx)
 
 	if jsonOutput {

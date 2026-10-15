@@ -87,7 +87,7 @@ func commandFailureFor(err error) (CommandResult, bool) {
 	if !errors.As(err, &coded) {
 		return CommandResult{}, false
 	}
-	return CommandResult{Ok: false, Detail: strPtr(coded.Error())}, true
+	return CommandResult{Ok: false, Detail: strPtr(coded.Error()), Code: coded.Code()}, true
 }
 
 // obscuredDetail is the step detail for an action refused because

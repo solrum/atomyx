@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"dev.atomyx/internal/device"
+	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/recording"
 	"dev.atomyx/internal/report"
@@ -33,6 +34,9 @@ type runRecord struct {
 	formats []string
 	outcome runfolder.Outcome
 	mutate  func(*runfolder.Meta)
+	// errorCode is the diag code written to the meta of a run that ended in
+	// failure. It is dropped for a run that passed or was cancelled.
+	errorCode string
 	// reportedInJSON is true once the run folder path has been written
 	// into the command's JSON output, which makes the plain path line
 	// redundant.
@@ -119,6 +123,17 @@ func (r *runRecord) setOutcome(outcome runfolder.Outcome, mutate func(*runfolder
 	r.outcome, r.mutate = outcome, mutate
 }
 
+// setErrorCode records the diag code of the failure that ended the run.
+func (r *runRecord) setErrorCode(code string) { r.errorCode = code }
+
+// setErrorFrom records the diag code carried by err, and nothing when err
+// carries none.
+func (r *runRecord) setErrorFrom(err error) {
+	if code, _, _ := diag.Describe(err); code != diag.CodeUnknown {
+		r.errorCode = code
+	}
+}
+
 // outcomeForResult maps a finished run's pass state to an outcome.
 func outcomeForResult(ok bool) runfolder.Outcome {
 	if ok {
@@ -149,6 +164,15 @@ func (r *runRecord) end(ctx context.Context, stderr io.Writer) {
 	}
 	r.settleOutcome(ctx)
 	mutate := r.mutate
+	if code := r.errorCode; code != "" && r.outcome != runfolder.OutcomePassed && r.outcome != runfolder.OutcomeCancelled {
+		inner := mutate
+		mutate = func(m *runfolder.Meta) {
+			if inner != nil {
+				inner(m)
+			}
+			m.ErrorCode = code
+		}
+	}
 	if rec := r.finishVideo(ctx); rec != nil {
 		mutate = func(m *runfolder.Meta) {
 			if r.mutate != nil {

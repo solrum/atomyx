@@ -348,3 +348,21 @@ func TestRecordAgentKeepsTheHostAndSkipsZeroValues(t *testing.T) {
 		t.Fatalf("host = %+v, want protocol 1", bare.Host)
 	}
 }
+
+func TestMetaErrorCodeIsOmittedWhenEmptyAndRoundTrips(t *testing.T) {
+	plain, err := json.Marshal(Meta{RunID: "r"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(plain), "errorCode") {
+		t.Fatalf("empty error code was written: %s", plain)
+	}
+	raw, err := json.Marshal(Meta{RunID: "r", ErrorCode: "AGENT_UNREACHABLE"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var back Meta
+	if err := json.Unmarshal(raw, &back); err != nil || back.ErrorCode != "AGENT_UNREACHABLE" {
+		t.Fatalf("round trip = %+v, %v", back, err)
+	}
+}
