@@ -2,8 +2,8 @@ package dev.atomyx.agent.control
 
 /**
  * What the typer can read from an input node without keeping the node
- * itself. [identity] names the field (resource id, class and screen
- * bounds) so a later read can tell whether it is the same field.
+ * itself. [identity] names the field (see [fieldIdentity]) so a later
+ * read can tell whether it is the same field.
  */
 data class FieldSnapshot(
     val identity: String,
@@ -13,6 +13,27 @@ data class FieldSnapshot(
 ) {
     /** Text the user would see as content, empty while a placeholder hint shows. */
     val content: String get() = if (showingHint) "" else text
+}
+
+/**
+ * Builds the key that tells whether two reads are the same field.
+ *
+ * The vertical position is deliberately excluded, because opening the
+ * keyboard shifts a field vertically and apps without resource ids (such
+ * as Flutter) would otherwise look like a different field. [uniqueId] is
+ * included only when the platform reports one.
+ */
+fun fieldIdentity(
+    className: String?,
+    secure: Boolean,
+    left: Int,
+    right: Int,
+    width: Int,
+    height: Int,
+    uniqueId: String?,
+): String {
+    val base = "$className|$secure|$left|$right|$width|$height"
+    return if (uniqueId != null) "$base|$uniqueId" else base
 }
 
 enum class Landing { MATCH, NOTHING_LANDED, MISMATCH }

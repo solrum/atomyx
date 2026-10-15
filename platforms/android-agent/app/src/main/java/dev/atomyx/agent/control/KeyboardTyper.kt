@@ -2,6 +2,7 @@ package dev.atomyx.agent.control
 
 import android.accessibilityservice.AccessibilityService
 import android.graphics.Rect
+import android.os.Build
 import android.os.Bundle
 import android.view.accessibility.AccessibilityNodeInfo
 import dev.atomyx.agent.control.clear.ClearTextChain
@@ -182,7 +183,15 @@ class KeyboardTyper(
         val bounds = Rect()
         node.getBoundsInScreen(bounds)
         return FieldSnapshot(
-            identity = "${node.viewIdResourceName}|${node.className}|${bounds.flattenToString()}",
+            identity = fieldIdentity(
+                className = node.className?.toString(),
+                secure = node.isPassword,
+                left = bounds.left,
+                right = bounds.right,
+                width = bounds.width(),
+                height = bounds.height(),
+                uniqueId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) node.uniqueId else null,
+            ),
             text = node.text?.toString() ?: "",
             secure = node.isPassword,
             showingHint = node.isShowingHintText,

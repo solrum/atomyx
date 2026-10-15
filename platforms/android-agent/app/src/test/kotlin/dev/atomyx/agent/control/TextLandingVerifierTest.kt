@@ -2,6 +2,7 @@ package dev.atomyx.agent.control
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 class TextLandingVerifierTest {
@@ -12,6 +13,44 @@ class TextLandingVerifierTest {
         secure: Boolean = false,
         hint: Boolean = false,
     ) = FieldSnapshot(id, text, secure, hint)
+
+    private fun identity(
+        className: String? = "android.widget.EditText",
+        left: Int = 40,
+        right: Int = 1040,
+        width: Int = 1000,
+        height: Int = 120,
+    ) = fieldIdentity(className, false, left, right, width, height, null)
+
+    @Test
+    fun verticalShiftOfTheSameFieldKeepsItsIdentity() {
+        val verdict = verifyLanding(
+            "alice",
+            5,
+            field("", id = identity()),
+            field("alice", id = identity()),
+        )
+
+        assertEquals(Landing.MATCH, verdict.landing)
+    }
+
+    @Test
+    fun differentWidthOrClassChangesTheIdentity() {
+        assertNotEquals(identity(), identity(width = 900, right = 940))
+        assertNotEquals(identity(), identity(className = "android.widget.TextView"))
+        assertEquals(
+            Landing.MISMATCH,
+            verifyLanding("a", 1, field("", id = identity()), field("a", id = identity(width = 900))).landing,
+        )
+    }
+
+    @Test
+    fun uniqueIdSeparatesOtherwiseIdenticalFields() {
+        val first = fieldIdentity("c", false, 0, 10, 10, 10, "u1")
+        val second = fieldIdentity("c", false, 0, 10, 10, 10, "u2")
+
+        assertNotEquals(first, second)
+    }
 
     @Test
     fun exactMatchOnTheSameFieldLands() {
