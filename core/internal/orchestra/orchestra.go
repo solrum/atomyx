@@ -280,7 +280,7 @@ func (o *Orchestra) InputText(ctx context.Context, selector Selector, text strin
 	if err := o.driver.Tap(ctx, prepared.point); err != nil {
 		return ActionResult{}, err
 	}
-	if err := o.awaitTargetFocus(ctx, selector, prepared.resolvedBy); err != nil {
+	if err := o.awaitTargetFocus(ctx, NewFocusTarget(prepared.cursor, prepared.bounds), prepared.resolvedBy); err != nil {
 		return ActionResult{}, err
 	}
 	clearFirst := opts.ClearFirst == nil || *opts.ClearFirst
@@ -337,21 +337,22 @@ func (e *InputFocusError) Remedy() string {
 
 var _ diag.Coded = (*InputFocusError)(nil)
 
-// awaitTargetFocus blocks until the element matching selector holds
+// awaitTargetFocus blocks until the node resolved before the tap holds
 // input focus, so a following EraseText and InputText land in the field
 // the caller aimed at rather than whichever field held focus before the
-// focus-settling tap. WaitForFocus polls the hierarchy and resolves only
-// when a node reporting focus coincides with selector's own candidate,
-// so a transient focus still on the previously focused field does not
-// satisfy it. It returns on the first poll when the target already holds
-// focus, so a settled field pays no extra latency. A focus that never
-// reaches the target surfaces as an *InputFocusError; the caller must
-// not type after receiving one. An infrastructure failure (driver
-// transport, context cancellation) propagates unchanged.
-func (o *Orchestra) awaitTargetFocus(ctx context.Context, selector Selector, resolvedBy string) error {
-	_, err := WaitForFocus(ctx, WaitForFocusOptions{
+// focus-settling tap. The check follows the resolved node by id or
+// frame instead of re-running the selector, so a label that changes on
+// focus does not hide the target and a transient focus still on the
+// previously focused field does not satisfy it. It returns on the first
+// poll when the target already holds focus, so a settled field pays no
+// extra latency. A focus that never reaches the target surfaces as an
+// *InputFocusError, and the caller must not type after receiving one.
+// An infrastructure failure (driver transport, context cancellation)
+// propagates unchanged.
+func (o *Orchestra) awaitTargetFocus(ctx context.Context, target FocusTarget, resolvedBy string) error {
+	err := WaitForTargetFocus(ctx, WaitForTargetFocusOptions{
 		Driver:     o.driver,
-		Selector:   selector,
+		Target:     target,
 		Clock:      o.clock,
 		TimeoutMs:  inputFocusSettleTimeoutMs,
 		IntervalMs: inputFocusSettlePollMs,

@@ -223,6 +223,123 @@ func WaitForFocus(ctx context.Context, opts WaitForFocusOptions) (*TreeCursor, e
 	)
 }
 
+// focusLayoutShiftMaxPx bounds how far a field may move vertically
+// between the pre-tap snapshot and the moment it takes focus. Opening
+// the soft keyboard scrolls or resizes the layout so the focused field
+// stays visible, and the keyboard is the largest thing that can push a
+// field, so its height (about 400 px on a phone) is the ceiling.
+const focusLayoutShiftMaxPx = 400
+
+// FocusTarget identifies the node a type action resolved before it
+// tapped, so the focus wait can confirm focus on that same node
+// instead of re-running the selector against a tree whose labels and
+// layout the tap may have changed.
+type FocusTarget struct {
+	// ID is the resolved node's identifier, empty when it has none.
+	ID string
+	// Bounds is the resolved node's pre-tap frame.
+	Bounds wire.Bounds
+	// otherBounds holds the pre-tap frame of every other node, so a
+	// focused node sitting exactly on a different node's old frame is
+	// recognized as that other node rather than a shifted target.
+	otherBounds map[wire.Bounds]struct{}
+}
+
+// NewFocusTarget captures the pre-tap identity of cursor, which must
+// carry parseable bounds, from the tree it points into.
+func NewFocusTarget(cursor *TreeCursor, bounds wire.Bounds) FocusTarget {
+	target := FocusTarget{
+		ID:          cursor.Node.Attributes[AttrID],
+		Bounds:      bounds,
+		otherBounds: make(map[wire.Bounds]struct{}),
+	}
+	for _, c := range Walk(RootOf(cursor)) {
+		if b, ok := ParseBounds(c.Node.Attributes[AttrBounds]); ok && b != bounds {
+			target.otherBounds[b] = struct{}{}
+		}
+	}
+	return target
+}
+
+// holdsFocus reports whether the focused node in tree is the target.
+// Any one of these confirms it:
+//
+//   - the target has an id and a node with that id is the focused node
+//     or shares its frame area
+//   - the focused frame overlaps the target's pre-tap frame
+//   - the focused frame overlaps the target horizontally, sits within
+//     focusLayoutShiftMaxPx of it vertically, and is not exactly the
+//     pre-tap frame of some other node (which would make it a
+//     different field that already held that place)
+func (t FocusTarget) holdsFocus(tree wire.TreeNodeWire) bool {
+	focused, ok := findFocusedNode(tree)
+	if !ok {
+		return false
+	}
+	fb, ok := ParseBounds(focused.Node.Attributes[AttrBounds])
+	if !ok {
+		return false
+	}
+	if t.ID != "" {
+		if focused.Node.Attributes[AttrID] == t.ID {
+			return true
+		}
+		for _, c := range Walk(tree) {
+			if c.Node.Attributes[AttrID] != t.ID {
+				continue
+			}
+			if b, ok := ParseBounds(c.Node.Attributes[AttrBounds]); ok && BoundsIntersect(b, fb) {
+				return true
+			}
+		}
+	}
+	if BoundsIntersect(t.Bounds, fb) {
+		return true
+	}
+	if _, other := t.otherBounds[fb]; other {
+		return false
+	}
+	horizontal := fb.Left < t.Bounds.Right && t.Bounds.Left < fb.Right
+	shift := BoundsCenter(fb).Y - BoundsCenter(t.Bounds).Y
+	return horizontal && shift <= focusLayoutShiftMaxPx && -shift <= focusLayoutShiftMaxPx
+}
+
+// WaitForTargetFocusOptions configures WaitForTargetFocus.
+type WaitForTargetFocusOptions struct {
+	Driver     HierarchyDriver
+	Target     FocusTarget
+	Clock      Clock
+	TimeoutMs  int
+	IntervalMs int
+}
+
+// WaitForTargetFocus polls Driver's hierarchy until the node captured
+// in Target holds input focus, returning WaitTimeoutError when it never
+// does. Unlike WaitForFocus it does not re-run a selector, so a field
+// whose label or hint changes when focused is still recognized, and a
+// different field taking focus is not mistaken for the target.
+func WaitForTargetFocus(ctx context.Context, opts WaitForTargetFocusOptions) error {
+	timeoutMs := opts.TimeoutMs
+	if timeoutMs == 0 {
+		timeoutMs = 1500
+	}
+	intervalMs := opts.IntervalMs
+	if intervalMs == 0 {
+		intervalMs = 50
+	}
+	_, err := WaitUntil(ctx, opts.Clock, timeoutMs, intervalMs, "waitForFocus",
+		func(ctx context.Context) (bool, error) {
+			tree, err := opts.Driver.Hierarchy(ctx)
+			if err != nil {
+				return false, err
+			}
+			return opts.Target.holdsFocus(tree), nil
+		},
+		func(held bool) bool { return held },
+	)
+	return err
+}
+
 // WaitForInputReadyOptions configures WaitForInputReady.
 type WaitForInputReadyOptions struct {
 	Driver     HierarchyDriver
