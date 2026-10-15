@@ -326,9 +326,13 @@ The shared driver contract cases that need a device fixture skip when
 the fixture is absent. On `android`, the installed `dev.atomyx.demo`
 app serves the launch and clear app data cases. The install and
 uninstall roundtrip needs `ATOMYX_ANDROID_INSTALL_APK` (path to an APK)
-and `ATOMYX_ANDROID_INSTALL_APP_ID` (that APK's package name), and it
-removes the package first when it is already installed, so do not point
-it at an app the run needs. The erase text case and the exact no
+and `ATOMYX_ANDROID_INSTALL_APP_ID` (that APK's package name). The
+fixture app may already be installed on the device. The case removes it,
+installs it, removes it again, and reinstalls it from the APK afterward,
+so the device ends as it started. The demo app works as the fixture: build
+it with Flutter from `examples/atomyx-demo`, set the APK to
+`examples/atomyx-demo/build/app/outputs/flutter-apk/app-debug.apk`, and
+set the app id to `dev.atomyx.demo`. The erase text case and the exact no
 foreground assertions skip on real devices, and the `iossim` leg skips
 the launch, clear app data, and install cases.
 The `ios` leg runs the launch cases against `com.apple.Preferences` and

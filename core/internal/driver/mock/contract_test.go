@@ -54,3 +54,23 @@ func TestDriverWithForeignAutomationSatisfiesContract(t *testing.T) {
 		FailPing:    func() { d.FailNextPingForContract(simulatedUnreachablePing()) },
 	}))
 }
+
+func TestPreInstalledFixtureIsRestoredAfterRoundtrip(t *testing.T) {
+	const fixtureID = "dev.atomyx.drivertest.preinstalled"
+	var d *mock.Driver
+	t.Run("suite", func(t *testing.T) {
+		drivertest.Run(t, func() driver.Driver {
+			d = mock.New()
+			d.InstalledApps[fixtureID] = struct{}{}
+			return d
+		}, drivertest.WithSyntheticFixtures(drivertest.Hooks{
+			DeviceCalls: func() int { return len(d.Calls) },
+			FailPing:    func() { d.FailNextPingForContract(simulatedUnreachablePing()) },
+			Install:     &drivertest.InstallFixture{Source: fixtureID, AppID: fixtureID},
+		}))
+	})
+	// The roundtrip is the last case, so d is the driver it used.
+	if _, ok := d.InstalledApps[fixtureID]; !ok {
+		t.Fatal("pre-installed fixture was not installed again after the roundtrip case")
+	}
+}

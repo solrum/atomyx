@@ -24,6 +24,9 @@ usage() {
   echo "  android  requires ATOMYX_ANDROID_SERIAL and the installed dev.atomyx.demo app" >&2
   echo "           optional: ATOMYX_ANDROID_INSTALL_APK and ATOMYX_ANDROID_INSTALL_APP_ID" >&2
   echo "           (APK path and its package name) enable the install roundtrip case" >&2
+  echo "           the app may already be installed and is restored after the case" >&2
+  echo "           example: examples/atomyx-demo/build/app/outputs/flutter-apk/app-debug.apk" >&2
+  echo "           with app id dev.atomyx.demo (flutter build apk --debug in examples/atomyx-demo)" >&2
   echo "  ios      requires ATOMYX_IOS_DEVICE_UDID" >&2
 }
 

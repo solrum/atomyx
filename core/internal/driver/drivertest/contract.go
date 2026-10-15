@@ -94,8 +94,9 @@ type Hooks struct {
 
 	// Install describes an artifact the install and uninstall
 	// roundtrip may install and remove. A nil Install skips that
-	// case. The case removes the app first when it is already
-	// installed, so the app must not be one the rest of the run needs.
+	// case. The app may already be installed. The case removes it,
+	// installs it, removes it again, and reinstalls it from Source
+	// afterward when it was present before.
 	Install *InstallFixture
 }
 

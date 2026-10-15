@@ -193,6 +193,12 @@ func testInstallUninstallRoundtrip(t *testing.T, newDriver Factory, hooks Hooks)
 		t.Fatalf("IsAppInstalled before install: %v", err)
 	}
 	if installed {
+		// Leave the device as found: other cases and later runs rely on this app being present.
+		t.Cleanup(func() {
+			if err := d.InstallApp(context.Background(), hooks.Install.Source); err != nil {
+				t.Errorf("reinstalling the fixture app that was present before the case: %v", err)
+			}
+		})
 		if err := d.UninstallApp(ctx, appID); err != nil {
 			t.Fatalf("UninstallApp of the already-installed fixture: %v", err)
 		}
