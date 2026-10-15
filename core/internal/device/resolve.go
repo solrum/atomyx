@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"dev.atomyx/internal/diag"
+	"dev.atomyx/internal/version"
 )
 
 // defaultAndroidSerial is the serial adb assigns to a single booted
@@ -49,7 +52,18 @@ func (e *DeviceNotFoundError) Error() string {
 //     (simulator or physical device) is returned. An id no scan finds
 //     returns a *DeviceNotFoundError, because a driver built with a
 //     guessed kind either dials a control port nothing serves or
-//     skips the USB tunnel a physical device needs.
+//     skips the USB tunnel a physical device needs. When the runner
+//     served on the default control port reports the same device
+//     (the simulator udid for a simulator, the target udid for a
+//     physical device, compared ignoring case) and speaks the host
+//     protocol, the Descriptor carries the default control port so
+//     that runner is used and nothing is launched. A matching
+//     runner that speaks another protocol returns an
+//     AGENT_VERSION_MISMATCH error, because launching a second
+//     runner would put two runners on one device. A runner for
+//     another device, a runner that reports no device, and no
+//     answering runner all leave the port unset so a runner is
+//     launched.
 //   - iOS without an id: the device comes from the runner served on
 //     the default control port, asked through runners. A runner that
 //     reports a simulator udid or a target device udid names that
@@ -71,7 +85,11 @@ func ResolveDescriptor(ctx context.Context, probe Probe, runners RunnerIdentifie
 	}
 	for _, d := range probe.Scan(ctx) {
 		if d.Platform == PlatformIOS && strings.EqualFold(d.ID, id) {
-			return Descriptor{ID: d.ID, Platform: PlatformIOS, Name: d.Name, Kind: d.Kind, State: d.State}, nil
+			desc := Descriptor{ID: d.ID, Platform: PlatformIOS, Name: d.Name, Kind: d.Kind, State: d.State}
+			if err := reuseServedRunner(ctx, runners, &desc); err != nil {
+				return Descriptor{}, err
+			}
+			return desc, nil
 		}
 	}
 	return Descriptor{}, &DeviceNotFoundError{Platform: PlatformIOS, ID: id}
@@ -123,4 +141,34 @@ func resolveServedRunner(ctx context.Context, probe Probe, runners RunnerIdentif
 	}
 	d := phones[0]
 	return Descriptor{ID: d.ID, Platform: PlatformIOS, Name: d.Name, Kind: KindDevice, State: d.State, Port: iosControlPort}, nil
+}
+
+// reuseServedRunner points desc at the runner served on the default
+// control port when that runner belongs to desc's device. It leaves
+// desc untouched when no runner is wired, nothing answers, or the
+// runner reports another device or none. A runner for the same device
+// that speaks another protocol version fails with
+// AGENT_VERSION_MISMATCH.
+func reuseServedRunner(ctx context.Context, runners RunnerIdentifier, desc *Descriptor) error {
+	if runners == nil {
+		return nil
+	}
+	got, ok := runners.IdentifyRunner(ctx, iosControlPort)
+	if !ok {
+		return nil
+	}
+	reported := got.TargetUDID
+	if desc.Kind == KindSimulator {
+		reported = got.SimulatorUDID
+	}
+	if reported == "" || !strings.EqualFold(reported, desc.ID) {
+		return nil
+	}
+	if got.ProtocolVersion != version.AgentProtocolVersion {
+		_, message, _ := diag.Describe(diag.NewAgentVersionMismatch(got.ProtocolVersion, version.AgentProtocolVersion))
+		remedy := fmt.Sprintf("Stop the runner served on port %d or rebuild it.", iosControlPort)
+		return diag.New(diag.CodeAgentVersionMismatch, message, remedy, nil)
+	}
+	desc.Port = iosControlPort
+	return nil
 }

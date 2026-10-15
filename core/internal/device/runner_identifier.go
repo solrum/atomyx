@@ -14,6 +14,9 @@ type ServedRunner struct {
 	SimulatorUDID string
 	// TargetUDID is the physical device the runner was aimed at.
 	TargetUDID string
+	// ProtocolVersion is the wire protocol version the runner declares,
+	// zero when it declares none.
+	ProtocolVersion int
 }
 
 // RunnerIdentifier reports the identity of the iOS runner answering on a
@@ -35,5 +38,5 @@ func (PingRunnerIdentifier) IdentifyRunner(ctx context.Context, port int) (Serve
 	if !ok {
 		return ServedRunner{}, false
 	}
-	return ServedRunner{SimulatorUDID: got.SimulatorUDID, TargetUDID: got.TargetUDID}, true
+	return ServedRunner{SimulatorUDID: got.SimulatorUDID, TargetUDID: got.TargetUDID, ProtocolVersion: got.ProtocolVersion}, true
 }

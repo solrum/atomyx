@@ -5,6 +5,9 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"dev.atomyx/internal/diag"
+	"dev.atomyx/internal/version"
 )
 
 const servedSimulatorUDID = "8DCBCBB0-A213-4AE0-96F8-3061DDAD4610"
@@ -96,12 +99,56 @@ func TestResolveDescriptor_NoDeviceIsDeviceNotFound(t *testing.T) {
 	}
 }
 
-func TestResolveDescriptor_ANamedIOSDeviceNeverProbesTheRunner(t *testing.T) {
-	runners := &fakeRunnerIdentifier{ok: true, id: ServedRunner{SimulatorUDID: "OTHER"}}
+func TestResolveDescriptor_ANamedIOSDeviceReusesOrProvisionsByServedRunner(t *testing.T) {
+	const deviceUDID = "00008101-AAAA"
+	hostVersion := version.AgentProtocolVersion
+	cases := []struct {
+		name     string
+		id       string
+		runner   *fakeRunnerIdentifier
+		wantPort int
+		wantCode string
+	}{
+		{"simulator match", "SIM-UDID", &fakeRunnerIdentifier{ok: true, id: ServedRunner{SimulatorUDID: "SIM-UDID", ProtocolVersion: hostVersion}}, iosControlPort, ""},
+		{"simulator match ignores case", "sim-udid", &fakeRunnerIdentifier{ok: true, id: ServedRunner{SimulatorUDID: "SIM-UDID", ProtocolVersion: hostVersion}}, iosControlPort, ""},
+		{"simulator protocol mismatch", "SIM-UDID", &fakeRunnerIdentifier{ok: true, id: ServedRunner{SimulatorUDID: "SIM-UDID", ProtocolVersion: hostVersion + 1}}, 0, diag.CodeAgentVersionMismatch},
+		{"simulator other target", "SIM-UDID", &fakeRunnerIdentifier{ok: true, id: ServedRunner{SimulatorUDID: "OTHER", ProtocolVersion: hostVersion + 1}}, 0, ""},
+		{"simulator legacy runner", "SIM-UDID", &fakeRunnerIdentifier{ok: true, id: ServedRunner{ProtocolVersion: hostVersion}}, 0, ""},
+		{"simulator nothing answers", "SIM-UDID", &fakeRunnerIdentifier{}, 0, ""},
+		{"simulator ignores a device target", "SIM-UDID", &fakeRunnerIdentifier{ok: true, id: ServedRunner{TargetUDID: "SIM-UDID", ProtocolVersion: hostVersion}}, 0, ""},
+		{"device match", deviceUDID, &fakeRunnerIdentifier{ok: true, id: ServedRunner{TargetUDID: deviceUDID, ProtocolVersion: hostVersion}}, iosControlPort, ""},
+		{"device match ignores case", "00008101-aaaa", &fakeRunnerIdentifier{ok: true, id: ServedRunner{TargetUDID: deviceUDID, ProtocolVersion: hostVersion}}, iosControlPort, ""},
+		{"device protocol mismatch", deviceUDID, &fakeRunnerIdentifier{ok: true, id: ServedRunner{TargetUDID: deviceUDID}}, 0, diag.CodeAgentVersionMismatch},
+		{"device other target", deviceUDID, &fakeRunnerIdentifier{ok: true, id: ServedRunner{TargetUDID: "OTHER", ProtocolVersion: hostVersion}}, 0, ""},
+		{"device legacy runner", deviceUDID, &fakeRunnerIdentifier{ok: true, id: ServedRunner{ProtocolVersion: hostVersion}}, 0, ""},
+		{"device nothing answers", deviceUDID, &fakeRunnerIdentifier{}, 0, ""},
+		{"device ignores a simulator target", deviceUDID, &fakeRunnerIdentifier{ok: true, id: ServedRunner{SimulatorUDID: deviceUDID, ProtocolVersion: hostVersion}}, 0, ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			desc, err := ResolveDescriptor(context.Background(), iosProbeFixture(), c.runner, PlatformIOS, c.id)
 
-	desc, err := ResolveDescriptor(context.Background(), iosProbeFixture(), runners, PlatformIOS, "SIM-UDID")
+			if c.wantCode != "" {
+				code, _, remedy := diag.Describe(err)
+				if code != c.wantCode || !strings.Contains(remedy, "Stop the runner served on port 22087 or rebuild it") {
+					t.Fatalf("err = %v, code %q, remedy %q, want %s with the stop-or-rebuild remedy", err, code, remedy, c.wantCode)
+				}
+				return
+			}
+			if err != nil || desc.Port != c.wantPort || !strings.EqualFold(desc.ID, c.id) {
+				t.Fatalf("got %+v, %v, want the scanned device with port %d", desc, err, c.wantPort)
+			}
+			if len(c.runner.ports) != 1 || c.runner.ports[0] != iosControlPort {
+				t.Fatalf("probed ports = %v, want the control port once", c.runner.ports)
+			}
+		})
+	}
+}
 
-	if err != nil || desc.ID != "SIM-UDID" || desc.Port != 0 || len(runners.ports) != 0 {
-		t.Fatalf("got %+v, %v, probed %v, want the scanned device with no port and no runner probe", desc, err, runners.ports)
+func TestResolveDescriptor_ANamedIOSDeviceWithoutRunnerIdentifierProvisions(t *testing.T) {
+	desc, err := ResolveDescriptor(context.Background(), iosProbeFixture(), nil, PlatformIOS, "SIM-UDID")
+
+	if err != nil || desc.ID != "SIM-UDID" || desc.Port != 0 {
+		t.Fatalf("got %+v, %v, want the scanned device with no port", desc, err)
 	}
 }
