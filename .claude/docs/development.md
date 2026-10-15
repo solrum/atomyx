@@ -330,9 +330,14 @@ and `ATOMYX_ANDROID_INSTALL_APP_ID` (that APK's package name). The
 fixture app may already be installed on the device. The case removes it,
 installs it, removes it again, and reinstalls it from the APK afterward,
 so the device ends as it started. The demo app works as the fixture: build
-it with Flutter from `examples/atomyx-demo`, set the APK to
+it with `make demo-android` from the repo root, set the APK to
 `examples/atomyx-demo/build/app/outputs/flutter-apk/app-debug.apk`, and
-set the app id to `dev.atomyx.demo`. The erase text case and the exact no
+set the app id to `dev.atomyx.demo`. `make demo-ios-sim` and
+`make demo-ios-device` build the iOS counterparts, and each target prints
+its output path. `demo-ios-device` signs with `DEV_TEAM` from
+`platforms/ios-agent/device.env`. The demo app also serves deep link
+`atomyxdemo://open/<route>`, with the routes listed in
+`examples/atomyx-demo/README.md`. The erase text case and the exact no
 foreground assertions skip on real devices, and the `iossim` leg skips
 the launch, clear app data, and install cases.
 The `ios` leg runs the launch cases against `com.apple.Preferences` and

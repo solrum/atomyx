@@ -56,9 +56,22 @@ GO_RELEASE_BINARIES := atomyx atomyx-mcp atomyx-runtime
 # access for code signing verification (OCSP, provisioning).
 APPLE_BYPASS := '(.*\.apple\.com|.*\.mzstatic\.com|.*\.icloud\.com)'
 
+# Demo app fixture builds. demo-ios-device reads DEV_TEAM from the
+# gitignored platforms/ios-agent/device.env, loaded only for that goal
+# because the file carries a contributor's personal signing identity.
+DEMO_DIR            := $(REPO_ROOT)/examples/atomyx-demo
+DEMO_ANDROID_APK    := build/app/outputs/flutter-apk/app-debug.apk
+DEMO_IOS_SIM_DD     := build/ios-sim
+DEMO_IOS_SIM_APP    := $(DEMO_IOS_SIM_DD)/Build/Products/Debug-iphonesimulator/Runner.app
+DEMO_IOS_DEVICE_DD  := build/ios-device
+DEMO_IOS_DEVICE_APP := $(DEMO_IOS_DEVICE_DD)/Build/Products/Release-iphoneos/Runner.app
+ifneq ($(filter demo-ios-device,$(MAKECMDGOALS)),)
+-include $(IOS_DIR)/device.env
+endif
+
 .PHONY: help build build-core release-core check e2e hooks ready-android ready-ios ready-ios-sim \
         ready-ios-capture ready-android-capture \
-        stop serve-ios serve-android mitm
+        stop serve-ios serve-android mitm demo-android demo-ios-sim demo-ios-device
 
 .DEFAULT_GOAL := help
 
@@ -72,6 +85,10 @@ help:
 	@echo "  make check                      Run every local gate: core + repo-wide lints"
 	@echo "  make hooks                      Install the commit size hook (core.hooksPath)"
 	@echo "  make e2e PLATFORM=<p>           Run the device-gated end-to-end suite (iossim, android, or ios)"
+	@echo "DEMO APP (fixture builds, each prints the output path):"
+	@echo "  make demo-android               Debug APK"
+	@echo "  make demo-ios-sim               Simulator build, no signing"
+	@echo "  make demo-ios-device            Device build, team from platforms/ios-agent/device.env"
 	@echo ""
 	@echo "READY (start driver, ready to run scripts):"
 	@echo "  make ready-android              Android device/emulator"
@@ -233,6 +250,39 @@ serve-ios:
 	@echo "iproxy tunnel started for $(DEVICE_UDID)"
 	@# Start driver (foreground, so it blocks the terminal)
 	cd $(IOS_DIR) && make serve-device
+
+# --- Demo app fixtures -----------------------------------------
+
+demo-android:
+	cd $(DEMO_DIR) && flutter build apk --debug
+	@echo "Output: $(DEMO_DIR)/$(DEMO_ANDROID_APK)"
+
+# Builds for the host architecture only, because the Xcode 27 lipo
+# rejects the multi-architecture verify call Flutter 3.38 makes when it
+# thins the engine framework for a universal simulator build.
+demo-ios-sim:
+	cd $(DEMO_DIR) && flutter build ios --simulator --debug --config-only
+	@cd $(DEMO_DIR) && xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner \
+		-configuration Debug -destination generic/platform=iOS\ Simulator \
+		-derivedDataPath $(DEMO_IOS_SIM_DD) ARCHS=$$(uname -m) ONLY_ACTIVE_ARCH=YES \
+		CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+	@echo "Output: $(DEMO_DIR)/$(DEMO_IOS_SIM_APP)"
+
+# Release configuration, because a debug Flutter app cannot launch from
+# the home screen on a device. Flutter has no team flag, so Flutter
+# prepares the project and xcodebuild signs with DEV_TEAM.
+demo-ios-device:
+	@if [ -z "$(DEV_TEAM)" ]; then \
+		echo "ERROR: DEV_TEAM is not set. Create platforms/ios-agent/device.env"; \
+		echo "from device.env.example, or pass DEV_TEAM=<team> on the command line."; \
+		exit 1; \
+	fi
+	cd $(DEMO_DIR) && flutter build ios --release --config-only
+	@cd $(DEMO_DIR) && xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner \
+		-configuration Release -destination generic/platform=iOS \
+		-derivedDataPath $(DEMO_IOS_DEVICE_DD) -allowProvisioningUpdates \
+		DEVELOPMENT_TEAM=$(DEV_TEAM) CODE_SIGN_STYLE=Automatic build
+	@echo "Output: $(DEMO_DIR)/$(DEMO_IOS_DEVICE_APP)"
 
 # --- iOS Simulator ---------------------------------------------
 
