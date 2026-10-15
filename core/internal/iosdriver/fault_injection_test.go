@@ -494,6 +494,36 @@ func TestIosDriver_BoundaryTranslation_SanitizesLeakingAgentRejectionMessage(t *
 	}
 }
 
+// TestIosDriver_FailedCommandReply_SurfacesRunnerMessageAndKeepsConnection
+// proves that an ok:false reply a runner sends for a command whose UI
+// action failed reaches the caller as a rejected request carrying the
+// runner's own short message, not as an unreachable or communication
+// failure, and that the same connection still answers the next call.
+func TestIosDriver_FailedCommandReply_SurfacesRunnerMessageAndKeepsConnection(t *testing.T) {
+	const runnerMessage = "Unable to find a focused element"
+	agent := newRejectingIosAgentWithMessage(t, runnerMessage)
+	host, port := agent.hostPort(t)
+	conn := transport.NewTCPClient(host, port, transport.WithTCPResponseTimeout(responseTimeout))
+	if err := conn.Connect(context.Background()); err != nil {
+		t.Fatalf("conn.Connect() against a rejecting runner: %v", err)
+	}
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "fault-injection", Kind: iosdriver.KindSimulator})
+
+	for attempt := 1; attempt <= 2; attempt++ {
+		err := d.Tap(context.Background(), wire.Point{X: 1, Y: 1})
+		if err == nil {
+			t.Fatalf("Tap() attempt %d against a runner reporting a failed action returned no error", attempt)
+		}
+		code, message, _ := diag.Describe(err)
+		if code != diag.CodeAgentRejected {
+			t.Fatalf("Tap() attempt %d: diag.Describe code = %q, want %q", attempt, code, diag.CodeAgentRejected)
+		}
+		if message != runnerMessage {
+			t.Fatalf("Tap() attempt %d: message = %q, want %q", attempt, message, runnerMessage)
+		}
+	}
+}
+
 // assertNoForbiddenTransportSubstring fails t when message contains
 // any shape of a leaked TCP address, port, or dial diagnostic,
 // case-insensitively.

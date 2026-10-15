@@ -115,6 +115,10 @@ runner never sees a selector: it only receives coordinates and, for
 | `ListApps()` / `InstallApp()` / `UninstallApp()` / `ClearAppData()` / `IsAppInstalled()` | none (host-only) | none | `xcrun simctl` (simulator) or `xcrun devicectl` (device), invoked directly by the Go adapter. |
 | `WaitForIdle()` | none | none | Always reports `true` without waiting, so a caller must fall back to tree-diff polling. |
 
+### Failed command contract
+
+A command whose UI action fails returns an error reply and the runner keeps serving the next command. The runner captures any issue the test framework records while a command runs (a typing call with nothing focused, a tap that cannot resolve an element, and similar) instead of letting it end the serving test. The reply is `{"id": N, "ok": false, "error": "<short message>"}`, the same envelope as every other rejection. The message is one line of at most 160 characters with framework type names and object addresses removed. The host maps it to an `AGENT_REJECTED` error carrying that message, never to an unreachable or communication failure, and the same connection stays usable. Issues recorded outside command handling keep the framework's normal behavior.
+
 ## Setup and run
 
 **Simulator** (zero configuration):
