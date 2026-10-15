@@ -134,12 +134,24 @@ and `s` (dot matches newline).
 Flutter Semantics often merges a visible title and a subtitle into
 one label, so an element showing "Products" with a subtitle below it
 can carry the combined label "Products\nBrowse our catalog", newline
-included. An exact match on "Products" does not match that element.
-The working alternative is a regex that matches the prefix:
+included. Segment rule: when an attribute value (`label`, `hint`,
+`text`, or `value`) contains newline-separated segments, a literal
+selector value that equals exactly one whole segment also matches it.
+So `{ "label": "Products" }` finds the merged label above.
 
-```json
-{ "label": { "regex": "^Products" } }
-```
+- Segments are compared with the same exact equality as a whole
+  value, so case and surrounding whitespace are not folded.
+- A partial segment never matches: `"Prod"` does not match
+  "Products\nBrowse our catalog".
+- Within one field, an element whose whole value equals the literal
+  always wins over an element matched only by a segment.
+- A literal `id` that matches no element id also tries the label
+  segments of every element, after every other content field has
+  failed. This reaches an identifier that the platform folded into the
+  label of its parent.
+- Regex patterns are unchanged and are never split into segments.
+  Use a regex such as `{ "label": { "regex": "^Products" } }` for a
+  prefix match.
 
 `find_element` takes the selector fields at the top level of its
 arguments, while `tap`, `input_text`, and `wait_for_element` take them

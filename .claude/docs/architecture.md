@@ -160,6 +160,20 @@ chain: every candidate filter AND-s them in as constraints. `Nth`
 skips ranking entirely and selects positionally from the winning
 filter's result list.
 
+Segment rule: a literal value for `Label`, `Text`, `Value`, or `Hint`
+also matches a node whose attribute value contains newline-separated
+segments when the literal equals exactly one whole segment. Segments
+use the same exact equality as a whole value (no case folding, no
+trimming), a partial segment never matches, and regex patterns are
+never split. Within one field, a node whose whole value equals the
+literal always wins over a node matched only by a segment, and the
+priority order above is unchanged. A literal `ID` that matches no node
+id is also tried against label segments, as the last entry of the
+chain, because XCUITest and Flutter Semantics fold a child identifier
+into the parent's newline-joined label and never expose it as its own
+node. Matching lives in the pattern and filter layer, so every
+platform adapter gets it through Orchestra with no platform branch.
+
 This is the mechanism that lets an agent write `{text: "Login"}`
 without knowing whether Android exposes that string through
 `contentDesc` or iOS through `label`: both adapters normalize onto

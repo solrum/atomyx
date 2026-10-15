@@ -249,15 +249,24 @@ matching case and no trimming of surrounding or embedded whitespace.
 There is no substring or partial match, and a YAML selector has no
 regex field.
 
-Flutter Semantics often merges a visible title and a subtitle into
-one label, so an element showing "Products" with a subtitle below it
-can carry the combined label "Products\nBrowse our catalog", newline
-included. A `text: "Products"` or `label: "Products"` selector does
-not match that element, because the full label is longer than the
-literal string. A YAML script cannot express a regex match for this
-case. Drive the same element through the MCP tool surface instead,
-where a `{"label": {"regex": "^Products"}}` selector matches the
-"Products" prefix regardless of what follows it.
+Segment rule: Flutter Semantics often merges a visible title and a
+subtitle into one label, so an element showing "Products" with a
+subtitle below it can carry the combined label
+"Products\nBrowse our catalog", newline included. When an attribute
+value (`label`, `hint`, `text`, or `value`) contains
+newline-separated segments, a selector value that equals exactly one
+whole segment also matches it. `text: "Products"` and
+`label: "Products"` therefore find that element.
+
+- Segments use the same exact equality as a whole value, with no case
+  folding and no trimming.
+- A partial segment never matches: `"Prod"` does not match.
+- An element whose whole value equals the selector always wins over
+  an element matched only by a segment.
+- An `id` selector that matches no element id also tries the label
+  segments of every element, after every other content field has
+  failed, to reach an identifier the platform folded into its
+  parent's label.
 
 ### type
 
