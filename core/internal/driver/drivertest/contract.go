@@ -66,6 +66,20 @@ type Hooks struct {
 	FailConnect func()
 }
 
+// tracked wraps newDriver so every driver it returns is disconnected
+// when t finishes. A real adapter can hold an exclusive client slot
+// (the iOS runner accepts one client at a time), so a case that
+// connects and returns would otherwise block every later case.
+// Disconnect is idempotent, so a case that disconnects itself is
+// unaffected.
+func tracked(t *testing.T, newDriver Factory) Factory {
+	return func() driver.Driver {
+		d := newDriver()
+		t.Cleanup(func() { _ = d.Disconnect() })
+		return d
+	}
+}
+
 // Run executes the driver contract suite against every driver value
 // newDriver constructs. It is the single suite any Driver
 // implementation is checked against, regardless of which platform
@@ -81,38 +95,38 @@ type Hooks struct {
 // no way to stage one (see Stager).
 func Run(t *testing.T, newDriver Factory, hooks Hooks) {
 	t.Helper()
-	t.Run("platform is non-empty", func(t *testing.T) { testPlatformNonEmpty(t, newDriver) })
-	t.Run("capabilities is stable across calls", func(t *testing.T) { testCapabilitiesStable(t, newDriver) })
-	t.Run("connect lifecycle", func(t *testing.T) { testConnectLifecycle(t, newDriver) })
-	t.Run("disconnect is idempotent", func(t *testing.T) { testDisconnectIdempotent(t, newDriver) })
-	t.Run("ping reports liveness", func(t *testing.T) { testPingReportsLiveness(t, newDriver, hooks) })
-	t.Run("agent info is local and stable", func(t *testing.T) { testAgentInfoIsLocalAndStable(t, newDriver, hooks) })
-	t.Run("agent info is zero after a failed connect", func(t *testing.T) { testAgentInfoZeroAfterFailedConnect(t, newDriver, hooks) })
-	t.Run("context cancellation", func(t *testing.T) { testContextCancellation(t, newDriver) })
+	t.Run("platform is non-empty", func(t *testing.T) { testPlatformNonEmpty(t, tracked(t, newDriver)) })
+	t.Run("capabilities is stable across calls", func(t *testing.T) { testCapabilitiesStable(t, tracked(t, newDriver)) })
+	t.Run("connect lifecycle", func(t *testing.T) { testConnectLifecycle(t, tracked(t, newDriver)) })
+	t.Run("disconnect is idempotent", func(t *testing.T) { testDisconnectIdempotent(t, tracked(t, newDriver)) })
+	t.Run("ping reports liveness", func(t *testing.T) { testPingReportsLiveness(t, tracked(t, newDriver), hooks) })
+	t.Run("agent info is local and stable", func(t *testing.T) { testAgentInfoIsLocalAndStable(t, tracked(t, newDriver), hooks) })
+	t.Run("agent info is zero after a failed connect", func(t *testing.T) { testAgentInfoZeroAfterFailedConnect(t, tracked(t, newDriver), hooks) })
+	t.Run("context cancellation", func(t *testing.T) { testContextCancellation(t, tracked(t, newDriver)) })
 
-	t.Run("tap long press swipe succeed", func(t *testing.T) { testTapLongPressSwipeSucceed(t, newDriver) })
-	t.Run("dispatch gesture multi-pointer capability", func(t *testing.T) { testDispatchGestureMultiPointerCapability(t, newDriver) })
-	t.Run("dispatch gesture pressure capability", func(t *testing.T) { testDispatchGesturePressureCapability(t, newDriver) })
-	t.Run("dispatch gesture capture capability", func(t *testing.T) { testDispatchGestureCaptureCapability(t, newDriver) })
-	t.Run("erase text capability", func(t *testing.T) { testEraseTextCapability(t, newDriver) })
-	t.Run("hide keyboard capability", func(t *testing.T) { testHideKeyboardCapability(t, newDriver) })
-	t.Run("press key supported code", func(t *testing.T) { testPressKeySupportedCode(t, newDriver) })
-	t.Run("press key unsupported code handled gracefully", func(t *testing.T) { testPressKeyUnsupportedCodeHandledGracefully(t, newDriver) })
-	t.Run("streaming touch is optional", func(t *testing.T) { testStreamingTouchOptional(t, newDriver) })
+	t.Run("tap long press swipe succeed", func(t *testing.T) { testTapLongPressSwipeSucceed(t, tracked(t, newDriver)) })
+	t.Run("dispatch gesture multi-pointer capability", func(t *testing.T) { testDispatchGestureMultiPointerCapability(t, tracked(t, newDriver)) })
+	t.Run("dispatch gesture pressure capability", func(t *testing.T) { testDispatchGesturePressureCapability(t, tracked(t, newDriver)) })
+	t.Run("dispatch gesture capture capability", func(t *testing.T) { testDispatchGestureCaptureCapability(t, tracked(t, newDriver)) })
+	t.Run("erase text capability", func(t *testing.T) { testEraseTextCapability(t, tracked(t, newDriver)) })
+	t.Run("hide keyboard capability", func(t *testing.T) { testHideKeyboardCapability(t, tracked(t, newDriver)) })
+	t.Run("press key supported code", func(t *testing.T) { testPressKeySupportedCode(t, tracked(t, newDriver)) })
+	t.Run("press key unsupported code handled gracefully", func(t *testing.T) { testPressKeyUnsupportedCodeHandledGracefully(t, tracked(t, newDriver)) })
+	t.Run("streaming touch is optional", func(t *testing.T) { testStreamingTouchOptional(t, tracked(t, newDriver)) })
 
-	t.Run("foreign automation is optional", func(t *testing.T) { testForeignAutomationOptional(t, newDriver) })
+	t.Run("foreign automation is optional", func(t *testing.T) { testForeignAutomationOptional(t, tracked(t, newDriver)) })
 
-	t.Run("screen size is positive and stable", func(t *testing.T) { testScreenSizePositiveAndStable(t, newDriver) })
-	t.Run("hierarchy shape", func(t *testing.T) { testHierarchyShape(t, newDriver) })
-	t.Run("hierarchy attributes are canonical", func(t *testing.T) { testHierarchyAttributesAreCanonical(t, newDriver) })
-	t.Run("device info contract", func(t *testing.T) { testDeviceInfoContract(t, newDriver) })
-	t.Run("screenshot capability", func(t *testing.T) { testScreenshotCapability(t, newDriver) })
+	t.Run("screen size is positive and stable", func(t *testing.T) { testScreenSizePositiveAndStable(t, tracked(t, newDriver)) })
+	t.Run("hierarchy shape", func(t *testing.T) { testHierarchyShape(t, tracked(t, newDriver)) })
+	t.Run("hierarchy attributes are canonical", func(t *testing.T) { testHierarchyAttributesAreCanonical(t, tracked(t, newDriver)) })
+	t.Run("device info contract", func(t *testing.T) { testDeviceInfoContract(t, tracked(t, newDriver)) })
+	t.Run("screenshot capability", func(t *testing.T) { testScreenshotCapability(t, tracked(t, newDriver)) })
 
-	t.Run("launch app lifecycle", func(t *testing.T) { testLaunchAppLifecycle(t, newDriver) })
-	t.Run("launch app fresh stops then launches", func(t *testing.T) { testLaunchAppFreshStopsThenLaunches(t, newDriver) })
-	t.Run("launch app attach reuses foreground", func(t *testing.T) { testLaunchAppAttach(t, newDriver) })
-	t.Run("clear app data succeeds with a source", func(t *testing.T) { testClearAppDataSucceedsWithSource(t, newDriver) })
-	t.Run("install uninstall roundtrip", func(t *testing.T) { testInstallUninstallRoundtrip(t, newDriver) })
+	t.Run("launch app lifecycle", func(t *testing.T) { testLaunchAppLifecycle(t, tracked(t, newDriver)) })
+	t.Run("launch app fresh stops then launches", func(t *testing.T) { testLaunchAppFreshStopsThenLaunches(t, tracked(t, newDriver)) })
+	t.Run("launch app attach reuses foreground", func(t *testing.T) { testLaunchAppAttach(t, tracked(t, newDriver)) })
+	t.Run("clear app data succeeds with a source", func(t *testing.T) { testClearAppDataSucceedsWithSource(t, tracked(t, newDriver)) })
+	t.Run("install uninstall roundtrip", func(t *testing.T) { testInstallUninstallRoundtrip(t, tracked(t, newDriver)) })
 }
 
 func testPlatformNonEmpty(t *testing.T, newDriver Factory) {
