@@ -120,6 +120,7 @@ deps:
     mayDependOn:
       - wire
       - transport
+      - diag
   drivermock:
     mayDependOn:
       - wire

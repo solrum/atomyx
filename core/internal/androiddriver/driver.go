@@ -556,8 +556,8 @@ func (d *AndroidDriver) DispatchGesture(ctx context.Context, gesture driver.Gest
 	if err := ctx.Err(); err != nil {
 		return driver.GestureResult{}, err
 	}
-	if len(gesture.Pointers) == 0 {
-		return driver.GestureResult{}, errors.New("dispatchGesture: empty pointers array")
+	if err := driver.ValidateGesture(gesture); err != nil {
+		return driver.GestureResult{}, err
 	}
 	if len(gesture.Pointers) > 1 && !d.capabilities.CanMultiPointer {
 		return driver.GestureResult{}, fmt.Errorf(

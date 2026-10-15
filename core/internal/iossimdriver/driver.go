@@ -213,6 +213,9 @@ func (d *IosSimDriver) Swipe(ctx context.Context, from, to wire.Point, durationM
 // mid-gesture capture waypoint goes through the same delegate call
 // and is honored the same way.
 func (d *IosSimDriver) DispatchGesture(ctx context.Context, gesture driver.Gesture) (driver.GestureResult, error) {
+	if err := driver.ValidateGesture(gesture); err != nil {
+		return driver.GestureResult{}, err
+	}
 	return d.delegate.DispatchGesture(ctx, gesture)
 }
 

@@ -118,8 +118,11 @@ func connectedFaultInjectionDriver(t *testing.T, server *httptest.Server) *andro
 // issues the wire call under test.
 var minimalGesture = driver.Gesture{
 	Pointers: []driver.GesturePointer{{
-		ID:        "0",
-		Waypoints: []driver.GestureWaypoint{{Phase: driver.GesturePhaseDown, Point: wire.Point{X: 1, Y: 1}}},
+		ID: "0",
+		Waypoints: []driver.GestureWaypoint{
+			{Phase: driver.GesturePhaseDown, Point: wire.Point{X: 1, Y: 1}},
+			{Phase: driver.GesturePhaseUp, Point: wire.Point{X: 1, Y: 1}, AtOffsetSeconds: 0.05},
+		},
 	}},
 }
 

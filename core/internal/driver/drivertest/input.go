@@ -37,8 +37,8 @@ func testDispatchGestureMultiPointerCapability(t *testing.T, newDriver Factory) 
 		t.Fatalf("Connect: %v", err)
 	}
 	gesture := driver.Gesture{Pointers: []driver.GesturePointer{
-		{ID: "a", Waypoints: []driver.GestureWaypoint{{Phase: driver.GesturePhaseDown, Point: wire.Point{X: 1, Y: 1}}}},
-		{ID: "b", Waypoints: []driver.GestureWaypoint{{Phase: driver.GesturePhaseDown, Point: wire.Point{X: 2, Y: 2}}}},
+		tapPointer("a", wire.Point{X: 1, Y: 1}, nil),
+		tapPointer("b", wire.Point{X: 2, Y: 2}, nil),
 	}}
 
 	_, err := d.DispatchGesture(ctx, gesture)
@@ -65,7 +65,7 @@ func testDispatchGesturePressureCapability(t *testing.T, newDriver Factory) {
 	}
 	pressure := 0.5
 	gesture := driver.Gesture{Pointers: []driver.GesturePointer{
-		{ID: "a", Waypoints: []driver.GestureWaypoint{{Phase: driver.GesturePhaseDown, Point: wire.Point{X: 1, Y: 1}, Pressure: &pressure}}},
+		tapPointer("a", wire.Point{X: 1, Y: 1}, &pressure),
 	}}
 
 	_, err := d.DispatchGesture(ctx, gesture)
@@ -268,5 +268,54 @@ func testForeignAutomationOptional(t *testing.T, newDriver Factory) {
 	second := reporter.ForeignAutomation()
 	if len(second) > 0 && second[0].Name == "mutated" {
 		t.Fatal("ForeignAutomation returned a slice that aliases its cache")
+	}
+}
+
+// tapPointer builds a well-formed single-contact pointer: a down
+// waypoint then an up waypoint at point, both carrying pressure.
+func tapPointer(id string, point wire.Point, pressure *float64) driver.GesturePointer {
+	return driver.GesturePointer{ID: id, Waypoints: []driver.GestureWaypoint{
+		{Phase: driver.GesturePhaseDown, Point: point, Pressure: pressure},
+		{Phase: driver.GesturePhaseUp, Point: point, AtOffsetSeconds: 0.05, Pressure: pressure},
+	}}
+}
+
+// testDispatchGestureRejectsMalformed asserts the shape rule
+// Driver.DispatchGesture documents: a gesture that fails
+// driver.ValidateGesture must be rejected with diag.CodeInvalidArgument
+// on every driver, whatever its capabilities.
+func testDispatchGestureRejectsMalformed(t *testing.T, newDriver Factory) {
+	d := newDriver()
+	ctx := context.Background()
+	if err := d.Connect(ctx); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	at := wire.Point{X: 1, Y: 1}
+	malformed := map[string]driver.Gesture{
+		"no pointers": {},
+		"single waypoint": {Pointers: []driver.GesturePointer{
+			{ID: "a", Waypoints: []driver.GestureWaypoint{{Phase: driver.GesturePhaseDown, Point: at}}},
+		}},
+		"missing up": {Pointers: []driver.GesturePointer{
+			{ID: "a", Waypoints: []driver.GestureWaypoint{
+				{Phase: driver.GesturePhaseDown, Point: at},
+				{Phase: driver.GesturePhaseMove, Point: at, AtOffsetSeconds: 0.1},
+			}},
+		}},
+		"decreasing offsets": {Pointers: []driver.GesturePointer{
+			{ID: "a", Waypoints: []driver.GestureWaypoint{
+				{Phase: driver.GesturePhaseDown, Point: at, AtOffsetSeconds: 0.2},
+				{Phase: driver.GesturePhaseUp, Point: at, AtOffsetSeconds: 0.1},
+			}},
+		}},
+	}
+	for name, gesture := range malformed {
+		_, err := d.DispatchGesture(ctx, gesture)
+		if err == nil {
+			t.Fatalf("DispatchGesture accepted a malformed gesture (%s)", name)
+		}
+		if code, _, _ := diag.Describe(err); code != diag.CodeInvalidArgument {
+			t.Fatalf("DispatchGesture (%s) failed with code %q, want %q", name, code, diag.CodeInvalidArgument)
+		}
 	}
 }

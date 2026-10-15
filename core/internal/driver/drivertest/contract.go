@@ -153,6 +153,7 @@ func Run(t *testing.T, newDriver Factory, hooks Hooks) {
 	t.Run("dispatch gesture multi-pointer capability", func(t *testing.T) { testDispatchGestureMultiPointerCapability(t, tracked(t, newDriver)) })
 	t.Run("dispatch gesture pressure capability", func(t *testing.T) { testDispatchGesturePressureCapability(t, tracked(t, newDriver)) })
 	t.Run("dispatch gesture capture capability", func(t *testing.T) { testDispatchGestureCaptureCapability(t, tracked(t, newDriver)) })
+	t.Run("dispatch gesture rejects malformed", func(t *testing.T) { testDispatchGestureRejectsMalformed(t, tracked(t, newDriver)) })
 	t.Run("erase text capability", func(t *testing.T) { testEraseTextCapability(t, tracked(t, newDriver), hooks) })
 	t.Run("hide keyboard capability", func(t *testing.T) { testHideKeyboardCapability(t, tracked(t, newDriver), hooks) })
 	t.Run("press key supported code", func(t *testing.T) { testPressKeySupportedCode(t, tracked(t, newDriver), hooks) })

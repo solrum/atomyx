@@ -254,7 +254,7 @@ func TestClearCallsLeavesHierarchyQueueIntact(t *testing.T) {
 
 func TestDispatchGesture_RejectsMultiPointerWithoutCapability(t *testing.T) {
 	d := New()
-	gesture := driver.Gesture{Pointers: []driver.GesturePointer{{ID: "a"}, {ID: "b"}}}
+	gesture := driver.Gesture{Pointers: []driver.GesturePointer{validTapPointer("a"), validTapPointer("b")}}
 
 	if _, err := d.DispatchGesture(context.Background(), gesture); err == nil {
 		t.Fatal("DispatchGesture() error = nil, want a multi-pointer rejection")
@@ -264,7 +264,7 @@ func TestDispatchGesture_RejectsMultiPointerWithoutCapability(t *testing.T) {
 func TestDispatchGesture_AcceptsMultiPointerWithCapability(t *testing.T) {
 	d := New()
 	d.SetCapabilities(driver.Capabilities{CanMultiPointer: true})
-	gesture := driver.Gesture{Pointers: []driver.GesturePointer{{ID: "a"}, {ID: "b"}}}
+	gesture := driver.Gesture{Pointers: []driver.GesturePointer{validTapPointer("a"), validTapPointer("b")}}
 
 	if _, err := d.DispatchGesture(context.Background(), gesture); err != nil {
 		t.Fatalf("DispatchGesture() error = %v, want the multi-pointer gesture accepted", err)
@@ -275,7 +275,7 @@ func TestDispatchGesture_RejectsPressureWithoutCapability(t *testing.T) {
 	d := New()
 	pressure := 0.5
 	gesture := driver.Gesture{Pointers: []driver.GesturePointer{
-		{ID: "a", Waypoints: []driver.GestureWaypoint{{Phase: driver.GesturePhaseDown, Pressure: &pressure}}},
+		{ID: "a", Waypoints: []driver.GestureWaypoint{{Phase: driver.GesturePhaseDown, Pressure: &pressure}, {Phase: driver.GesturePhaseUp, Pressure: &pressure}}},
 	}}
 
 	if _, err := d.DispatchGesture(context.Background(), gesture); err == nil {
@@ -288,7 +288,7 @@ func TestDispatchGesture_AcceptsPressureWithCapability(t *testing.T) {
 	d.SetCapabilities(driver.Capabilities{CanPressure: true})
 	pressure := 0.5
 	gesture := driver.Gesture{Pointers: []driver.GesturePointer{
-		{ID: "a", Waypoints: []driver.GestureWaypoint{{Phase: driver.GesturePhaseDown, Pressure: &pressure}}},
+		{ID: "a", Waypoints: []driver.GestureWaypoint{{Phase: driver.GesturePhaseDown, Pressure: &pressure}, {Phase: driver.GesturePhaseUp, Pressure: &pressure}}},
 	}}
 
 	if _, err := d.DispatchGesture(context.Background(), gesture); err != nil {
@@ -494,4 +494,11 @@ func TestForeignAutomationReportsStagedSessions(t *testing.T) {
 	if got := d.ForeignAutomation(); got != nil {
 		t.Fatalf("after clearing, ForeignAutomation() = %v, want nil", got)
 	}
+}
+
+func validTapPointer(id string) driver.GesturePointer {
+	return driver.GesturePointer{ID: id, Waypoints: []driver.GestureWaypoint{
+		{Phase: driver.GesturePhaseDown},
+		{Phase: driver.GesturePhaseUp, AtOffsetSeconds: 0.05},
+	}}
 }

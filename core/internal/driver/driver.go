@@ -91,6 +91,14 @@ type Driver interface {
 	// cannot express (press-and-drag, multi-waypoint paths, pinch,
 	// rotate, multi-finger custom).
 	//
+	// An implementation must first reject a malformed gesture by
+	// returning the error from ValidateGesture, which carries
+	// diag.CodeInvalidArgument. A well-formed gesture has at least
+	// one pointer, and every pointer has at least two waypoints that
+	// start with down, end with up, contain no other down, never
+	// decrease in time offset, use non-negative coordinates, and keep
+	// any pressure within [0, 1].
+	//
 	// An implementation must reject a gesture with more than one
 	// pointer when Capabilities().CanMultiPointer is false, and must
 	// reject a gesture carrying a waypoint pressure value when

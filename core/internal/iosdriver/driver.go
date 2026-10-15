@@ -496,6 +496,9 @@ func (d *IosDriver) DispatchGesture(ctx context.Context, gesture driver.Gesture)
 	if err := ctx.Err(); err != nil {
 		return driver.GestureResult{}, err
 	}
+	if err := driver.ValidateGesture(gesture); err != nil {
+		return driver.GestureResult{}, err
+	}
 	if len(gesture.Pointers) > 1 && !d.capabilities.CanMultiPointer {
 		return driver.GestureResult{}, fmt.Errorf(
 			"iOS driver cannot dispatch a %d-pointer gesture: multi-pointer capability is unavailable on this Xcode or iOS combination",

@@ -367,6 +367,15 @@ typically means the XCSynthesizedEventRecord symbols are
 missing, which is usually resolved by upgrading Xcode to a version
 known to ship them.
 
+**Malformed gesture shape.** Every driver checks the compiled
+gesture before dispatch and rejects a malformed one with
+`INVALID_ARGUMENT`. A gesture is well formed when it has at least
+one pointer and each pointer has at least two waypoints, opens
+with `down`, ends with `up`, has no other `down`, never moves
+backwards in time, uses non-negative coordinates, and keeps
+pressure within 0 to 1. Gestures compiled from a `pointer` step
+satisfy this by construction.
+
 ## Error codes
 
 | Code | Cause |
