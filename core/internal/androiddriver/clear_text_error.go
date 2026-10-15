@@ -19,6 +19,8 @@ type ClearTextDiagnostic struct {
 // field. Diagnostic carries enough state for a caller to report why,
 // rather than just that the clear failed.
 type ClearTextError struct {
+	// Reason is the agent's own one-line explanation, possibly empty.
+	Reason     string
 	Diagnostic ClearTextDiagnostic
 }
 

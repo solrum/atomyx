@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/transport"
@@ -13,6 +14,11 @@ import (
 // request because another action still holds the device. The refused
 // request never ran, so repeating it is safe.
 const agentBusyRemedy = "Wait for the running gesture to finish, then repeat the call. The refused call did not run."
+
+const (
+	clearTextFailedMessage = "the focused input could not be cleared"
+	clearTextFailedRemedy  = "Focus an input field that holds text, then call again."
+)
 
 // fail is the single boundary every AndroidDriver method that issues a
 // wire call routes its returned error through before it reaches a
@@ -29,6 +35,14 @@ const agentBusyRemedy = "Wait for the running gesture to finish, then repeat the
 // route path: only Error() (used for logs, never surfaced to a
 // caller) carries that detail.
 func (d *AndroidDriver) fail(err error) error {
+	var clearErr *ClearTextError
+	if errors.As(err, &clearErr) {
+		message := clearTextFailedMessage
+		if strings.TrimSpace(clearErr.Reason) != "" {
+			message = diag.SanitizeAgentMessage(clearErr.Reason)
+		}
+		return diag.New(diag.CodeAgentRejected, message, clearTextFailedRemedy, err)
+	}
 	var agentErr *transport.AgentError
 	if errors.As(err, &agentErr) && agentErr.StatusCode == http.StatusTooManyRequests {
 		return diag.New(diag.CodeAgentNotReady,

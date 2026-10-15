@@ -596,7 +596,8 @@ func (d *AndroidDriver) InputText(ctx context.Context, text string) error {
 
 // EraseText ignores count: the agent's clear-focused-input route
 // always clears the field's entire current value in one call. On
-// failure it returns a *ClearTextError carrying the agent's full
+// failure it returns an AGENT_REJECTED error carrying the sanitized
+// agent reason, wrapping a *ClearTextError with the agent's full
 // diagnosis, not just the reason string, so a caller can distinguish
 // a clear failure from a transport error and report why it happened.
 func (d *AndroidDriver) EraseText(ctx context.Context, count int) error {
@@ -618,13 +619,16 @@ func (d *AndroidDriver) EraseText(ctx context.Context, count int) error {
 	if focusedNodeDesc == "" {
 		focusedNodeDesc = "unknown"
 	}
-	return d.fail(&ClearTextError{Diagnostic: ClearTextDiagnostic{
-		StrategiesTried: strategiesTried,
-		LastValue:       res.LastValue,
-		FocusedNodeDesc: focusedNodeDesc,
-		ScreenWidth:     res.ScreenWidth,
-		ScreenHeight:    res.ScreenHeight,
-	}})
+	return d.fail(&ClearTextError{
+		Reason: res.Reason,
+		Diagnostic: ClearTextDiagnostic{
+			StrategiesTried: strategiesTried,
+			LastValue:       res.LastValue,
+			FocusedNodeDesc: focusedNodeDesc,
+			ScreenWidth:     res.ScreenWidth,
+			ScreenHeight:    res.ScreenHeight,
+		},
+	})
 }
 
 // PressKey reports Ok unconditionally: Android system key dispatch

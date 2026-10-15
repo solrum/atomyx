@@ -1361,3 +1361,53 @@ func TestAndroidDriver_Connect_SecondConnectFailing_ClearsTheEarlierAgentInfo(t 
 		t.Fatalf("AgentInfo() = %+v after a failed second Connect, want the zero value", got)
 	}
 }
+
+func TestAndroidDriver_EraseText_FailureSurfacesAgentReason(t *testing.T) {
+	tr := newFakeTransport()
+	tr.clearFocusedResp = transport.ClearFocusedInputResult{
+		Ok:     false,
+		Reason: "no input-focused node found",
+	}
+	d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{Serial: "S1"})
+
+	err := d.EraseText(context.Background(), 3)
+	code, message, remedy := diag.Describe(err)
+	if code != diag.CodeAgentRejected {
+		t.Fatalf("code = %q, want %q", code, diag.CodeAgentRejected)
+	}
+	if message != "no input-focused node found" {
+		t.Fatalf("message = %q, want the agent's reason", message)
+	}
+	if !strings.Contains(remedy, "Focus an input field") {
+		t.Fatalf("remedy = %q, want guidance to focus an input", remedy)
+	}
+	var clearErr *androiddriver.ClearTextError
+	if !errors.As(err, &clearErr) {
+		t.Fatalf("error %v does not wrap a *ClearTextError", err)
+	}
+}
+
+func TestAndroidDriver_EraseText_FailureSanitizesLeakyReason(t *testing.T) {
+	tr := newFakeTransport()
+	tr.clearFocusedResp = transport.ClearFocusedInputResult{
+		Ok:     false,
+		Reason: "POST http://127.0.0.1:8765/actions/clear_focused_input failed",
+	}
+	d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{Serial: "S1"})
+
+	_, message, _ := diag.Describe(d.EraseText(context.Background(), 3))
+	if strings.Contains(message, "127.0.0.1") || strings.Contains(message, "/actions/") {
+		t.Fatalf("message = %q leaks wire detail", message)
+	}
+}
+
+func TestAndroidDriver_EraseText_FailureWithoutReasonUsesNeutralMessage(t *testing.T) {
+	tr := newFakeTransport()
+	tr.clearFocusedResp = transport.ClearFocusedInputResult{Ok: false}
+	d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{Serial: "S1"})
+
+	_, message, _ := diag.Describe(d.EraseText(context.Background(), 3))
+	if message != "the focused input could not be cleared" {
+		t.Fatalf("message = %q", message)
+	}
+}
