@@ -1,0 +1,82 @@
+format: atomyx/v1
+appId: dev.atomyx.demo
+name: Demo app soak
+description: |
+  One short pass over the launch, typing, navigation, scroll, gesture,
+  wait, and assertion paths of the demo app. Platform neutral, so the
+  same file runs on Android and iOS. Meant to be repeated many times by
+  scripts/soak.sh to measure how often the infrastructure fails.
+tags:
+  - soak
+env:
+  email: soak@example.com
+  password: secret123
+
+# The demo app keeps its navigation state across a relaunch, so a
+# previous iteration that ended on the Dashboard would skip the Sign in
+# screen. Signing out first makes every iteration start from the same
+# screen.
+preconditions:
+  - check:
+      notVisible: "Dashboard"
+    setup:
+      - tap: "Sign out"
+      - waitFor: "Confirm"
+      - tap: "Confirm"
+      - waitFor: "Sign in"
+---
+- launchApp
+- waitFor:
+    text: "Sign in"
+    timeout: 10000
+
+- type:
+    into:
+      role: text-field
+      nth: 0
+    text: ${email}
+- type:
+    into:
+      role: text-field
+      nth: 1
+    text: ${password}
+- tap: "Login"
+- waitFor:
+    text: "Dashboard"
+    timeout: 10000
+- assertVisible: "Welcome"
+
+- tap: "Products"
+- waitFor:
+    text: "Product A"
+    timeout: 10000
+- assertVisible: "Product B"
+- swipe: up
+- swipe: down
+- assertVisible: "Product A"
+- back
+- waitFor:
+    text: "Dashboard"
+    timeout: 10000
+
+- tap: "Gestures"
+- waitFor:
+    id: "gesture-longpress-target"
+    timeout: 10000
+- longPress:
+    at:
+      id: "gesture-longpress-target"
+    holdMs: 700
+- assertVisible:
+    id: "gesture-longpress-count"
+    timeout: 5000
+- swipe: up
+- swipe: down
+- assertVisible:
+    id: "gesture-tap-target"
+- back
+- waitFor:
+    text: "Dashboard"
+    timeout: 10000
+
+- pressKey: home
