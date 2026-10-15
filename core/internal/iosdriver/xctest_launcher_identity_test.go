@@ -5,8 +5,10 @@ import (
 	"errors"
 	"strconv"
 	"testing"
+	"time"
 
 	"dev.atomyx/internal/iosdriver"
+	"dev.atomyx/internal/process"
 )
 
 func requireLauncherCode(t *testing.T, err error, want iosdriver.XctestLauncherErrorCode) (exitCode int) {
@@ -220,6 +222,34 @@ func TestXctestLauncher_EnsureRunning_RetriesWhenAnotherRunnerHoldsTheAllocatedP
 	free := freeTCPPort(t)
 	runner := &fakeXcodebuildRunner{spawnReady: true}
 	l := newSimLauncher(t, runner, iosdriver.LaunchConfig{AllocatePort: sequencePorts(t, occupied, free)})
+
+	kill, err := l.EnsureRunning(context.Background())
+	if err != nil {
+		t.Fatalf("EnsureRunning() error = %v, want a retry on a fresh port", err)
+	}
+	defer func() { _ = kill() }()
+	if l.Port() != free {
+		t.Fatalf("Port() = %d, want %d", l.Port(), free)
+	}
+}
+
+func TestXctestLauncher_EnsureRunning_RetriesWhenASilentListenerHoldsTheAllocatedPort(t *testing.T) {
+	t.Cleanup(iosdriver.SetTunnelPingTimeout(80 * time.Millisecond))
+	occupied, _ := startHeldListener(t, -1, "")
+	free := freeTCPPort(t)
+	runner := &fakeXcodebuildRunner{spawnReady: true}
+	l := newSimLauncher(t, runner, iosdriver.LaunchConfig{
+		AllocatePort: sequencePorts(t, occupied, free),
+		AfterSpawn: func(ctx context.Context, spawned iosdriver.SpawnedRunner) (func(), error) {
+			if spawned.HostPort != occupied {
+				return func() {}, nil
+			}
+			_, _, err := iosdriver.StartTunnel(ctx, process.NewFakeBackground(), &fakeClock{}, iosdriver.TunnelConfig{
+				UDID: "DEV-1", HostPort: spawned.HostPort, FreshPort: true,
+			})
+			return nil, err
+		},
+	})
 
 	kill, err := l.EnsureRunning(context.Background())
 	if err != nil {

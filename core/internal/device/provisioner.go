@@ -548,7 +548,7 @@ func (p *DriverProvisioner) afterSpawn(udid string, kind IosAgentKind, runnerID 
 			return removeRecord, nil
 		}
 		stopTunnel, tunnelPid, err := iosdriver.StartTunnel(ctx, p.background, p.clock, iosdriver.TunnelConfig{
-			UDID: udid, HostPort: spawned.HostPort, RunnerID: runnerID, OnExit: onTunnelExit,
+			UDID: udid, HostPort: spawned.HostPort, RunnerID: runnerID, OnExit: onTunnelExit, FreshPort: true,
 		})
 		if err != nil {
 			removeRecord()

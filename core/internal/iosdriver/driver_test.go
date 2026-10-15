@@ -1531,11 +1531,14 @@ func TestIosDriver_InputText_UnfocusedFieldIsRejectedWithReason(t *testing.T) {
 	if err == nil {
 		t.Fatal("InputText() error = nil, want a rejection")
 	}
-	code, message, _ := diag.Describe(err)
+	code, message, remedy := diag.Describe(err)
 	if code != diag.CodeAgentRejected {
 		t.Fatalf("code = %q, want %q", code, diag.CodeAgentRejected)
 	}
-	if !strings.Contains(message, "no_focused_field") {
-		t.Fatalf("message = %q, want the runner reason", message)
+	if message != "nothing was typed because no input field has keyboard focus" {
+		t.Fatalf("message = %q, want the focus message without the wire token", message)
+	}
+	if remedy != "Tap the input field so it has focus, then type again." {
+		t.Fatalf("remedy = %q, want the tool-neutral remedy", remedy)
 	}
 }

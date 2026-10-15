@@ -251,7 +251,7 @@ func (d *IosDriver) Connect(ctx context.Context) error {
 			var iproxyErr *IproxyError
 			if errors.As(err, &iproxyErr) && iproxyErr.Code == IproxyErrRunnerBusy {
 				return diag.New(diag.CodeAgentNotReady,
-					fmt.Sprintf("the agent on device %s is busy or held by another client", d.opts.UDID),
+					fmt.Sprintf("the agent on device %s did not answer, it may be busy with another client or not be an Atomyx runner", d.opts.UDID),
 					runnerBusyRemedy,
 					err)
 			}
@@ -566,8 +566,8 @@ func (d *IosDriver) InputText(ctx context.Context, text string) error {
 	}
 	if resp.Success != nil && !*resp.Success {
 		return diag.New(diag.CodeAgentRejected,
-			"nothing was typed because no input field has keyboard focus ("+resp.Reason+")",
-			"Tap the target field to focus it, then call input_text again.",
+			"nothing was typed because no input field has keyboard focus",
+			"Tap the input field so it has focus, then type again.",
 			nil)
 	}
 	return nil

@@ -159,10 +159,77 @@ func TestIosDriver_Connect_Device_BusyRunnerReportsNotReadyWithRemedy(t *testing
 	if code != diag.CodeAgentNotReady {
 		t.Fatalf("code = %q, want %q", code, diag.CodeAgentNotReady)
 	}
-	if message != "the agent on device DEV-1 is busy or held by another client" {
+	if message != "the agent on device DEV-1 did not answer, it may be busy with another client or not be an Atomyx runner" {
 		t.Fatalf("message = %q", message)
 	}
 	if remedy == "" {
 		t.Fatal("remedy is empty")
+	}
+}
+
+func TestStartTunnel_SilentListenerOnFreshPortReportsBindConflict(t *testing.T) {
+	port, _ := startHeldListener(t, -1, "")
+	t.Cleanup(iosdriver.SetTunnelPingTimeout(busyTestProbeTimeout))
+
+	_, _, err := iosdriver.StartTunnel(context.Background(), process.NewFakeBackground(), &fakeClock{}, iosdriver.TunnelConfig{
+		UDID: "DEV-1", HostPort: port, FreshPort: true,
+	})
+
+	var iproxyErr *iosdriver.IproxyError
+	if !errors.As(err, &iproxyErr) || iproxyErr.Code != iosdriver.IproxyErrBindConflict {
+		t.Fatalf("StartTunnel() error = %v, want an IproxyErrBindConflict IproxyError so the launch retries on a new port", err)
+	}
+}
+
+func TestStartTunnel_BusyMessageDoesNotAssumeARunner(t *testing.T) {
+	port, _ := startHeldListener(t, -1, "")
+
+	_, err := startTunnelOn(t, port)
+
+	want := fmt.Sprintf("the listener on 127.0.0.1:%d did not answer, it may be busy with another client or not be an Atomyx runner", port)
+	if err == nil || err.Error() != want {
+		t.Fatalf("StartTunnel() error = %v, want %q", err, want)
+	}
+}
+
+// cancellingClock cancels the supplied context on its first Sleep.
+type cancellingClock struct {
+	cancel context.CancelFunc
+}
+
+func (c *cancellingClock) NowMs() int64 { return 0 }
+
+func (c *cancellingClock) Sleep(ctx context.Context, _ int64) error {
+	c.cancel()
+	return ctx.Err()
+}
+
+func TestStartTunnel_CancelDuringBusyRetryReturnsContextError(t *testing.T) {
+	port, _ := startHeldListener(t, -1, "")
+	t.Cleanup(iosdriver.SetTunnelPingTimeout(busyTestProbeTimeout))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	_, _, err := iosdriver.StartTunnel(ctx, process.NewFakeBackground(), &cancellingClock{cancel: cancel}, iosdriver.TunnelConfig{
+		UDID: "DEV-1", HostPort: port, Reuse: func() (int, bool) { return 0, true },
+	})
+
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("StartTunnel() error = %v, want context.Canceled", err)
+	}
+}
+
+func TestStartTunnel_ContextDeadlineDuringProbeReturnsContextError(t *testing.T) {
+	port, _ := startHeldListener(t, -1, "")
+	t.Cleanup(iosdriver.SetTunnelPingTimeout(busyTestProbeTimeout))
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancel()
+
+	_, _, err := iosdriver.StartTunnel(ctx, process.NewFakeBackground(), &fakeClock{}, iosdriver.TunnelConfig{
+		UDID: "DEV-1", HostPort: port, Reuse: func() (int, bool) { return 0, true },
+	})
+
+	if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
+		t.Fatalf("StartTunnel() error = %v, want the context error and not a busy or conflict diagnosis", err)
 	}
 }

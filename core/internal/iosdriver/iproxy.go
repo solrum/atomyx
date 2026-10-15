@@ -63,8 +63,8 @@ const (
 	// listener that does not answer the Atomyx ping handshake.
 	IproxyErrBindConflict IproxyErrorCode = "bind-conflict"
 	// IproxyErrRunnerBusy means 127.0.0.1:port accepts connections but the
-	// runner behind it did not answer the ping handshake within the retry
-	// budget, because another client holds it.
+	// listener behind it did not answer the ping handshake within the retry
+	// budget, which usually means another client holds the runner.
 	IproxyErrRunnerBusy IproxyErrorCode = "runner-busy"
 	// IproxyErrTunnelTimeout means a freshly spawned iproxy never made
 	// the port reachable within its budget.
@@ -107,6 +107,13 @@ type TunnelConfig struct {
 	// IproxyErrBindConflict, because a tunnel nobody can stop would outlive
 	// its user.
 	Reuse func() (pid int, ok bool)
+	// FreshPort marks HostPort as reserved for a runner the caller has just
+	// spawned, so no other client of the runner can legitimately hold it.
+	// A listener there that accepts but stays silent then lost the race
+	// for the port and is refused with IproxyErrBindConflict, which lets a
+	// caller retry on a new port. Without it, a silent listener is
+	// refused with IproxyErrRunnerBusy.
+	FreshPort bool
 	// OnExit receives the verdict when the tunnel process exits on its own
 	// after it became reachable. A stop through the returned stop function
 	// is not reported. Nil watches nothing.
@@ -141,8 +148,9 @@ type TunnelConfig struct {
 //     accounted for is refused with IproxyErrBindConflict instead of
 //     racing whatever else is bound there. A listener that accepts but
 //     stays silent is probed up to iproxyBusyProbeAttempts times, then
-//     refused with IproxyErrRunnerBusy, because the runner serves one
-//     client at a time and is most likely held by another.
+//     refused with IproxyErrRunnerBusy, or with IproxyErrBindConflict when
+//     cfg.FreshPort says the port was just reserved for a new runner.
+//     A cancelled ctx during the probe returns ctx.Err() instead.
 //   - Poll for real tunnel connectivity after spawn. iproxy emits no
 //     "ready" signal on stdout or stderr, so this polls the port on
 //     iproxyTunnelPollInterval until a fresh TCP connect succeeds,
@@ -161,11 +169,18 @@ func StartTunnel(ctx context.Context, bg process.BackgroundRunner, clk clock.Clo
 	if canConnectTCP(ctx, cfg.HostPort, iproxyPortProbeTimeout) {
 		want := ExpectedRunner{UDID: cfg.UDID, Kind: KindDevice, RunnerID: cfg.RunnerID}
 		got, outcome := probeListener(ctx, clk, cfg.HostPort)
+		if outcome == probeCancelled {
+			return nil, 0, ctx.Err()
+		}
 		if outcome == probeSilent {
+			code := IproxyErrRunnerBusy
+			if cfg.FreshPort {
+				code = IproxyErrBindConflict
+			}
 			return nil, 0, &IproxyError{
-				Code: IproxyErrRunnerBusy,
+				Code: code,
 				Message: fmt.Sprintf(
-					"the runner on 127.0.0.1:%d did not answer: it is busy or held by another client",
+					"the listener on 127.0.0.1:%d did not answer, it may be busy with another client or not be an Atomyx runner",
 					cfg.HostPort,
 				),
 			}
@@ -339,7 +354,7 @@ func probeListener(ctx context.Context, clk clock.Clock, port int) (RunnerIdenti
 			return got, outcome
 		}
 		if err := clk.Sleep(ctx, iproxyBusyRetryPause.Milliseconds()); err != nil {
-			return got, probeRejected
+			return got, probeCancelled
 		}
 	}
 }

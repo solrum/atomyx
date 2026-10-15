@@ -153,9 +153,15 @@ const (
 	// probeRejected means the listener refused, closed the connection, or
 	// replied with something that is not the runner protocol.
 	probeRejected
+	// probeCancelled means the caller's context ended before the probe
+	// could finish, so the listener was not judged at all.
+	probeCancelled
 )
 
-func silentIfTimeout(err error) probeOutcome {
+func silentIfTimeout(ctx context.Context, err error) probeOutcome {
+	if ctx.Err() != nil {
+		return probeCancelled
+	}
 	var netErr net.Error
 	if errors.As(err, &netErr) && netErr.Timeout() {
 		return probeSilent
@@ -169,16 +175,16 @@ func probeRunner(ctx context.Context, port int, timeout time.Duration) (RunnerId
 	defer cancel()
 	conn, err := new(net.Dialer).DialContext(dialCtx, "tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
 	if err != nil {
-		return RunnerIdentity{}, silentIfTimeout(err)
+		return RunnerIdentity{}, silentIfTimeout(ctx, err)
 	}
 	defer func() { _ = conn.Close() }()
 	_ = conn.SetDeadline(time.Now().Add(timeout))
 	if _, err := conn.Write([]byte(`{"id":0,"type":"ping","args":{}}` + "\n")); err != nil {
-		return RunnerIdentity{}, silentIfTimeout(err)
+		return RunnerIdentity{}, silentIfTimeout(ctx, err)
 	}
 	line, err := bufio.NewReader(conn).ReadString('\n')
 	if err != nil {
-		return RunnerIdentity{}, silentIfTimeout(err)
+		return RunnerIdentity{}, silentIfTimeout(ctx, err)
 	}
 	var frame struct {
 		Ok   *bool `json:"ok"`
