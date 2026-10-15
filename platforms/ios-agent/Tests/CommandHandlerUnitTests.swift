@@ -704,6 +704,21 @@ final class CommandHandlerUnitTests: XCTestCase {
         XCTAssertEqual(resp.data["reason"] as? String, "ok")
     }
 
+    func testTypeTextReportsNoFocusedFieldWhenBridgeDidNotType() {
+        let cmd = TypeTextCommand()
+        let bridge = MockXCUIBridge()
+        bridge.typeTextResult = false
+
+        let req = Request(id: 1, type: "typeText", args: ["text": "hello"])
+        let resp = cmd.handle(req, bridge: bridge, state: mockState())
+
+        XCTAssertTrue(resp.ok)
+        XCTAssertEqual(resp.data["success"] as? Bool, false)
+        XCTAssertEqual(resp.data["typed"] as? Int, 0)
+        XCTAssertEqual(resp.data["total"] as? Int, 5)
+        XCTAssertEqual(resp.data["reason"] as? String, "no_focused_field")
+    }
+
     // MARK: - HideKeyboardCommand
 
     func testHideKeyboardRejectsWhenNoAppLaunched() {
@@ -1266,8 +1281,11 @@ final class MockXCUIBridge: XCUIBridge {
         return "ZmFrZS1wbmc=" // base64("fake-png")
     }
 
-    func typeText(app _: XCUIApplication, text: String) {
+    var typeTextResult = true
+
+    func typeText(app _: XCUIApplication, text: String) -> Bool {
         typeTextCalls.append(text)
+        return typeTextResult
     }
 
     /// Records the `(key, modifiers)` sent to typeKey so tests can

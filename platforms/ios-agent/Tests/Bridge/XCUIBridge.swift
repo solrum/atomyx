@@ -95,7 +95,10 @@ protocol XCUIBridge {
     /// per-character events internally. No per-key delay simulation
     /// needed; XCUITest handles IME layout switching transparently for
     /// system-provided keyboards.
-    func typeText(app: XCUIApplication, text: String)
+    ///
+    /// Returns `false` without typing when no element holds keyboard
+    /// focus, `true` once the text was dispatched.
+    func typeText(app: XCUIApplication, text: String) -> Bool
 
     /// Dispatch a hardware-keyboard key press with modifier flags.
     /// Used for cross-platform keyboard shortcuts that the on-screen
@@ -223,11 +226,12 @@ final class DefaultXCUIBridge: XCUIBridge {
         }
     }
 
-    func typeText(app: XCUIApplication, text: String) {
+    func typeText(app: XCUIApplication, text: String) -> Bool {
         // Typing with no focused element records an XCTest failure that
-        // ends the serve test, so it is skipped as a no-op instead.
-        guard appHasKeyboardFocus(app) else { return }
+        // ends the serve test, so it is skipped and reported instead.
+        guard appHasKeyboardFocus(app) else { return false }
         app.typeText(text)
+        return true
     }
 
     func typeKey(app: XCUIApplication, key: String, modifiers: XCUIElement.KeyModifierFlags) -> Bool {

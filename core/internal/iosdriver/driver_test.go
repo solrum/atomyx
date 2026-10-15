@@ -1519,3 +1519,23 @@ func TestIosDriver_RestoreLaunchedApp_SeedsTheSameRunnerAndRelaunchesThroughAnyO
 		t.Fatalf("restoring an empty bundle: err = %v launches = %d, want no error and no launch", err, launchCalls(noneConn))
 	}
 }
+
+func TestIosDriver_InputText_UnfocusedFieldIsRejectedWithReason(t *testing.T) {
+	conn := newFakeConn()
+	conn.Respond("typeText", func(map[string]any) (map[string]any, error) {
+		return map[string]any{"success": false, "typed": 0, "total": 5, "reason": "no_focused_field"}, nil
+	})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+
+	err := d.InputText(context.Background(), "hello")
+	if err == nil {
+		t.Fatal("InputText() error = nil, want a rejection")
+	}
+	code, message, _ := diag.Describe(err)
+	if code != diag.CodeAgentRejected {
+		t.Fatalf("code = %q, want %q", code, diag.CodeAgentRejected)
+	}
+	if !strings.Contains(message, "no_focused_field") {
+		t.Fatalf("message = %q, want the runner reason", message)
+	}
+}

@@ -105,7 +105,7 @@ runner never sees a selector: it only receives coordinates and, for
 | `DispatchGesture()` | `dispatchPointer` | `DispatchPointerCommand` | Routes through the active `EventSynthesizer`. Rejects multi-pointer or pressure waypoints host-side first when the runner's capabilities don't support them. |
 | `LaunchApp()` | `launchApp` | `LaunchAppCommand` | Updates `DriverState.currentApp` / `currentBundleId`. |
 | `StopApp()` / `KillApp()` | `forceStopApp` | `ForceStopAppCommand` | Clears the tracked `currentApp` when it matches. |
-| `InputText()` | `typeText` | `TypeTextCommand` | Native `XCUIApplication.typeText`. Requires a focused field. |
+| `InputText()` | `typeText` | `TypeTextCommand` | Native `XCUIApplication.typeText`. Requires a focused field. With none, the runner types nothing and replies `success: false`, `reason: no_focused_field`, which the host returns as an `AGENT_REJECTED` error. |
 | `EraseText()` | `clearFocusedInput` | `ClearFocusedInputCommand` | 4-strategy chain, see quirks below. |
 | `PressKey()` | `pressKey` | `PressKeyCommand` plus `PressKey/*` | Returns whether a verifiable affordance was used. |
 | `HideKeyboard()` | `hideKeyboard` | `HideKeyboardCommand` | |

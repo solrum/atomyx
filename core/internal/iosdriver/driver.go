@@ -547,11 +547,30 @@ func (d *IosDriver) DispatchGesture(ctx context.Context, gesture driver.Gesture)
 	return driver.GestureResult{CapturedImages: images}, nil
 }
 
+type typeTextResponse struct {
+	Success *bool  `json:"success"`
+	Reason  string `json:"reason"`
+}
+
+// InputText types into the focused field. A runner reply with success
+// false means nothing was typed, which surfaces as an agent-rejected
+// error carrying the runner's reason. A reply without the field counts
+// as success.
 func (d *IosDriver) InputText(ctx context.Context, text string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return d.fail(d.conn.CallInto(ctx, "typeText", map[string]any{"text": text}, nil))
+	var resp typeTextResponse
+	if err := d.conn.CallInto(ctx, "typeText", map[string]any{"text": text}, &resp); err != nil {
+		return d.fail(err)
+	}
+	if resp.Success != nil && !*resp.Success {
+		return diag.New(diag.CodeAgentRejected,
+			"nothing was typed because no input field has keyboard focus ("+resp.Reason+")",
+			"Tap the target field to focus it, then call input_text again.",
+			nil)
+	}
+	return nil
 }
 
 func (d *IosDriver) EraseText(ctx context.Context, count int) error {

@@ -14,7 +14,7 @@ struct ExactLengthDeleteStrategy: ClearTextStrategy {
         let length = min(value.count, context.hardCap)
         guard length > 0 else { return .success(strategy: "already-empty") }
         let deleteStr = String(repeating: XCUIKeyboardKey.delete.rawValue, count: length)
-        context.bridge.typeText(app: context.app, text: deleteStr)
+        guard context.bridge.typeText(app: context.app, text: deleteStr) else { return .skipped }
         return .attempted
     }
 }

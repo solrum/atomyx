@@ -8,8 +8,8 @@ import Foundation
 /// switches, so callers do not need to tap individual keys.
 ///
 /// The caller must have tapped (and thus focused) the target input
-/// before calling. `typeText` with nothing focused is a silent no-op,
-/// because XCUITest swallows the event.
+/// before calling. With nothing focused, nothing is typed and the reply
+/// reports `success: false` with reason `no_focused_field`.
 ///
 /// Framework notes (expand this list when adding support):
 ///
@@ -25,12 +25,13 @@ import Foundation
 ///   - `text` (required): the string to type.
 ///
 /// Response data:
-///   - `success`: always true, because XCUITest has no per-character failure
-///     signal, so apparent failure is indistinguishable from success
-///     at this layer. The host adapter verifies post-condition
-///     (field content) when it needs stronger guarantees.
-///   - `typed`, `total`: both equal to `text.count`
-///   - `reason`: "ok"
+///   - `success`: true when the text was dispatched to a focused field,
+///     false when no element held keyboard focus and nothing was typed.
+///     XCUITest has no per-character failure signal, so the host adapter
+///     verifies the field content when it needs stronger guarantees.
+///   - `typed`: `text.count` on success, 0 otherwise
+///   - `total`: `text.count`
+///   - `reason`: "ok" on success, "no_focused_field" otherwise
 final class TypeTextCommand: CommandHandler {
     let type = "typeText"
 
@@ -41,7 +42,14 @@ final class TypeTextCommand: CommandHandler {
         guard let app = state.currentApp else {
             return .error(id: request.id, message: "no app launched, call launchApp first")
         }
-        bridge.typeText(app: app, text: text)
+        guard bridge.typeText(app: app, text: text) else {
+            return .ok(id: request.id, data: [
+                "success": false,
+                "typed": 0,
+                "total": text.count,
+                "reason": "no_focused_field",
+            ])
+        }
         return .ok(id: request.id, data: [
             "success": true,
             "typed": text.count,
