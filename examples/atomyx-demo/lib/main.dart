@@ -1,12 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/login_screen.dart';
-import 'screens/dashboard_screen.dart';
-import 'screens/otp_screen.dart';
-import 'screens/settings_screen.dart';
-import 'screens/product_list_screen.dart';
-import 'screens/gestures_screen.dart';
-import 'screens/context_menu_screen.dart';
-import 'screens/media_viewer_screen.dart';
+import 'routes.dart';
 
 void main() {
   runApp(const AtomyxDemoApp());
@@ -24,17 +17,7 @@ class AtomyxDemoApp extends StatelessWidget {
         colorSchemeSeed: Colors.blue,
         useMaterial3: true,
       ),
-      initialRoute: '/login',
-      routes: {
-        '/login': (_) => const LoginScreen(),
-        '/otp': (_) => const OtpScreen(),
-        '/dashboard': (_) => const DashboardScreen(),
-        '/settings': (_) => const SettingsScreen(),
-        '/products': (_) => const ProductListScreen(),
-        '/gestures': (_) => const GesturesScreen(),
-        '/context-menu': (_) => const ContextMenuScreen(),
-        '/media': (_) => const MediaViewerScreen(),
-      },
+      onGenerateRoute: generateAppRoute,
     );
   }
 }

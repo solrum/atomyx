@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Atomyx Web Fixture</title>
+</head>
+<body>
+  <h1 id="webview-heading">Atomyx Web Fixture</h1>
+  <input id="webview-input" name="webview-input" type="text" placeholder="Type here" aria-label="Web input">
+  <button id="webview-button" name="webview-button" type="button">Submit</button>
+  <p id="webview-result" role="status"></p>
+  <script>
+    document.getElementById('webview-button').addEventListener('click', function () {
+      var value = document.getElementById('webview-input').value;
+      document.getElementById('webview-result').textContent = 'Submitted: ' + value;
+    });
+  </script>
+</body>
+</html>

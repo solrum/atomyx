@@ -15,6 +15,9 @@ rest of the tool surface.
 | Settings | `/settings` | Profile, Notifications toggle, Dark Mode toggle, Version |
 | Products | `/products` | Product list with name, category, price |
 | Gestures | `/gestures` | Tap, long-press, drag, reorder, flick fixtures for `pointer` |
+| Focus | `/focus` | One text field, focused on open, prefilled with `Prefilled text` |
+| Permission | `/permission` | Location permission request button and status text |
+| Webview | `/webview` | Bundled local web page with a heading, a text input, and a button |
 
 ## Test flows
 
@@ -38,6 +41,44 @@ with the pointer action each exercises:
 | `gesture-drag-target` / `gesture-drag-status` | status `idle` then `dragging` then `released`, dx/dy update | `[down, move…, up]` |
 | `gesture-reorder-target` / `gesture-reorder-state` | comma-joined order updates after a row moves | press-and-drag (`[down, wait, move, up]`) |
 | `gesture-flick-target` / `gesture-flick-bottom-hits` | counter increments when the list reaches Item 50 | flick (fast `[down, move, up]`) |
+
+## Deep links
+
+The scheme `atomyxdemo://` opens any route above. The URL form is
+`atomyxdemo://open/<route>`, for example `atomyxdemo://open/settings`
+opens `/settings` and `atomyxdemo://open/focus` opens `/focus`. A path
+that matches no route opens `/login`, and a malformed URL never crashes
+the app.
+
+```bash
+adb shell am start -a android.intent.action.VIEW -d atomyxdemo://open/focus
+xcrun simctl openurl booted atomyxdemo://open/focus
+```
+
+## Fixture identifiers
+
+| Route | Identifier | Element |
+|---|---|---|
+| `/focus` | `focus-input` | Text field, autofocused, starts as `Prefilled text` |
+| `/permission` | `permission-request-button` | Button that requests location |
+| `/permission` | `permission-status` | Text `Location status: <status>` |
+| `/webview` | `webview-heading`, `webview-input`, `webview-button`, `webview-result` | Element ids inside the bundled page `assets/webview/index.html` |
+
+## Build targets
+
+Run from the repository root. Each target prints the output path.
+
+| Target | Result |
+|---|---|
+| `make demo-android` | Debug APK at `examples/atomyx-demo/build/app/outputs/flutter-apk/app-debug.apk` |
+| `make demo-ios-sim` | Unsigned simulator build at `examples/atomyx-demo/build/ios-sim/Build/Products/Debug-iphonesimulator/Runner.app` |
+| `make demo-ios-device` | Signed release build at `examples/atomyx-demo/build/ios-device/Build/Products/Release-iphoneos/Runner.app` |
+
+`demo-ios-device` reads `DEV_TEAM` from the gitignored
+`platforms/ios-agent/device.env` (the same file the iOS agent Makefile
+uses) and never prints it. Android needs minSdk 24 and iOS needs a
+deployment target of 15.0, both required by the webview plugin and the
+current Xcode toolchain.
 
 ## Run
 
