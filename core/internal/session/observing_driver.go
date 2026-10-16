@@ -235,6 +235,11 @@ func (o *observingCore) UninstallApp(ctx context.Context, appID string) error {
 	return o.inner.UninstallApp(ctx, appID)
 }
 
+func (o *observingCore) OpenLink(ctx context.Context, link string, opts driver.OpenLinkOptions) error {
+	defer o.mutate()()
+	return o.inner.OpenLink(ctx, link, opts)
+}
+
 func (o *observingCore) ClearAppData(ctx context.Context, appID string, opts driver.ClearAppDataOptions) error {
 	defer o.mutate()()
 	return o.inner.ClearAppData(ctx, appID, opts)

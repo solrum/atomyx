@@ -139,6 +139,14 @@ const (
 	// screen. The condition is permanent for that device, so a run that
 	// asked for a video continues without one.
 	CodeRecordingUnsupported = "RECORDING_UNSUPPORTED"
+	// CodeLinkUnsupported means the target device cannot open a link,
+	// either because its adapter never offers the capability or because
+	// the device software is too old for it. The condition is permanent
+	// for that device, so retrying cannot help.
+	CodeLinkUnsupported = "LINK_UNSUPPORTED"
+	// CodeLinkNotOpened means the device was reached but no app handled
+	// the link, or the handler refused it.
+	CodeLinkNotOpened = "LINK_NOT_OPENED"
 	// CodeInputNotFocused means a type action found its field but the
 	// field never took input focus, so nothing was typed. The screen
 	// did not offer the field in a focusable state, which is a property

@@ -125,6 +125,9 @@ func newDefaultFakeConn() *fakeConn {
 	c.Respond("getScreenSize", func(map[string]any) (map[string]any, error) {
 		return map[string]any{"width": 1080.0, "height": 2340.0}, nil
 	})
+	c.Respond("openLink", func(map[string]any) (map[string]any, error) {
+		return map[string]any{"opened": true}, nil
+	})
 	c.Respond("dispatchPointer", func(args map[string]any) (map[string]any, error) {
 		if !dispatchPointerArgsHaveCapture(args) {
 			return map[string]any{}, nil
@@ -1607,6 +1610,75 @@ func TestIosDriver_LaunchApp_RejectsInvalidArgumentsBeforeTheDevice(t *testing.T
 	err := d.LaunchApp(context.Background(), "dev.atomyx.app", driver.LaunchArgs{Arguments: map[string]string{"a=b": "x"}})
 	if code, _, _ := diag.Describe(err); code != diag.CodeInvalidArgument {
 		t.Fatalf("LaunchApp() error code = %q (err %v), want %q", code, err, diag.CodeInvalidArgument)
+	}
+	if len(conn.Calls()) != 0 {
+		t.Fatalf("calls = %+v, want none", conn.Calls())
+	}
+}
+
+func TestIosDriver_OpenLink_SendsTheLinkAndTracksTheNamedApp(t *testing.T) {
+	conn := newDefaultFakeConn()
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+
+	link := "atomyxdemo://open/focus?a=1&b=two words"
+	if err := d.OpenLink(context.Background(), link, driver.OpenLinkOptions{AppID: "dev.atomyx.demo"}); err != nil {
+		t.Fatalf("OpenLink() error = %v", err)
+	}
+	calls := conn.Calls()
+	if len(calls) != 1 || calls[0].cmdType != "openLink" {
+		t.Fatalf("calls = %+v, want one openLink", calls)
+	}
+	want := map[string]any{"url": link, "bundleId": "dev.atomyx.demo"}
+	if !reflect.DeepEqual(calls[0].args, want) {
+		t.Fatalf("openLink args = %#v, want %#v", calls[0].args, want)
+	}
+}
+
+func TestIosDriver_OpenLink_WithoutAnAppOmitsTheBundleId(t *testing.T) {
+	conn := newDefaultFakeConn()
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+
+	if err := d.OpenLink(context.Background(), "https://example.com", driver.OpenLinkOptions{}); err != nil {
+		t.Fatalf("OpenLink() error = %v", err)
+	}
+	if _, ok := conn.Calls()[0].args["bundleId"]; ok {
+		t.Fatalf("args = %+v, want no bundleId", conn.Calls()[0].args)
+	}
+}
+
+func TestIosDriver_OpenLink_OldOsIsReportedAsUnsupported(t *testing.T) {
+	conn := newDefaultFakeConn()
+	conn.Respond("openLink", func(map[string]any) (map[string]any, error) {
+		return map[string]any{"opened": false, "reason": "unsupported-os"}, nil
+	})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+
+	err := d.OpenLink(context.Background(), "https://example.com", driver.OpenLinkOptions{})
+	if code, _, _ := diag.Describe(err); code != diag.CodeLinkUnsupported {
+		t.Fatalf("OpenLink() code = %q (err %v), want %q", code, err, diag.CodeLinkUnsupported)
+	}
+}
+
+func TestIosDriver_OpenLink_RefusalWithoutAReasonIsLinkNotOpened(t *testing.T) {
+	conn := newDefaultFakeConn()
+	conn.Respond("openLink", func(map[string]any) (map[string]any, error) {
+		return map[string]any{"opened": false}, nil
+	})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+
+	err := d.OpenLink(context.Background(), "https://example.com", driver.OpenLinkOptions{})
+	if code, _, _ := diag.Describe(err); code != diag.CodeLinkNotOpened {
+		t.Fatalf("OpenLink() code = %q (err %v), want %q", code, err, diag.CodeLinkNotOpened)
+	}
+}
+
+func TestIosDriver_OpenLink_RejectsAnInvalidLinkBeforeTheDevice(t *testing.T) {
+	conn := newDefaultFakeConn()
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+
+	err := d.OpenLink(context.Background(), "no scheme here", driver.OpenLinkOptions{})
+	if code, _, _ := diag.Describe(err); code != diag.CodeInvalidArgument {
+		t.Fatalf("OpenLink() code = %q (err %v), want %q", code, err, diag.CodeInvalidArgument)
 	}
 	if len(conn.Calls()) != 0 {
 		t.Fatalf("calls = %+v, want none", conn.Calls())

@@ -3,5 +3,5 @@
 /// rises whenever the host and runner wire contract changes
 /// incompatibly.
 enum AgentProtocol {
-    static let version = 2
+    static let version = 3
 }

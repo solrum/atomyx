@@ -35,6 +35,13 @@ func WithSyntheticFixtures(h Hooks) Hooks {
 			Await:     func(*testing.T, driver.Driver) {},
 		}
 	}
+	if h.OpenLink == nil {
+		h.OpenLink = &OpenLinkFixture{
+			Link:  "atomyxdemo://open/focus",
+			AppID: syntheticAppID,
+			Await: func(*testing.T, driver.Driver) {},
+		}
+	}
 	if h.Install == nil {
 		h.Install = &InstallFixture{Source: syntheticAppID, AppID: syntheticAppID}
 	}

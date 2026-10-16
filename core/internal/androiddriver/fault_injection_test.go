@@ -288,6 +288,7 @@ var boundaryTranslationSkipped = map[string]string{
 	"UninstallApp":   "issues a host subprocess call through process.Runner (adb), not the HTTP transport this boundary classifies",
 	"ClearAppData":   "issues a host subprocess call through process.Runner (adb), not the HTTP transport this boundary classifies",
 	"IsAppInstalled": "issues a host subprocess call through process.Runner (adb), not the HTTP transport this boundary classifies",
+	"OpenLink":       "issues a host subprocess call through process.Runner (adb), not the HTTP transport this boundary classifies",
 	"StopApp":        "issues a host subprocess call through process.Runner (adb), not the HTTP transport this boundary classifies",
 	"KillApp":        "issues a host subprocess call through process.Runner (adb), not the HTTP transport this boundary classifies",
 }

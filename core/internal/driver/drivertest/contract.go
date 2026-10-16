@@ -93,6 +93,11 @@ type Hooks struct {
 	// case.
 	LaunchArguments *LaunchArgumentsFixture
 
+	// OpenLink describes how to prove that a link opens
+	// LaunchableAppID on a known screen. A nil value skips the open
+	// link case.
+	OpenLink *OpenLinkFixture
+
 	// ClearableAppID is an app id installed on the target whose data
 	// may be wiped. An empty value skips the clear app data case.
 	ClearableAppID string
@@ -177,6 +182,8 @@ func Run(t *testing.T, newDriver Factory, hooks Hooks) {
 	t.Run("launch app fresh stops then launches", func(t *testing.T) { testLaunchAppFreshStopsThenLaunches(t, tracked(t, newDriver), hooks) })
 	t.Run("launch app attach reuses foreground", func(t *testing.T) { testLaunchAppAttach(t, tracked(t, newDriver), hooks) })
 	t.Run("launch app delivers arguments", func(t *testing.T) { testLaunchAppDeliversArguments(t, tracked(t, newDriver), hooks) })
+	t.Run("open link matches capability", func(t *testing.T) { testOpenLinkMatchesCapability(t, tracked(t, newDriver)) })
+	t.Run("open link reaches the app", func(t *testing.T) { testOpenLinkReachesTheApp(t, tracked(t, newDriver), hooks) })
 	t.Run("clear app data succeeds with a source", func(t *testing.T) { testClearAppDataSucceedsWithSource(t, tracked(t, newDriver), hooks) })
 	t.Run("install uninstall roundtrip", func(t *testing.T) { testInstallUninstallRoundtrip(t, tracked(t, newDriver), hooks) })
 }
@@ -346,6 +353,9 @@ func testContextCancellation(t *testing.T, newDriver Factory) {
 		{"HideKeyboard", func(ctx context.Context, d driver.Driver) error { _, err := d.HideKeyboard(ctx); return err }},
 		{"LaunchApp", func(ctx context.Context, d driver.Driver) error {
 			return d.LaunchApp(ctx, "dev.atomyx.drivertest.cancel", driver.LaunchArgs{})
+		}},
+		{"OpenLink", func(ctx context.Context, d driver.Driver) error {
+			return d.OpenLink(ctx, "dev-atomyx-drivertest://cancel", driver.OpenLinkOptions{})
 		}},
 		{"StopApp", func(ctx context.Context, d driver.Driver) error {
 			return d.StopApp(ctx, "dev.atomyx.drivertest.cancel")

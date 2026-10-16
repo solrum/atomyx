@@ -24,6 +24,7 @@ const (
 
 	iosE2EFocusRoute = "/focus"
 	iosE2EFocusInput = "focus-input"
+	iosE2EFocusLink  = "atomyxdemo://open/focus"
 )
 
 // iosE2EFixture builds drivers for the corpus and remembers the latest
@@ -153,6 +154,13 @@ func simulatorDemoHooks(t *testing.T, udid string) drivertest.Hooks {
 		},
 		LaunchArguments: &drivertest.LaunchArgumentsFixture{
 			Arguments: map[string]string{"route": iosE2EFocusRoute},
+			Await: func(t *testing.T, d driver.Driver) {
+				drivertest.AwaitFocusedInput(t, d, iosE2EFocusInput)
+			},
+		},
+		OpenLink: &drivertest.OpenLinkFixture{
+			Link:  iosE2EFocusLink,
+			AppID: appID,
 			Await: func(t *testing.T, d driver.Driver) {
 				drivertest.AwaitFocusedInput(t, d, iosE2EFocusInput)
 			},

@@ -172,6 +172,28 @@ type Driver interface {
 	//     winning over an Arguments entry of the same name.
 	LaunchApp(ctx context.Context, bundleID string, args LaunchArgs) error
 
+	// OpenLink opens link, a URL, deep link or universal link, in the
+	// device's handler for it, or in opts.AppID when that is set. It
+	// returns once the device accepted the request, not once the
+	// handler finished showing a screen, so a caller that needs the
+	// destination waits for it with a wait primitive.
+	//
+	// A caller checks Capabilities().CanOpenLink first. An adapter
+	// that reports it false, or whose device software cannot open
+	// links, fails with diag.CodeLinkUnsupported. An invalid link,
+	// see ValidateLink, fails with diag.CodeInvalidArgument before
+	// the device is touched. A link that no app opened fails with
+	// diag.CodeLinkNotOpened.
+	//
+	// Platform notes (expand this list when adding support):
+	//
+	//   - Android: the host asks the device to start a view intent for
+	//     the link, restricted to opts.AppID when set.
+	//   - iOS: the runner opens the link through the system, or
+	//     through opts.AppID when set. The device needs iOS 16.4 or
+	//     later, and an older one fails with diag.CodeLinkUnsupported.
+	OpenLink(ctx context.Context, link string, opts OpenLinkOptions) error
+
 	// StopApp stops bundleID. See CurrentForeground for what the
 	// foreground report guarantees once StopApp returns nil.
 	StopApp(ctx context.Context, bundleID string) error

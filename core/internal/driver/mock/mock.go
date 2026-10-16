@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/driver"
 	"dev.atomyx/internal/wire"
 )
@@ -84,8 +85,11 @@ type Driver struct {
 	// first.
 	ScreenshotData []byte
 
+	// OpenedLinks records the links passed to OpenLink, in call order.
+	OpenedLinks []string
+
 	// ScreenshotErr, SwipeErr, PressKeyErr, LaunchAppErr, ListAppsErr,
-	// and PingErr, when set, make the matching method return that
+	// OpenLinkErr, and PingErr, when set, make the matching method return that
 	// error instead of its normal result, so a test can drive a
 	// caller's error-surfacing path without a real device.
 	ScreenshotErr error
@@ -93,6 +97,7 @@ type Driver struct {
 	PressKeyErr   error
 	LaunchAppErr  error
 	ListAppsErr   error
+	OpenLinkErr   error
 	PingErr       error
 
 	// Agent is the AgentInfo the mock reports, settable so a test can
@@ -120,6 +125,7 @@ func New() *Driver {
 			CanSetLocation:     false,
 			CanSetOrientation:  false,
 			CanHideKeyboard:    true,
+			CanOpenLink:        true,
 			CanQueryForeground: true,
 			CanMultiPointer:    false,
 			CanPressure:        false,
@@ -403,6 +409,28 @@ func (d *Driver) HideKeyboard(ctx context.Context) (driver.KeyResult, error) {
 		}
 	}
 	return driver.KeyResult{Ok: true}, nil
+}
+
+// OpenLink validates link, then records it in OpenedLinks. It fails
+// with diag.CodeLinkUnsupported when the reported capabilities report
+// CanOpenLink false, the same caller-must-check contract the real
+// adapters honor.
+func (d *Driver) OpenLink(ctx context.Context, link string, opts driver.OpenLinkOptions) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if !d.capabilities.CanOpenLink {
+		return diag.NewLinkUnsupported("")
+	}
+	if err := driver.ValidateLink(link); err != nil {
+		return err
+	}
+	d.record("OpenLink", link, opts.AppID)
+	if d.OpenLinkErr != nil {
+		return d.OpenLinkErr
+	}
+	d.OpenedLinks = append(d.OpenedLinks, link)
+	return nil
 }
 
 func (d *Driver) LaunchApp(ctx context.Context, bundleID string, args driver.LaunchArgs) error {

@@ -57,6 +57,13 @@ const (
 	// LaunchArguments fixture.
 	SkipNoLaunchArgumentsFixture SkipKey = "no-launch-arguments-fixture"
 
+	// SkipNoOpenLinkFixture marks a driver wired without an OpenLink
+	// fixture.
+	SkipNoOpenLinkFixture SkipKey = "no-open-link-fixture"
+
+	// SkipNoOpenLink marks a driver that reports CanOpenLink false.
+	SkipNoOpenLink SkipKey = "no-open-link"
+
 	// SkipNoFailPing marks a driver wired without a FailPing hook.
 	SkipNoFailPing SkipKey = "no-fail-ping"
 

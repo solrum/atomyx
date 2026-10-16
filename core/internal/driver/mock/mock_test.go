@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/driver"
 	"dev.atomyx/internal/wire"
 )
@@ -515,5 +516,43 @@ func TestLaunchAppRecordsArguments(t *testing.T) {
 	recorded, ok := d.Calls[0].Args[1].(driver.LaunchArgs)
 	if !ok || recorded.Arguments["route"] != "/focus" {
 		t.Fatalf("recorded args = %#v, want the launch arguments", d.Calls[0].Args)
+	}
+}
+
+func TestOpenLink_RecordsTheLinkAndTheApp(t *testing.T) {
+	d := New()
+	if err := d.OpenLink(context.Background(), "myapp://home", driver.OpenLinkOptions{AppID: "com.example.app"}); err != nil {
+		t.Fatalf("OpenLink() error = %v", err)
+	}
+	if len(d.OpenedLinks) != 1 || d.OpenedLinks[0] != "myapp://home" {
+		t.Fatalf("OpenedLinks = %v, want [myapp://home]", d.OpenedLinks)
+	}
+	last := d.Calls[len(d.Calls)-1]
+	if last.Method != "OpenLink" || len(last.Args) != 2 || last.Args[1] != "com.example.app" {
+		t.Fatalf("last call = %+v, want OpenLink with the app id", last)
+	}
+}
+
+func TestOpenLink_FailsAsUnsupportedWhenTheCapabilityIsOff(t *testing.T) {
+	d := New()
+	d.SetCapabilities(driver.Capabilities{CanOpenLink: false})
+
+	err := d.OpenLink(context.Background(), "myapp://home", driver.OpenLinkOptions{})
+	if code, _, _ := diag.Describe(err); code != diag.CodeLinkUnsupported {
+		t.Fatalf("OpenLink() code = %q (err %v), want %q", code, err, diag.CodeLinkUnsupported)
+	}
+	if len(d.OpenedLinks) != 0 {
+		t.Fatalf("OpenedLinks = %v, want none", d.OpenedLinks)
+	}
+}
+
+func TestOpenLink_RejectsAnInvalidLinkAndSurfacesTheInjectedError(t *testing.T) {
+	d := New()
+	if err := d.OpenLink(context.Background(), "no scheme", driver.OpenLinkOptions{}); err == nil {
+		t.Fatal("OpenLink() accepted a link without a scheme")
+	}
+	d.OpenLinkErr = errors.New("injected")
+	if err := d.OpenLink(context.Background(), "myapp://home", driver.OpenLinkOptions{}); !errors.Is(err, d.OpenLinkErr) {
+		t.Fatalf("OpenLink() error = %v, want the injected error", err)
 	}
 }

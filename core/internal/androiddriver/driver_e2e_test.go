@@ -60,6 +60,7 @@ func TestAndroidDriver_E2E(t *testing.T) {
 const (
 	androidE2EDemoAppID    = "dev.atomyx.demo"
 	androidE2EFocusRoute   = "/focus"
+	androidE2EFocusLink    = "atomyxdemo://open/focus"
 	androidE2EMainActivity = "dev.atomyx.demo/.MainActivity"
 	androidE2EFocusInput   = "focus-input"
 	androidE2EAdbDeadline  = 30 * time.Second
@@ -129,6 +130,13 @@ func (f *androidE2EFixture) hooks(t *testing.T) drivertest.Hooks {
 		FocusInput: f.focusInput,
 		LaunchArguments: &drivertest.LaunchArgumentsFixture{
 			Arguments: map[string]string{"route": androidE2EFocusRoute},
+			Await: func(t *testing.T, d driver.Driver) {
+				drivertest.AwaitFocusedInput(t, d, androidE2EFocusInput)
+			},
+		},
+		OpenLink: &drivertest.OpenLinkFixture{
+			Link:  androidE2EFocusLink,
+			AppID: androidE2EDemoAppID,
 			Await: func(t *testing.T, d driver.Driver) {
 				drivertest.AwaitFocusedInput(t, d, androidE2EFocusInput)
 			},

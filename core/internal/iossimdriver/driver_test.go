@@ -131,6 +131,9 @@ func newDefaultFakeConn() *fakeConn {
 	c.Respond("getScreenSize", func(map[string]any) (map[string]any, error) {
 		return map[string]any{"width": 390.0, "height": 844.0}, nil
 	})
+	c.Respond("openLink", func(map[string]any) (map[string]any, error) {
+		return map[string]any{"opened": true}, nil
+	})
 	c.Respond("dispatchPointer", func(args map[string]any) (map[string]any, error) {
 		if !dispatchPointerArgsHaveCapture(args) {
 			return map[string]any{}, nil

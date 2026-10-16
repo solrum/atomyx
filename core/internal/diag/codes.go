@@ -36,6 +36,8 @@ func Codes() []string {
 		CodeUnsupported,
 		CodeUnsupportedVersion,
 		CodeRecordingUnsupported,
+		CodeLinkUnsupported,
+		CodeLinkNotOpened,
 		CodeInputNotFocused,
 		CodeElementNotFound,
 	}

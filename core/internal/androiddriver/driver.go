@@ -146,6 +146,7 @@ func New(t Transport, proc process.Runner, opts Options) *AndroidDriver {
 			CanSetLocation:     false,
 			CanSetOrientation:  false,
 			CanHideKeyboard:    true,
+			CanOpenLink:        true,
 			CanQueryForeground: true,
 			CanMultiPointer:    false,
 			CanPressure:        false,

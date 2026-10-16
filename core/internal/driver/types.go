@@ -14,6 +14,11 @@ type Capabilities struct {
 	CanSetOrientation bool `json:"canSetOrientation"`
 	CanHideKeyboard   bool `json:"canHideKeyboard"`
 
+	// CanOpenLink reports whether Driver.OpenLink is supported. When
+	// false, OpenLink fails with diag.CodeLinkUnsupported, so a caller
+	// can tell an unsupported device from a link that failed to open.
+	CanOpenLink bool `json:"canOpenLink"`
+
 	// CanQueryForeground reports whether the driver can truthfully
 	// answer Driver.CurrentForeground by querying the device for the
 	// app actually in the foreground, rather than by reporting a
@@ -178,6 +183,14 @@ type InstalledApp struct {
 // platform notes on Driver.ClearAppData.
 type ClearAppDataOptions struct {
 	Source string `json:"source,omitempty"`
+}
+
+// OpenLinkOptions configures Driver.OpenLink.
+type OpenLinkOptions struct {
+	// AppID names the app that must open the link, as an Android
+	// package name or an iOS bundle id. Empty lets the device choose
+	// the handler.
+	AppID string `json:"appId,omitempty"`
 }
 
 // DeviceKind classifies the device a driver is attached to.

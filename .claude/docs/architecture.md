@@ -115,6 +115,9 @@ method:
 
 - `CanEraseText`: native backward erase from the focused field.
 - `CanHideKeyboard`: native keyboard dismissal.
+- `CanOpenLink`: `OpenLink` opens a URL, deep link or universal link. A
+  device that cannot fails the call with `LINK_UNSUPPORTED`, so a caller
+  tells an unsupported device from a link that failed to open.
 - `CanWaitForIdle`: a native idle-detection primitive. `orchestra`
   falls back to tree-diff polling when absent.
 - `CanMultiPointer`: multi-pointer gesture dispatch (pinch, rotate,

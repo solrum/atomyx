@@ -300,6 +300,10 @@ func (d *IosSimDriver) UninstallApp(ctx context.Context, appID string) error {
 	return d.delegate.UninstallApp(ctx, appID)
 }
 
+func (d *IosSimDriver) OpenLink(ctx context.Context, link string, opts driver.OpenLinkOptions) error {
+	return d.delegate.OpenLink(ctx, link, opts)
+}
+
 func (d *IosSimDriver) ClearAppData(ctx context.Context, appID string, opts driver.ClearAppDataOptions) error {
 	return d.delegate.ClearAppData(ctx, appID, opts)
 }

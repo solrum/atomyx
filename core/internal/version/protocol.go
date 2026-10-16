@@ -5,4 +5,4 @@ package version
 // exactly this version. The number rises whenever the host and agent
 // wire contract changes incompatibly, and the Android agent and the
 // iOS runner carry the same number in their own sources.
-const AgentProtocolVersion = 2
+const AgentProtocolVersion = 3

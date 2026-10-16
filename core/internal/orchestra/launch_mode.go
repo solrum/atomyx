@@ -47,6 +47,11 @@ type LaunchOptions struct {
 	// that carries arguments is never skipped as a repeat, because the
 	// values have to reach a new start of the app.
 	Arguments map[string]string
+	// Link, when not empty, starts the app by opening this link in it,
+	// so the app lands on the link's destination. It cannot be combined
+	// with a mode other than the default or with Arguments, because a
+	// link launch has no separate start step to apply them to.
+	Link string
 }
 
 // LaunchAppWithMode launches appID using mode and the dedup rule
@@ -61,7 +66,13 @@ func (o *Orchestra) LaunchAppWithMode(ctx context.Context, appID string, mode La
 // applies, except that a launch carrying arguments always reaches the
 // driver. An unknown mode or an invalid arguments map is rejected
 // before any device call with an error coded diag.CodeInvalidArgument.
+//
+// With opts.Link set, the app is started by OpenLink instead, and the
+// dedup rule does not apply.
 func (o *Orchestra) LaunchAppWithOptions(ctx context.Context, appID string, opts LaunchOptions) error {
+	if opts.Link != "" {
+		return o.launchAppWithLink(ctx, appID, opts)
+	}
 	if err := driver.ValidateLaunchArguments(opts.Arguments); err != nil {
 		return err
 	}
