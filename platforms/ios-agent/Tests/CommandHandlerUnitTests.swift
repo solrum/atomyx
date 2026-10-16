@@ -155,6 +155,71 @@ final class CommandHandlerUnitTests: XCTestCase {
         XCTAssertEqual(bridge.lastLaunchEnvironment, [:])
     }
 
+    func testOpenLinkPassesTheUrlWithoutChangingTheTrackedApp() {
+        let cmd = OpenLinkCommand()
+        let bridge = MockXCUIBridge()
+        let state = mockState(bundleId: "com.example.app")
+
+        let req = Request(id: 1, type: "openLink", args: ["url": "myapp://home?a=1&b=2"])
+        let resp = cmd.handle(req, bridge: bridge, state: state)
+
+        XCTAssertTrue(resp.ok)
+        XCTAssertEqual(resp.data["opened"] as? Bool, true)
+        XCTAssertEqual(bridge.openLinkCalls.count, 1)
+        XCTAssertEqual(bridge.openLinkCalls.first?.0.absoluteString, "myapp://home?a=1&b=2")
+        XCTAssertNil(bridge.openLinkCalls.first?.1)
+        XCTAssertEqual(state.currentBundleId, "com.example.app")
+    }
+
+    func testOpenLinkWithBundleIdTracksThatApp() {
+        let cmd = OpenLinkCommand()
+        let bridge = MockXCUIBridge()
+        let state = DriverState()
+
+        let req = Request(id: 1, type: "openLink", args: [
+            "url": "myapp://home",
+            "bundleId": "com.example.app",
+        ])
+        let resp = cmd.handle(req, bridge: bridge, state: state)
+
+        XCTAssertTrue(resp.ok)
+        XCTAssertEqual(bridge.openLinkCalls.first?.1, "com.example.app")
+        XCTAssertEqual(state.currentBundleId, "com.example.app")
+        XCTAssertNotNil(state.currentApp)
+    }
+
+    func testOpenLinkReportsAnUnsupportedOs() {
+        let cmd = OpenLinkCommand()
+        let bridge = MockXCUIBridge()
+        bridge.openLinkBehavior = { _, _ in .unsupported }
+        let state = DriverState()
+
+        let req = Request(id: 1, type: "openLink", args: [
+            "url": "myapp://home",
+            "bundleId": "com.example.app",
+        ])
+        let resp = cmd.handle(req, bridge: bridge, state: state)
+
+        XCTAssertTrue(resp.ok)
+        XCTAssertEqual(resp.data["opened"] as? Bool, false)
+        XCTAssertEqual(resp.data["reason"] as? String, "unsupported-os")
+        XCTAssertNil(state.currentApp)
+        XCTAssertEqual(state.currentBundleId, "")
+    }
+
+    func testOpenLinkRequiresAUrl() {
+        let cmd = OpenLinkCommand()
+        let bridge = MockXCUIBridge()
+
+        let missing = cmd.handle(Request(id: 1, type: "openLink", args: [:]), bridge: bridge, state: DriverState())
+        let empty = cmd.handle(Request(id: 2, type: "openLink", args: ["url": ""]), bridge: bridge, state: DriverState())
+
+        XCTAssertFalse(missing.ok)
+        XCTAssertEqual(missing.error, "missing url")
+        XCTAssertFalse(empty.ok)
+        XCTAssertTrue(bridge.openLinkCalls.isEmpty)
+    }
+
     func testLaunchAppHappyPathUpdatesTrackedState() {
         let cmd = LaunchAppCommand()
         let bridge = MockXCUIBridge()
@@ -1419,6 +1484,19 @@ final class MockXCUIBridge: XCUIBridge {
 
     func terminateApp(bundleId: String) {
         terminateCalls.append(bundleId)
+    }
+
+    /// Records every `openLink` call. The default behavior reports the
+    /// link opened and returns an unlaunched application reference for
+    /// a named bundle id.
+    var openLinkCalls: [(URL, String?)] = []
+    var openLinkBehavior: (URL, String?) -> OpenLinkResult = { _, bundleId in
+        .opened(app: bundleId.map { XCUIApplication(bundleIdentifier: $0) })
+    }
+
+    func openLink(url: URL, bundleId: String?) -> OpenLinkResult {
+        openLinkCalls.append((url, bundleId))
+        return openLinkBehavior(url, bundleId)
     }
 
     func tapAt(app _: XCUIApplication, x: CGFloat, y: CGFloat) {

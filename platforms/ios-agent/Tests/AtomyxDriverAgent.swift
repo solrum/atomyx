@@ -66,6 +66,7 @@ final class AtomyxDriverAgent: XCTestCase {
         registry.register(PingCommand(synthesizer: synthesizer, environment: environment))
         registry.register(LaunchAppCommand())
         registry.register(ForceStopAppCommand())
+        registry.register(OpenLinkCommand())
         registry.register(TapAtCommand(synthesizer: synthesizer))
         registry.register(LongPressAtCommand(synthesizer: synthesizer))
         registry.register(SwipeCommand(synthesizer: synthesizer))

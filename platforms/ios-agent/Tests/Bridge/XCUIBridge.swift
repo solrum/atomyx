@@ -17,6 +17,15 @@ import XCTest
 /// adapter over XCUI primitives; anything with its own strategy chain
 /// belongs in a dedicated registry.
 
+/// Result of `openLink`. `unsupported` means the OS cannot open links
+/// through XCUITest, which is permanent for the device. `opened` carries
+/// the application the link was opened in when the caller named one, so
+/// the driver can track it as the app under test.
+enum OpenLinkResult {
+    case opened(app: XCUIApplication?)
+    case unsupported
+}
+
 /// Per-key descriptor inside a keyboard. `label` is the visible key
 /// text (e.g. "Q", "return", "shift"), `frame` is the tap target.
 struct KeyDescriptor {
@@ -65,6 +74,12 @@ protocol XCUIBridge {
     /// Current process state of `app`. One call costs one query to the
     /// app proxy, so callers read it once per command.
     func appState(app: XCUIApplication) -> XCUIApplication.State
+
+    /// Open `url` through the system's default handler, or in the
+    /// application with `bundleId` when one is given. Returns
+    /// `unsupported` without opening anything on an OS older than
+    /// iOS 16.4, the first release with the XCUITest link API.
+    func openLink(url: URL, bundleId: String?) -> OpenLinkResult
 
     /// Terminate an app by bundle id. Creates a fresh reference
     /// internally, so the caller does not need to hold one. Safe to call
@@ -199,6 +214,17 @@ final class DefaultXCUIBridge: XCUIBridge {
     func terminateApp(bundleId: String) {
         let app = XCUIApplication(bundleIdentifier: bundleId)
         app.terminate()
+    }
+
+    func openLink(url: URL, bundleId: String?) -> OpenLinkResult {
+        guard #available(iOS 16.4, *) else { return .unsupported }
+        if let bundleId = bundleId {
+            let app = XCUIApplication(bundleIdentifier: bundleId)
+            app.open(url)
+            return .opened(app: app)
+        }
+        XCUIDevice.shared.system.open(url)
+        return .opened(app: nil)
     }
 
     func tapAt(app: XCUIApplication, x: CGFloat, y: CGFloat) {
