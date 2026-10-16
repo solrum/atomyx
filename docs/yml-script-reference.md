@@ -224,7 +224,7 @@ Rules:
 - `clearState: true` together with `stopApp: false` is rejected, because clearing data stops the app.
 - A `launchApp` that would only repeat an earlier launch of the same app in the flow is skipped. A launch with `stopApp: true` or `clearState: true` always runs.
 - A `launchApp` after a `stopApp`, `killApp` or `clearState` of the same app runs again.
-- On iOS, `clearState` reinstalls the app and needs the app's `artifact` in the project config. The step fails when none is configured.
+- On iOS, `clearState` reinstalls the app and needs the app's `artifact` in the project config. The step fails with the `INVALID_ARGUMENT` code when none is configured.
 
 ### stopApp
 
@@ -253,8 +253,9 @@ better in the script.
 
 Reset an app's data to a clean state. The argument forms are the same as
 `stopApp`. The app stays installed on Android. On iOS the app is
-reinstalled from the app's `artifact` in the project config, and the step
-fails when none is configured.
+reinstalled from the app's `artifact` in the project config, so that field
+is required there. Without it the step fails with the `INVALID_ARGUMENT`
+code and a message telling you to set the `artifact` field.
 
 ```yaml
 - clearState

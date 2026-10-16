@@ -1238,10 +1238,27 @@ func TestIosDriver_IsAppInstalled_Device_SeesSystemApps(t *testing.T) {
 }
 
 func TestIosDriver_ClearAppData_RequiresSource(t *testing.T) {
-	d := iosdriver.New(newFakeConn(), process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	runner := process.NewFake()
+	d := iosdriver.New(newFakeConn(), runner, iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
 
-	if err := d.ClearAppData(context.Background(), "dev.atomyx.app", driver.ClearAppDataOptions{}); err == nil {
+	err := d.ClearAppData(context.Background(), "dev.atomyx.app", driver.ClearAppDataOptions{})
+	if err == nil {
 		t.Fatal("ClearAppData() error = nil, want an error when Source is empty")
+	}
+	code, message, remedy := diag.Describe(err)
+	if code != diag.CodeInvalidArgument {
+		t.Fatalf("code = %q, want %q", code, diag.CodeInvalidArgument)
+	}
+	if !strings.Contains(message, "dev.atomyx.app") || !strings.Contains(remedy, `"artifact"`) {
+		t.Fatalf("message %q and remedy %q should name the app and the artifact field", message, remedy)
+	}
+	for _, banned := range []string{"iOS", "opts.", "Source"} {
+		if strings.Contains(message+remedy, banned) {
+			t.Fatalf("message %q and remedy %q must not mention %q", message, remedy, banned)
+		}
+	}
+	if got := len(runner.Invocations()); got != 0 {
+		t.Fatalf("invocations = %d, want none before the artifact is known", got)
 	}
 }
 

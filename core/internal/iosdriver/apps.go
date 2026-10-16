@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"sort"
 
+	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/driver"
 	"dev.atomyx/internal/process"
 )
@@ -167,11 +168,16 @@ func (d *IosDriver) UninstallApp(ctx context.Context, appID string) error {
 	return err
 }
 
+// clearAppDataArtifactRemedy is the next step reported when a data
+// clear is requested for an app that has no artifact to reinstall.
+const clearAppDataArtifactRemedy = `Set the "artifact" field of this app in the project config to the path of the installable app, then run again.`
+
 // ClearAppData resets appID to a clean data state. iOS exposes no
 // primitive that clears an app's data in place, so the only path to a
 // clean state is uninstall then reinstall from the artifact, and
-// opts.Source is required: this returns an error when it is empty
-// instead of silently no-op-ing. The uninstall step tolerates only a
+// opts.Source is required: this returns a diag.CodeInvalidArgument
+// error naming the "artifact" config field when it is empty, instead
+// of silently no-op-ing. The uninstall step tolerates only a
 // confirmed "not installed" failure, because a device that never had
 // the app installed is already in the target "no app data" state and
 // the following install still needs to run; any other uninstall
@@ -182,10 +188,10 @@ func (d *IosDriver) ClearAppData(ctx context.Context, appID string, opts driver.
 		return err
 	}
 	if opts.Source == "" {
-		return fmt.Errorf(
-			"iosdriver: clearAppData(%s): iOS has no direct data-clear primitive, pass opts.Source with the installable artifact path",
-			appID,
-		)
+		return diag.New(diag.CodeInvalidArgument,
+			fmt.Sprintf("cannot clear the data of %s because the app has no installable artifact configured", appID),
+			clearAppDataArtifactRemedy,
+			nil)
 	}
 	result, err := d.runUninstall(ctx, appID)
 	if err != nil {

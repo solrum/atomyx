@@ -658,3 +658,19 @@ func TestIosSimDriver_ForeignAutomation_ForwardsTheDelegatesSessions(t *testing.
 		time.Sleep(5 * time.Millisecond)
 	}
 }
+
+func TestIosSimDriver_ClearAppData_WithoutSourceReportsInvalidArgument(t *testing.T) {
+	d, _ := newContractSimDriver(t)
+
+	err := d.ClearAppData(context.Background(), "dev.atomyx.app", driver.ClearAppDataOptions{})
+	if err == nil {
+		t.Fatal("ClearAppData() error = nil, want an error when Source is empty")
+	}
+	code, _, remedy := diag.Describe(err)
+	if code != diag.CodeInvalidArgument {
+		t.Fatalf("code = %q, want %q", code, diag.CodeInvalidArgument)
+	}
+	if remedy == "" {
+		t.Fatal("remedy is empty, want the config field to set")
+	}
+}
