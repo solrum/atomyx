@@ -1,0 +1,5 @@
+{
+  "name": "step-assert-exists",
+  "description": "assertExists parses from both the shorthand string and the selector form with a polling timeout.",
+  "yaml": "- launchApp\n- assertExists: \"Row 12\"\n- assertExists:\n    id: row_12\n    timeout: 5000\n"
+}

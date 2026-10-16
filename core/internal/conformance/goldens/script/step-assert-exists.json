@@ -1,0 +1,33 @@
+{
+  "parsed": {
+    "_stepLines": [
+      1,
+      2,
+      3
+    ],
+    "appId": "",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Untitled script",
+    "steps": [
+      {
+        "command": "launchApp"
+      },
+      {
+        "command": "assertExists",
+        "selector": {
+          "label": "Row 12",
+          "text": "Row 12"
+        }
+      },
+      {
+        "command": "assertExists",
+        "selector": {
+          "id": "row_12"
+        },
+        "timeoutMs": 5000
+      }
+    ]
+  },
+  "valid": true
+}
