@@ -420,6 +420,7 @@ var boundaryTranslationSkipped = map[string]string{
 	"UninstallApp":   "issues a host subprocess call through process.Runner (xcrun), not the TCP transport this boundary classifies",
 	"ClearAppData":   "issues a host subprocess call through process.Runner (xcrun), not the TCP transport this boundary classifies",
 	"IsAppInstalled": "issues a host subprocess call through process.Runner (xcrun), not the TCP transport this boundary classifies",
+	"SetPermissions": "issues a host subprocess call through process.Runner (xcrun), not the TCP transport this boundary classifies",
 }
 
 // TestIosDriver_BoundaryTranslation_CoversEveryDriverMethod proves

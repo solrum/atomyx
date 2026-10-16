@@ -335,3 +335,7 @@ func (d *IosSimDriver) LaunchedApp() (bundleID, runnerID string) {
 func (d *IosSimDriver) RestoreLaunchedApp(ctx context.Context, bundleID, fromRunnerID string) error {
 	return d.delegate.RestoreLaunchedApp(ctx, bundleID, fromRunnerID)
 }
+
+func (d *IosSimDriver) SetPermissions(ctx context.Context, appID string, permissions map[driver.Permission]driver.PermissionState) error {
+	return d.delegate.SetPermissions(ctx, appID, permissions)
+}

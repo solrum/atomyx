@@ -118,6 +118,11 @@ method:
 - `CanOpenLink`: `OpenLink` opens a URL, deep link or universal link. A
   device that cannot fails the call with `LINK_UNSUPPORTED`, so a caller
   tells an unsupported device from a link that failed to open.
+- `CanSetPermissions`: `SetPermissions` grants or revokes app permissions
+  by platform-neutral name without a prompt. A device that cannot, or one
+  that has no permission for a requested name, fails the call with
+  `PERMISSIONS_UNSUPPORTED`. A request that reached the device but changed
+  nothing fails with `PERMISSION_NOT_SET`.
 - `CanWaitForIdle`: a native idle-detection primitive. `orchestra`
   falls back to tree-diff polling when absent.
 - `CanMultiPointer`: multi-pointer gesture dispatch (pinch, rotate,

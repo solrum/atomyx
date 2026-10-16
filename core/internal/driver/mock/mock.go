@@ -88,17 +88,22 @@ type Driver struct {
 	// OpenedLinks records the links passed to OpenLink, in call order.
 	OpenedLinks []string
 
+	// PermissionChanges records the app id and permissions passed to
+	// SetPermissions, in call order.
+	PermissionChanges []PermissionChange
+
 	// ScreenshotErr, SwipeErr, PressKeyErr, LaunchAppErr, ListAppsErr,
-	// OpenLinkErr, and PingErr, when set, make the matching method return that
+	// OpenLinkErr, SetPermissionsErr, and PingErr, when set, make the matching method return that
 	// error instead of its normal result, so a test can drive a
 	// caller's error-surfacing path without a real device.
-	ScreenshotErr error
-	SwipeErr      error
-	PressKeyErr   error
-	LaunchAppErr  error
-	ListAppsErr   error
-	OpenLinkErr   error
-	PingErr       error
+	ScreenshotErr     error
+	SwipeErr          error
+	PressKeyErr       error
+	LaunchAppErr      error
+	ListAppsErr       error
+	OpenLinkErr       error
+	SetPermissionsErr error
+	PingErr           error
 
 	// Agent is the AgentInfo the mock reports, settable so a test can
 	// drive a caller's version-reporting path without a real agent.
@@ -126,6 +131,7 @@ func New() *Driver {
 			CanSetOrientation:  false,
 			CanHideKeyboard:    true,
 			CanOpenLink:        true,
+			CanSetPermissions:  true,
 			CanQueryForeground: true,
 			CanMultiPointer:    false,
 			CanPressure:        false,
@@ -572,4 +578,36 @@ func (d *Driver) ScreenSize(ctx context.Context) (wire.Size, error) {
 
 func (d *Driver) record(method string, args ...any) {
 	d.Calls = append(d.Calls, Call{Method: method, Args: args})
+}
+
+// PermissionChange is one SetPermissions call as the mock recorded it.
+type PermissionChange struct {
+	AppID       string
+	Permissions map[driver.Permission]driver.PermissionState
+}
+
+// SetPermissions validates permissions, then records the call in
+// PermissionChanges. It fails with diag.CodePermissionsUnsupported when
+// the reported capabilities report CanSetPermissions false, the same
+// caller-must-check contract the real adapters honor.
+func (d *Driver) SetPermissions(ctx context.Context, appID string, permissions map[driver.Permission]driver.PermissionState) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if !d.capabilities.CanSetPermissions {
+		return diag.NewPermissionsUnsupported("")
+	}
+	if err := driver.ValidatePermissions(permissions); err != nil {
+		return err
+	}
+	copied := make(map[driver.Permission]driver.PermissionState, len(permissions))
+	for name, state := range permissions {
+		copied[name] = state
+	}
+	d.record("SetPermissions", appID, copied)
+	if d.SetPermissionsErr != nil {
+		return d.SetPermissionsErr
+	}
+	d.PermissionChanges = append(d.PermissionChanges, PermissionChange{AppID: appID, Permissions: copied})
+	return nil
 }

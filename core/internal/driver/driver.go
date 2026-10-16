@@ -194,6 +194,36 @@ type Driver interface {
 	//     later, and an older one fails with diag.CodeLinkUnsupported.
 	OpenLink(ctx context.Context, link string, opts OpenLinkOptions) error
 
+	// SetPermissions grants or revokes permissions of appID without a
+	// prompt. Each key names a platform-neutral permission group and
+	// each value is PermissionAllow or PermissionDeny. The change is
+	// in place before the call returns, but an app that is running
+	// may keep its earlier view of a permission until it starts
+	// again, so a caller applies permissions before launching the app.
+	//
+	// A caller checks Capabilities().CanSetPermissions first. An
+	// adapter that reports it false, or a device on which a requested
+	// permission does not exist, fails with
+	// diag.CodePermissionsUnsupported. An empty map, an unknown name
+	// or an unknown state fails with diag.CodeInvalidArgument before
+	// the device is touched, see ValidatePermissions. A request that
+	// reached the device but changed nothing, such as an app that is
+	// not installed or does not declare the permission, fails with
+	// diag.CodePermissionNotSet.
+	//
+	// Platform notes (expand this list when adding support):
+	//
+	//   - Android: the host grants or revokes each runtime
+	//     permission the name maps to. A group member the app does
+	//     not declare is skipped, and the call fails only when the
+	//     app declares none of them. Notifications need Android 13
+	//     or later.
+	//   - iOS simulator: the host sets the privacy service the name
+	//     maps to for the app.
+	//   - iOS device: not supported, because the system offers no way
+	//     to change an app's permissions from outside the app.
+	SetPermissions(ctx context.Context, appID string, permissions map[Permission]PermissionState) error
+
 	// StopApp stops bundleID. See CurrentForeground for what the
 	// foreground report guarantees once StopApp returns nil.
 	StopApp(ctx context.Context, bundleID string) error

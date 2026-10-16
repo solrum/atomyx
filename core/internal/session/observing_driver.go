@@ -244,3 +244,8 @@ func (o *observingCore) ClearAppData(ctx context.Context, appID string, opts dri
 	defer o.mutate()()
 	return o.inner.ClearAppData(ctx, appID, opts)
 }
+
+func (o *observingCore) SetPermissions(ctx context.Context, appID string, permissions map[driver.Permission]driver.PermissionState) error {
+	defer o.mutate()()
+	return o.inner.SetPermissions(ctx, appID, permissions)
+}

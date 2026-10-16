@@ -58,13 +58,14 @@ func TestAndroidDriver_E2E(t *testing.T) {
 }
 
 const (
-	androidE2EDemoAppID    = "dev.atomyx.demo"
-	androidE2EFocusRoute   = "/focus"
-	androidE2EFocusLink    = "atomyxdemo://open/focus"
-	androidE2EMainActivity = "dev.atomyx.demo/.MainActivity"
-	androidE2EFocusInput   = "focus-input"
-	androidE2EAdbDeadline  = 30 * time.Second
-	androidE2EHTTPTimeout  = 10 * time.Second
+	androidE2EDemoAppID       = "dev.atomyx.demo"
+	androidE2EFocusRoute      = "/focus"
+	androidE2EFocusLink       = "atomyxdemo://open/focus"
+	androidE2EPermissionRoute = "/permission"
+	androidE2EMainActivity    = "dev.atomyx.demo/.MainActivity"
+	androidE2EFocusInput      = "focus-input"
+	androidE2EAdbDeadline     = 30 * time.Second
+	androidE2EHTTPTimeout     = 10 * time.Second
 )
 
 // androidE2EInstance is one driver the suite built, with the command
@@ -140,6 +141,11 @@ func (f *androidE2EFixture) hooks(t *testing.T) drivertest.Hooks {
 			Await: func(t *testing.T, d driver.Driver) {
 				drivertest.AwaitFocusedInput(t, d, androidE2EFocusInput)
 			},
+		},
+		Permissions: &drivertest.PermissionsFixture{
+			Permission: driver.PermissionLocation,
+			Arguments:  map[string]string{"route": androidE2EPermissionRoute},
+			Await:      drivertest.AwaitPermissionStatus,
 		},
 	}
 	appID := os.Getenv("ATOMYX_ANDROID_INSTALL_APP_ID")

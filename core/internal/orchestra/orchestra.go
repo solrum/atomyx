@@ -584,11 +584,17 @@ func (o *Orchestra) EraseText(ctx context.Context, count int) error {
 // values have to reach the app. See ResetLaunchedApps
 // for how this tracking resets between a suite's independent entries.
 func (o *Orchestra) LaunchApp(ctx context.Context, appID string, args driver.LaunchArgs) error {
+	return o.launchApp(ctx, appID, args, false)
+}
+
+// launchApp is LaunchApp with an extra way to bypass the dedup rule,
+// for a launch whose options have to reach a new start of the app.
+func (o *Orchestra) launchApp(ctx context.Context, appID string, args driver.LaunchArgs, forceLaunch bool) error {
 	if err := validateAppID(appID); err != nil {
 		return err
 	}
 
-	dedup := (args.NoReset == nil || *args.NoReset) && len(args.Arguments) == 0
+	dedup := (args.NoReset == nil || *args.NoReset) && len(args.Arguments) == 0 && !forceLaunch
 	if dedup && o.claimLaunch(appID) {
 		return nil
 	}

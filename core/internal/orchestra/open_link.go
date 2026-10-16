@@ -57,5 +57,13 @@ func (o *Orchestra) launchAppWithLink(ctx context.Context, appID string, opts La
 			nil,
 		)
 	}
+	if len(opts.Permissions) > 0 {
+		if err := driver.ValidateLink(opts.Link); err != nil {
+			return err
+		}
+		if err := o.SetPermissions(ctx, appID, opts.Permissions); err != nil {
+			return err
+		}
+	}
 	return o.OpenLink(ctx, opts.Link, appID)
 }

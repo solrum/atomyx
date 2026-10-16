@@ -42,6 +42,13 @@ func WithSyntheticFixtures(h Hooks) Hooks {
 			Await: func(*testing.T, driver.Driver) {},
 		}
 	}
+	if h.Permissions == nil {
+		h.Permissions = &PermissionsFixture{
+			Permission: driver.PermissionLocation,
+			Arguments:  map[string]string{"route": "/permission"},
+			Await:      func(*testing.T, driver.Driver, bool) {},
+		}
+	}
 	if h.Install == nil {
 		h.Install = &InstallFixture{Source: syntheticAppID, AppID: syntheticAppID}
 	}

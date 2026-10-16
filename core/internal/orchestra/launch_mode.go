@@ -47,6 +47,12 @@ type LaunchOptions struct {
 	// that carries arguments is never skipped as a repeat, because the
 	// values have to reach a new start of the app.
 	Arguments map[string]string
+	// Permissions are granted or revoked before the app starts, so the
+	// app sees them from its first moment. A launch that carries
+	// permissions is never skipped as a repeat, because a running
+	// instance may keep its earlier view of them. A device that cannot
+	// set permissions fails the launch with diag.CodePermissionsUnsupported.
+	Permissions map[driver.Permission]driver.PermissionState
 	// Link, when not empty, starts the app by opening this link in it,
 	// so the app lands on the link's destination. It cannot be combined
 	// with a mode other than the default or with Arguments, because a
@@ -66,6 +72,10 @@ func (o *Orchestra) LaunchAppWithMode(ctx context.Context, appID string, mode La
 // applies, except that a launch carrying arguments always reaches the
 // driver. An unknown mode or an invalid arguments map is rejected
 // before any device call with an error coded diag.CodeInvalidArgument.
+//
+// With opts.Permissions set, they are applied after the other options
+// are validated and before the app starts, and the launch always
+// reaches the driver.
 //
 // With opts.Link set, the app is started by OpenLink instead, and the
 // dedup rule does not apply.
@@ -97,5 +107,10 @@ func (o *Orchestra) LaunchAppWithOptions(ctx context.Context, appID string, opts
 			nil,
 		)
 	}
-	return o.LaunchApp(ctx, appID, args)
+	if len(opts.Permissions) > 0 {
+		if err := o.SetPermissions(ctx, appID, opts.Permissions); err != nil {
+			return err
+		}
+	}
+	return o.launchApp(ctx, appID, args, len(opts.Permissions) > 0)
 }

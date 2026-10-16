@@ -256,6 +256,8 @@ func (r *contractRunner) Run(ctx context.Context, name string, args ...string) (
 		}
 	case len(args) == 5 && args[2] == "install":
 		r.installed[args[4]] = true
+	case len(args) == 5 && args[2] == "shell" && args[3] == "getprop" && args[4] == "ro.build.version.sdk":
+		return process.Result{Stdout: "34\n"}, nil
 	case len(args) == 4 && args[2] == "uninstall":
 		delete(r.installed, args[3])
 	case len(args) == 7 && args[2] == "shell" && args[3] == "pm" && args[4] == "list" && args[5] == "packages":

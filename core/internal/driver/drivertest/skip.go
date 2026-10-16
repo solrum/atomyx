@@ -64,6 +64,10 @@ const (
 	// SkipNoOpenLink marks a driver that reports CanOpenLink false.
 	SkipNoOpenLink SkipKey = "no-open-link"
 
+	// SkipNoPermissionsFixture marks a driver that can set permissions but
+	// is wired without a Permissions fixture.
+	SkipNoPermissionsFixture SkipKey = "no-permissions-fixture"
+
 	// SkipNoFailPing marks a driver wired without a FailPing hook.
 	SkipNoFailPing SkipKey = "no-fail-ping"
 

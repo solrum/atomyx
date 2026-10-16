@@ -22,9 +22,10 @@ const (
 	iosE2EDemoAppID    = "dev.atomyx.demo"
 	iosE2ECommandLimit = 60 * time.Second
 
-	iosE2EFocusRoute = "/focus"
-	iosE2EFocusInput = "focus-input"
-	iosE2EFocusLink  = "atomyxdemo://open/focus"
+	iosE2EFocusRoute      = "/focus"
+	iosE2EFocusInput      = "focus-input"
+	iosE2EFocusLink       = "atomyxdemo://open/focus"
+	iosE2EPermissionRoute = "/permission"
 )
 
 // iosE2EFixture builds drivers for the corpus and remembers the latest
@@ -164,6 +165,11 @@ func simulatorDemoHooks(t *testing.T, udid string) drivertest.Hooks {
 			Await: func(t *testing.T, d driver.Driver) {
 				drivertest.AwaitFocusedInput(t, d, iosE2EFocusInput)
 			},
+		},
+		Permissions: &drivertest.PermissionsFixture{
+			Permission: driver.PermissionLocation,
+			Arguments:  map[string]string{"route": iosE2EPermissionRoute},
+			Await:      drivertest.AwaitPermissionStatus,
 		},
 	}
 }

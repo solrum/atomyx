@@ -147,6 +147,16 @@ const (
 	// CodeLinkNotOpened means the device was reached but no app handled
 	// the link, or the handler refused it.
 	CodeLinkNotOpened = "LINK_NOT_OPENED"
+	// CodePermissionsUnsupported means permissions cannot be set on the
+	// target device, either because its adapter never offers the
+	// capability or because the device software has no such permission.
+	// The condition is permanent for that device, so retrying cannot
+	// help.
+	CodePermissionsUnsupported = "PERMISSIONS_UNSUPPORTED"
+	// CodePermissionNotSet means the device was reached but a
+	// permission request changed nothing, for example because the app
+	// is not installed or does not declare the permission.
+	CodePermissionNotSet = "PERMISSION_NOT_SET"
 	// CodeInputNotFocused means a type action found its field but the
 	// field never took input focus, so nothing was typed. The screen
 	// did not offer the field in a focusable state, which is a property

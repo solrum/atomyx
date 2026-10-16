@@ -19,6 +19,12 @@ type Capabilities struct {
 	// can tell an unsupported device from a link that failed to open.
 	CanOpenLink bool `json:"canOpenLink"`
 
+	// CanSetPermissions reports whether Driver.SetPermissions is
+	// supported. When false, SetPermissions fails with
+	// diag.CodePermissionsUnsupported, so a caller can tell an
+	// unsupported device from a request that failed.
+	CanSetPermissions bool `json:"canSetPermissions"`
+
 	// CanQueryForeground reports whether the driver can truthfully
 	// answer Driver.CurrentForeground by querying the device for the
 	// app actually in the foreground, rather than by reporting a

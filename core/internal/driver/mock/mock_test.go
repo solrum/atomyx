@@ -556,3 +556,44 @@ func TestOpenLink_RejectsAnInvalidLinkAndSurfacesTheInjectedError(t *testing.T) 
 		t.Fatalf("OpenLink() error = %v, want the injected error", err)
 	}
 }
+
+func TestSetPermissions_RecordsTheAppAndPermissions(t *testing.T) {
+	d := New()
+	permissions := map[driver.Permission]driver.PermissionState{driver.PermissionCamera: driver.PermissionAllow}
+	if err := d.SetPermissions(context.Background(), "com.example.app", permissions); err != nil {
+		t.Fatalf("SetPermissions() error = %v", err)
+	}
+	permissions[driver.PermissionCamera] = driver.PermissionDeny
+	if len(d.PermissionChanges) != 1 || d.PermissionChanges[0].AppID != "com.example.app" ||
+		d.PermissionChanges[0].Permissions[driver.PermissionCamera] != driver.PermissionAllow {
+		t.Fatalf("PermissionChanges = %+v, want one snapshot of the allow request", d.PermissionChanges)
+	}
+	if last := d.Calls[len(d.Calls)-1]; last.Method != "SetPermissions" || last.Args[0] != "com.example.app" {
+		t.Fatalf("last call = %+v, want SetPermissions for the app", last)
+	}
+}
+
+func TestSetPermissions_FailsAsUnsupportedWhenTheCapabilityIsOff(t *testing.T) {
+	d := New()
+	d.SetCapabilities(driver.Capabilities{CanSetPermissions: false})
+
+	err := d.SetPermissions(context.Background(), "com.example.app", map[driver.Permission]driver.PermissionState{driver.PermissionCamera: driver.PermissionAllow})
+	if code, _, _ := diag.Describe(err); code != diag.CodePermissionsUnsupported {
+		t.Fatalf("SetPermissions() code = %q (err %v), want %q", code, err, diag.CodePermissionsUnsupported)
+	}
+	if len(d.PermissionChanges) != 0 {
+		t.Fatalf("PermissionChanges = %v, want none", d.PermissionChanges)
+	}
+}
+
+func TestSetPermissions_RejectsInvalidInputAndSurfacesTheInjectedError(t *testing.T) {
+	d := New()
+	if err := d.SetPermissions(context.Background(), "com.example.app", nil); err == nil {
+		t.Fatal("SetPermissions() accepted an empty map")
+	}
+	d.SetPermissionsErr = errors.New("injected")
+	err := d.SetPermissions(context.Background(), "com.example.app", map[driver.Permission]driver.PermissionState{driver.PermissionCamera: driver.PermissionAllow})
+	if !errors.Is(err, d.SetPermissionsErr) {
+		t.Fatalf("SetPermissions() error = %v, want the injected error", err)
+	}
+}

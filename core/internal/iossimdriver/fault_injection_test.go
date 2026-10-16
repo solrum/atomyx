@@ -136,6 +136,7 @@ var boundaryTranslationSkipped = map[string]string{
 	"HideKeyboard":      "delegates entirely to the embedded IosDriver's own fail boundary",
 	"LaunchApp":         "delegates entirely to the embedded IosDriver's own fail boundary",
 	"OpenLink":          "delegates entirely to the embedded IosDriver's own fail boundary",
+	"SetPermissions":    "delegates entirely to the embedded IosDriver's own fail boundary",
 	"StopApp":           "delegates entirely to the embedded IosDriver's own fail boundary",
 	"KillApp":           "delegates entirely to the embedded IosDriver's own fail boundary",
 	"CurrentForeground": "delegates entirely to the embedded IosDriver's own fail boundary",

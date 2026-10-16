@@ -177,6 +177,7 @@ func New(conn Conn, proc process.Runner, opts Options) *IosDriver {
 			CanSetOrientation:  false,
 			CanHideKeyboard:    true,
 			CanOpenLink:        true,
+			CanSetPermissions:  opts.Kind == KindSimulator,
 			CanQueryForeground: false,
 			CanMultiPointer:    false,
 			CanPressure:        false,
