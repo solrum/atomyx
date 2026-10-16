@@ -6,6 +6,8 @@ description: |
   wait, and assertion paths of the demo app. Platform neutral, so the
   same file runs on Android and iOS. Meant to be repeated many times by
   scripts/soak.sh to measure how often the infrastructure fails.
+  Every run starts signed out and in portrait, whatever orientation a
+  previous run left the device in.
   Permission and location steps are left out on purpose, because a
   physical Android device cannot do them and a script step cannot be
   conditioned on the platform.
@@ -32,6 +34,15 @@ preconditions:
               - tap: "Confirm"
               - waitFor: "Sign in"
           - otherwise: skip
+
+  # The flow rotates the device, and a run that stopped midway leaves it
+  # turned. Portrait is restored on every run, after the sign-in gate so
+  # the Sign in screen is already showing when this gate confirms it.
+  - check:
+      visible: "Sign in"
+    setup:
+      - setOrientation: portrait
+    policy: always
 ---
 - launchApp
 - waitFor:
