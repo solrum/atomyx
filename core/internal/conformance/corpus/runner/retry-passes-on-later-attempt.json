@@ -1,0 +1,12 @@
+{
+  "name": "retry-passes-on-later-attempt",
+  "description": "a retry block whose assertion fails twice then passes re-runs from its first step and succeeds on attempt 3.",
+  "yaml": "appId: com.test\nname: retry passes\nenv: {}\n---\n- retry:\n    maxRetries: 3\n    commands:\n      - assertVisible: Ready\n      - back\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] },
+      { "attributes": {}, "children": [] },
+      { "attributes": {}, "children": [ { "attributes": { "text": "Ready", "label": "Ready", "bounds": "0,0,10,10" }, "children": [] } ] }
+    ]
+  }
+}

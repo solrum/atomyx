@@ -45,6 +45,7 @@ const (
 	CommandPinch            = "pinch"
 	CommandRotate           = "rotate"
 	CommandRepeat           = "repeat"
+	CommandRetry            = "retry"
 )
 
 // RepeatWhileIterationLimit is the most iterations a repeat step runs
@@ -439,3 +440,25 @@ type RepeatStep struct {
 
 func (s *RepeatStep) StepCommand() string { return s.Command }
 func (s *RepeatStep) isScriptStep()       {}
+
+// Bounds of a retry step's maxRetries.
+const (
+	// RetryMaxRetriesLimit is the largest maxRetries a retry step accepts.
+	RetryMaxRetriesLimit = 3
+	// DefaultRetryMaxRetries is the number of extra attempts a retry step
+	// makes when it sets no maxRetries.
+	DefaultRetryMaxRetries = 1
+)
+
+// RetryStep runs Commands and, when any of them fails, runs the whole
+// list again from its first step, up to MaxRetries extra attempts. A nil
+// MaxRetries means DefaultRetryMaxRetries.
+type RetryStep struct {
+	stepSource
+	Command    string       `json:"command"`
+	MaxRetries *int         `json:"maxRetries,omitempty"`
+	Commands   []ScriptStep `json:"commands"`
+}
+
+func (s *RetryStep) StepCommand() string { return s.Command }
+func (s *RetryStep) isScriptStep()       {}

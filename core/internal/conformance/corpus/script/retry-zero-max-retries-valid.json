@@ -1,0 +1,5 @@
+{
+  "name": "retry-zero-max-retries-valid",
+  "description": "a retry block with maxRetries 0 parses.",
+  "yaml": "- retry:\n    maxRetries: 0\n    commands:\n      - back\n"
+}

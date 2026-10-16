@@ -1,0 +1,10 @@
+{
+  "name": "retry-zero-retries-runs-once",
+  "description": "a retry block with maxRetries 0 runs its block a single time.",
+  "yaml": "appId: com.test\nname: retry zero\nenv: {}\n---\n- retry:\n    maxRetries: 0\n    commands:\n      - back\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

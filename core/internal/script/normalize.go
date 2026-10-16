@@ -45,6 +45,7 @@ func init() {
 		CommandPinch:            normalizePinch,
 		CommandRotate:           normalizeRotate,
 		CommandRepeat:           normalizeRepeat,
+		CommandRetry:            normalizeRetry,
 	}
 }
 

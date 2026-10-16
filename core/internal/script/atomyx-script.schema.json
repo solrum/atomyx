@@ -844,6 +844,35 @@
       ],
       "type": "object"
     },
+    "RetryStep": {
+      "additionalProperties": false,
+      "description": "Run `commands`. When any step fails, run the whole list again from its first step, up to `maxRetries` extra attempts.",
+      "properties": {
+        "command": {
+          "const": "retry",
+          "type": "string"
+        },
+        "commands": {
+          "description": "Steps to run in every attempt.",
+          "items": {
+            "$ref": "#/definitions/ScriptStep"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "maxRetries": {
+          "description": "Extra attempts after the first one fails. Defaults to 1.",
+          "maximum": 3,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "command",
+        "commands"
+      ],
+      "type": "object"
+    },
     "RotateStep": {
       "additionalProperties": false,
       "description": "Two-finger rotation of `degrees` around `center`, with the contact points placed `radius` apart on opposite sides. A selector `center` is resolved to a coordinate at dispatch time.",
@@ -1212,6 +1241,9 @@
         },
         {
           "$ref": "#/definitions/RepeatStep"
+        },
+        {
+          "$ref": "#/definitions/RetryStep"
         }
       ]
     },

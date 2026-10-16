@@ -31,5 +31,6 @@ func DefaultCommands() []CommandDefinition {
 		PinchCommand{},
 		RotateCommand{},
 		RepeatCommand{},
+		RetryCommand{},
 	}
 }

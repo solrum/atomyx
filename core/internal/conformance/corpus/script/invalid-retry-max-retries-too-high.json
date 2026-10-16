@@ -1,0 +1,5 @@
+{
+  "name": "invalid-retry-max-retries-too-high",
+  "description": "a retry block with maxRetries above 3 must be REJECTED.",
+  "yaml": "- retry:\n    maxRetries: 4\n    commands:\n      - back\n"
+}

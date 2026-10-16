@@ -32,6 +32,7 @@ var stepCommandOrder = []string{
 	"PinchStep",
 	"RotateStep",
 	"RepeatStep",
+	"RetryStep",
 }
 
 // captureVarPattern is the shape a capture-bound variable name must
@@ -262,6 +263,15 @@ func stepJSONSchemaDefinitions() map[string]any {
 			},
 			[]string{"command", "commands"},
 			fmt.Sprintf("Run `commands` in a loop. At least one of `times` or `while` is required. With `while` and no `times`, the loop fails after %d iterations if the condition still holds.", RepeatWhileIterationLimit),
+		),
+		"RetryStep": objectSchema(
+			map[string]any{
+				"command":    constString(CommandRetry),
+				"maxRetries": integerMinMax(0, RetryMaxRetriesLimit, fmt.Sprintf("Extra attempts after the first one fails. Defaults to %d.", DefaultRetryMaxRetries)),
+				"commands":   arraySchema(ref("ScriptStep"), 1, "Steps to run in every attempt."),
+			},
+			[]string{"command", "commands"},
+			"Run `commands`. When any step fails, run the whole list again from its first step, up to `maxRetries` extra attempts.",
 		),
 	}
 }

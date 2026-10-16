@@ -1,0 +1,5 @@
+{
+  "name": "retry-default-max-retries-valid",
+  "description": "a retry block without maxRetries parses, leaving the default to the runner, and nests inside a repeat block.",
+  "yaml": "- repeat:\n    times: 2\n    commands:\n      - retry:\n          commands:\n            - tap: Refresh\n"
+}

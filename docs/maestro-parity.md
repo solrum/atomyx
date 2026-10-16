@@ -45,7 +45,7 @@ A Maestro flow that uses only present commands runs as is after a syntax change.
 | Maestro command | Atomyx equivalent | Status | Note |
 | --- | --- | --- | --- |
 | `repeat` with `times` or `while` | `repeat` | Present | `while` takes `visible`, `notVisible` or `expr`. A loop with `while` and no `times` fails after 50 iterations. |
-| `retry` | None | Missing | Retries exist only per suite entry. |
+| `retry` | `retry` | Present | `maxRetries` is 0 to 3 and defaults to 1. A suite entry retry is separate. |
 | Regex in selectors | `text`, `id`, `label` and `hint` as `{regex, flags}` | Present | A plain string stays an exact match. A regex match is unanchored, so write `^` and `$` to match a whole value. |
 
 ## App and device state

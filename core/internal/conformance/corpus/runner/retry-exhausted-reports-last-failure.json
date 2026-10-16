@@ -1,0 +1,10 @@
+{
+  "name": "retry-exhausted-reports-last-failure",
+  "description": "a retry block with the default of one retry that never passes fails with the last attempt's error.",
+  "yaml": "appId: com.test\nname: retry exhausted\nenv: {}\n---\n- retry:\n    commands:\n      - assertVisible: Ready\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

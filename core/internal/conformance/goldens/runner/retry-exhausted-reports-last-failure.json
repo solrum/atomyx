@@ -1,0 +1,244 @@
+{
+  "calls": [
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "retry",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "retry: up to 1 retry",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "retry"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "up to 1 retry"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "assertVisible",
+      "depth": 1,
+      "detail": null,
+      "durationMs": null,
+      "line": null,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "assertVisible: element.text = \"Ready\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "assertVisible"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "element"
+        },
+        {
+          "kind": "punct",
+          "text": "."
+        },
+        {
+          "kind": "identifier",
+          "text": "text"
+        },
+        {
+          "kind": "punct",
+          "text": " = "
+        },
+        {
+          "kind": "string",
+          "text": "\"Ready\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "assertVisible",
+      "depth": 1,
+      "detail": "Element not visible on screen",
+      "durationMs": 0,
+      "line": null,
+      "ok": false,
+      "stepIndex": 1,
+      "summary": "assertVisible: element.text = \"Ready\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "assertVisible"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "element"
+        },
+        {
+          "kind": "punct",
+          "text": "."
+        },
+        {
+          "kind": "identifier",
+          "text": "text"
+        },
+        {
+          "kind": "punct",
+          "text": " = "
+        },
+        {
+          "kind": "string",
+          "text": "\"Ready\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "assertVisible",
+      "depth": 1,
+      "detail": null,
+      "durationMs": null,
+      "line": null,
+      "ok": null,
+      "stepIndex": 2,
+      "summary": "assertVisible: element.text = \"Ready\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "assertVisible"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "element"
+        },
+        {
+          "kind": "punct",
+          "text": "."
+        },
+        {
+          "kind": "identifier",
+          "text": "text"
+        },
+        {
+          "kind": "punct",
+          "text": " = "
+        },
+        {
+          "kind": "string",
+          "text": "\"Ready\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "assertVisible",
+      "depth": 1,
+      "detail": "Element not visible on screen",
+      "durationMs": 0,
+      "line": null,
+      "ok": false,
+      "stepIndex": 2,
+      "summary": "assertVisible: element.text = \"Ready\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "assertVisible"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "element"
+        },
+        {
+          "kind": "punct",
+          "text": "."
+        },
+        {
+          "kind": "identifier",
+          "text": "text"
+        },
+        {
+          "kind": "punct",
+          "text": " = "
+        },
+        {
+          "kind": "string",
+          "text": "\"Ready\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "retry",
+      "depth": 0,
+      "detail": "retry: attempt 2 of 2 failed: Element not visible on screen",
+      "durationMs": 0,
+      "line": 5,
+      "ok": false,
+      "stepIndex": 0,
+      "summary": "retry: up to 1 retry",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "retry"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "up to 1 retry"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": 0,
+  "ok": false,
+  "passedSteps": 0,
+  "screenshots": [],
+  "scriptName": "retry exhausted",
+  "steps": [
+    {
+      "command": "retry",
+      "detail": "retry: attempt 2 of 2 failed: Element not visible on screen",
+      "durationMs": 0,
+      "ok": false,
+      "stepIndex": 0
+    }
+  ],
+  "totalSteps": 1
+}

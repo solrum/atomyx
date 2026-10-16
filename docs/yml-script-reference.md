@@ -993,6 +993,44 @@ names the iteration, for example `repeat: iteration 2 of 4 failed:` and
 the nested step's own detail. Every nested step appears in the run
 events at one level deeper than the `repeat` step, in iteration order.
 
+### retry
+
+Run a block of steps and, when any step in it fails, run the whole
+block again from its first step.
+
+```yaml
+# One retry, the default
+- retry:
+    commands:
+      - tap: "Refresh"
+      - assertVisible: "Results"
+
+# Up to three retries
+- retry:
+    maxRetries: 3
+    commands:
+      - tap: "Submit"
+      - assertVisible: "Confirmed"
+```
+
+`commands` is required and holds at least one step.
+
+**`maxRetries`** is a whole number from 0 to 3, the number of extra
+attempts after the first one fails. It defaults to 1 when omitted, so
+a block runs at most twice. With 0 the block runs once and a failure
+fails the step as usual.
+
+**Attempts.** The block always restarts from its first step.
+Variables and captures that an earlier attempt wrote stay set. The
+step passes on the first attempt that passes, and its detail names the
+attempt, for example `retry: passed on attempt 2 of 3`.
+
+**Failures.** When every attempt fails, the step fails with the last
+attempt's error, for example `retry: attempt 3 of 3 failed:` and the
+nested step's own detail. Every attempt's steps appear in the run
+events at one level deeper than the `retry` step, so a failed earlier
+attempt is visible there.
+
 ---
 
 ## Flow Fragments

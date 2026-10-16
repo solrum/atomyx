@@ -112,6 +112,13 @@ func SummarizeStep(step script.ScriptStep) StepSummary {
 		b.kw("runFlow").punct(": ").str(s.File)
 	case *script.RepeatStep:
 		summarizeRepeat(b, s)
+	case *script.RetryStep:
+		retries := retryLimit(s)
+		noun := "retries"
+		if retries == 1 {
+			noun = "retry"
+		}
+		b.kw("retry").punct(": ").rawStr(fmt.Sprintf("up to %d %s", retries, noun))
 	case *script.AssertApiStep:
 		b.kw("assertApi").punct(": ").id("$" + s.From)
 		var parts []string

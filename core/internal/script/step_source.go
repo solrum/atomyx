@@ -39,6 +39,8 @@ func markWrittenFormLost(step ScriptStep) {
 		}
 	case *RepeatStep:
 		markListLost(StepsOrFile{Steps: s.Commands})
+	case *RetryStep:
+		markListLost(StepsOrFile{Steps: s.Commands})
 	}
 }
 
@@ -84,6 +86,9 @@ func attachAuthored(resolved, authored ScriptStep) {
 		}
 	case *RepeatStep:
 		a := authored.(*RepeatStep)
+		attachAuthoredList(StepsOrFile{Steps: r.Commands}, StepsOrFile{Steps: a.Commands})
+	case *RetryStep:
+		a := authored.(*RetryStep)
 		attachAuthoredList(StepsOrFile{Steps: r.Commands}, StepsOrFile{Steps: a.Commands})
 	}
 	resolved.setAuthored(authored)

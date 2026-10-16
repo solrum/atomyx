@@ -1,0 +1,5 @@
+{
+  "name": "retry-max-retries-valid",
+  "description": "a retry block with maxRetries at the upper bound and a multi-step command list parses.",
+  "yaml": "- launchApp\n- retry:\n    maxRetries: 3\n    commands:\n      - tap: Submit\n      - assertVisible: Confirmed\n"
+}

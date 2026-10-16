@@ -100,3 +100,22 @@ func normalizeRepeatCondition(raw any) (*RepeatCondition, error) {
 	}
 	return cond, nil
 }
+
+func normalizeRetry(value any) (ScriptStep, error) {
+	m, ok := asMap(value)
+	if !ok {
+		return nil, newParseError("retry: expected an object with `commands` and an optional `maxRetries`")
+	}
+	step := &RetryStep{Command: CommandRetry}
+	maxRetries, err := normalizeIntField(m["maxRetries"], "retry.maxRetries")
+	if err != nil {
+		return nil, err
+	}
+	step.MaxRetries = maxRetries
+	commands, err := normalizeCommandList(m["commands"], "retry")
+	if err != nil {
+		return nil, err
+	}
+	step.Commands = commands
+	return step, nil
+}

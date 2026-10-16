@@ -170,3 +170,90 @@ func TestRepeatStep_AuthoredFormKeepsPlaceholders(t *testing.T) {
 		t.Errorf("authored text = %q, want ${who}", got)
 	}
 }
+
+func TestParseScript_Retry(t *testing.T) {
+	def := mustParse(t, "- retry:\n    maxRetries: 2\n    commands:\n      - tap: Submit\n")
+	step, ok := def.Steps[0].(*RetryStep)
+	if !ok {
+		t.Fatalf("step 0 is %T, want *RetryStep", def.Steps[0])
+	}
+	if step.MaxRetries == nil || *step.MaxRetries != 2 {
+		t.Errorf("maxRetries = %v, want 2", step.MaxRetries)
+	}
+	if len(step.Commands) != 1 {
+		t.Errorf("commands = %d, want 1", len(step.Commands))
+	}
+}
+
+func TestParseScript_RetryOmittedMaxRetriesStaysUnset(t *testing.T) {
+	def := mustParse(t, "- retry:\n    commands:\n      - tap: Submit\n")
+	if step := def.Steps[0].(*RetryStep); step.MaxRetries != nil {
+		t.Errorf("maxRetries = %d, want unset so the runner applies the default", *step.MaxRetries)
+	}
+}
+
+func TestParseScript_RetryAcceptsTheBoundaries(t *testing.T) {
+	for _, n := range []string{"0", "3"} {
+		mustParse(t, "- retry:\n    maxRetries: "+n+"\n    commands:\n      - back\n")
+	}
+}
+
+func TestParseScript_RetryRejections(t *testing.T) {
+	cases := []struct {
+		name string
+		yaml string
+		want string
+	}{
+		{
+			name: "above the limit",
+			yaml: "- retry:\n    maxRetries: 4\n    commands:\n      - back\n",
+			want: "maxRetries: must be between 0 and 3",
+		},
+		{
+			name: "negative",
+			yaml: "- retry:\n    maxRetries: -1\n    commands:\n      - back\n",
+			want: "maxRetries: must be between 0 and 3",
+		},
+		{
+			name: "fractional",
+			yaml: "- retry:\n    maxRetries: 1.5\n    commands:\n      - back\n",
+			want: "retry.maxRetries: must be a whole number",
+		},
+		{
+			name: "not a number",
+			yaml: "- retry:\n    maxRetries: many\n    commands:\n      - back\n",
+			want: "retry.maxRetries: must be a whole number",
+		},
+		{
+			name: "commands missing",
+			yaml: "- retry:\n    maxRetries: 1\n",
+			want: "commands: must have at least one step",
+		},
+		{
+			name: "commands empty",
+			yaml: "- retry:\n    commands: []\n",
+			want: "commands: must have at least one step",
+		},
+		{
+			name: "commands not a list",
+			yaml: "- retry:\n    commands: back\n",
+			want: "retry.commands: expected a step list",
+		},
+		{
+			name: "retry not an object",
+			yaml: "- retry: 2\n",
+			want: "retry: expected an object",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := ParseScript(tc.yaml, nil)
+			if err == nil {
+				t.Fatalf("ParseScript accepted %q", tc.yaml)
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("error %q does not contain %q", err.Error(), tc.want)
+			}
+		})
+	}
+}

@@ -643,6 +643,12 @@ func cancellationPanic(rec any, runCtx context.Context) (bool, error) {
 // level deeper than the caller, restored once the list finishes or
 // fails.
 func (r *ScriptRunner) runNestedSteps(ctx context.Context, rs *runState, steps []script.ScriptStep) CommandResult {
+	// A gate error has already ended the run, so a looping command must
+	// not start another pass over its steps.
+	if rs.gateErr != nil {
+		return CommandResult{Ok: false, Detail: strPtr(rs.gateErr.Error())}
+	}
+
 	rs.depth++
 	defer func() { rs.depth-- }()
 

@@ -1,0 +1,5 @@
+{
+  "name": "invalid-retry-empty-commands",
+  "description": "a retry block with an empty commands list must be REJECTED.",
+  "yaml": "- retry:\n    maxRetries: 1\n    commands: []\n"
+}

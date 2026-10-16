@@ -1,0 +1,5 @@
+{
+  "name": "invalid-retry-max-retries-negative",
+  "description": "a retry block with a negative maxRetries must be REJECTED.",
+  "yaml": "- retry:\n    maxRetries: -1\n    commands:\n      - back\n"
+}

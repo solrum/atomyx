@@ -47,3 +47,10 @@ func validateRepeatCondition(c *RepeatCondition, path string, report reportFunc)
 		report("%s.expr: must not be empty", path)
 	}
 }
+
+func validateRetryStep(s *RetryStep, path string, report reportFunc) {
+	if s.MaxRetries != nil && (*s.MaxRetries < 0 || *s.MaxRetries > RetryMaxRetriesLimit) {
+		report("%s.maxRetries: must be between 0 and %d, got %d", path, RetryMaxRetriesLimit, *s.MaxRetries)
+	}
+	validateCommandList(s.Commands, path+".commands", report)
+}
