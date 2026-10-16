@@ -128,6 +128,33 @@ final class CommandHandlerUnitTests: XCTestCase {
         XCTAssertEqual(resp.error, "missing bundleId")
     }
 
+    func testLaunchAppPassesLaunchArgumentsAndEnvironmentToTheBridge() {
+        let cmd = LaunchAppCommand()
+        let bridge = MockXCUIBridge()
+
+        let req = Request(id: 1, type: "launchApp", args: [
+            "bundleId": "com.example.app",
+            "launchArguments": ["-route", "/focus"],
+            "launchEnvironment": ["route": "/focus"],
+        ])
+        let resp = cmd.handle(req, bridge: bridge, state: DriverState())
+
+        XCTAssertTrue(resp.ok)
+        XCTAssertEqual(bridge.lastLaunchArguments, ["-route", "/focus"])
+        XCTAssertEqual(bridge.lastLaunchEnvironment, ["route": "/focus"])
+    }
+
+    func testLaunchAppWithoutLaunchInputsPassesEmptyCollections() {
+        let cmd = LaunchAppCommand()
+        let bridge = MockXCUIBridge()
+
+        let req = Request(id: 1, type: "launchApp", args: ["bundleId": "com.example.app"])
+        _ = cmd.handle(req, bridge: bridge, state: DriverState())
+
+        XCTAssertEqual(bridge.lastLaunchArguments, [])
+        XCTAssertEqual(bridge.lastLaunchEnvironment, [:])
+    }
+
     func testLaunchAppHappyPathUpdatesTrackedState() {
         let cmd = LaunchAppCommand()
         let bridge = MockXCUIBridge()
@@ -1339,6 +1366,8 @@ final class MockXCUIBridge: XCUIBridge {
     var screenshotCallCount = 0
     var typeTextCalls: [String] = []
     var launchCalls: [String] = []
+    var lastLaunchArguments: [String] = []
+    var lastLaunchEnvironment: [String: String] = [:]
 
     /// Override to simulate keyboard presence / layout. Default
     /// returns `.notVisible` so tests that don't care about the
@@ -1375,8 +1404,14 @@ final class MockXCUIBridge: XCUIBridge {
         return appStateBehavior()
     }
 
-    func launchApp(bundleId: String) -> XCUIApplication {
+    func launchApp(
+        bundleId: String,
+        launchArguments: [String],
+        launchEnvironment: [String: String]
+    ) -> XCUIApplication {
         launchCalls.append(bundleId)
+        lastLaunchArguments = launchArguments
+        lastLaunchEnvironment = launchEnvironment
         // Returns a reference WITHOUT launching. Safe for unit tests
         // that only use the ref as a pass-through to other mock methods.
         return XCUIApplication(bundleIdentifier: bundleId)

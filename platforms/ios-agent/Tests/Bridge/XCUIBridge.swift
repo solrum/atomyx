@@ -52,8 +52,15 @@ struct HideKeyboardResult {
 protocol XCUIBridge {
     /// Launch an app by bundle id and return its `XCUIApplication`
     /// reference. Idempotent: if the app is already running, this
-    /// activates it.
-    func launchApp(bundleId: String) -> XCUIApplication
+    /// activates it. `launchArguments` and `launchEnvironment` are set
+    /// on the application before it starts, so the app reads them from
+    /// its process arguments, its environment, and its standard user
+    /// defaults.
+    func launchApp(
+        bundleId: String,
+        launchArguments: [String],
+        launchEnvironment: [String: String]
+    ) -> XCUIApplication
 
     /// Current process state of `app`. One call costs one query to the
     /// app proxy, so callers read it once per command.
@@ -177,8 +184,14 @@ protocol XCUIBridge {
 /// Works on iOS 15+ / Xcode 14+. Bleeding-edge APIs belong in a
 /// separate bridge class when they appear. Do not leak them here.
 final class DefaultXCUIBridge: XCUIBridge {
-    func launchApp(bundleId: String) -> XCUIApplication {
+    func launchApp(
+        bundleId: String,
+        launchArguments: [String],
+        launchEnvironment: [String: String]
+    ) -> XCUIApplication {
         let app = XCUIApplication(bundleIdentifier: bundleId)
+        app.launchArguments = launchArguments
+        app.launchEnvironment = launchEnvironment
         app.launch()
         return app
     }

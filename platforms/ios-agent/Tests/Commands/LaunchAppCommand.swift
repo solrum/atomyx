@@ -16,6 +16,10 @@ import Foundation
 /// the driver has no record of the bundle (`currentApp == nil` or
 /// `currentBundleId != bundleId`), `noReset` falls back to a fresh
 /// launch, because the request would otherwise be unfulfillable.
+///
+/// `launchArguments` (a list of strings) and `launchEnvironment` (a map
+/// of strings) are applied to the application before it starts. The
+/// attach path never starts the app, so it ignores both.
 final class LaunchAppCommand: CommandHandler {
     let type = "launchApp"
 
@@ -34,7 +38,13 @@ final class LaunchAppCommand: CommandHandler {
                 ])
             }
         }
-        let app = bridge.launchApp(bundleId: bundleId)
+        let launchArguments = request.args["launchArguments"] as? [String] ?? []
+        let launchEnvironment = request.args["launchEnvironment"] as? [String: String] ?? [:]
+        let app = bridge.launchApp(
+            bundleId: bundleId,
+            launchArguments: launchArguments,
+            launchEnvironment: launchEnvironment
+        )
         state.currentApp = app
         state.currentBundleId = bundleId
         return .ok(id: request.id, data: [
