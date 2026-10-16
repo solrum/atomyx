@@ -1,0 +1,68 @@
+{
+  "calls": [
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    }
+  ],
+  "durationMs": 400,
+  "events": [
+    {
+      "command": "waitForAnimationToEnd",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "waitForAnimationToEnd",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "waitForAnimationToEnd"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "waitForAnimationToEnd",
+      "depth": 0,
+      "detail": "Screen settled after 400ms",
+      "durationMs": 400,
+      "line": 5,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "waitForAnimationToEnd",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "waitForAnimationToEnd"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 1,
+  "screenshots": [],
+  "scriptName": "animation settles",
+  "steps": [
+    {
+      "command": "waitForAnimationToEnd",
+      "detail": "Screen settled after 400ms",
+      "durationMs": 400,
+      "ok": true,
+      "stepIndex": 0
+    }
+  ],
+  "totalSteps": 1
+}

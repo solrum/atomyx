@@ -49,6 +49,12 @@ func init() {
 		CommandStopApp:          normalizeStopApp,
 		CommandKillApp:          normalizeKillApp,
 		CommandClearState:       normalizeClearState,
+
+		CommandHideKeyboard:          normalizeHideKeyboard,
+		CommandEraseText:             normalizeEraseText,
+		CommandScrollUntilVisible:    normalizeScrollUntilVisible,
+		CommandWaitForAnimationToEnd: normalizeWaitForAnimationToEnd,
+		CommandInputRandom:           normalizeInputRandom,
 	}
 }
 

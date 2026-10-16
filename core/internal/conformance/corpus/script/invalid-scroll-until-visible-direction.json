@@ -1,0 +1,5 @@
+{
+  "name": "invalid-scroll-until-visible-direction",
+  "description": "scrollUntilVisible with a horizontal direction must be REJECTED.",
+  "yaml": "- scrollUntilVisible:\n    text: Footer\n    direction: left\n"
+}

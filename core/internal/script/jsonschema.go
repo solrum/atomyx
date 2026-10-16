@@ -95,6 +95,9 @@ func jsonSchemaDefinitions() map[string]any {
 	for name, s := range stepJSONSchemaDefinitions() {
 		defs[name] = s
 	}
+	for name, s := range inputStepSchemaDefinitions() {
+		defs[name] = s
+	}
 	return defs
 }
 

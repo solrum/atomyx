@@ -49,6 +49,12 @@ const (
 	CommandStopApp          = "stopApp"
 	CommandKillApp          = "killApp"
 	CommandClearState       = "clearState"
+
+	CommandHideKeyboard          = "hideKeyboard"
+	CommandEraseText             = "eraseText"
+	CommandScrollUntilVisible    = "scrollUntilVisible"
+	CommandWaitForAnimationToEnd = "waitForAnimationToEnd"
+	CommandInputRandom           = "inputRandom"
 )
 
 // RepeatWhileIterationLimit is the most iterations a repeat step runs
@@ -503,3 +509,88 @@ type ClearStateStep struct {
 
 func (s *ClearStateStep) StepCommand() string { return s.Command }
 func (s *ClearStateStep) isScriptStep()       {}
+
+// Kinds of value an inputRandom step types.
+const (
+	RandomKindText       = "text"
+	RandomKindNumber     = "number"
+	RandomKindEmail      = "email"
+	RandomKindPersonName = "personName"
+)
+
+// RandomKinds lists every kind an inputRandom step accepts.
+var RandomKinds = []string{RandomKindText, RandomKindNumber, RandomKindEmail, RandomKindPersonName}
+
+// Bounds and defaults of the keyboard and wait steps.
+const (
+	// DefaultEraseTextCharacters is the number of characters an
+	// eraseText step erases when it sets no charactersToErase.
+	DefaultEraseTextCharacters = 50
+	// DefaultRandomLength is the length of the generated part of an
+	// inputRandom value when the step sets no length.
+	DefaultRandomLength = 8
+	// RandomLengthLimit is the largest length an inputRandom step
+	// accepts.
+	RandomLengthLimit = 256
+	// DefaultAnimationTimeoutMs is how long a waitForAnimationToEnd
+	// step waits for the screen to settle when it sets no timeout.
+	DefaultAnimationTimeoutMs = 5000
+)
+
+// HideKeyboardStep dismisses the on-screen keyboard, if one is showing.
+type HideKeyboardStep struct {
+	stepSource
+	Command string `json:"command"`
+}
+
+func (s *HideKeyboardStep) StepCommand() string { return s.Command }
+func (s *HideKeyboardStep) isScriptStep()       {}
+
+// EraseTextStep erases characters backwards from the focused field. A
+// nil Characters means DefaultEraseTextCharacters.
+type EraseTextStep struct {
+	stepSource
+	Command    string `json:"command"`
+	Characters *int   `json:"charactersToErase,omitempty"`
+}
+
+func (s *EraseTextStep) StepCommand() string { return s.Command }
+func (s *EraseTextStep) isScriptStep()       {}
+
+// ScrollUntilVisibleStep scrolls until the element resolved by Selector
+// sits in the viewport. Direction is "up" or "down", the scroll
+// direction searched first, and nil means "down".
+type ScrollUntilVisibleStep struct {
+	stepSource
+	Command   string         `json:"command"`
+	Selector  ScriptSelector `json:"selector"`
+	Direction *string        `json:"direction,omitempty"`
+}
+
+func (s *ScrollUntilVisibleStep) StepCommand() string { return s.Command }
+func (s *ScrollUntilVisibleStep) isScriptStep()       {}
+
+// WaitForAnimationToEndStep waits until the screen stops changing, or
+// until TimeoutMs elapses. A nil TimeoutMs means
+// DefaultAnimationTimeoutMs.
+type WaitForAnimationToEndStep struct {
+	stepSource
+	Command   string `json:"command"`
+	TimeoutMs *int   `json:"timeoutMs,omitempty"`
+}
+
+func (s *WaitForAnimationToEndStep) StepCommand() string { return s.Command }
+func (s *WaitForAnimationToEndStep) isScriptStep()       {}
+
+// InputRandomStep types a generated value of Kind into the focused
+// field. Length sizes the generated text or digits and applies to the
+// text, number and email kinds. A nil Length means DefaultRandomLength.
+type InputRandomStep struct {
+	stepSource
+	Command string `json:"command"`
+	Kind    string `json:"kind"`
+	Length  *int   `json:"length,omitempty"`
+}
+
+func (s *InputRandomStep) StepCommand() string { return s.Command }
+func (s *InputRandomStep) isScriptStep()       {}

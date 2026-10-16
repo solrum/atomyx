@@ -1,0 +1,10 @@
+{
+  "name": "scroll-until-visible-not-found-fails",
+  "description": "scrollUntilVisible fails with the element-not-found code when scrolling never reveals the element.",
+  "yaml": "appId: com.test\nname: scroll missing\nenv: {}\n---\n- scrollUntilVisible:\n    text: Nowhere\n    direction: down\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

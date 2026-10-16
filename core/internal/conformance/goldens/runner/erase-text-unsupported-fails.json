@@ -1,0 +1,71 @@
+{
+  "calls": [],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "eraseText",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "eraseText: 3 characters",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "eraseText"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "3 characters"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "eraseText",
+      "depth": 0,
+      "detail": "This device cannot erase text directly. Use `pressKey: delete` instead.",
+      "durationMs": 0,
+      "line": 5,
+      "ok": false,
+      "stepIndex": 0,
+      "summary": "eraseText: 3 characters",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "eraseText"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "3 characters"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": 0,
+  "ok": false,
+  "passedSteps": 0,
+  "screenshots": [],
+  "scriptName": "erase text unsupported",
+  "steps": [
+    {
+      "command": "eraseText",
+      "detail": "This device cannot erase text directly. Use `pressKey: delete` instead.",
+      "durationMs": 0,
+      "ok": false,
+      "stepIndex": 0
+    }
+  ],
+  "totalSteps": 1
+}

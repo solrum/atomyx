@@ -1,0 +1,390 @@
+{
+  "calls": [
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [
+        "nardxeqr"
+      ],
+      "method": "inputText"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [
+        "95556168"
+      ],
+      "method": "inputText"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [
+        "bontzvpk@example.com"
+      ],
+      "method": "inputText"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [
+        "Tara Bennett"
+      ],
+      "method": "inputText"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [
+        "dng"
+      ],
+      "method": "inputText"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "inputRandom",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "inputRandom: text",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "inputRandom"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "text"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "inputRandom",
+      "depth": 0,
+      "detail": "Typed a random text of 8 characters into focused field",
+      "durationMs": 0,
+      "line": 5,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "inputRandom: text",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "inputRandom"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "text"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "inputRandom",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 6,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "inputRandom: number",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "inputRandom"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "number"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "inputRandom",
+      "depth": 0,
+      "detail": "Typed a random number of 8 characters into focused field",
+      "durationMs": 0,
+      "line": 6,
+      "ok": true,
+      "stepIndex": 1,
+      "summary": "inputRandom: number",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "inputRandom"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "number"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "inputRandom",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 7,
+      "ok": null,
+      "stepIndex": 2,
+      "summary": "inputRandom: email",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "inputRandom"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "email"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "inputRandom",
+      "depth": 0,
+      "detail": "Typed a random email of 20 characters into focused field",
+      "durationMs": 0,
+      "line": 7,
+      "ok": true,
+      "stepIndex": 2,
+      "summary": "inputRandom: email",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "inputRandom"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "email"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "inputRandom",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 8,
+      "ok": null,
+      "stepIndex": 3,
+      "summary": "inputRandom: personName",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "inputRandom"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "personName"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "inputRandom",
+      "depth": 0,
+      "detail": "Typed a random personName of 12 characters into focused field",
+      "durationMs": 0,
+      "line": 8,
+      "ok": true,
+      "stepIndex": 3,
+      "summary": "inputRandom: personName",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "inputRandom"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "personName"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "inputRandom",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 9,
+      "ok": null,
+      "stepIndex": 4,
+      "summary": "inputRandom: text (length=3)",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "inputRandom"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "text"
+        },
+        {
+          "kind": "punct",
+          "text": " ("
+        },
+        {
+          "kind": "identifier",
+          "text": "length"
+        },
+        {
+          "kind": "punct",
+          "text": "="
+        },
+        {
+          "kind": "string",
+          "text": "3"
+        },
+        {
+          "kind": "punct",
+          "text": ")"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "inputRandom",
+      "depth": 0,
+      "detail": "Typed a random text of 3 characters into focused field",
+      "durationMs": 0,
+      "line": 9,
+      "ok": true,
+      "stepIndex": 4,
+      "summary": "inputRandom: text (length=3)",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "inputRandom"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "text"
+        },
+        {
+          "kind": "punct",
+          "text": " ("
+        },
+        {
+          "kind": "identifier",
+          "text": "length"
+        },
+        {
+          "kind": "punct",
+          "text": "="
+        },
+        {
+          "kind": "string",
+          "text": "3"
+        },
+        {
+          "kind": "punct",
+          "text": ")"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 5,
+  "screenshots": [],
+  "scriptName": "input random",
+  "steps": [
+    {
+      "command": "inputRandom",
+      "detail": "Typed a random text of 8 characters into focused field",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    },
+    {
+      "command": "inputRandom",
+      "detail": "Typed a random number of 8 characters into focused field",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 1
+    },
+    {
+      "command": "inputRandom",
+      "detail": "Typed a random email of 20 characters into focused field",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 2
+    },
+    {
+      "command": "inputRandom",
+      "detail": "Typed a random personName of 12 characters into focused field",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 3
+    },
+    {
+      "command": "inputRandom",
+      "detail": "Typed a random text of 3 characters into focused field",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 4
+    }
+  ],
+  "totalSteps": 5
+}

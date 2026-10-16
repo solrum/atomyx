@@ -1,0 +1,108 @@
+{
+  "calls": [
+    {
+      "args": [],
+      "method": "hierarchy"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "scrollUntilVisible",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "scrollUntilVisible: element.text = \"Footer\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "scrollUntilVisible"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "element"
+        },
+        {
+          "kind": "punct",
+          "text": "."
+        },
+        {
+          "kind": "identifier",
+          "text": "text"
+        },
+        {
+          "kind": "punct",
+          "text": " = "
+        },
+        {
+          "kind": "string",
+          "text": "\"Footer\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "scrollUntilVisible",
+      "depth": 0,
+      "detail": "element is visible",
+      "durationMs": 0,
+      "line": 5,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "scrollUntilVisible: element.text = \"Footer\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "scrollUntilVisible"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "element"
+        },
+        {
+          "kind": "punct",
+          "text": "."
+        },
+        {
+          "kind": "identifier",
+          "text": "text"
+        },
+        {
+          "kind": "punct",
+          "text": " = "
+        },
+        {
+          "kind": "string",
+          "text": "\"Footer\""
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 1,
+  "screenshots": [],
+  "scriptName": "scroll visible",
+  "steps": [
+    {
+      "command": "scrollUntilVisible",
+      "detail": "element is visible",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    }
+  ],
+  "totalSteps": 1
+}

@@ -1,0 +1,11 @@
+{
+  "name": "erase-text-unsupported-fails",
+  "description": "eraseText fails the step and points at pressKey when the device cannot erase text.",
+  "yaml": "appId: com.test\nname: erase text unsupported\nenv: {}\n---\n- eraseText: 3\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ],
+    "capabilities": { "canEraseText": false }
+  }
+}

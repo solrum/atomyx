@@ -36,6 +36,11 @@ var stepCommandOrder = []string{
 	"StopAppStep",
 	"KillAppStep",
 	"ClearStateStep",
+	"HideKeyboardStep",
+	"EraseTextStep",
+	"ScrollUntilVisibleStep",
+	"WaitForAnimationToEndStep",
+	"InputRandomStep",
 }
 
 // captureVarPattern is the shape a capture-bound variable name must
@@ -282,6 +287,52 @@ func stepJSONSchemaDefinitions() map[string]any {
 			},
 			[]string{"command", "commands"},
 			"Run `commands`. When any step fails, run the whole list again from its first step, up to `maxRetries` extra attempts.",
+		),
+	}
+}
+
+func inputStepSchemaDefinitions() map[string]any {
+	return map[string]any{
+		"HideKeyboardStep": objectSchema(
+			map[string]any{"command": constString(CommandHideKeyboard)},
+			[]string{"command"},
+			"Dismiss the on-screen keyboard. Succeeds when no keyboard is showing.",
+		),
+		"EraseTextStep": objectSchema(
+			map[string]any{
+				"command": constString(CommandEraseText),
+				"charactersToErase": integerMin(1, fmt.Sprintf(
+					"Number of characters to erase backwards from the focused field. Defaults to %d.", DefaultEraseTextCharacters)),
+			},
+			[]string{"command"},
+			"Erase characters from the focused field.",
+		),
+		"ScrollUntilVisibleStep": objectSchema(
+			map[string]any{
+				"command":   constString(CommandScrollUntilVisible),
+				"selector":  ref("ScriptSelector"),
+				"direction": stringEnum([]string{"up", "down"}, "Scroll direction searched first. The other direction is searched afterwards. Defaults to down."),
+			},
+			[]string{"command", "selector"},
+			"Scroll until the element resolved by `selector` sits in the viewport. Fails when the element is never found.",
+		),
+		"WaitForAnimationToEndStep": objectSchema(
+			map[string]any{
+				"command":   constString(CommandWaitForAnimationToEnd),
+				"timeoutMs": integerMin(0, fmt.Sprintf("Longest wait in milliseconds. Defaults to %d.", DefaultAnimationTimeoutMs)),
+			},
+			[]string{"command"},
+			"Wait until the screen stops changing. The step passes when the timeout elapses first.",
+		),
+		"InputRandomStep": objectSchema(
+			map[string]any{
+				"command": constString(CommandInputRandom),
+				"kind":    stringEnum(RandomKinds, "Kind of value to type."),
+				"length": integerMinMax(1, RandomLengthLimit, fmt.Sprintf(
+					"Length of the generated text, digits or email name. Defaults to %d. Does not apply to personName.", DefaultRandomLength)),
+			},
+			[]string{"command", "kind"},
+			"Type a generated value into the focused field.",
 		),
 	}
 }

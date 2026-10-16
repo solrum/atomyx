@@ -276,6 +276,11 @@ func TestRunnerCorpusShape(t *testing.T) {
 	}
 }
 
+// corpusRandomSeed seeds the random source every runner case runs
+// with, so the values an inputRandom step types are the same on every
+// run and a golden can hold them.
+const corpusRandomSeed = 1
+
 // runGoRunnerCase stages c's driver, network, and flow files under
 // dir, runs it through the Go script runner, and returns the parsed
 // script, the run result, the driver calls recorded, and the step
@@ -323,6 +328,7 @@ func runGoRunnerCase(t *testing.T, c *RunnerCase, dir string) (result runner.Scr
 		FlowLoader:     fsFlowLoader{},
 		Commands:       runner.DefaultCommands(),
 		OnStep:         func(e runner.StepEvent) { events = append(events, e) },
+		Random:         runner.NewSeededRandom(corpusRandomSeed),
 	})
 
 	result, runErr = r.Run(context.Background(), def)

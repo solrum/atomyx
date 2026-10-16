@@ -1,0 +1,5 @@
+{
+  "name": "erase-text-forms-valid",
+  "description": "eraseText parses bare, with a count, and with a charactersToErase object.",
+  "yaml": "- eraseText\n- eraseText: 5\n- eraseText:\n    charactersToErase: 12\n"
+}

@@ -1,0 +1,5 @@
+{
+  "name": "input-random-kinds-valid",
+  "description": "inputRandom parses for every kind, as a bare kind and as an object with a length.",
+  "yaml": "- inputRandom: text\n- inputRandom: number\n- inputRandom: email\n- inputRandom: personName\n- inputRandom:\n    kind: number\n    length: 6\n"
+}

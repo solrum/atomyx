@@ -1,0 +1,11 @@
+{
+  "name": "hide-keyboard-unsupported-fails",
+  "description": "hideKeyboard fails the step when the device cannot hide the keyboard.",
+  "yaml": "appId: com.test\nname: hide keyboard unsupported\nenv: {}\n---\n- hideKeyboard\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ],
+    "capabilities": { "canHideKeyboard": false }
+  }
+}

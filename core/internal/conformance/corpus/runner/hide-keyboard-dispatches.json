@@ -1,0 +1,10 @@
+{
+  "name": "hide-keyboard-dispatches",
+  "description": "hideKeyboard dismisses the keyboard through the driver and passes.",
+  "yaml": "appId: com.test\nname: hide keyboard\nenv: {}\n---\n- hideKeyboard\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

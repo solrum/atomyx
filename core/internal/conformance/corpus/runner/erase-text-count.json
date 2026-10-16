@@ -1,0 +1,10 @@
+{
+  "name": "erase-text-count",
+  "description": "eraseText erases the requested number of characters, and 50 when none is given.",
+  "yaml": "appId: com.test\nname: erase text\nenv: {}\n---\n- eraseText: 7\n- eraseText\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

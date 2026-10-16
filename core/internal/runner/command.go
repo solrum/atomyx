@@ -152,6 +152,8 @@ type CommandContext struct {
 	// app, when the host's config declares one. Nil when it declares
 	// none.
 	AppArtifact *string
+	// Random supplies the values an inputRandom step generates.
+	Random RandomSource
 	// Artifacts collects screenshots and other evidence for this run.
 	Artifacts ScriptArtifacts
 	// RunSteps executes a nested step list, which may be a `handle`/`branch` `do`

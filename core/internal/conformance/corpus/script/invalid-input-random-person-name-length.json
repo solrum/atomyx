@@ -1,0 +1,5 @@
+{
+  "name": "invalid-input-random-person-name-length",
+  "description": "inputRandom personName with a length must be REJECTED, because a name has no length to set.",
+  "yaml": "- inputRandom:\n    kind: personName\n    length: 5\n"
+}

@@ -134,6 +134,17 @@ func NewScrollController(driverDep ScrollDriver, clock Clock, opts ScrollControl
 // interactive viewport, returning the cursor once the element's
 // midpoint sits inside the safe-area-inset rect.
 func (s *ScrollController) EnsureVisible(ctx context.Context, filter ElementFilter) (*TreeCursor, error) {
+	return s.EnsureVisibleSearching(ctx, filter, "")
+}
+
+// EnsureVisibleSearching is EnsureVisible with the order of the
+// scroll-search directions chosen by the caller. firstDirection is
+// "down" to reveal content below the screen first, or "up" to reveal
+// content above it first. Both directions are still searched, so the
+// element is found wherever it sits, and only the cost of finding it
+// changes. An empty or unknown value keeps the default order, up then
+// down.
+func (s *ScrollController) EnsureVisibleSearching(ctx context.Context, filter ElementFilter, firstDirection string) (*TreeCursor, error) {
 	screen, err := s.driver.ScreenSize(ctx)
 	if err != nil {
 		return nil, err
@@ -147,7 +158,7 @@ func (s *ScrollController) EnsureVisible(ctx context.Context, filter ElementFilt
 	if len(initial) > 0 {
 		match = initial[0]
 	} else {
-		found, err := s.scrollSearch(ctx, filter, screen)
+		found, err := s.scrollSearch(ctx, filter, screen, searchOrder(firstDirection))
 		if err != nil {
 			return nil, err
 		}
@@ -214,7 +225,7 @@ func (s *ScrollController) EnsureVisible(ctx context.Context, filter ElementFilt
 // each swipe. It breaks early when two consecutive hierarchy
 // snapshots hash identically, signalling either a scroll boundary or
 // a non-scrollable container.
-func (s *ScrollController) scrollSearch(ctx context.Context, filter ElementFilter, screen wire.Size) (*TreeCursor, error) {
+func (s *ScrollController) scrollSearch(ctx context.Context, filter ElementFilter, screen wire.Size, order [2]string) (*TreeCursor, error) {
 	currentTree, err := s.driver.Hierarchy(ctx)
 	if err != nil {
 		return nil, err
@@ -227,7 +238,7 @@ func (s *ScrollController) scrollSearch(ctx context.Context, filter ElementFilte
 		effectiveBudget = thinTreeBudget
 	}
 
-	for _, direction := range [...]string{"up", "down"} {
+	for _, direction := range order {
 		prevSig := HashVisibleLeaves(currentTree)
 		for i := 0; i < effectiveBudget; i++ {
 			if err := s.swipeCenter(ctx, screen, direction); err != nil {
@@ -251,6 +262,15 @@ func (s *ScrollController) scrollSearch(ctx context.Context, filter ElementFilte
 		}
 	}
 	return nil, nil
+}
+
+// searchOrder returns the two scroll-search directions in the order
+// they are tried, given the one the caller wants first.
+func searchOrder(firstDirection string) [2]string {
+	if firstDirection == "down" {
+		return [2]string{"down", "up"}
+	}
+	return [2]string{"up", "down"}
 }
 
 // scrollTowardElement dispatches one scroll gesture sized and

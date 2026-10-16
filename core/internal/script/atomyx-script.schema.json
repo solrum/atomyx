@@ -274,6 +274,25 @@
       ],
       "type": "object"
     },
+    "EraseTextStep": {
+      "additionalProperties": false,
+      "description": "Erase characters from the focused field.",
+      "properties": {
+        "charactersToErase": {
+          "description": "Number of characters to erase backwards from the focused field. Defaults to 50.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "command": {
+          "const": "eraseText",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command"
+      ],
+      "type": "object"
+    },
     "ExtractStep": {
       "additionalProperties": false,
       "description": "Extract fields from a captured API response into runtime variables.",
@@ -377,6 +396,51 @@
       "required": [
         "command",
         "branches"
+      ],
+      "type": "object"
+    },
+    "HideKeyboardStep": {
+      "additionalProperties": false,
+      "description": "Dismiss the on-screen keyboard. Succeeds when no keyboard is showing.",
+      "properties": {
+        "command": {
+          "const": "hideKeyboard",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command"
+      ],
+      "type": "object"
+    },
+    "InputRandomStep": {
+      "additionalProperties": false,
+      "description": "Type a generated value into the focused field.",
+      "properties": {
+        "command": {
+          "const": "inputRandom",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind of value to type.",
+          "enum": [
+            "text",
+            "number",
+            "email",
+            "personName"
+          ],
+          "type": "string"
+        },
+        "length": {
+          "description": "Length of the generated text, digits or email name. Defaults to 8. Does not apply to personName.",
+          "maximum": 256,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "command",
+        "kind"
       ],
       "type": "object"
     },
@@ -1299,8 +1363,49 @@
         },
         {
           "$ref": "#/definitions/ClearStateStep"
+        },
+        {
+          "$ref": "#/definitions/HideKeyboardStep"
+        },
+        {
+          "$ref": "#/definitions/EraseTextStep"
+        },
+        {
+          "$ref": "#/definitions/ScrollUntilVisibleStep"
+        },
+        {
+          "$ref": "#/definitions/WaitForAnimationToEndStep"
+        },
+        {
+          "$ref": "#/definitions/InputRandomStep"
         }
       ]
+    },
+    "ScrollUntilVisibleStep": {
+      "additionalProperties": false,
+      "description": "Scroll until the element resolved by `selector` sits in the viewport. Fails when the element is never found.",
+      "properties": {
+        "command": {
+          "const": "scrollUntilVisible",
+          "type": "string"
+        },
+        "direction": {
+          "description": "Scroll direction searched first. The other direction is searched afterwards. Defaults to down.",
+          "enum": [
+            "up",
+            "down"
+          ],
+          "type": "string"
+        },
+        "selector": {
+          "$ref": "#/definitions/ScriptSelector"
+        }
+      },
+      "required": [
+        "command",
+        "selector"
+      ],
+      "type": "object"
     },
     "SleepStep": {
       "additionalProperties": false,
@@ -1414,6 +1519,25 @@
       "required": [
         "command",
         "text"
+      ],
+      "type": "object"
+    },
+    "WaitForAnimationToEndStep": {
+      "additionalProperties": false,
+      "description": "Wait until the screen stops changing. The step passes when the timeout elapses first.",
+      "properties": {
+        "command": {
+          "const": "waitForAnimationToEnd",
+          "type": "string"
+        },
+        "timeoutMs": {
+          "description": "Longest wait in milliseconds. Defaults to 5000.",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "command"
       ],
       "type": "object"
     },

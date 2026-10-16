@@ -1,0 +1,55 @@
+{
+  "calls": [],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "hideKeyboard",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "hideKeyboard",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "hideKeyboard"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "hideKeyboard",
+      "depth": 0,
+      "detail": "driver does not support hideKeyboard",
+      "durationMs": 0,
+      "line": 5,
+      "ok": false,
+      "stepIndex": 0,
+      "summary": "hideKeyboard",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "hideKeyboard"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": 0,
+  "ok": false,
+  "passedSteps": 0,
+  "screenshots": [],
+  "scriptName": "hide keyboard unsupported",
+  "steps": [
+    {
+      "command": "hideKeyboard",
+      "detail": "driver does not support hideKeyboard",
+      "durationMs": 0,
+      "ok": false,
+      "stepIndex": 0
+    }
+  ],
+  "totalSteps": 1
+}

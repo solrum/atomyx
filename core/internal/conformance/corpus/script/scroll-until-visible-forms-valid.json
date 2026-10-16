@@ -1,0 +1,5 @@
+{
+  "name": "scroll-until-visible-forms-valid",
+  "description": "scrollUntilVisible parses with a text shorthand, a selector object, and a direction.",
+  "yaml": "- scrollUntilVisible: Footer\n- scrollUntilVisible:\n    id: footer\n- scrollUntilVisible:\n    text: Footer\n    direction: up\n"
+}

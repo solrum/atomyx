@@ -1,0 +1,125 @@
+{
+  "calls": [
+    {
+      "args": [
+        7
+      ],
+      "method": "eraseText"
+    },
+    {
+      "args": [
+        50
+      ],
+      "method": "eraseText"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "eraseText",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "eraseText: 7 characters",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "eraseText"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "7 characters"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "eraseText",
+      "depth": 0,
+      "detail": "Erased up to 7 characters",
+      "durationMs": 0,
+      "line": 5,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "eraseText: 7 characters",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "eraseText"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "7 characters"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "eraseText",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 6,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "eraseText",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "eraseText"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "eraseText",
+      "depth": 0,
+      "detail": "Erased up to 50 characters",
+      "durationMs": 0,
+      "line": 6,
+      "ok": true,
+      "stepIndex": 1,
+      "summary": "eraseText",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "eraseText"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 2,
+  "screenshots": [],
+  "scriptName": "erase text",
+  "steps": [
+    {
+      "command": "eraseText",
+      "detail": "Erased up to 7 characters",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    },
+    {
+      "command": "eraseText",
+      "detail": "Erased up to 50 characters",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 1
+    }
+  ],
+  "totalSteps": 2
+}

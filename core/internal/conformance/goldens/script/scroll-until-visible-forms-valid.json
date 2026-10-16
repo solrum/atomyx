@@ -1,0 +1,37 @@
+{
+  "parsed": {
+    "_stepLines": [
+      1,
+      2,
+      4
+    ],
+    "appId": "",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Untitled script",
+    "steps": [
+      {
+        "command": "scrollUntilVisible",
+        "selector": {
+          "label": "Footer",
+          "text": "Footer"
+        }
+      },
+      {
+        "command": "scrollUntilVisible",
+        "selector": {
+          "id": "footer"
+        }
+      },
+      {
+        "command": "scrollUntilVisible",
+        "direction": "up",
+        "selector": {
+          "label": "Footer",
+          "text": "Footer"
+        }
+      }
+    ]
+  },
+  "valid": true
+}

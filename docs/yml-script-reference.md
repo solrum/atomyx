@@ -389,6 +389,56 @@ name with the length of its value, and a failed `assertApi` or
 `assertExpr` describes a string it compared by length, for the same
 reason.
 
+### inputRandom
+
+Type a generated value into the focused field. The kind is required.
+
+```yaml
+- inputRandom: text
+- inputRandom: email
+- inputRandom:
+    kind: number
+    length: 6
+```
+
+| Kind | Value | `length` |
+| --- | --- | --- |
+| `text` | Lowercase letters | Number of letters. Default 8. |
+| `number` | Decimal digits | Number of digits. Default 8. |
+| `email` | Lowercase letters, then `@example.com` | Number of letters before the `@`. Default 8. |
+| `personName` | A first and a last name from a fixed list | Not accepted. |
+
+`length` is between 1 and 256. Every value comes from the run's random
+source. A host that needs repeatable values seeds it, so two runs with
+the same seed type the same text. The step result reports the kind and
+the number of characters, not the value itself.
+
+### hideKeyboard
+
+Dismiss the on-screen keyboard. The step passes when no keyboard is
+showing, and fails when the device cannot hide a keyboard.
+
+```yaml
+- hideKeyboard
+```
+
+### eraseText
+
+Erase characters backwards from the focused field.
+
+```yaml
+- eraseText
+- eraseText: 5
+- eraseText:
+    charactersToErase: 5
+```
+
+Without a count the step erases 50 characters. A count must be at least 1.
+Erasing more characters than the field holds is not an error. The step
+fails when the device cannot erase text directly, and then
+`pressKey: delete` is the alternative. A `type` step already clears its
+field first, so use `eraseText` to edit a field without retyping it.
+
 ### waitFor
 
 Wait for an element to appear. Throws on timeout.
@@ -549,6 +599,49 @@ Shorthand for `pressKey: back`.
 ```yaml
 - back
 ```
+
+### scrollUntilVisible
+
+Scroll until an element sits inside the viewport. The selector takes the
+same forms as `tap`.
+
+```yaml
+- scrollUntilVisible: "Terms of service"
+- scrollUntilVisible:
+    id: footer
+    direction: down
+```
+
+| Field | Effect |
+| --- | --- |
+| `direction` | `down` (default) or `up`. The direction searched first. |
+
+The step searches in both directions, so the element is found wherever it
+sits, and `direction` only decides which one is tried first. The step
+fails, with the element-not-found code, when scrolling never reveals the
+element. It does not tap the element or check whether another element
+covers it. A `tap` or `type` step scrolls its own target into view, so use
+`scrollUntilVisible` when the scroll is the point of the step or when an
+assertion follows it. There is no timeout or visibility percentage, because
+the search is bounded by a fixed number of swipes.
+
+### waitForAnimationToEnd
+
+Wait until the screen stops changing. The step compares consecutive
+snapshots of the screen and passes when two of them are identical.
+
+```yaml
+- waitForAnimationToEnd
+- waitForAnimationToEnd: 3000
+- waitForAnimationToEnd:
+    timeout: 3000
+```
+
+The timeout is in milliseconds and defaults to 5000. A screen that is
+still changing when the timeout elapses does not fail the step, because
+a permanent animation such as a spinner never settles and the next step
+still has to run. The step result says whether the screen settled. Use
+`waitFor` or `assertVisible` when the script needs a specific element.
 
 ### sleep
 

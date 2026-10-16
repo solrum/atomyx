@@ -1,0 +1,12 @@
+{
+  "name": "wait-for-animation-to-end-times-out-and-passes",
+  "description": "waitForAnimationToEnd passes after its timeout even when the screen never stops changing.",
+  "yaml": "appId: com.test\nname: animation timeout\nenv: {}\n---\n- waitForAnimationToEnd: 400\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [ { "attributes": { "text": "Box", "bounds": "0,0,10,10" }, "children": [] } ] },
+      { "attributes": {}, "children": [ { "attributes": { "text": "Box", "bounds": "0,20,10,30" }, "children": [] } ] },
+      { "attributes": {}, "children": [ { "attributes": { "text": "Box", "bounds": "0,40,10,50" }, "children": [] } ] }
+    ]
+  }
+}

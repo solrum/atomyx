@@ -1,0 +1,10 @@
+{
+  "name": "scroll-until-visible-on-screen",
+  "description": "scrollUntilVisible passes without scrolling when the element is already in the viewport.",
+  "yaml": "appId: com.test\nname: scroll visible\nenv: {}\n---\n- scrollUntilVisible: Footer\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [ { "attributes": { "text": "Footer", "label": "Footer", "bounds": "0,400,430,440" }, "children": [] } ] }
+    ]
+  }
+}

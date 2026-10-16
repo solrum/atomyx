@@ -102,6 +102,28 @@ func SummarizeStep(step script.ScriptStep) StepSummary {
 		summarizeAppStep(b, "killApp", s.AppID)
 	case *script.ClearStateStep:
 		summarizeAppStep(b, "clearState", s.AppID)
+	case *script.HideKeyboardStep:
+		b.kw("hideKeyboard")
+	case *script.EraseTextStep:
+		b.kw("eraseText")
+		if s.Characters != nil {
+			b.punct(": ").rawStr(fmt.Sprintf("%d %s", *s.Characters, pluralWord(*s.Characters, "character")))
+		}
+	case *script.ScrollUntilVisibleStep:
+		b.kw("scrollUntilVisible").punct(": ").selector(&s.Selector)
+		if s.Direction != nil {
+			b.punct(" (").id("direction").punct("=").str(*s.Direction).punct(")")
+		}
+	case *script.WaitForAnimationToEndStep:
+		b.kw("waitForAnimationToEnd")
+		if s.TimeoutMs != nil {
+			b.punct(" (").id("timeout").punct("=").str(fmt.Sprintf("%dms", *s.TimeoutMs)).punct(")")
+		}
+	case *script.InputRandomStep:
+		b.kw("inputRandom").punct(": ").rawStr(s.Kind)
+		if s.Length != nil {
+			b.punct(" (").id("length").punct("=").rawStr(fmt.Sprintf("%d", *s.Length)).punct(")")
+		}
 	case *script.CaptureStep:
 		b.kw("capture").punct(": ").id(s.As).punct(" ← ").str(s.Pattern)
 	case *script.HandleStep:

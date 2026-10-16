@@ -1,0 +1,27 @@
+{
+  "parsed": {
+    "_stepLines": [
+      1,
+      2,
+      3
+    ],
+    "appId": "",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Untitled script",
+    "steps": [
+      {
+        "command": "waitForAnimationToEnd"
+      },
+      {
+        "command": "waitForAnimationToEnd",
+        "timeoutMs": 3000
+      },
+      {
+        "command": "waitForAnimationToEnd",
+        "timeoutMs": 1500
+      }
+    ]
+  },
+  "valid": true
+}

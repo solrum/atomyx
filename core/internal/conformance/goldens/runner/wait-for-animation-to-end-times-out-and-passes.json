@@ -1,0 +1,108 @@
+{
+  "calls": [
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    }
+  ],
+  "durationMs": 400,
+  "events": [
+    {
+      "command": "waitForAnimationToEnd",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "waitForAnimationToEnd (timeout=\"400ms\")",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "waitForAnimationToEnd"
+        },
+        {
+          "kind": "punct",
+          "text": " ("
+        },
+        {
+          "kind": "identifier",
+          "text": "timeout"
+        },
+        {
+          "kind": "punct",
+          "text": "="
+        },
+        {
+          "kind": "string",
+          "text": "\"400ms\""
+        },
+        {
+          "kind": "punct",
+          "text": ")"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "waitForAnimationToEnd",
+      "depth": 0,
+      "detail": "Screen still changing after 400ms, continuing",
+      "durationMs": 400,
+      "line": 5,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "waitForAnimationToEnd (timeout=\"400ms\")",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "waitForAnimationToEnd"
+        },
+        {
+          "kind": "punct",
+          "text": " ("
+        },
+        {
+          "kind": "identifier",
+          "text": "timeout"
+        },
+        {
+          "kind": "punct",
+          "text": "="
+        },
+        {
+          "kind": "string",
+          "text": "\"400ms\""
+        },
+        {
+          "kind": "punct",
+          "text": ")"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 1,
+  "screenshots": [],
+  "scriptName": "animation timeout",
+  "steps": [
+    {
+      "command": "waitForAnimationToEnd",
+      "detail": "Screen still changing after 400ms, continuing",
+      "durationMs": 400,
+      "ok": true,
+      "stepIndex": 0
+    }
+  ],
+  "totalSteps": 1
+}

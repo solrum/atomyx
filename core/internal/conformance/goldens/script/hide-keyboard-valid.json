@@ -1,0 +1,33 @@
+{
+  "parsed": {
+    "_stepLines": [
+      1,
+      2,
+      3
+    ],
+    "appId": "",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Untitled script",
+    "steps": [
+      {
+        "command": "tap",
+        "selector": {
+          "label": "Email",
+          "text": "Email"
+        }
+      },
+      {
+        "command": "hideKeyboard"
+      },
+      {
+        "command": "tap",
+        "selector": {
+          "label": "Submit",
+          "text": "Submit"
+        }
+      }
+    ]
+  },
+  "valid": true
+}

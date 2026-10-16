@@ -885,13 +885,7 @@ func (o *Orchestra) prepareSelectorForAction(ctx context.Context, selector Selec
 		if err != nil {
 			var unreachable *ScrollUnreachableError
 			if errors.As(err, &unreachable) {
-				failed := ActionFail(
-					fmt.Sprintf("could not scroll element into view: %s", unreachable.Message), nil,
-				)
-				if unreachable.NotFound {
-					failed.Code = diag.CodeElementNotFound
-				}
-				return preparedAction{result: failed}, nil
+				return preparedAction{result: unreachableResult(unreachable)}, nil
 			}
 			return preparedAction{}, err
 		}

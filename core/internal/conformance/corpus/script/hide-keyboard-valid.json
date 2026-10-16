@@ -1,0 +1,5 @@
+{
+  "name": "hide-keyboard-valid",
+  "description": "hideKeyboard parses as a bare step between other steps.",
+  "yaml": "- tap: Email\n- hideKeyboard\n- tap: Submit\n"
+}

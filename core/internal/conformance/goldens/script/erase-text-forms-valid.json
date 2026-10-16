@@ -1,0 +1,27 @@
+{
+  "parsed": {
+    "_stepLines": [
+      1,
+      2,
+      3
+    ],
+    "appId": "",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Untitled script",
+    "steps": [
+      {
+        "command": "eraseText"
+      },
+      {
+        "charactersToErase": 5,
+        "command": "eraseText"
+      },
+      {
+        "charactersToErase": 12,
+        "command": "eraseText"
+      }
+    ]
+  },
+  "valid": true
+}

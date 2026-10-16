@@ -1,0 +1,5 @@
+{
+  "name": "invalid-erase-text-zero",
+  "description": "eraseText with a count below one must be REJECTED.",
+  "yaml": "- eraseText: 0\n"
+}

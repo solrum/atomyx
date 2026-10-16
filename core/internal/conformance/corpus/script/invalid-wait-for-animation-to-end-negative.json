@@ -1,0 +1,5 @@
+{
+  "name": "invalid-wait-for-animation-to-end-negative",
+  "description": "waitForAnimationToEnd with a negative timeout must be REJECTED.",
+  "yaml": "- waitForAnimationToEnd: -1\n"
+}

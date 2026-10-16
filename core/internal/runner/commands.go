@@ -35,5 +35,10 @@ func DefaultCommands() []CommandDefinition {
 		StopAppCommand{},
 		KillAppCommand{},
 		ClearStateCommand{},
+		HideKeyboardCommand{},
+		EraseTextCommand{},
+		ScrollUntilVisibleCommand{},
+		WaitForAnimationToEndCommand{},
+		InputRandomCommand{},
 	}
 }

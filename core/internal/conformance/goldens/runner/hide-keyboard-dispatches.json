@@ -1,0 +1,60 @@
+{
+  "calls": [
+    {
+      "args": [],
+      "method": "hideKeyboard"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "hideKeyboard",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "hideKeyboard",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "hideKeyboard"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "hideKeyboard",
+      "depth": 0,
+      "detail": "hideKeyboard: dispatched",
+      "durationMs": 0,
+      "line": 5,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "hideKeyboard",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "hideKeyboard"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 1,
+  "screenshots": [],
+  "scriptName": "hide keyboard",
+  "steps": [
+    {
+      "command": "hideKeyboard",
+      "detail": "hideKeyboard: dispatched",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    }
+  ],
+  "totalSteps": 1
+}

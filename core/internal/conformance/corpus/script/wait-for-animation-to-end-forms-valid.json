@@ -1,0 +1,5 @@
+{
+  "name": "wait-for-animation-to-end-forms-valid",
+  "description": "waitForAnimationToEnd parses bare, with a timeout number, and with a timeout object.",
+  "yaml": "- waitForAnimationToEnd\n- waitForAnimationToEnd: 3000\n- waitForAnimationToEnd:\n    timeout: 1500\n"
+}

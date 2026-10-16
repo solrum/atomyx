@@ -1,0 +1,5 @@
+{
+  "name": "invalid-input-random-unknown-kind",
+  "description": "inputRandom with an unknown kind must be REJECTED.",
+  "yaml": "- inputRandom: color\n"
+}

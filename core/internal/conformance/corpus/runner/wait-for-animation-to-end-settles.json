@@ -1,0 +1,12 @@
+{
+  "name": "wait-for-animation-to-end-settles",
+  "description": "waitForAnimationToEnd passes as soon as two consecutive screens are identical.",
+  "yaml": "appId: com.test\nname: animation settles\nenv: {}\n---\n- waitForAnimationToEnd\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [ { "attributes": { "text": "Box", "bounds": "0,0,10,10" }, "children": [] } ] },
+      { "attributes": {}, "children": [ { "attributes": { "text": "Box", "bounds": "0,50,10,60" }, "children": [] } ] },
+      { "attributes": {}, "children": [ { "attributes": { "text": "Box", "bounds": "0,50,10,60" }, "children": [] } ] }
+    ]
+  }
+}

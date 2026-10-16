@@ -258,7 +258,19 @@ func validateStep(step ScriptStep, path string, report reportFunc) {
 	case *ClearStateStep:
 		validateAppID(s.AppID, path, report)
 
-	case *BackStep, *ScreenshotStep:
+	case *EraseTextStep:
+		validateEraseTextStep(s, path, report)
+
+	case *ScrollUntilVisibleStep:
+		validateScrollUntilVisibleStep(s, path, report)
+
+	case *WaitForAnimationToEndStep:
+		validateTimeoutMs(s.TimeoutMs, path, report)
+
+	case *InputRandomStep:
+		validateInputRandomStep(s, path, report)
+
+	case *BackStep, *ScreenshotStep, *HideKeyboardStep:
 		// No per-step constraints beyond the discriminant.
 	}
 }

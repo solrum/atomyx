@@ -59,10 +59,10 @@ A Maestro flow that uses only present commands runs as is after a syntax change.
 | `setLocation` | None | Missing | The capability flag exists with no method behind it. |
 | `travel` | None | Missing | Depends on `setLocation`. |
 | `setOrientation` | None | Missing | The capability flag exists with no method behind it. |
-| `hideKeyboard` | None as a step | Partial | The engine hides the keyboard. No step exposes it. |
-| `eraseText` | `type` | Partial | `type` clears the field first. No standalone erase step. |
-| `scrollUntilVisible` | `tap` and `type` | Partial | Both scroll the target into view on their own. No standalone step. |
-| `waitForAnimationToEnd` | None as a step | Partial | The engine waits for a screen transition. No step exposes it. |
+| `hideKeyboard` | `hideKeyboard` | Present | |
+| `eraseText` | `eraseText` | Present | `charactersToErase` defaults to 50, like Maestro. |
+| `scrollUntilVisible` | `scrollUntilVisible` | Present | Takes a selector and a `down` or `up` direction. It has no timeout or visibility percentage. The search is bounded by a fixed number of swipes. |
+| `waitForAnimationToEnd` | `waitForAnimationToEnd` | Present | Takes an optional timeout. A screen that never settles does not fail the step. |
 
 ## Text and clipboard
 
@@ -71,7 +71,7 @@ A Maestro flow that uses only present commands runs as is after a syntax change.
 | `copyTextFrom` | `read` into a variable | Partial | Binds an element field to a variable. |
 | `pasteText` | `type` with `${var}` | Partial | Types the stored value. The device clipboard is not used. |
 | Device clipboard read and write | `read` then `type` with `${var}` | Out of scope | Android 10 and later blocks background clipboard reads, and iOS prompts on paste, so a device clipboard path is unreliable on both. |
-| `inputRandom` variants | None | Missing | The runner has no value generator. |
+| `inputRandom` variants | `inputRandom` with a `kind` of `text`, `number`, `email` or `personName` | Present | `length` sizes text, number and email values. The host can seed the generator for repeatable runs. |
 
 ## Scripting and media
 
