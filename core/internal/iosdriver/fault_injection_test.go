@@ -285,9 +285,6 @@ var wireCallMethodCases = []struct {
 	{"SetOrientation", func(ctx context.Context, d driver.Driver) error {
 		return d.SetOrientation(ctx, driver.OrientationLandscapeLeft)
 	}},
-	{"SetLocation", func(ctx context.Context, d driver.Driver) error {
-		return d.SetLocation(ctx, driver.Location{Latitude: 1, Longitude: 2})
-	}},
 	{"StopApp", func(ctx context.Context, d driver.Driver) error {
 		return d.StopApp(ctx, "dev.atomyx.faultinjection")
 	}},
@@ -427,6 +424,7 @@ var boundaryTranslationSkipped = map[string]string{
 	"ClearAppData":   "issues a host subprocess call through process.Runner (xcrun), not the TCP transport this boundary classifies",
 	"IsAppInstalled": "issues a host subprocess call through process.Runner (xcrun), not the TCP transport this boundary classifies",
 	"SetPermissions": "issues a host subprocess call through process.Runner (xcrun), not the TCP transport this boundary classifies",
+	"SetLocation":    "issues a host subprocess call through process.Runner (xcrun), not the TCP transport this boundary classifies",
 }
 
 // TestIosDriver_BoundaryTranslation_CoversEveryDriverMethod proves
