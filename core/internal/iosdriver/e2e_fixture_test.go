@@ -126,12 +126,12 @@ func freeLocalPort() int {
 // relaunch outside the driver leaves the runner tracking a stale app.
 func simulatorDemoHooks(t *testing.T, udid string) drivertest.Hooks {
 	t.Helper()
-	app := os.Getenv("ATOMYX_IOS_INSTALL_APP")
 	appID := os.Getenv("ATOMYX_IOS_INSTALL_APP_ID")
-	if app == "" || appID == "" {
+	if os.Getenv("ATOMYX_IOS_INSTALL_APP") == "" || appID == "" {
 		drivertest.SkipBecause(t, drivertest.SkipRequiredEnvUnset,
 			"set ATOMYX_IOS_INSTALL_APP (the built Runner.app path) and ATOMYX_IOS_INSTALL_APP_ID (its bundle id)")
 	}
+	app := drivertest.RequireInstallSource(t, "ATOMYX_IOS_INSTALL_APP", drivertest.InstallSourceAppBundle)
 	if _, err := runSimctl(t, "install", udid, app); err != nil {
 		t.Fatalf("install the demo app on the simulator: %v", err)
 	}

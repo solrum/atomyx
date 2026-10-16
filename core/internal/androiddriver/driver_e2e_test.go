@@ -32,9 +32,11 @@ const androidE2EControlPort = 8765
 //
 // The demo app "dev.atomyx.demo" must be installed and serves as the
 // launchable and clearable app. ATOMYX_ANDROID_INSTALL_APK (an APK
-// path) together with ATOMYX_ANDROID_INSTALL_APP_ID (that APK's package
-// name) enable the install roundtrip, which removes the package first
-// when it is already installed.
+// path, absolute or relative to the repository root) together with
+// ATOMYX_ANDROID_INSTALL_APP_ID (that APK's package name) enable the
+// install roundtrip, which removes the package first when it is already
+// installed. A path that does not name a file fails the test before the
+// device is touched.
 //
 // Each driver the suite builds gets its own adb forward on a host port
 // the test picked, so the fault hooks only ever touch resources this
@@ -52,7 +54,7 @@ func TestAndroidDriver_E2E(t *testing.T) {
 
 	fx := &androidE2EFixture{serial: serial}
 	t.Cleanup(fx.removeCreatedForwards)
-	drivertest.Run(t, fx.newDriver, fx.hooks())
+	drivertest.Run(t, fx.newDriver, fx.hooks(t))
 }
 
 const (
@@ -113,7 +115,8 @@ func (f *androidE2EFixture) current() *androidE2EInstance {
 	return f.instances[len(f.instances)-1]
 }
 
-func (f *androidE2EFixture) hooks() drivertest.Hooks {
+func (f *androidE2EFixture) hooks(t *testing.T) drivertest.Hooks {
+	t.Helper()
 	hooks := drivertest.Hooks{
 		LaunchableAppID: androidE2EDemoAppID,
 		ClearableAppID:  androidE2EDemoAppID,
@@ -125,9 +128,9 @@ func (f *androidE2EFixture) hooks() drivertest.Hooks {
 		},
 		FocusInput: f.focusInput,
 	}
-	apk := os.Getenv("ATOMYX_ANDROID_INSTALL_APK")
 	appID := os.Getenv("ATOMYX_ANDROID_INSTALL_APP_ID")
-	if apk != "" && appID != "" {
+	if os.Getenv("ATOMYX_ANDROID_INSTALL_APK") != "" && appID != "" {
+		apk := drivertest.RequireInstallSource(t, "ATOMYX_ANDROID_INSTALL_APK", drivertest.InstallSourceFile)
 		hooks.Install = &drivertest.InstallFixture{Source: apk, AppID: appID}
 	}
 	return hooks

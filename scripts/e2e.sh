@@ -27,11 +27,13 @@ usage() {
   echo "           also requires ATOMYX_IOS_INSTALL_APP (the built demo Runner.app path) and" >&2
   echo "           ATOMYX_IOS_INSTALL_APP_ID (its bundle id, dev.atomyx.demo), which the leg" >&2
   echo "           installs and uses as the launchable, install, and clearable fixture" >&2
+  echo "           the path is absolute or relative to the repository root and must be a .app directory" >&2
   echo "           example: examples/atomyx-demo/build/ios-sim/Build/Products/Debug-iphonesimulator/Runner.app" >&2
   echo "           (make demo-ios-sim)" >&2
   echo "  android  requires ATOMYX_ANDROID_SERIAL and the installed dev.atomyx.demo app" >&2
   echo "           optional: ATOMYX_ANDROID_INSTALL_APK and ATOMYX_ANDROID_INSTALL_APP_ID" >&2
   echo "           (APK path and its package name) enable the install roundtrip case" >&2
+  echo "           a relative path resolves against the repository root, and a missing file fails the case before the device is touched" >&2
   echo "           the app may already be installed and is restored after the case" >&2
   echo "           example: examples/atomyx-demo/build/app/outputs/flutter-apk/app-debug.apk" >&2
   echo "           with app id dev.atomyx.demo (flutter build apk --debug in examples/atomyx-demo)" >&2

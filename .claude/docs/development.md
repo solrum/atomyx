@@ -331,7 +331,11 @@ uninstall roundtrip needs `ATOMYX_ANDROID_INSTALL_APK` (path to an APK)
 and `ATOMYX_ANDROID_INSTALL_APP_ID` (that APK's package name). The
 fixture app may already be installed on the device. The case removes it,
 installs it, removes it again, and reinstalls it from the APK afterward,
-so the device ends as it started. The demo app works as the fixture: build
+so the device ends as it started. Both fixture paths (`ATOMYX_ANDROID_INSTALL_APK`
+and `ATOMYX_IOS_INSTALL_APP`) may be absolute or relative to the repository
+root. The test validates them before it touches the device, requiring an
+existing file for the APK and an existing `.app` directory for iOS, and fails
+with a message naming the variable otherwise. The demo app works as the fixture: build
 it with `make demo-android` from the repo root, set the APK to
 `examples/atomyx-demo/build/app/outputs/flutter-apk/app-debug.apk`, and
 set the app id to `dev.atomyx.demo`. `make demo-ios-sim` and
