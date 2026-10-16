@@ -70,8 +70,8 @@ protocol InterfaceOrientationSource: AnyObject {
 /// Holds the last known device orientation so a gesture never has to ask
 /// the system for it. The first read of `XCUIDevice.orientation` takes
 /// several seconds, which is longer than a gesture call may wait, so the
-/// value is seeded once on a background queue at startup and updated by
-/// every orientation change the runner makes.
+/// value is seeded once at startup and updated by every orientation change
+/// the runner makes.
 ///
 /// Safe to call from any thread. An orientation change made outside the
 /// runner, such as turning a physical device by hand, is not observed
@@ -105,10 +105,12 @@ final class DeviceOrientationTracker: InterfaceOrientationSource {
         known = true
     }
 
-    /// Reads the device orientation on a background queue and seeds the
-    /// tracker with it.
+    /// Reads the device orientation on the main queue and seeds the tracker
+    /// with it. XCUIAutomation requires the read to happen on the main
+    /// thread. The call returns immediately, and the read runs once the
+    /// main run loop is serving.
     func seed(
-        on queue: DispatchQueue = DispatchQueue.global(qos: .utility),
+        on queue: DispatchQueue = DispatchQueue.main,
         read: @escaping () -> Int
     ) {
         queue.async { [weak self] in

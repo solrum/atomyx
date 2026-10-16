@@ -67,6 +67,26 @@ final class DeviceOrientationTests: XCTestCase {
         }
     }
 
+    func testSeedReadsTheOrientationOnTheMainThread() {
+        let tracker = DeviceOrientationTracker()
+        let done = expectation(description: "seed read")
+        let lock = NSLock()
+        var readOnMain: Bool?
+        DispatchQueue.global(qos: .utility).async {
+            tracker.seed {
+                lock.lock()
+                readOnMain = Thread.isMainThread
+                lock.unlock()
+                done.fulfill()
+                return 4
+            }
+        }
+        wait(for: [done], timeout: 5)
+        lock.lock()
+        defer { lock.unlock() }
+        XCTAssertEqual(readOnMain, true)
+    }
+
     func testSeedSetsTheCodeWhenNothingWasRecorded() {
         let tracker = DeviceOrientationTracker()
         tracker.seedIfUnknown(deviceOrientationRaw: 4)
