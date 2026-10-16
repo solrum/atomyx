@@ -2,6 +2,7 @@ package driver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -81,20 +82,30 @@ func SizeMatchesOrientation(o Orientation, size wire.Size) bool {
 
 // AwaitOrientation reads the screen size through readSize until it
 // matches o, and fails with diag.CodeOrientationNotSet when it does not
-// within OrientationSettleTimeoutMs. A read error ends the wait and is
-// returned unchanged. The size is read at least once, so a screen that
-// already matches returns without sleeping.
+// within OrientationSettleTimeoutMs. The size is read at least once, so
+// a screen that already matches returns without sleeping.
+//
+// A read error whose code marks the agent as momentarily out of reach
+// does not end the wait. When the deadline passes without a matching
+// size, the last read error is returned if the final attempt failed,
+// and the orientation error otherwise. Any other read error, including
+// a context cancellation, is returned immediately.
 func AwaitOrientation(ctx context.Context, clk clock.Clock, o Orientation, readSize func(context.Context) (wire.Size, error)) error {
 	deadline := clk.NowMs() + OrientationSettleTimeoutMs
+	var lastErr error
 	for {
 		size, err := readSize(ctx)
-		if err != nil {
+		if err != nil && !isTransientAgentError(err) {
 			return err
 		}
-		if SizeMatchesOrientation(o, size) {
+		lastErr = err
+		if err == nil && SizeMatchesOrientation(o, size) {
 			return nil
 		}
 		if clk.NowMs() >= deadline {
+			if lastErr != nil {
+				return lastErr
+			}
 			return diag.NewOrientationNotSet(fmt.Sprintf(
 				"the screen did not become %s within %d seconds", o, OrientationSettleTimeoutMs/1000), nil)
 		}
@@ -102,4 +113,25 @@ func AwaitOrientation(ctx context.Context, clk clock.Clock, o Orientation, readS
 			return err
 		}
 	}
+}
+
+// isTransientAgentError reports whether err describes an agent that may
+// answer again shortly. While the foreground activity is recreated for
+// a rotation, the agent can drop a connection, answer malformed, or
+// report that it cannot read the screen yet, which surface as
+// diag.CodeAgentUnreachable, diag.CodeAgentCommunicationFailed, and
+// diag.CodeAgentNotReady. Every other error is permanent for this wait:
+// an invalid argument, a rejected request, a missing device, and an
+// uncoded error will not change by polling, and a context error means
+// the caller stopped waiting.
+func isTransientAgentError(err error) bool {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	code, _, _ := diag.Describe(err)
+	switch code {
+	case diag.CodeAgentUnreachable, diag.CodeAgentCommunicationFailed, diag.CodeAgentNotReady:
+		return true
+	}
+	return false
 }

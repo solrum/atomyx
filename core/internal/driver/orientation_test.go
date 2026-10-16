@@ -124,13 +124,96 @@ func TestAwaitOrientation_FailsWithOrientationNotSetAtTheBound(t *testing.T) {
 	}
 }
 
-func TestAwaitOrientation_ReturnsAReadErrorUnchanged(t *testing.T) {
-	want := errors.New("device gone")
-	err := AwaitOrientation(context.Background(), clock.NewFakeClock(0), OrientationPortrait, func(context.Context) (wire.Size, error) {
+func transientReadError() error {
+	return diag.New(diag.CodeAgentCommunicationFailed, "could not complete the request", "", errors.New("eof"))
+}
+
+func TestAwaitOrientation_KeepsWaitingThroughTransientReadErrors(t *testing.T) {
+	clk := clock.NewFakeClock(0)
+	reads := 0
+	err := AwaitOrientation(context.Background(), clk, OrientationLandscapeLeft, func(context.Context) (wire.Size, error) {
+		reads++
+		if reads < 3 {
+			return wire.Size{}, transientReadError()
+		}
+		return wire.Size{Width: 800, Height: 400}, nil
+	})
+	if err != nil {
+		t.Fatalf("AwaitOrientation = %v, want nil", err)
+	}
+	if reads != 3 {
+		t.Fatalf("reads = %d, want 3", reads)
+	}
+}
+
+func TestAwaitOrientation_ReturnsTheLastTransientErrorAtTheBound(t *testing.T) {
+	clk := clock.NewFakeClock(0)
+	want := transientReadError()
+	err := AwaitOrientation(context.Background(), clk, OrientationLandscapeLeft, func(context.Context) (wire.Size, error) {
 		return wire.Size{}, want
 	})
 	if !errors.Is(err, want) {
 		t.Fatalf("AwaitOrientation = %v, want %v", err, want)
+	}
+	if clk.NowMs() < OrientationSettleTimeoutMs {
+		t.Fatalf("gave up after %dms, before the %dms bound", clk.NowMs(), OrientationSettleTimeoutMs)
+	}
+}
+
+func TestAwaitOrientation_ReturnsOrientationNotSetWhenTheLastReadSucceeded(t *testing.T) {
+	clk := clock.NewFakeClock(0)
+	reads := 0
+	err := AwaitOrientation(context.Background(), clk, OrientationLandscapeLeft, func(context.Context) (wire.Size, error) {
+		reads++
+		if reads == 1 {
+			return wire.Size{}, transientReadError()
+		}
+		return wire.Size{Width: 400, Height: 800}, nil
+	})
+	if code, _, _ := diag.Describe(err); code != diag.CodeOrientationNotSet {
+		t.Fatalf("code = %q, want %q", code, diag.CodeOrientationNotSet)
+	}
+}
+
+func TestAwaitOrientation_FailsFastOnAPermanentReadError(t *testing.T) {
+	for name, want := range map[string]error{
+		"invalid argument": diag.New(diag.CodeInvalidArgument, "bad", "", nil),
+		"device not found": diag.New(diag.CodeDeviceNotFound, "gone", "", nil),
+		"uncoded":          errors.New("device gone"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			clk := clock.NewFakeClock(0)
+			reads := 0
+			err := AwaitOrientation(context.Background(), clk, OrientationPortrait, func(context.Context) (wire.Size, error) {
+				reads++
+				return wire.Size{}, want
+			})
+			if !errors.Is(err, want) {
+				t.Fatalf("AwaitOrientation = %v, want %v", err, want)
+			}
+			if reads != 1 || clk.NowMs() != 0 {
+				t.Fatalf("reads = %d, elapsed = %dms, want one read and no sleep", reads, clk.NowMs())
+			}
+		})
+	}
+}
+
+func TestAwaitOrientation_ReturnsPromptlyWhenCancelledDuringTransientErrors(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	clk := clock.NewFakeClock(0)
+	reads := 0
+	err := AwaitOrientation(ctx, clk, OrientationLandscapeLeft, func(context.Context) (wire.Size, error) {
+		reads++
+		if reads == 2 {
+			cancel()
+		}
+		return wire.Size{}, transientReadError()
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("AwaitOrientation = %v, want context.Canceled", err)
+	}
+	if reads != 2 {
+		t.Fatalf("reads = %d, want 2", reads)
 	}
 }
 
