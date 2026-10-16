@@ -6,6 +6,9 @@ description: |
   wait, and assertion paths of the demo app. Platform neutral, so the
   same file runs on Android and iOS. Meant to be repeated many times by
   scripts/soak.sh to measure how often the infrastructure fails.
+  Permission and location steps are left out on purpose, because a
+  physical Android device cannot do them and a script step cannot be
+  conditioned on the platform.
 tags:
   - soak
 env:
@@ -71,13 +74,42 @@ preconditions:
 - assertVisible:
     id: "gesture-longpress-count"
     timeout: 5000
-- swipe: up
-- swipe: down
+- repeat:
+    times: 2
+    commands:
+      - swipe: up
+      - swipe: down
 - assertVisible:
     id: "gesture-tap-target"
+
+# A tap in landscape proves gestures and the hierarchy agree on the
+# rotated screen. The device is turned back before the flow goes on.
+- setOrientation: landscapeLeft
+- waitFor:
+    id: "gesture-tap-target"
+    timeout: 10000
+- tap:
+    id: "gesture-tap-target"
+- assertVisible:
+    text:
+      regex: "^Tap count: [1-9]"
+    timeout: 5000
+- setOrientation: portrait
+- waitFor:
+    id: "gesture-tap-target"
+    timeout: 10000
 - back
 - waitFor:
     text: "Dashboard"
     timeout: 10000
+
+# The link lands on the sign-in screen, which the next run starts from.
+- retry:
+    maxRetries: 1
+    commands:
+      - openLink: atomyxdemo://open/login
+      - waitFor:
+          text: "Sign in"
+          timeout: 10000
 
 - pressKey: home
