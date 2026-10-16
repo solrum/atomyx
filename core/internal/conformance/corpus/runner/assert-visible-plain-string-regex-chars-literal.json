@@ -1,0 +1,18 @@
+{
+  "name": "assert-visible-plain-string-regex-chars-literal",
+  "description": "assertVisible with a plain string holding regex metacharacters matches literally and so fails against a value the regex would match",
+  "yaml": "appId: com.test\nname: assert-visible-plain-string-regex-chars-literal\nenv: {}\n---\n- launchApp\n- assertVisible: \"a.c\"\n",
+  "driver": {
+    "hierarchies": [
+      {
+        "attributes": {},
+        "children": [
+          {
+            "attributes": { "text": "abc", "label": "abc", "bounds": "0,0,10,10" },
+            "children": []
+          }
+        ]
+      }
+    ]
+  }
+}

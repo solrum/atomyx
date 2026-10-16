@@ -991,28 +991,39 @@ func toScriptSelector(v script.StringOrSelector) script.ScriptSelector {
 }
 
 // compileScriptSelector converts a script-level selector into the
-// Selector shape Orchestra understands. Script selectors are
-// intentionally simpler than MCP selectors (no regex), so this
-// conversion is a direct field mapping.
+// Selector shape Orchestra understands. A field authored as
+// {regex, flags} becomes a regex pattern and any other string stays an
+// exact literal. Script selectors carry no value, enabled, clickable
+// or focused constraint, so the rest is a direct field mapping.
 func compileScriptSelector(sel script.ScriptSelector) orchestra.Selector {
-	out := orchestra.Selector{Role: sel.Role, Nth: sel.Nth}
-	if sel.ID != nil {
-		p := orchestra.LiteralPattern(*sel.ID)
-		out.ID = &p
+	return orchestra.Selector{
+		ID:    selectorPattern(sel.ID, sel.IDRegex),
+		Text:  selectorPattern(sel.Text, sel.TextRegex),
+		Label: selectorPattern(sel.Label, sel.LabelRegex),
+		Hint:  selectorPattern(sel.Hint, sel.HintRegex),
+		Role:  sel.Role,
+		Nth:   sel.Nth,
 	}
-	if sel.Text != nil {
-		p := orchestra.LiteralPattern(*sel.Text)
-		out.Text = &p
+}
+
+// selectorPattern maps one script selector field to an Orchestra
+// pattern, preferring the regex form when both are present. Parsing
+// and validation reject a regex that does not compile, so the compile
+// failure here only guards a hand-built selector, and it falls back to
+// matching the source literally instead of dropping the constraint.
+func selectorPattern(literal *string, regex *script.RegexPattern) *orchestra.Pattern {
+	if regex != nil {
+		p, err := regex.Compile()
+		if err != nil {
+			p = orchestra.LiteralPattern(regex.Regex)
+		}
+		return &p
 	}
-	if sel.Label != nil {
-		p := orchestra.LiteralPattern(*sel.Label)
-		out.Label = &p
+	if literal != nil {
+		p := orchestra.LiteralPattern(*literal)
+		return &p
 	}
-	if sel.Hint != nil {
-		p := orchestra.LiteralPattern(*sel.Hint)
-		out.Hint = &p
-	}
-	return out
+	return nil
 }
 
 // evaluateCheck reports whether check currently holds against the

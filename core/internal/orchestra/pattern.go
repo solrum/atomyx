@@ -206,3 +206,17 @@ func (p Pattern) Literal() (string, bool) {
 	}
 	return p.literal, true
 }
+
+// NewRegexPattern compiles a JavaScript-syntax regular expression
+// source and flag string into a regex Pattern, applying the same
+// translation, flag set, and unsupported-construct rejection the JSON
+// {"regex", "flags"} form goes through. It returns the compile error
+// unchanged so a caller can report it at the point the pattern is
+// authored.
+func NewRegexPattern(source, flags string) (Pattern, error) {
+	re, err := compileJSRegex(source, flags)
+	if err != nil {
+		return Pattern{}, err
+	}
+	return RegexPattern(re), nil
+}

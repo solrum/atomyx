@@ -149,15 +149,32 @@ func scriptDefinitionSchema() map[string]any {
 func scriptSelectorSchema() map[string]any {
 	return objectSchema(
 		map[string]any{
-			"text":  stringSchema("Match element by its visible text."),
-			"id":    stringSchema("Match element by its stable resource id or accessibility id."),
-			"label": stringSchema("Match element by its accessibility label."),
-			"hint":  stringSchema("Match element by its input hint or placeholder."),
+			"text":  patternFieldSchema("Match element by its visible text."),
+			"id":    patternFieldSchema("Match element by its stable resource id or accessibility id."),
+			"label": patternFieldSchema("Match element by its accessibility label."),
+			"hint":  patternFieldSchema("Match element by its input hint or placeholder."),
 			"role":  stringSchema("Constrain the match to a semantic role, for example 'button'."),
 			"nth":   integerMin(0, "When multiple elements match, pick the nth one (0-indexed)."),
 		},
 		nil,
 		"Element selector. Every field is optional, but at least one should be set for the selector to be useful.",
+	)
+}
+
+// patternFieldSchema describes a selector content field: an exact
+// string, or a {regex, flags} object for a regular expression match.
+func patternFieldSchema(description string) map[string]any {
+	return anyOfSchema(
+		description+" A plain string matches exactly. A {regex, flags} object matches by regular expression, unanchored unless the source starts with ^ and ends with $.",
+		stringSchema(""),
+		objectSchema(
+			map[string]any{
+				"regex": stringSchema("JavaScript-syntax regular expression source. Lookahead, lookbehind and backreferences are not supported."),
+				"flags": stringSchema("Optional flags from i, m, s, g, y, u, d."),
+			},
+			[]string{"regex"},
+			"Regular expression pattern.",
+		),
 	)
 }
 

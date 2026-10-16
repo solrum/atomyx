@@ -1,0 +1,18 @@
+{
+  "name": "assert-visible-regex-prefix-success",
+  "description": "assertVisible with a start-anchored regex matches a value that starts with the pattern",
+  "yaml": "appId: com.test\nname: assert-visible-regex-prefix-success\nenv: {}\n---\n- launchApp\n- assertVisible:\n    text: { regex: \"^Ready\" }\n",
+  "driver": {
+    "hierarchies": [
+      {
+        "attributes": {},
+        "children": [
+          {
+            "attributes": { "text": "Ready now", "label": "Ready now", "bounds": "0,0,10,10" },
+            "children": []
+          }
+        ]
+      }
+    ]
+  }
+}

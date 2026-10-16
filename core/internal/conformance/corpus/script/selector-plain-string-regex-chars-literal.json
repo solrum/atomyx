@@ -1,0 +1,5 @@
+{
+  "name": "selector-plain-string-regex-chars-literal",
+  "description": "a plain string holding regex metacharacters stays an exact literal.",
+  "yaml": "- tap: \"Price (USD) [1.5]+\"\n"
+}

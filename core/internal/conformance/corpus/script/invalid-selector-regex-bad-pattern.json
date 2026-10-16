@@ -1,0 +1,5 @@
+{
+  "name": "invalid-selector-regex-bad-pattern",
+  "description": "a regex selector field that does not compile must be REJECTED at parse time.",
+  "yaml": "- tap:\n    text: { regex: \"([a-z\" }\n"
+}

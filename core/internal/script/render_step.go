@@ -119,6 +119,9 @@ func bareText(sel ScriptSelector) (string, bool) {
 	if sel.Text == nil || sel.ID != nil || sel.Hint != nil || sel.Role != nil || sel.Nth != nil {
 		return "", false
 	}
+	if sel.TextRegex != nil || sel.IDRegex != nil || sel.LabelRegex != nil || sel.HintRegex != nil {
+		return "", false
+	}
 	if sel.Label != nil && *sel.Label != *sel.Text {
 		return "", false
 	}
@@ -126,26 +129,42 @@ func bareText(sel ScriptSelector) (string, bool) {
 }
 
 func selectorMapping(sel ScriptSelector) (*yaml.Node, error) {
-	if sel.ID == nil && sel.Text == nil && sel.Label == nil && sel.Hint == nil && sel.Role == nil {
+	hasContent := sel.ID != nil || sel.Text != nil || sel.Label != nil || sel.Hint != nil ||
+		sel.IDRegex != nil || sel.TextRegex != nil || sel.LabelRegex != nil || sel.HintRegex != nil
+	if !hasContent && sel.Role == nil {
 		return nil, ErrEmptySelector
 	}
 	m := &yaml.Node{Kind: yaml.MappingNode}
-	add := func(key string, value *string) {
-		if value != nil {
+	add := func(key string, value *string, regex *RegexPattern) {
+		switch {
+		case regex != nil:
+			m.Content = append(m.Content, str(key), regexNode(*regex))
+		case value != nil:
 			m.Content = append(m.Content, str(key), str(*value))
 		}
 	}
-	add("id", sel.ID)
-	add("text", sel.Text)
-	if sel.Label != nil && (sel.Text == nil || *sel.Label != *sel.Text) {
-		add("label", sel.Label)
+	add("id", sel.ID, sel.IDRegex)
+	add("text", sel.Text, sel.TextRegex)
+	mirrored := sel.Label != nil && sel.Text != nil && *sel.Label == *sel.Text ||
+		sel.LabelRegex != nil && sel.TextRegex != nil && *sel.LabelRegex == *sel.TextRegex
+	if !mirrored {
+		add("label", sel.Label, sel.LabelRegex)
 	}
-	add("hint", sel.Hint)
-	add("role", sel.Role)
+	add("hint", sel.Hint, sel.HintRegex)
+	add("role", sel.Role, nil)
 	if sel.Nth != nil {
 		m.Content = append(m.Content, str("nth"), integer(*sel.Nth))
 	}
 	return m, nil
+}
+
+// regexNode renders a regex pattern as the {regex, flags} mapping,
+// omitting flags when none are set.
+func regexNode(p RegexPattern) *yaml.Node {
+	if p.Flags == "" {
+		return mapping("regex", str(p.Regex))
+	}
+	return mapping("regex", str(p.Regex), "flags", str(p.Flags))
 }
 
 func mapping(pairs ...any) *yaml.Node {

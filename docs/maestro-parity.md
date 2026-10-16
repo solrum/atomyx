@@ -26,7 +26,7 @@ A Maestro flow that uses only present commands runs as is after a syntax change.
 | `launchApp` | `launchApp` | Partial | The step takes no parameters. Launch mode and data clearing come from the project launch policy. |
 | `launchApp` with arguments | None | Missing | The driver port carries arguments, but neither real adapter delivers them. |
 | `launchApp` with permissions | None | Missing | Needs a permission capability on the driver. |
-| `tapOn` | `tap` | Present | Selector fields are literal strings. |
+| `tapOn` | `tap` | Present | Selector fields are literal strings, or `{regex, flags}` for a pattern. |
 | `inputText` | `type` | Present | Clears the field first by default and interpolates `${var}`. |
 | `assertVisible` | `assertVisible` | Present | Accepts `timeout` to poll. |
 | `assertNotVisible` | `assertNotVisible` | Present | Accepts `timeout` to wait for disappearance. |
@@ -46,7 +46,7 @@ A Maestro flow that uses only present commands runs as is after a syntax change.
 | --- | --- | --- | --- |
 | `repeat` with `times` or `while` | None | Missing | The runner already nests step lists, so a block step can reuse that. |
 | `retry` | None | Missing | Retries exist only per suite entry. |
-| Regex in selectors | None in YAML | Partial | The MCP selector and the engine accept a regex. YAML selectors are literal only. |
+| Regex in selectors | `text`, `id`, `label` and `hint` as `{regex, flags}` | Present | A plain string stays an exact match. A regex match is unanchored, so write `^` and `$` to match a whole value. |
 
 ## App and device state
 

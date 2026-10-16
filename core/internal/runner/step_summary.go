@@ -198,12 +198,20 @@ func (b *tokenBuilder) build() StepSummary {
 // happens to be set.
 func selectorFieldNameAndValue(sel *script.ScriptSelector) (field string, value string, ok bool) {
 	switch {
+	case sel.IDRegex != nil:
+		return "id", sel.IDRegex.Regex, true
 	case sel.ID != nil:
 		return "id", *sel.ID, true
+	case sel.TextRegex != nil:
+		return "text", sel.TextRegex.Regex, true
 	case sel.Text != nil:
 		return "text", *sel.Text, true
+	case sel.LabelRegex != nil:
+		return "label", sel.LabelRegex.Regex, true
 	case sel.Label != nil:
 		return "label", *sel.Label, true
+	case sel.HintRegex != nil:
+		return "hint", sel.HintRegex.Regex, true
 	case sel.Hint != nil:
 		return "hint", *sel.Hint, true
 	case sel.Role != nil:

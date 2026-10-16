@@ -247,11 +247,35 @@ command that takes a selector (`tap`, `waitFor`, `assertVisible`,
 `assertNotVisible`, `assertExists`, `read`, and pointer targets)
 accepts the same shorthand and field set.
 
-Every selector field matches by exact string equality: the element's
-entire attribute value must equal the field's value exactly, with
-matching case and no trimming of surrounding or embedded whitespace.
-There is no substring or partial match, and a YAML selector has no
-regex field.
+A string selector field matches by exact string equality: the
+element's entire attribute value must equal the field's value exactly,
+with matching case and no trimming of surrounding or embedded
+whitespace. A string that contains regex characters, such as
+`Price (USD)`, stays a literal.
+
+The `text`, `id`, `label` and `hint` fields also accept a
+`{regex, flags}` object, the same shape the MCP selector takes, for a
+partial, anchored or case-insensitive match:
+
+```yaml
+- tap:
+    text:
+      regex: "^Item [0-9]+$"
+- assertVisible:
+    id: { regex: "^row_", flags: "i" }
+```
+
+- `regex` is a JavaScript-syntax expression, required.
+- `flags` is optional and accepts `i` (case-insensitive), `m`
+  (multiline anchors) and `s` (dot matches newline). `g`, `y`, `u` and
+  `d` are accepted and have no effect.
+- A regex match is an unanchored search, so `Item` also matches
+  "Item 42 extra". Write `^` and `$` to require a whole-value match.
+- Lookahead, lookbehind and backreferences are not supported.
+- An invalid expression, an unknown flag, or an unknown key in the
+  object is rejected when the script is parsed.
+- A regex `text` is mirrored onto `label` just like a string `text`.
+- A regex field is never split into newline segments.
 
 Segment rule: Flutter Semantics often merges a visible title and a
 subtitle into one label, so an element showing "Products" with a

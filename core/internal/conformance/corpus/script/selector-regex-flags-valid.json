@@ -1,0 +1,5 @@
+{
+  "name": "selector-regex-flags-valid",
+  "description": "a regex selector field accepts the flags the MCP selector accepts.",
+  "yaml": "- launchApp\n- assertVisible:\n    id: { regex: \"^row_\", flags: \"i\" }\n    timeout: 500\n"
+}

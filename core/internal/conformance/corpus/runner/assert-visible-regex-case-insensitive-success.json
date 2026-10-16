@@ -1,0 +1,18 @@
+{
+  "name": "assert-visible-regex-case-insensitive-success",
+  "description": "assertVisible with the i flag matches a value that differs only by case",
+  "yaml": "appId: com.test\nname: assert-visible-regex-case-insensitive-success\nenv: {}\n---\n- launchApp\n- assertVisible:\n    text: { regex: \"^ready$\", flags: \"i\" }\n",
+  "driver": {
+    "hierarchies": [
+      {
+        "attributes": {},
+        "children": [
+          {
+            "attributes": { "text": "READY", "label": "READY", "bounds": "0,0,10,10" },
+            "children": []
+          }
+        ]
+      }
+    ]
+  }
+}

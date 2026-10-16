@@ -1,0 +1,5 @@
+{
+  "name": "invalid-selector-regex-missing-regex",
+  "description": "a pattern object without a regex field must be REJECTED.",
+  "yaml": "- tap:\n    text: { flags: \"i\" }\n"
+}

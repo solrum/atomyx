@@ -1,0 +1,25 @@
+{
+  "parsed": {
+    "_stepLines": [
+      5
+    ],
+    "appId": "com.test",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "regex anchored",
+    "steps": [
+      {
+        "command": "tap",
+        "selector": {
+          "label": {
+            "regex": "^Item [0-9]+$"
+          },
+          "text": {
+            "regex": "^Item [0-9]+$"
+          }
+        }
+      }
+    ]
+  },
+  "valid": true
+}

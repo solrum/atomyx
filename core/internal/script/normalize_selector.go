@@ -13,29 +13,21 @@ func selectorFieldsFromMap(m map[string]any) (*ScriptSelector, error) {
 	for k, v := range m {
 		switch k {
 		case "text":
-			s, ok := asString(v)
-			if !ok {
-				return nil, newParseError("selector.text: expected a string")
+			if err := patternField("text", v, &sel.Text, &sel.TextRegex); err != nil {
+				return nil, err
 			}
-			sel.Text = &s
 		case "id":
-			s, ok := asString(v)
-			if !ok {
-				return nil, newParseError("selector.id: expected a string")
+			if err := patternField("id", v, &sel.ID, &sel.IDRegex); err != nil {
+				return nil, err
 			}
-			sel.ID = &s
 		case "label":
-			s, ok := asString(v)
-			if !ok {
-				return nil, newParseError("selector.label: expected a string")
+			if err := patternField("label", v, &sel.Label, &sel.LabelRegex); err != nil {
+				return nil, err
 			}
-			sel.Label = &s
 		case "hint":
-			s, ok := asString(v)
-			if !ok {
-				return nil, newParseError("selector.hint: expected a string")
+			if err := patternField("hint", v, &sel.Hint, &sel.HintRegex); err != nil {
+				return nil, err
 			}
-			sel.Hint = &s
 		case "role":
 			s, ok := asString(v)
 			if !ok {
@@ -55,11 +47,48 @@ func selectorFieldsFromMap(m map[string]any) (*ScriptSelector, error) {
 	return sel, nil
 }
 
+// patternField decodes one content field of a selector mapping: a
+// string sets literal, and a {regex, flags} object sets pattern after
+// compiling it, so an invalid expression or an unknown flag fails at
+// parse time.
+func patternField(name string, v any, literal **string, pattern **RegexPattern) error {
+	if s, ok := asString(v); ok {
+		*literal = &s
+		return nil
+	}
+	m, ok := asMap(v)
+	if !ok {
+		return newParseError("selector.%s: expected a string or a {regex, flags} object", name)
+	}
+	p := RegexPattern{}
+	for k, raw := range m {
+		s, isString := asString(raw)
+		switch {
+		case k == "regex" && isString:
+			p.Regex = s
+		case k == "flags" && isString:
+			p.Flags = s
+		case k == "regex" || k == "flags":
+			return newParseError("selector.%s.%s: expected a string", name, k)
+		default:
+			return newParseError("selector.%s: unknown field %q, expected regex and flags", name, k)
+		}
+	}
+	if _, present := m["regex"]; !present {
+		return newParseError("selector.%s: a pattern object requires a regex field", name)
+	}
+	if _, err := p.Compile(); err != nil {
+		return newParseError("selector.%s: invalid regex %q: %s", name, p.Regex, err.Error())
+	}
+	*pattern = &p
+	return nil
+}
+
 // expandSelectorShorthand expands a YAML selector value into a
 // canonical ScriptSelector: a bare string becomes a visible-content
 // match (text and label both set), and an object passes through
 // field-checked, with label mirrored from text when text is set and
-// label is not.
+// label is not. A regex text is mirrored to label the same way.
 func expandSelectorShorthand(value any) (*ScriptSelector, error) {
 	if s, ok := asString(value); ok {
 		return &ScriptSelector{Text: &s, Label: &s}, nil
@@ -72,8 +101,11 @@ func expandSelectorShorthand(value any) (*ScriptSelector, error) {
 	if err != nil {
 		return nil, err
 	}
-	if sel.Text != nil && sel.Label == nil {
+	if sel.Text != nil && sel.Label == nil && sel.LabelRegex == nil {
 		sel.Label = sel.Text
+	}
+	if sel.TextRegex != nil && sel.Label == nil && sel.LabelRegex == nil {
+		sel.LabelRegex = sel.TextRegex
 	}
 	return sel, nil
 }

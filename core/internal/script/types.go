@@ -1,18 +1,48 @@
 package script
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"dev.atomyx/internal/orchestra"
+)
 
 // ScriptSelector matches an element in the driver's accessibility
 // tree. Every field is optional; leaving all of them unset is legal
 // (priority broadening then has nothing to work with), so callers
 // should carry at least one identifying field.
+//
+// Text, ID, Label and Hint match by exact string equality. Their
+// Regex counterparts match by regular expression instead and are
+// authored as a {regex, flags} object in place of the string. A field
+// and its Regex counterpart are never both set. The JSON form carries
+// either shape under the plain field name, see selector_json.go.
 type ScriptSelector struct {
-	Text  *string `json:"text,omitempty"`
-	ID    *string `json:"id,omitempty"`
-	Label *string `json:"label,omitempty"`
-	Hint  *string `json:"hint,omitempty"`
-	Role  *string `json:"role,omitempty"`
-	Nth   *int    `json:"nth,omitempty"`
+	Text       *string
+	TextRegex  *RegexPattern
+	ID         *string
+	IDRegex    *RegexPattern
+	Label      *string
+	LabelRegex *RegexPattern
+	Hint       *string
+	HintRegex  *RegexPattern
+	Role       *string
+	Nth        *int
+}
+
+// RegexPattern is the authored form of a regular expression selector
+// field: a JavaScript-syntax source and an optional flag string, the
+// same {regex, flags} shape the MCP selector accepts. A match is an
+// unanchored search, so anchor the source with ^ and $ to match a whole
+// value.
+type RegexPattern struct {
+	Regex string `json:"regex"`
+	Flags string `json:"flags,omitempty"`
+}
+
+// Compile builds the matcher for the pattern, applying the same flag
+// set and unsupported-construct rejection the MCP selector applies.
+func (p RegexPattern) Compile() (orchestra.Pattern, error) {
+	return orchestra.NewRegexPattern(p.Regex, p.Flags)
 }
 
 // PointerAnchorValues lists the accepted PointerTarget anchor names.

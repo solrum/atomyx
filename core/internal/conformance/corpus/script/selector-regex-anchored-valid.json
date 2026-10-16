@@ -1,0 +1,5 @@
+{
+  "name": "selector-regex-anchored-valid",
+  "description": "a selector field written as a {regex} object parses to a regex pattern and mirrors text onto label.",
+  "yaml": "appId: com.test\nname: regex anchored\nenv: {}\n---\n- tap:\n    text:\n      regex: \"^Item [0-9]+$\"\n"
+}

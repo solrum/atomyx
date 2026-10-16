@@ -971,16 +971,82 @@
       "description": "Element selector. Every field is optional, but at least one should be set for the selector to be useful.",
       "properties": {
         "hint": {
-          "description": "Match element by its input hint or placeholder.",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Regular expression pattern.",
+              "properties": {
+                "flags": {
+                  "description": "Optional flags from i, m, s, g, y, u, d.",
+                  "type": "string"
+                },
+                "regex": {
+                  "description": "JavaScript-syntax regular expression source. Lookahead, lookbehind and backreferences are not supported.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "regex"
+              ],
+              "type": "object"
+            }
+          ],
+          "description": "Match element by its input hint or placeholder. A plain string matches exactly. A {regex, flags} object matches by regular expression, unanchored unless the source starts with ^ and ends with $."
         },
         "id": {
-          "description": "Match element by its stable resource id or accessibility id.",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Regular expression pattern.",
+              "properties": {
+                "flags": {
+                  "description": "Optional flags from i, m, s, g, y, u, d.",
+                  "type": "string"
+                },
+                "regex": {
+                  "description": "JavaScript-syntax regular expression source. Lookahead, lookbehind and backreferences are not supported.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "regex"
+              ],
+              "type": "object"
+            }
+          ],
+          "description": "Match element by its stable resource id or accessibility id. A plain string matches exactly. A {regex, flags} object matches by regular expression, unanchored unless the source starts with ^ and ends with $."
         },
         "label": {
-          "description": "Match element by its accessibility label.",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Regular expression pattern.",
+              "properties": {
+                "flags": {
+                  "description": "Optional flags from i, m, s, g, y, u, d.",
+                  "type": "string"
+                },
+                "regex": {
+                  "description": "JavaScript-syntax regular expression source. Lookahead, lookbehind and backreferences are not supported.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "regex"
+              ],
+              "type": "object"
+            }
+          ],
+          "description": "Match element by its accessibility label. A plain string matches exactly. A {regex, flags} object matches by regular expression, unanchored unless the source starts with ^ and ends with $."
         },
         "nth": {
           "description": "When multiple elements match, pick the nth one (0-indexed).",
@@ -992,8 +1058,30 @@
           "type": "string"
         },
         "text": {
-          "description": "Match element by its visible text.",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Regular expression pattern.",
+              "properties": {
+                "flags": {
+                  "description": "Optional flags from i, m, s, g, y, u, d.",
+                  "type": "string"
+                },
+                "regex": {
+                  "description": "JavaScript-syntax regular expression source. Lookahead, lookbehind and backreferences are not supported.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "regex"
+              ],
+              "type": "object"
+            }
+          ],
+          "description": "Match element by its visible text. A plain string matches exactly. A {regex, flags} object matches by regular expression, unanchored unless the source starts with ^ and ends with $."
         }
       },
       "type": "object"

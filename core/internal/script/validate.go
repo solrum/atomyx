@@ -63,6 +63,24 @@ func validateSelector(sel *ScriptSelector, path string, report reportFunc) {
 	if sel.Nth != nil && *sel.Nth < 0 {
 		report("%s.nth: must be nonnegative", path)
 	}
+	validatePatternField(path+".text", sel.Text != nil, sel.TextRegex, report)
+	validatePatternField(path+".id", sel.ID != nil, sel.IDRegex, report)
+	validatePatternField(path+".label", sel.Label != nil, sel.LabelRegex, report)
+	validatePatternField(path+".hint", sel.Hint != nil, sel.HintRegex, report)
+}
+
+// validatePatternField reports a selector field that is set as both a
+// literal and a regex, and a regex that does not compile.
+func validatePatternField(path string, hasLiteral bool, pattern *RegexPattern, report reportFunc) {
+	if pattern == nil {
+		return
+	}
+	if hasLiteral {
+		report("%s: set either a string or a {regex, flags} object, not both", path)
+	}
+	if _, err := pattern.Compile(); err != nil {
+		report("%s: invalid regex %q: %s", path, pattern.Regex, err.Error())
+	}
 }
 
 func validateStringOrSelector(v *StringOrSelector, path string, report reportFunc) {

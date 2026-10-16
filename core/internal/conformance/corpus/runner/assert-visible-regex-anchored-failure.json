@@ -1,0 +1,18 @@
+{
+  "name": "assert-visible-regex-anchored-failure",
+  "description": "assertVisible with a fully anchored regex fails when the value has extra text",
+  "yaml": "appId: com.test\nname: assert-visible-regex-anchored-failure\nenv: {}\n---\n- launchApp\n- assertVisible:\n    text: { regex: \"^Ready$\" }\n",
+  "driver": {
+    "hierarchies": [
+      {
+        "attributes": {},
+        "children": [
+          {
+            "attributes": { "text": "Ready now", "label": "Ready now", "bounds": "0,0,10,10" },
+            "children": []
+          }
+        ]
+      }
+    ]
+  }
+}

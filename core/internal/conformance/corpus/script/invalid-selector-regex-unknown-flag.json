@@ -1,0 +1,5 @@
+{
+  "name": "invalid-selector-regex-unknown-flag",
+  "description": "a regex selector field with an unknown flag must be REJECTED at parse time.",
+  "yaml": "- tap:\n    text: { regex: \"abc\", flags: \"z\" }\n"
+}
