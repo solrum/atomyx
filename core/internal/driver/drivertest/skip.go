@@ -53,6 +53,10 @@ const (
 	// SkipNoFocusInput marks a driver wired without a FocusInput hook.
 	SkipNoFocusInput SkipKey = "no-focus-input"
 
+	// SkipNoLaunchArgumentsFixture marks a driver wired without a
+	// LaunchArguments fixture.
+	SkipNoLaunchArgumentsFixture SkipKey = "no-launch-arguments-fixture"
+
 	// SkipNoFailPing marks a driver wired without a FailPing hook.
 	SkipNoFailPing SkipKey = "no-fail-ping"
 

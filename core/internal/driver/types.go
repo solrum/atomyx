@@ -135,9 +135,21 @@ type KeyResult struct {
 }
 
 // LaunchArgs configures Driver.LaunchApp.
+//
+// Arguments is the portable way to pass named values to the app at
+// launch, and every adapter honors it. Args and Environment are
+// process-level inputs that only some platforms can deliver. An
+// adapter that cannot deliver a non-empty Args or Environment rejects
+// the launch with diag.CodeInvalidArgument instead of dropping it.
 type LaunchArgs struct {
 	Args        []string          `json:"args,omitempty"`
 	Environment map[string]string `json:"environment,omitempty"`
+
+	// Arguments maps names to scalar values rendered as strings. They
+	// reach the app only when the launch starts a process, so a launch
+	// that reuses a running instance ignores them. See
+	// ValidateLaunchArguments for the key and value rules.
+	Arguments map[string]string `json:"arguments,omitempty"`
 
 	// NoReset selects the launch strategy as a tri-state: see
 	// Driver.LaunchApp for the meaning of nil, false, and true.

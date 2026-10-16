@@ -152,6 +152,24 @@ type Driver interface {
 	//     is already the foreground app, useful for driving an app
 	//     without losing in-memory state. Falls back to a plain
 	//     launch when bundleID is not currently foreground.
+	//
+	// args.Arguments is delivered to the app as named values that it
+	// can read at startup. A launch that attaches to a running
+	// instance ignores them. An invalid arguments map, or a non-empty
+	// args.Args or args.Environment on an adapter that cannot deliver
+	// them, fails with diag.CodeInvalidArgument before the device is
+	// touched.
+	//
+	// Platform notes (expand this list when adding support):
+	//
+	//   - Android: Arguments become string extras on the launch
+	//     intent. Args and Environment are rejected.
+	//   - iOS: Arguments become launch environment entries and
+	//     "-name value" launch arguments, which the app reads from
+	//     its environment or from its standard user defaults. Args
+	//     are appended to the launch arguments and Environment is
+	//     merged into the launch environment, with Environment
+	//     winning over an Arguments entry of the same name.
 	LaunchApp(ctx context.Context, bundleID string, args LaunchArgs) error
 
 	// StopApp stops bundleID. See CurrentForeground for what the

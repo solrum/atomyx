@@ -59,6 +59,13 @@ func launchArgsFromParams(p map[string]any) driver.LaunchArgs {
 		}
 		args.Environment = env
 	}
+	if raw, ok := p["arguments"].(map[string]any); ok {
+		arguments := make(map[string]string, len(raw))
+		for k, v := range raw {
+			arguments[k] = fmt.Sprint(v)
+		}
+		args.Arguments = arguments
+	}
 	if noReset, ok := p["noReset"].(bool); ok {
 		args.NoReset = &noReset
 	}

@@ -103,7 +103,7 @@ runner never sees a selector: it only receives coordinates and, for
 | `LongPress()` | `longPressAt` | `LongPressAtCommand` | |
 | `Swipe()` | `swipe` | `SwipeCommand` | |
 | `DispatchGesture()` | `dispatchPointer` | `DispatchPointerCommand` | Routes through the active `EventSynthesizer`. Rejects multi-pointer or pressure waypoints host-side first when the runner's capabilities don't support them. |
-| `LaunchApp()` | `launchApp` | `LaunchAppCommand` | Updates `DriverState.currentApp` / `currentBundleId`. |
+| `LaunchApp()` | `launchApp` | `LaunchAppCommand` | Updates `DriverState.currentApp` / `currentBundleId`. Sets `launchArguments` and `launchEnvironment` on the application before it starts. The host sends each launch argument `name: value` as the environment entry `name=value` and as the argument pair `-name value`, which the app reads from its standard user defaults. Explicit environment entries win over an argument of the same name, and explicit arguments follow the derived pairs. |
 | `StopApp()` / `KillApp()` | `forceStopApp` | `ForceStopAppCommand` | Clears the tracked `currentApp` when it matches. |
 | `InputText()` | `typeText` | `TypeTextCommand` | Native `XCUIApplication.typeText`. Requires a focused field. With none, the runner types nothing and replies `success: false`, `reason: no_focused_field`, which the host returns as an `AGENT_REJECTED` error. |
 | `EraseText()` | `clearFocusedInput` | `ClearFocusedInputCommand` | 4-strategy chain, see quirks below. |
@@ -709,7 +709,8 @@ an external termination leaves it in place. The contract per command:
   ever tracked.
 - `launchApp` with `noReset` attaches only to a running tracked app.
   When the tracked app has exited, it launches a fresh instance and
-  replaces the tracked reference.
+  replaces the tracked reference. The attach path never starts the
+  app, so it ignores launch arguments and environment.
 
 **Gesture synthesizer selection is fully automatic, with no runtime
 override.** `EventSynthesizerFactory.make()` picks

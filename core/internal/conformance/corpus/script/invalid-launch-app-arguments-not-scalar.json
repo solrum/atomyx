@@ -1,0 +1,5 @@
+{
+  "name": "invalid-launch-app-arguments-not-scalar",
+  "description": "launchApp with a list as an arguments value must be REJECTED.",
+  "yaml": "- launchApp:\n    arguments:\n      route:\n        - /focus\n"
+}

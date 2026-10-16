@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 
 	"dev.atomyx/internal/orchestra"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -12,13 +13,43 @@ var launchAppInputSchema = jsObject(map[string]any{
 	"appId": jsStringDesc("Cross-platform app identifier (bundle id / package name). " +
 		"Use the string reported by `list_apps`."),
 	"mode": launchModeSchema(),
+	"arguments": map[string]any{
+		"type":                 "object",
+		"additionalProperties": jsAnyOf(jsString(), jsNumber(), jsBoolean()),
+		"description": "Named values handed to the app at launch, each a string, number or boolean " +
+			"delivered as text. The app reads them at startup. They apply only when the launch " +
+			"starts the app, so a launch with `attach` that finds the app running ignores them. " +
+			"A launch that carries arguments is never skipped as a repeat.",
+	},
 }, "appId")
 
 var launchAppSchema = compileToolSchema("launch_app", launchAppInputSchema)
 
 type launchAppArgs struct {
-	AppID string `json:"appId"`
-	Mode  string `json:"mode"`
+	AppID     string         `json:"appId"`
+	Mode      string         `json:"mode"`
+	Arguments map[string]any `json:"arguments"`
+}
+
+// launchArgumentValues renders each validated argument value as the text
+// the app receives. Numbers print without an exponent or a trailing
+// fraction when they are whole.
+func launchArgumentValues(arguments map[string]any) map[string]string {
+	if len(arguments) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(arguments))
+	for name, value := range arguments {
+		switch v := value.(type) {
+		case string:
+			out[name] = v
+		case bool:
+			out[name] = strconv.FormatBool(v)
+		case float64:
+			out[name] = strconv.FormatFloat(v, 'f', -1, 64)
+		}
+	}
+	return out
 }
 
 // launchModeSchema accepts the three launch modes. A caller that omits
@@ -39,7 +70,9 @@ func registerLaunchAppTool(server *mcp.Server, tc *ToolContext) {
 			"operate on its UI. Requires an active device, so call `select_device` " +
 			"first. Use `list_apps` to discover available identifiers. A second " +
 			"default launch of the same app in the same session is skipped, so " +
-			"pass mode `fresh` to force-stop and relaunch it with its data kept.",
+			"pass mode `fresh` to force-stop and relaunch it with its data kept. " +
+			"Pass `arguments` to hand named values to the app at launch, for " +
+			"example to start it on a given screen.",
 		InputSchema: launchAppInputSchema,
 	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		if err := validateToolArguments(launchAppSchema, req.Params.Arguments); err != nil {
@@ -54,7 +87,8 @@ func registerLaunchAppTool(server *mcp.Server, tc *ToolContext) {
 		if err != nil {
 			return errorResult(err), nil
 		}
-		if err := orch.LaunchAppWithMode(ctx, args.AppID, launchModeOf(args.Mode)); err != nil {
+		opts := orchestra.LaunchOptions{Mode: launchModeOf(args.Mode), Arguments: launchArgumentValues(args.Arguments)}
+		if err := orch.LaunchAppWithOptions(ctx, args.AppID, opts); err != nil {
 			return errorResult(err), nil
 		}
 		return jsonToolResult(map[string]any{"ok": true, "appId": args.AppID})

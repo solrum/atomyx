@@ -67,12 +67,14 @@ const RepeatWhileIterationLimit = 50
 // script's appId. ClearState true clears the app's data and then starts
 // it fresh. StopApp true force-stops a running instance before the
 // launch, and StopApp false reuses a running instance. A nil option
-// leaves the run's configured launch policy in effect.
+// leaves the run's configured launch policy in effect. Arguments are
+// named values, rendered as text, that the app reads at startup.
 type LaunchAppStep struct {
 	stepSource
-	Command    string `json:"command"`
-	ClearState *bool  `json:"clearState,omitempty"`
-	StopApp    *bool  `json:"stopApp,omitempty"`
+	Command    string            `json:"command"`
+	ClearState *bool             `json:"clearState,omitempty"`
+	StopApp    *bool             `json:"stopApp,omitempty"`
+	Arguments  map[string]string `json:"arguments,omitempty"`
 }
 
 func (s *LaunchAppStep) StepCommand() string { return s.Command }

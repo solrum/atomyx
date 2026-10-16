@@ -1,0 +1,5 @@
+{
+  "name": "invalid-launch-app-arguments-bad-key",
+  "description": "launchApp with an arguments key that contains an equals sign must be REJECTED.",
+  "yaml": "- launchApp:\n    arguments:\n      \"a=b\": x\n"
+}

@@ -1,0 +1,10 @@
+{
+  "name": "launch-app-arguments",
+  "description": "launchApp with arguments reaches the driver with them, and a repeat launch carrying arguments is not skipped.",
+  "yaml": "appId: com.test\nname: launch arguments\nenv: {}\n---\n- launchApp:\n    arguments:\n      route: /focus\n      retries: 3\n- launchApp:\n    arguments:\n      route: /focus\n      retries: 3\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

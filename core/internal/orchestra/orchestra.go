@@ -579,14 +579,16 @@ func (o *Orchestra) EraseText(ctx context.Context, count int) error {
 // must surface as the next step failing, not as a silent relaunch.
 // Only an explicit fresh launch (args.NoReset false, which force-stops
 // then relaunches) bypasses the dedup, since the caller is asking for
-// a real relaunch regardless of flow history. See ResetLaunchedApps
+// a real relaunch regardless of flow history. A call whose
+// args.Arguments is non-empty also bypasses the dedup, because the
+// values have to reach the app. See ResetLaunchedApps
 // for how this tracking resets between a suite's independent entries.
 func (o *Orchestra) LaunchApp(ctx context.Context, appID string, args driver.LaunchArgs) error {
 	if err := validateAppID(appID); err != nil {
 		return err
 	}
 
-	dedup := args.NoReset == nil || *args.NoReset
+	dedup := (args.NoReset == nil || *args.NoReset) && len(args.Arguments) == 0
 	if dedup && o.claimLaunch(appID) {
 		return nil
 	}

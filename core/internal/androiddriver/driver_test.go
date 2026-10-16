@@ -49,6 +49,7 @@ type fakeTransport struct {
 	lastTypeKb     transport.TypeKeyboardRequest
 	lastPressKey   transport.KeyRequest
 	launchAppCalls []string
+	lastLaunch     transport.LaunchRequest
 
 	calls atomic.Int64
 }
@@ -188,6 +189,7 @@ func (f *fakeTransport) LaunchApp(_ context.Context, req transport.LaunchRequest
 	id := req.PackageName
 	f.foreground = &id
 	f.launchAppCalls = append(f.launchAppCalls, req.PackageName)
+	f.lastLaunch = req
 	f.mu.Unlock()
 	return transport.OkResponse{Ok: true}, nil
 }
@@ -1494,5 +1496,40 @@ func TestAndroidDriver_StopApp_ContextCancelledDuringAdb_ReturnsContextError(t *
 	var stopErr *androiddriver.ForceStopError
 	if errors.As(err, &stopErr) {
 		t.Fatalf("StopApp() error = %v, must not be a ForceStopError", err)
+	}
+}
+
+func TestAndroidDriver_LaunchApp_SendsArgumentsToTheLaunchRoute(t *testing.T) {
+	tr := newFakeTransport()
+	d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{Serial: "S1"})
+	arguments := map[string]string{"route": "/focus"}
+
+	if err := d.LaunchApp(context.Background(), "com.example.app", driver.LaunchArgs{Arguments: arguments}); err != nil {
+		t.Fatalf("LaunchApp() error = %v, want nil", err)
+	}
+	if !reflect.DeepEqual(tr.lastLaunch.Arguments, arguments) {
+		t.Fatalf("launch request arguments = %v, want %v", tr.lastLaunch.Arguments, arguments)
+	}
+}
+
+func TestAndroidDriver_LaunchApp_RejectsInputsAnIntentCannotCarry(t *testing.T) {
+	cases := map[string]driver.LaunchArgs{
+		"args":        {Args: []string{"-x"}},
+		"environment": {Environment: map[string]string{"A": "1"}},
+		"bad key":     {Arguments: map[string]string{"": "1"}},
+	}
+	for name, args := range cases {
+		t.Run(name, func(t *testing.T) {
+			tr := newFakeTransport()
+			d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{Serial: "S1"})
+
+			err := d.LaunchApp(context.Background(), "com.example.app", args)
+			if code, _, _ := diag.Describe(err); code != diag.CodeInvalidArgument {
+				t.Fatalf("LaunchApp() error code = %q (err %v), want %q", code, err, diag.CodeInvalidArgument)
+			}
+			if len(tr.launchAppCalls) != 0 {
+				t.Fatalf("launch route called %v times, want none", tr.launchAppCalls)
+			}
+		})
 	}
 }

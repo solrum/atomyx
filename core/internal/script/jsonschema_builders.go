@@ -123,3 +123,18 @@ func anyOfSchema(description string, schemas ...any) map[string]any {
 func oneOfSchema(description string, schemas ...any) map[string]any {
 	return withDescription(map[string]any{"oneOf": schemas}, description)
 }
+
+// scalarMapSchema is a record keyed by string whose values are strings,
+// numbers or booleans.
+func scalarMapSchema(description string) map[string]any {
+	return withDescription(map[string]any{
+		"type": "object",
+		"additionalProperties": map[string]any{
+			"anyOf": []any{
+				map[string]any{"type": "string"},
+				map[string]any{"type": "number"},
+				map[string]any{"type": "boolean"},
+			},
+		},
+	}, description)
+}

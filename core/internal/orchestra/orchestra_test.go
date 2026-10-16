@@ -721,3 +721,35 @@ func TestOrchestra_SwipeDirection_ComputesCenteredEndpoints(t *testing.T) {
 		t.Fatalf("swiping up must drag from a lower Y to a higher Y up the screen, got from=%+v to=%+v", from, to)
 	}
 }
+
+func TestOrchestra_LaunchApp_LaunchWithArgumentsBypassesDedup(t *testing.T) {
+	d := mock.New()
+	d.Apps = []driver.InstalledApp{{BundleID: "com.example.app"}}
+	o, _ := newTestOrchestra(d)
+	ctx := context.Background()
+
+	if err := o.LaunchApp(ctx, "com.example.app", driver.LaunchArgs{}); err != nil {
+		t.Fatalf("plain LaunchApp returned error: %v", err)
+	}
+	opts := LaunchOptions{Arguments: map[string]string{"route": "/focus"}}
+	if err := o.LaunchAppWithOptions(ctx, "com.example.app", opts); err != nil {
+		t.Fatalf("LaunchAppWithOptions returned error: %v", err)
+	}
+	if got := countLaunchCalls(d, "com.example.app"); got != 2 {
+		t.Fatalf("got %d driver-level launches, want 2 (arguments must reach the app)", got)
+	}
+}
+
+func TestOrchestra_LaunchAppWithOptions_RejectsInvalidArgumentsBeforeTheDevice(t *testing.T) {
+	d := mock.New()
+	d.Apps = []driver.InstalledApp{{BundleID: "com.example.app"}}
+	o, _ := newTestOrchestra(d)
+
+	err := o.LaunchAppWithOptions(context.Background(), "com.example.app", LaunchOptions{Arguments: map[string]string{"a=b": "x"}})
+	if code, _, _ := diag.Describe(err); code != diag.CodeInvalidArgument {
+		t.Fatalf("error code = %q (err %v), want %q", code, err, diag.CodeInvalidArgument)
+	}
+	if got := countLaunchCalls(d, "com.example.app"); got != 0 {
+		t.Fatalf("got %d driver-level launches, want 0", got)
+	}
+}

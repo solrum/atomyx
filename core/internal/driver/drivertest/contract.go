@@ -88,6 +88,11 @@ type Hooks struct {
 	// cases.
 	LaunchableAppID string
 
+	// LaunchArguments describes how to prove that launch arguments
+	// reach LaunchableAppID. A nil value skips the launch arguments
+	// case.
+	LaunchArguments *LaunchArgumentsFixture
+
 	// ClearableAppID is an app id installed on the target whose data
 	// may be wiped. An empty value skips the clear app data case.
 	ClearableAppID string
@@ -171,6 +176,7 @@ func Run(t *testing.T, newDriver Factory, hooks Hooks) {
 	t.Run("launch app lifecycle", func(t *testing.T) { testLaunchAppLifecycle(t, tracked(t, newDriver), hooks) })
 	t.Run("launch app fresh stops then launches", func(t *testing.T) { testLaunchAppFreshStopsThenLaunches(t, tracked(t, newDriver), hooks) })
 	t.Run("launch app attach reuses foreground", func(t *testing.T) { testLaunchAppAttach(t, tracked(t, newDriver), hooks) })
+	t.Run("launch app delivers arguments", func(t *testing.T) { testLaunchAppDeliversArguments(t, tracked(t, newDriver), hooks) })
 	t.Run("clear app data succeeds with a source", func(t *testing.T) { testClearAppDataSucceedsWithSource(t, tracked(t, newDriver), hooks) })
 	t.Run("install uninstall roundtrip", func(t *testing.T) { testInstallUninstallRoundtrip(t, tracked(t, newDriver), hooks) })
 }

@@ -467,6 +467,23 @@
       "additionalProperties": false,
       "description": "Launch (or relaunch) the app declared at the top of the script via `appId`.",
       "properties": {
+        "arguments": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "description": "Named values handed to the app at launch. Each value is a string, number or boolean, delivered as text. They take effect only when the launch starts the app, so a launch that reuses a running instance ignores them.",
+          "type": "object"
+        },
         "clearState": {
           "description": "When true, clear the app's data and start it fresh. Cannot be combined with `stopApp: false`.",
           "type": "boolean"

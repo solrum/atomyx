@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 
 	"dev.atomyx/internal/device"
@@ -138,5 +139,55 @@ func TestLaunchAppRejectsUnknownMode(t *testing.T) {
 	}
 	if len(launchAppDriverCalls(drv)) != 0 {
 		t.Fatal("an invalid mode reached the driver")
+	}
+}
+
+func TestLaunchAppArgumentsReachDriverAndBypassRepeatSkip(t *testing.T) {
+	drv := mockdriver.New()
+	drv.Apps = []driver.InstalledApp{{BundleID: "com.example.app"}}
+	cs, ctx := testServer(t, ServerDeps{
+		Probe:   device.NewStaticProbe(),
+		Factory: singleMockDriverFactory{driver: drv},
+		Storage: storage.NewInMemoryStorage(),
+	})
+	selectMockDevice(t, cs, ctx)
+
+	args := map[string]any{
+		"appId":     "com.example.app",
+		"arguments": map[string]any{"route": "/focus", "retries": 3, "debug": true},
+	}
+	for range 2 {
+		if result, decoded := callTool(t, cs, ctx, "launch_app", args); result.IsError {
+			t.Fatalf("launch_app: %v", decoded)
+		}
+	}
+	calls := launchAppDriverCalls(drv)
+	if len(calls) != 2 {
+		t.Fatalf("driver launches = %d, want 2 (arguments are never skipped as a repeat)", len(calls))
+	}
+	want := map[string]string{"route": "/focus", "retries": "3", "debug": "true"}
+	if !reflect.DeepEqual(calls[0].Arguments, want) {
+		t.Fatalf("driver launch arguments = %v, want %v", calls[0].Arguments, want)
+	}
+}
+
+func TestLaunchAppRejectsNonScalarArguments(t *testing.T) {
+	drv := mockdriver.New()
+	drv.Apps = []driver.InstalledApp{{BundleID: "com.example.app"}}
+	cs, ctx := testServer(t, ServerDeps{
+		Probe:   device.NewStaticProbe(),
+		Factory: singleMockDriverFactory{driver: drv},
+		Storage: storage.NewInMemoryStorage(),
+	})
+	selectMockDevice(t, cs, ctx)
+
+	for _, arguments := range []any{map[string]any{"a": []any{"x"}}, map[string]any{"a": nil}, "route=/focus"} {
+		result, decoded := callTool(t, cs, ctx, "launch_app", map[string]any{"appId": "com.example.app", "arguments": arguments})
+		if !result.IsError || decoded["code"] != diag.CodeInvalidArgument {
+			t.Fatalf("arguments %v: got %v, want INVALID_ARGUMENT", arguments, decoded)
+		}
+	}
+	if len(launchAppDriverCalls(drv)) != 0 {
+		t.Fatal("invalid arguments reached the driver")
 	}
 }

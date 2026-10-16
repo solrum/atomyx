@@ -275,14 +275,15 @@ func TestHTTPClient_LaunchApp_IssuesPostWithPackageName(t *testing.T) {
 	defer server.Close()
 
 	client := newTestHTTPClient(t, server)
-	got, err := client.LaunchApp(context.Background(), LaunchRequest{PackageName: "dev.atomyx.driver.host"})
+	sent := LaunchRequest{PackageName: "dev.atomyx.driver.host", Arguments: map[string]string{"route": "/focus"}}
+	got, err := client.LaunchApp(context.Background(), sent)
 	if err != nil {
 		t.Fatalf("LaunchApp() error = %v", err)
 	}
 	if gotPath != "/actions/launch" {
 		t.Fatalf("request path = %s, want /actions/launch", gotPath)
 	}
-	if wantBody := (LaunchRequest{PackageName: "dev.atomyx.driver.host"}); gotBody != wantBody {
+	if wantBody := sent; !reflect.DeepEqual(gotBody, wantBody) {
 		t.Fatalf("request body = %+v, want %+v", gotBody, wantBody)
 	}
 	if want := (OkResponse{Ok: true}); got != want {

@@ -135,3 +135,42 @@ func boolPtrEqual(a, b *bool) bool {
 	}
 	return *a == *b
 }
+
+func TestParseScript_LaunchAppArguments(t *testing.T) {
+	def := mustParse(t, "- launchApp:\n    arguments:\n      route: /focus\n      retries: 3\n      ratio: 1.5\n      debug: true\n")
+	want := map[string]string{"route": "/focus", "retries": "3", "ratio": "1.5", "debug": "true"}
+	got := def.Steps[0].(*LaunchAppStep).Arguments
+	if len(got) != len(want) {
+		t.Fatalf("arguments = %v, want %v", got, want)
+	}
+	for key, value := range want {
+		if got[key] != value {
+			t.Errorf("arguments[%s] = %q, want %q", key, got[key], value)
+		}
+	}
+}
+
+func TestParseScript_LaunchAppArgumentsRejections(t *testing.T) {
+	cases := []struct {
+		name string
+		yaml string
+		want string
+	}{
+		{name: "not a mapping", yaml: "- launchApp:\n    arguments: route\n", want: "launchApp.arguments: must be a mapping"},
+		{name: "list value", yaml: "- launchApp:\n    arguments:\n      route: [a]\n", want: "launchApp.arguments.route: must be a string, number or boolean"},
+		{name: "null value", yaml: "- launchApp:\n    arguments:\n      route:\n", want: "launchApp.arguments.route: must be a string, number or boolean"},
+		{name: "with attach", yaml: "- launchApp:\n    stopApp: false\n    arguments:\n      route: /x\n", want: "arguments cannot be combined with stopApp: false"},
+		{name: "key with equals", yaml: "- launchApp:\n    arguments:\n      \"a=b\": x\n", want: "must not contain '='"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := ParseScript(tc.yaml, nil)
+			if err == nil {
+				t.Fatalf("ParseScript accepted %q", tc.yaml)
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("error %q does not contain %q", err.Error(), tc.want)
+			}
+		})
+	}
+}

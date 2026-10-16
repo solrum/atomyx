@@ -24,7 +24,7 @@ A Maestro flow that uses only present commands runs as is after a syntax change.
 | Maestro command | Atomyx equivalent | Status | Note |
 | --- | --- | --- | --- |
 | `launchApp` | `launchApp` | Present | Accepts `clearState` and `stopApp: false`. A field left out follows the project launch policy. |
-| `launchApp` with arguments | None | Missing | The driver port carries arguments, but neither real adapter delivers them. |
+| `launchApp` with arguments | `launchApp` with `arguments` | Present | A mapping of names to string, number or boolean values. Android delivers them as intent extras and iOS as launch environment and `-name value` launch arguments. |
 | `launchApp` with permissions | None | Missing | Needs a permission capability on the driver. |
 | `tapOn` | `tap` | Present | Selector fields are literal strings, or `{regex, flags}` for a pattern. |
 | `inputText` | `type` | Present | Clears the field first by default and interpolates `${var}`. |

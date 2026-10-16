@@ -285,6 +285,9 @@ type KeyRequest struct {
 // LaunchRequest is the request body for POST /actions/launch.
 type LaunchRequest struct {
 	PackageName string `json:"packageName"`
+
+	// Arguments are put on the launch intent as string extras.
+	Arguments map[string]string `json:"arguments,omitempty"`
 }
 
 // ForceStopRequest is the request body for POST /actions/force_stop.

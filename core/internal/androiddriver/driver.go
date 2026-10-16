@@ -704,6 +704,9 @@ func (d *AndroidDriver) LaunchApp(ctx context.Context, bundleID string, args dri
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	if err := rejectUndeliverableLaunchInputs(args); err != nil {
+		return err
+	}
 	switch {
 	case args.NoReset != nil && *args.NoReset:
 		foreground, err := d.CurrentForeground(ctx)
@@ -718,10 +721,26 @@ func (d *AndroidDriver) LaunchApp(ctx context.Context, bundleID string, args dri
 			return d.fail(err)
 		}
 	}
-	if _, err := d.transport.LaunchApp(ctx, transport.LaunchRequest{PackageName: bundleID}); err != nil {
+	if _, err := d.transport.LaunchApp(ctx, transport.LaunchRequest{PackageName: bundleID, Arguments: args.Arguments}); err != nil {
 		return d.fail(err)
 	}
 	return d.awaitForeground(ctx, bundleID, "in front", func(current string) bool { return current == bundleID })
+}
+
+// rejectUndeliverableLaunchInputs fails a launch that carries inputs an
+// intent cannot express. Arguments travel as intent extras, but raw
+// process arguments and environment variables have no intent
+// equivalent, so dropping them would hide a request the app never saw.
+func rejectUndeliverableLaunchInputs(args driver.LaunchArgs) error {
+	if len(args.Args) > 0 || len(args.Environment) > 0 {
+		return diag.New(
+			diag.CodeInvalidArgument,
+			"this device cannot pass process arguments or environment variables at launch",
+			"pass named values through the launch arguments map instead",
+			nil,
+		)
+	}
+	return driver.ValidateLaunchArguments(args.Arguments)
 }
 
 // StopApp force-stops bundleID through the device shell, which holds

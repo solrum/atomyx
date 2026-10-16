@@ -621,7 +621,9 @@ func (d *IosDriver) HideKeyboard(ctx context.Context) (driver.KeyResult, error) 
 	return driver.KeyResult{Ok: resp.Ok, Reason: resp.Strategy}, nil
 }
 
-// LaunchApp dispatches per the tri-state of args.NoReset:
+// LaunchApp dispatches per the tri-state of args.NoReset. The runner
+// receives args.Arguments, args.Args and args.Environment as launch
+// arguments and launch environment, as launchParams describes.
 //
 //   - nil (plain launch): dispatched unconditionally to the runner,
 //     which launches via XCUIApplication.launch(). No pre-check, no
@@ -636,6 +638,11 @@ func (d *IosDriver) LaunchApp(ctx context.Context, bundleID string, args driver.
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	noReset := args.NoReset != nil && *args.NoReset
+	params, err := launchParams(bundleID, noReset, args)
+	if err != nil {
+		return err
+	}
 	switch {
 	case args.NoReset != nil && *args.NoReset:
 		if d.lastLaunchedBundleID == bundleID {
@@ -646,8 +653,7 @@ func (d *IosDriver) LaunchApp(ctx context.Context, bundleID string, args driver.
 			return d.fail(err)
 		}
 	}
-	noReset := args.NoReset != nil && *args.NoReset
-	if err := d.conn.CallInto(ctx, "launchApp", map[string]any{"bundleId": bundleID, "noReset": noReset}, nil); err != nil {
+	if err := d.conn.CallInto(ctx, "launchApp", params, nil); err != nil {
 		return d.fail(err)
 	}
 	d.lastLaunchedBundleID = bundleID

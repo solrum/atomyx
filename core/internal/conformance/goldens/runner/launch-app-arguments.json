@@ -1,0 +1,153 @@
+{
+  "calls": [
+    {
+      "args": [
+        "com.test",
+        {
+          "arguments": {
+            "retries": "3",
+            "route": "/focus"
+          }
+        }
+      ],
+      "method": "launchApp"
+    },
+    {
+      "args": [
+        "com.test",
+        {
+          "arguments": {
+            "retries": "3",
+            "route": "/focus"
+          }
+        }
+      ],
+      "method": "launchApp"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "launchApp: arguments=retries|route",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "arguments=retries|route"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "line": 5,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "launchApp: arguments=retries|route",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "arguments=retries|route"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 9,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "launchApp: arguments=retries|route",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "arguments=retries|route"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "launchApp",
+      "depth": 0,
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "line": 9,
+      "ok": true,
+      "stepIndex": 1,
+      "summary": "launchApp: arguments=retries|route",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "launchApp"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "arguments=retries|route"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 2,
+  "screenshots": [],
+  "scriptName": "launch arguments",
+  "steps": [
+    {
+      "command": "launchApp",
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    },
+    {
+      "command": "launchApp",
+      "detail": "Launched com.test",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 1
+    }
+  ],
+  "totalSteps": 2
+}

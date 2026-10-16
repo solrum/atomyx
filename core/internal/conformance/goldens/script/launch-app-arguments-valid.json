@@ -1,0 +1,30 @@
+{
+  "parsed": {
+    "_stepLines": [
+      1,
+      6
+    ],
+    "appId": "",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Untitled script",
+    "steps": [
+      {
+        "arguments": {
+          "debug": "true",
+          "retries": "3",
+          "route": "/focus"
+        },
+        "command": "launchApp"
+      },
+      {
+        "arguments": {
+          "mode": "demo"
+        },
+        "command": "launchApp",
+        "stopApp": true
+      }
+    ]
+  },
+  "valid": true
+}

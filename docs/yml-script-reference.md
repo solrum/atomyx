@@ -203,7 +203,7 @@ Launch the app specified in `appId`.
 - launchApp
 ```
 
-Two optional fields change how the app starts. A field a step leaves out
+Three optional fields change how the app starts. A field a step leaves out
 falls back to the project launch policy, so a bare `launchApp` behaves as
 the policy says.
 
@@ -212,17 +212,32 @@ the policy says.
     clearState: true
 - launchApp:
     stopApp: false
+- launchApp:
+    arguments:
+      route: /focus
+      retries: 3
+      debug: true
 ```
 
 | Field | Type | Effect |
 | --- | --- | --- |
 | `clearState` | boolean | `true` clears the app's data and then launches it fresh. `false` skips a data clear that the launch policy asks for. |
 | `stopApp` | boolean | `true` force-stops a running instance, then launches again. `false` reuses a running instance. |
+| `arguments` | mapping | Named values handed to the app at launch. Each value is a string, number or boolean and reaches the app as text. |
+
+How `arguments` reach the app:
+
+- Android: each entry is a string extra on the launch intent, so the app reads it from its launching intent.
+- iOS: each entry `name: value` becomes the launch environment entry `name=value` and the launch argument pair `-name value`. The app reads it from its environment or from its standard user defaults.
 
 Rules:
 
 - `clearState: true` together with `stopApp: false` is rejected, because clearing data stops the app.
-- A `launchApp` that would only repeat an earlier launch of the same app in the flow is skipped. A launch with `stopApp: true` or `clearState: true` always runs.
+- `arguments` together with `stopApp: false` is rejected, because a reused instance never receives them.
+- An arguments name must not be empty and must not contain `=`.
+- Arguments take effect only when the launch starts the app. A project launch policy that attaches to a running instance ignores them.
+- A launch that carries `arguments` always runs, even when it repeats an earlier launch of the same app.
+- A `launchApp` that would only repeat an earlier launch of the same app in the flow is skipped. A launch with `stopApp: true`, `clearState: true` or `arguments` always runs.
 - A `launchApp` after a `stopApp`, `killApp` or `clearState` of the same app runs again.
 - On iOS, `clearState` reinstalls the app and needs the app's `artifact` in the project config. The step fails with the `INVALID_ARGUMENT` code when none is configured.
 

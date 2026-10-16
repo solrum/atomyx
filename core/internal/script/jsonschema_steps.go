@@ -55,6 +55,7 @@ func stepJSONSchemaDefinitions() map[string]any {
 				"command":    constString(CommandLaunchApp),
 				"clearState": booleanSchema("When true, clear the app's data and start it fresh. Cannot be combined with `stopApp: false`."),
 				"stopApp":    booleanSchema("When true, force-stop a running instance before launching. When false, reuse a running instance. When omitted, the run's launch policy applies."),
+				"arguments":  scalarMapSchema("Named values handed to the app at launch. Each value is a string, number or boolean, delivered as text. They take effect only when the launch starts the app, so a launch that reuses a running instance ignores them."),
 			},
 			[]string{"command"},
 			"Launch (or relaunch) the app declared at the top of the script via `appId`.",

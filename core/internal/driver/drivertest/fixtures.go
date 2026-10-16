@@ -29,6 +29,12 @@ func WithSyntheticFixtures(h Hooks) Hooks {
 	if h.ClearableAppID == "" {
 		h.ClearableAppID = syntheticAppID
 	}
+	if h.LaunchArguments == nil {
+		h.LaunchArguments = &LaunchArgumentsFixture{
+			Arguments: map[string]string{"route": "/focus"},
+			Await:     func(*testing.T, driver.Driver) {},
+		}
+	}
 	if h.Install == nil {
 		h.Install = &InstallFixture{Source: syntheticAppID, AppID: syntheticAppID}
 	}

@@ -1,0 +1,5 @@
+{
+  "name": "launch-app-arguments-valid",
+  "description": "launchApp parses an arguments mapping of strings, numbers and booleans alongside its other options.",
+  "yaml": "- launchApp:\n    arguments:\n      route: /focus\n      retries: 3\n      debug: true\n- launchApp:\n    stopApp: true\n    arguments:\n      mode: demo\n"
+}

@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"os/exec"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -1557,5 +1558,57 @@ func TestIosDriver_InputText_UnfocusedFieldIsRejectedWithReason(t *testing.T) {
 	}
 	if remedy != "Tap the input field so it has focus, then type again." {
 		t.Fatalf("remedy = %q, want the tool-neutral remedy", remedy)
+	}
+}
+
+func TestIosDriver_LaunchApp_DeliversArgumentsAsEnvironmentAndDefaults(t *testing.T) {
+	conn := newFakeConn()
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+
+	args := driver.LaunchArgs{
+		Arguments:   map[string]string{"route": "/focus", "mode": "demo"},
+		Args:        []string{"-verbose"},
+		Environment: map[string]string{"mode": "override", "TRACE": "1"},
+	}
+	if err := d.LaunchApp(context.Background(), "dev.atomyx.app", args); err != nil {
+		t.Fatalf("LaunchApp() error = %v", err)
+	}
+	got := conn.Calls()[0].args
+	wantArguments := []string{"-mode", "demo", "-route", "/focus", "-verbose"}
+	if !reflect.DeepEqual(got["launchArguments"], wantArguments) {
+		t.Fatalf("launchArguments = %#v, want %#v", got["launchArguments"], wantArguments)
+	}
+	wantEnvironment := map[string]string{"mode": "override", "route": "/focus", "TRACE": "1"}
+	if !reflect.DeepEqual(got["launchEnvironment"], wantEnvironment) {
+		t.Fatalf("launchEnvironment = %#v, want %#v", got["launchEnvironment"], wantEnvironment)
+	}
+}
+
+func TestIosDriver_LaunchApp_PlainLaunchOmitsLaunchInputs(t *testing.T) {
+	conn := newFakeConn()
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+
+	if err := d.LaunchApp(context.Background(), "dev.atomyx.app", driver.LaunchArgs{}); err != nil {
+		t.Fatalf("LaunchApp() error = %v", err)
+	}
+	got := conn.Calls()[0].args
+	if _, ok := got["launchArguments"]; ok {
+		t.Fatalf("launchArguments present in %+v, want it omitted", got)
+	}
+	if _, ok := got["launchEnvironment"]; ok {
+		t.Fatalf("launchEnvironment present in %+v, want it omitted", got)
+	}
+}
+
+func TestIosDriver_LaunchApp_RejectsInvalidArgumentsBeforeTheDevice(t *testing.T) {
+	conn := newFakeConn()
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+
+	err := d.LaunchApp(context.Background(), "dev.atomyx.app", driver.LaunchArgs{Arguments: map[string]string{"a=b": "x"}})
+	if code, _, _ := diag.Describe(err); code != diag.CodeInvalidArgument {
+		t.Fatalf("LaunchApp() error code = %q (err %v), want %q", code, err, diag.CodeInvalidArgument)
+	}
+	if len(conn.Calls()) != 0 {
+		t.Fatalf("calls = %+v, want none", conn.Calls())
 	}
 }

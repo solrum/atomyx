@@ -445,12 +445,29 @@
     }
   },
   "launch_app": {
-    "description": "Launch an app on the connected device by its app identifier. The driver brings the app to the foreground; subsequent tool calls operate on its UI. Requires an active device, so call `select_device` first. Use `list_apps` to discover available identifiers. A second default launch of the same app in the same session is skipped, so pass mode `fresh` to force-stop and relaunch it with its data kept.",
+    "description": "Launch an app on the connected device by its app identifier. The driver brings the app to the foreground; subsequent tool calls operate on its UI. Requires an active device, so call `select_device` first. Use `list_apps` to discover available identifiers. A second default launch of the same app in the same session is skipped, so pass mode `fresh` to force-stop and relaunch it with its data kept. Pass `arguments` to hand named values to the app at launch, for example to start it on a given screen.",
     "inputSchema": {
       "properties": {
         "appId": {
           "description": "Cross-platform app identifier (bundle id / package name). Use the string reported by `list_apps`.",
           "type": "string"
+        },
+        "arguments": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "description": "Named values handed to the app at launch, each a string, number or boolean delivered as text. The app reads them at startup. They apply only when the launch starts the app, so a launch with `attach` that finds the app running ignores them. A launch that carries arguments is never skipped as a repeat.",
+          "type": "object"
         },
         "mode": {
           "anyOf": [

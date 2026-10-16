@@ -502,3 +502,18 @@ func validTapPointer(id string) driver.GesturePointer {
 		{Phase: driver.GesturePhaseUp, AtOffsetSeconds: 0.05},
 	}}
 }
+
+func TestLaunchAppRecordsArguments(t *testing.T) {
+	d := New()
+	args := driver.LaunchArgs{Arguments: map[string]string{"route": "/focus"}}
+	if err := d.LaunchApp(context.Background(), "a", args); err != nil {
+		t.Fatalf("LaunchApp: %v", err)
+	}
+	if len(d.Calls) != 1 {
+		t.Fatalf("Calls = %+v, want one LaunchApp entry", d.Calls)
+	}
+	recorded, ok := d.Calls[0].Args[1].(driver.LaunchArgs)
+	if !ok || recorded.Arguments["route"] != "/focus" {
+		t.Fatalf("recorded args = %#v, want the launch arguments", d.Calls[0].Args)
+	}
+}

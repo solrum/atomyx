@@ -5,7 +5,7 @@ import "strings"
 // Normalizers for the steps that control an app's process and data.
 
 // normalizeLaunchApp accepts a bare `launchApp` or an object with the
-// optional boolean fields `clearState` and `stopApp`.
+// optional fields `clearState`, `stopApp` and `arguments`.
 func normalizeLaunchApp(value any) (ScriptStep, error) {
 	step := &LaunchAppStep{Command: CommandLaunchApp}
 	if value == nil {
@@ -13,7 +13,7 @@ func normalizeLaunchApp(value any) (ScriptStep, error) {
 	}
 	m, ok := asMap(value)
 	if !ok {
-		return nil, newParseError("launchApp: expected no value or an object with `clearState` and `stopApp`, got %s", goType(value))
+		return nil, newParseError("launchApp: expected no value or an object with `clearState`, `stopApp` and `arguments`, got %s", goType(value))
 	}
 	clearState, err := normalizeBoolField(m["clearState"], "launchApp.clearState")
 	if err != nil {
@@ -23,9 +23,41 @@ func normalizeLaunchApp(value any) (ScriptStep, error) {
 	if err != nil {
 		return nil, err
 	}
+	arguments, err := normalizeLaunchArguments(m["arguments"])
+	if err != nil {
+		return nil, err
+	}
 	step.ClearState = clearState
 	step.StopApp = stopApp
+	step.Arguments = arguments
 	return step, nil
+}
+
+// normalizeLaunchArguments reads the optional `arguments` mapping of a
+// launchApp step. Each value must be a string, number or boolean and is
+// stored as the text a script author would read it as. It returns nil
+// when the field is absent or empty.
+func normalizeLaunchArguments(raw any) (map[string]string, error) {
+	if raw == nil {
+		return nil, nil
+	}
+	m, ok := asMap(raw)
+	if !ok {
+		return nil, newParseError("launchApp.arguments: must be a mapping of names to values, got %s", goType(raw))
+	}
+	if len(m) == 0 {
+		return nil, nil
+	}
+	arguments := make(map[string]string, len(m))
+	for key, value := range m {
+		switch value.(type) {
+		case string, bool, int, int64, float64:
+			arguments[key] = jsString(value)
+		default:
+			return nil, newParseError("launchApp.arguments.%s: must be a string, number or boolean, got %s", key, goType(value))
+		}
+	}
+	return arguments, nil
 }
 
 func normalizeStopApp(value any) (ScriptStep, error) {

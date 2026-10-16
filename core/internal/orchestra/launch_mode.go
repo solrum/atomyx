@@ -37,11 +37,39 @@ func LaunchModeFromNoReset(noReset *bool) LaunchMode {
 	}
 }
 
+// LaunchOptions is everything a caller chooses about one launch beyond
+// the app id.
+type LaunchOptions struct {
+	// Mode selects how the app starts. The zero value means
+	// LaunchModeDefault.
+	Mode LaunchMode
+	// Arguments are named values handed to the app at launch. A launch
+	// that carries arguments is never skipped as a repeat, because the
+	// values have to reach a new start of the app.
+	Arguments map[string]string
+}
+
 // LaunchAppWithMode launches appID using mode and the dedup rule
 // documented on LaunchApp. An unknown mode is rejected before any device
 // call with an error coded diag.CodeInvalidArgument.
 func (o *Orchestra) LaunchAppWithMode(ctx context.Context, appID string, mode LaunchMode) error {
-	var args driver.LaunchArgs
+	return o.LaunchAppWithOptions(ctx, appID, LaunchOptions{Mode: mode})
+}
+
+// LaunchAppWithOptions launches appID using opts.Mode and passes
+// opts.Arguments to the app. The dedup rule documented on LaunchApp
+// applies, except that a launch carrying arguments always reaches the
+// driver. An unknown mode or an invalid arguments map is rejected
+// before any device call with an error coded diag.CodeInvalidArgument.
+func (o *Orchestra) LaunchAppWithOptions(ctx context.Context, appID string, opts LaunchOptions) error {
+	if err := driver.ValidateLaunchArguments(opts.Arguments); err != nil {
+		return err
+	}
+	args := driver.LaunchArgs{Arguments: opts.Arguments}
+	mode := opts.Mode
+	if mode == "" {
+		mode = LaunchModeDefault
+	}
 	switch mode {
 	case LaunchModeDefault:
 	case LaunchModeFresh:
