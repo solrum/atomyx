@@ -144,7 +144,8 @@ func resolveServedRunner(ctx context.Context, probe Probe, runners RunnerIdentif
 }
 
 // reuseServedRunner points desc at the runner served on the default
-// control port when that runner belongs to desc's device. It leaves
+// control port, or through a tunnel to a physical device when the host
+// has no listener, when that runner belongs to desc's device. It leaves
 // desc untouched when no runner is wired, nothing answers, or the
 // runner reports another device or none. A runner for the same device
 // that speaks another protocol version fails with
@@ -154,6 +155,13 @@ func reuseServedRunner(ctx context.Context, runners RunnerIdentifier, desc *Desc
 		return nil
 	}
 	got, ok := runners.IdentifyRunner(ctx, iosControlPort)
+	if !ok && desc.Kind == KindDevice {
+		// A physical device has no host listener until a tunnel exists,
+		// so a runner served by hand answers only through one.
+		if tunneled, can := runners.(DeviceRunnerIdentifier); can {
+			got, ok = tunneled.IdentifyDeviceRunner(ctx, desc.ID)
+		}
+	}
 	if !ok {
 		return nil
 	}

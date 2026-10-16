@@ -58,7 +58,7 @@ func main() {
 
 	deps := cli.Deps{
 		Probe:        probe,
-		Runners:      device.PingRunnerIdentifier{},
+		Runners:      device.TunnelRunnerIdentifier{Background: background, Clock: clock},
 		Factory:      factory,
 		Clock:        clock,
 		Logger:       logger,

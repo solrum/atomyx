@@ -193,7 +193,7 @@ udid up in the device probe (`device.ResolveDescriptor` in
 scan does not find fails with `DEVICE_NOT_FOUND` and a remedy. Without
 `--device`, the CLI does not provision a runner. It pings the runner served
 on the default port, 22087, through the `device.RunnerIdentifier` port
-(`device.PingRunnerIdentifier` in
+(`device.TunnelRunnerIdentifier` in
 `core/internal/device/runner_identifier.go`) and keys ownership on the
 device the ping names. A runner that reports `simulatorUdid` names that
 simulator, and one that reports `targetUdid` names that physical device.
@@ -212,10 +212,16 @@ the device explicitly.
 A named device reuses a runner already served on port 22087 when that
 runner belongs to the device and speaks the host protocol. The match is on
 `simulatorUdid` for a simulator and `targetUdid` for a physical device,
-case-insensitive. The descriptor then carries port 22087, the CLI logs
+case-insensitive. A physical device has no host listener until a USB
+tunnel exists, so when nothing answers on the host port the CLI opens a
+short-lived tunnel to the device on a free host port, pings through it,
+and stops it before connecting. The tunnel never occupies port 22087, so
+the driver opens its own there afterwards. The descriptor then carries port 22087, the CLI logs
 that it uses the served runner, and Atomyx never stops it. A runner that
 belongs to another device, reports no device, or does not answer is
-ignored, and the CLI launches its own runner on an allocated port. A
+ignored, and the CLI launches its own runner on an allocated port. Only
+that launch needs a development team for signing, so a hand-served runner
+needs none. A
 runner that belongs to the device but speaks another protocol version
 fails with `AGENT_VERSION_MISMATCH`, and the remedy is to stop the runner
 served on port 22087 or rebuild it, so two runners never drive one device.

@@ -159,7 +159,7 @@ func run(opts options) int {
 
 	server, err := mcp.NewServer(mcp.Info{Name: serverName, Version: serverVersion}, mcp.ServerDeps{
 		Probe:          probe,
-		Runners:        device.PingRunnerIdentifier{},
+		Runners:        device.TunnelRunnerIdentifier{Background: background, Clock: clock},
 		Factory:        factory,
 		Storage:        store,
 		RunStarter:     runStarter,
