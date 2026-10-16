@@ -110,6 +110,8 @@ func SummarizeStep(step script.ScriptStep) StepSummary {
 			punct(" (").str(fmt.Sprintf("%d case%s", cases, pluralSuffix(cases, "s"))).punct(")")
 	case *script.RunFlowStep:
 		b.kw("runFlow").punct(": ").str(s.File)
+	case *script.RepeatStep:
+		summarizeRepeat(b, s)
 	case *script.AssertApiStep:
 		b.kw("assertApi").punct(": ").id("$" + s.From)
 		var parts []string
@@ -231,4 +233,33 @@ func jsTruncate(value string, max int) string {
 		return value
 	}
 	return string(utf16.Decode(units[:max-1])) + "…"
+}
+
+// summarizeRepeat renders a repeat step as its loop bounds, for example
+// `repeat: 3 times` or `repeat: while visible element.text = "More"`.
+func summarizeRepeat(b *tokenBuilder, s *script.RepeatStep) {
+	b.kw("repeat").punct(": ")
+	if s.Times != nil {
+		b.rawStr(fmt.Sprintf("%d %s", *s.Times, pluralWord(*s.Times, "time")))
+		if s.While != nil {
+			b.punct(", ")
+		}
+	}
+	if s.While == nil {
+		return
+	}
+	b.id("while").punct(" ")
+	switch {
+	case s.While.Visible != nil:
+		b.id("visible").punct(" ").selector(selectorOf(*s.While.Visible))
+	case s.While.NotVisible != nil:
+		b.id("notVisible").punct(" ").selector(selectorOf(*s.While.NotVisible))
+	case s.While.Expr != nil:
+		b.str(*s.While.Expr)
+	}
+}
+
+func selectorOf(v script.StringOrSelector) *script.ScriptSelector {
+	sel := toScriptSelector(v)
+	return &sel
 }

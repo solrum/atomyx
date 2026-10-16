@@ -1,0 +1,5 @@
+{
+  "name": "invalid-repeat-while-no-condition",
+  "description": "a repeat while condition that sets none of visible, notVisible or expr must be REJECTED.",
+  "yaml": "- repeat:\n    while: {}\n    commands:\n      - back\n"
+}

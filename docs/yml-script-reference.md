@@ -926,6 +926,73 @@ Execute another YML file as a sub-flow.
 Sub-flows inherit the parent's variables and captures. They can be
 either full scripts (with config) or flow fragments (steps only).
 
+### repeat
+
+Run a block of steps in a loop, a fixed number of times, while a
+condition holds, or both.
+
+```yaml
+# A fixed count
+- repeat:
+    times: 3
+    commands:
+      - swipe: up
+      - assertVisible: "Next page"
+
+# While an element is visible
+- repeat:
+    while:
+      visible: "Load more"
+    commands:
+      - tap: "Load more"
+
+# Whichever comes first
+- repeat:
+    times: 10
+    while:
+      notVisible: "Done"
+    commands:
+      - swipe: up
+```
+
+`commands` is required and holds at least one step. At least one of
+`times` and `while` is required.
+
+**`times`** is a whole number of at least 1.
+
+**`while`** sets exactly one condition, which is checked before every
+iteration:
+
+```yaml
+# The element is on screen
+while:
+  visible: "Load more"
+
+# The element is not on screen
+while:
+  notVisible: "Done"
+
+# A boolean expression over runtime variables
+while:
+  expr: attempts < 5
+```
+
+`visible` and `notVisible` take a string or a selector object, like
+`handle` conditions. `expr` uses the syntax in
+[Expression Syntax](#expression-syntax), and it must evaluate to a
+boolean.
+
+**Stopping.** With `times` alone the block runs exactly `times`
+iterations. With `while` alone the loop ends when the condition stops
+holding, and it fails if the condition still holds after 50
+iterations. With both, the loop ends at whichever comes first, and the
+50 iteration limit does not apply because `times` bounds the loop.
+
+**Failures.** The first failing step ends the loop. The step detail
+names the iteration, for example `repeat: iteration 2 of 4 failed:` and
+the nested step's own detail. Every nested step appears in the run
+events at one level deeper than the `repeat` step, in iteration order.
+
 ---
 
 ## Flow Fragments

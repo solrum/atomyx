@@ -44,7 +44,14 @@ const (
 	CommandLongPress        = "longPress"
 	CommandPinch            = "pinch"
 	CommandRotate           = "rotate"
+	CommandRepeat           = "repeat"
 )
+
+// RepeatWhileIterationLimit is the most iterations a repeat step runs
+// when it carries a `while` condition and no `times`. A loop whose
+// condition still holds after that many iterations fails instead of
+// running on, so a condition that never turns false cannot hang a run.
+const RepeatWhileIterationLimit = 50
 
 // LaunchAppStep launches (or relaunches) the app declared by the
 // script's appId.
@@ -406,3 +413,29 @@ type RotateStep struct {
 
 func (s *RotateStep) StepCommand() string { return s.Command }
 func (s *RotateStep) isScriptStep()       {}
+
+// RepeatCondition is the loop condition of a repeat step. Exactly one
+// of Visible, NotVisible or Expr is set. Visible and NotVisible probe
+// the current screen, and Expr is a boolean expression over the run's
+// variables, evaluated by the same engine assertExpr uses.
+type RepeatCondition struct {
+	Visible    *StringOrSelector `json:"visible,omitempty"`
+	NotVisible *StringOrSelector `json:"notVisible,omitempty"`
+	Expr       *string           `json:"expr,omitempty"`
+}
+
+// RepeatStep runs Commands in a loop. With Times alone it runs exactly
+// Times iterations. With While alone it runs while the condition holds,
+// up to RepeatWhileIterationLimit iterations. With both it stops at
+// whichever comes first. The condition is checked before every
+// iteration.
+type RepeatStep struct {
+	stepSource
+	Command  string           `json:"command"`
+	Times    *int             `json:"times,omitempty"`
+	While    *RepeatCondition `json:"while,omitempty"`
+	Commands []ScriptStep     `json:"commands"`
+}
+
+func (s *RepeatStep) StepCommand() string { return s.Command }
+func (s *RepeatStep) isScriptStep()       {}

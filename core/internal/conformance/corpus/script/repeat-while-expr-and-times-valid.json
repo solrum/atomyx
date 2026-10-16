@@ -1,0 +1,5 @@
+{
+  "name": "repeat-while-expr-and-times-valid",
+  "description": "a repeat block carrying both times and an expr condition parses, with a selector-object notVisible nested in an inner repeat.",
+  "yaml": "- repeat:\n    times: 10\n    while:\n      expr: attempts < 5\n    commands:\n      - repeat:\n          while:\n            notVisible:\n              id: spinner\n          commands:\n            - back\n"
+}

@@ -1,0 +1,5 @@
+{
+  "name": "invalid-repeat-times-zero",
+  "description": "a repeat block with times below 1 must be REJECTED.",
+  "yaml": "- repeat:\n    times: 0\n    commands:\n      - back\n"
+}

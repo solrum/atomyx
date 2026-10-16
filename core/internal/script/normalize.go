@@ -44,6 +44,7 @@ func init() {
 		CommandLongPress:        normalizeLongPress,
 		CommandPinch:            normalizePinch,
 		CommandRotate:           normalizeRotate,
+		CommandRepeat:           normalizeRepeat,
 	}
 }
 

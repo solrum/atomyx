@@ -1,0 +1,11 @@
+{
+  "name": "repeat-nested-failure-names-iteration",
+  "description": "a nested assertion that fails on the second iteration stops the loop and the failure names iteration 2 of 4.",
+  "yaml": "appId: com.test\nname: repeat failure\nenv: {}\n---\n- repeat:\n    times: 4\n    commands:\n      - assertVisible: Ready\n      - back\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [ { "attributes": { "text": "Ready", "label": "Ready", "bounds": "0,0,10,10" }, "children": [] } ] },
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

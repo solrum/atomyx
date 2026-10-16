@@ -1,0 +1,5 @@
+{
+  "name": "repeat-while-visible-valid",
+  "description": "a repeat block whose while condition is a bare-string visible shorthand parses without times.",
+  "yaml": "- repeat:\n    while:\n      visible: Load more\n    commands:\n      - tap: Load more\n"
+}

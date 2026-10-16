@@ -1,5 +1,7 @@
 package script
 
+import "fmt"
+
 // stepCommandOrder lists every step definition name in the order the
 // ScriptStep union declares its variants, so the
 // generated schema's "oneOf" reads in the order a script author
@@ -29,6 +31,7 @@ var stepCommandOrder = []string{
 	"LongPressStep",
 	"PinchStep",
 	"RotateStep",
+	"RepeatStep",
 }
 
 // captureVarPattern is the shape a capture-bound variable name must
@@ -249,6 +252,16 @@ func stepJSONSchemaDefinitions() map[string]any {
 			},
 			[]string{"command", "center", "degrees"},
 			"Two-finger rotation of `degrees` around `center`, with the contact points placed `radius` apart on opposite sides. A selector `center` is resolved to a coordinate at dispatch time.",
+		),
+		"RepeatStep": objectSchema(
+			map[string]any{
+				"command":  constString(CommandRepeat),
+				"times":    integerMin(1, "Number of iterations to run. Without `while`, the block runs exactly this many times."),
+				"while":    ref("RepeatCondition"),
+				"commands": arraySchema(ref("ScriptStep"), 1, "Steps to run in every iteration."),
+			},
+			[]string{"command", "commands"},
+			fmt.Sprintf("Run `commands` in a loop. At least one of `times` or `while` is required. With `while` and no `times`, the loop fails after %d iterations if the condition still holds.", RepeatWhileIterationLimit),
 		),
 	}
 }

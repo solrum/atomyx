@@ -240,6 +240,9 @@ func validateStep(step ScriptStep, path string, report reportFunc) {
 	case *RotateStep:
 		validateRotateStep(s, path, report)
 
+	case *RepeatStep:
+		validateRepeatStep(s, path, report)
+
 	case *LaunchAppStep, *BackStep, *ScreenshotStep:
 		// No per-step constraints beyond the discriminant.
 	}

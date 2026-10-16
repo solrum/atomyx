@@ -37,6 +37,8 @@ func markWrittenFormLost(step ScriptStep) {
 		if s.Default != nil {
 			markListLost(*s.Default)
 		}
+	case *RepeatStep:
+		markListLost(StepsOrFile{Steps: s.Commands})
 	}
 }
 
@@ -60,7 +62,7 @@ func AuthoredOf(step ScriptStep) ScriptStep {
 
 // attachAuthored records authored as the written form of resolved when
 // interpolation changed it, including any inline steps nested in a
-// handle or branch step. It does nothing for steps of different kinds or
+// handle, branch or block step. It does nothing for steps of different kinds or
 // steps that are identical.
 func attachAuthored(resolved, authored ScriptStep) {
 	if reflect.TypeOf(resolved) != reflect.TypeOf(authored) || reflect.DeepEqual(resolved, authored) {
@@ -80,6 +82,9 @@ func attachAuthored(resolved, authored ScriptStep) {
 		if r.Default != nil && a.Default != nil {
 			attachAuthoredList(*r.Default, *a.Default)
 		}
+	case *RepeatStep:
+		a := authored.(*RepeatStep)
+		attachAuthoredList(StepsOrFile{Steps: r.Commands}, StepsOrFile{Steps: a.Commands})
 	}
 	resolved.setAuthored(authored)
 }

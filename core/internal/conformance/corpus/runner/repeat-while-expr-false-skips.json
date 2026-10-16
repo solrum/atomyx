@@ -1,0 +1,10 @@
+{
+  "name": "repeat-while-expr-false-skips",
+  "description": "a repeat whose expr condition is false on entry runs zero iterations and succeeds.",
+  "yaml": "appId: com.test\nname: repeat expr\nenv:\n  mode: idle\n---\n- repeat:\n    while:\n      expr: mode == \"busy\"\n    commands:\n      - back\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

@@ -44,7 +44,7 @@ A Maestro flow that uses only present commands runs as is after a syntax change.
 
 | Maestro command | Atomyx equivalent | Status | Note |
 | --- | --- | --- | --- |
-| `repeat` with `times` or `while` | None | Missing | The runner already nests step lists, so a block step can reuse that. |
+| `repeat` with `times` or `while` | `repeat` | Present | `while` takes `visible`, `notVisible` or `expr`. A loop with `while` and no `times` fails after 50 iterations. |
 | `retry` | None | Missing | Retries exist only per suite entry. |
 | Regex in selectors | `text`, `id`, `label` and `hint` as `{regex, flags}` | Present | A plain string stays an exact match. A regex match is unanchored, so write `^` and `$` to match a whole value. |
 

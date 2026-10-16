@@ -1,0 +1,5 @@
+{
+  "name": "invalid-repeat-no-times-or-while",
+  "description": "a repeat block with neither times nor while must be REJECTED.",
+  "yaml": "- repeat:\n    commands:\n      - back\n"
+}

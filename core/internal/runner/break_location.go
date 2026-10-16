@@ -151,7 +151,7 @@ func nextStepLine(def *script.ScriptDefinition, i int) int {
 
 func isNestingStep(step script.ScriptStep) bool {
 	switch step.(type) {
-	case *script.RunFlowStep, *script.HandleStep, *script.BranchStep:
+	case *script.RunFlowStep, *script.HandleStep, *script.BranchStep, *script.RepeatStep:
 		return true
 	}
 	return false

@@ -795,6 +795,55 @@
       ],
       "type": "object"
     },
+    "RepeatCondition": {
+      "additionalProperties": false,
+      "description": "Condition a repeat loop checks before each iteration. Exactly one of `visible`, `notVisible` or `expr` must be set.",
+      "properties": {
+        "expr": {
+          "description": "Boolean expression over the script's runtime variables.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "notVisible": {
+          "$ref": "#/definitions/StringOrSelector"
+        },
+        "visible": {
+          "$ref": "#/definitions/StringOrSelector"
+        }
+      },
+      "type": "object"
+    },
+    "RepeatStep": {
+      "additionalProperties": false,
+      "description": "Run `commands` in a loop. At least one of `times` or `while` is required. With `while` and no `times`, the loop fails after 50 iterations if the condition still holds.",
+      "properties": {
+        "command": {
+          "const": "repeat",
+          "type": "string"
+        },
+        "commands": {
+          "description": "Steps to run in every iteration.",
+          "items": {
+            "$ref": "#/definitions/ScriptStep"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "times": {
+          "description": "Number of iterations to run. Without `while`, the block runs exactly this many times.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "while": {
+          "$ref": "#/definitions/RepeatCondition"
+        }
+      },
+      "required": [
+        "command",
+        "commands"
+      ],
+      "type": "object"
+    },
     "RotateStep": {
       "additionalProperties": false,
       "description": "Two-finger rotation of `degrees` around `center`, with the contact points placed `radius` apart on opposite sides. A selector `center` is resolved to a coordinate at dispatch time.",
@@ -1160,6 +1209,9 @@
         },
         {
           "$ref": "#/definitions/RotateStep"
+        },
+        {
+          "$ref": "#/definitions/RepeatStep"
         }
       ]
     },

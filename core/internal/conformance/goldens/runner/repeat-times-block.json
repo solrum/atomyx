@@ -1,0 +1,254 @@
+{
+  "calls": [
+    {
+      "args": [
+        "back"
+      ],
+      "method": "pressKey"
+    },
+    {
+      "args": [
+        "back"
+      ],
+      "method": "pressKey"
+    },
+    {
+      "args": [
+        "back"
+      ],
+      "method": "pressKey"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "repeat",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "repeat: 3 times",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "repeat"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "3 times"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "back",
+      "depth": 1,
+      "detail": null,
+      "durationMs": null,
+      "line": null,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "back",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "back"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "back",
+      "depth": 1,
+      "detail": "Pressed back",
+      "durationMs": 0,
+      "line": null,
+      "ok": true,
+      "stepIndex": 1,
+      "summary": "back",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "back"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "back",
+      "depth": 1,
+      "detail": null,
+      "durationMs": null,
+      "line": null,
+      "ok": null,
+      "stepIndex": 2,
+      "summary": "back",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "back"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "back",
+      "depth": 1,
+      "detail": "Pressed back",
+      "durationMs": 0,
+      "line": null,
+      "ok": true,
+      "stepIndex": 2,
+      "summary": "back",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "back"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "back",
+      "depth": 1,
+      "detail": null,
+      "durationMs": null,
+      "line": null,
+      "ok": null,
+      "stepIndex": 3,
+      "summary": "back",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "back"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "back",
+      "depth": 1,
+      "detail": "Pressed back",
+      "durationMs": 0,
+      "line": null,
+      "ok": true,
+      "stepIndex": 3,
+      "summary": "back",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "back"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "repeat",
+      "depth": 0,
+      "detail": "repeat: completed 3 iterations",
+      "durationMs": 0,
+      "line": 5,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "repeat: 3 times",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "repeat"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "3 times"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "screenshot",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 9,
+      "ok": null,
+      "stepIndex": 4,
+      "summary": "screenshot: \"after\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "screenshot"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"after\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "screenshot",
+      "depth": 0,
+      "detail": "Screenshot saved as \"after\"",
+      "durationMs": 0,
+      "line": 9,
+      "ok": true,
+      "stepIndex": 4,
+      "summary": "screenshot: \"after\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "screenshot"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"after\""
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 2,
+  "screenshots": [
+    {
+      "dataLength": 0,
+      "label": "after"
+    }
+  ],
+  "scriptName": "repeat times",
+  "steps": [
+    {
+      "command": "repeat",
+      "detail": "repeat: completed 3 iterations",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    },
+    {
+      "command": "screenshot",
+      "detail": "Screenshot saved as \"after\"",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 1
+    }
+  ],
+  "totalSteps": 2
+}

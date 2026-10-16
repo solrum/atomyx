@@ -1,0 +1,5 @@
+{
+  "name": "invalid-repeat-while-two-conditions",
+  "description": "a repeat while condition that sets both visible and expr must be REJECTED.",
+  "yaml": "- repeat:\n    while:\n      visible: Done\n      expr: n < 3\n    commands:\n      - back\n"
+}

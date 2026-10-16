@@ -1,0 +1,36 @@
+{
+  "parsed": {
+    "_stepLines": [
+      1
+    ],
+    "appId": "",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Untitled script",
+    "steps": [
+      {
+        "command": "repeat",
+        "commands": [
+          {
+            "command": "repeat",
+            "commands": [
+              {
+                "command": "back"
+              }
+            ],
+            "while": {
+              "notVisible": {
+                "id": "spinner"
+              }
+            }
+          }
+        ],
+        "times": 10,
+        "while": {
+          "expr": "attempts \u003c 5"
+        }
+      }
+    ]
+  },
+  "valid": true
+}

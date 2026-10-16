@@ -1,0 +1,5 @@
+{
+  "name": "repeat-times-valid",
+  "description": "a repeat block with a times count and a mixed command list parses.",
+  "yaml": "- launchApp\n- repeat:\n    times: 3\n    commands:\n      - tap: Next\n      - assertVisible: Page\n"
+}

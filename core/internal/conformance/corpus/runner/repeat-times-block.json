@@ -1,0 +1,10 @@
+{
+  "name": "repeat-times-block",
+  "description": "a repeat with times 3 runs its block three times and reports each nested step.",
+  "yaml": "appId: com.test\nname: repeat times\nenv: {}\n---\n- repeat:\n    times: 3\n    commands:\n      - back\n- screenshot: after\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

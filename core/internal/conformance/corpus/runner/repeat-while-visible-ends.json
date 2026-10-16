@@ -1,0 +1,12 @@
+{
+  "name": "repeat-while-visible-ends",
+  "description": "a repeat while an element is visible stops once the element disappears.",
+  "yaml": "appId: com.test\nname: repeat while\nenv: {}\n---\n- repeat:\n    while:\n      visible: More\n    commands:\n      - back\n- screenshot: after\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [ { "attributes": { "text": "More", "label": "More", "bounds": "0,0,10,10" }, "children": [] } ] },
+      { "attributes": {}, "children": [ { "attributes": { "text": "More", "label": "More", "bounds": "0,0,10,10" }, "children": [] } ] },
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

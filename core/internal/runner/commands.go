@@ -30,5 +30,6 @@ func DefaultCommands() []CommandDefinition {
 		LongPressCommand{},
 		PinchCommand{},
 		RotateCommand{},
+		RepeatCommand{},
 	}
 }

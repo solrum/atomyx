@@ -84,6 +84,7 @@ func jsonSchemaDefinitions() map[string]any {
 		"PointerTouch":         pointerTouchSchema(),
 		"HandleCondition":      handleConditionSchema(),
 		"HandleBranch":         handleBranchSchema(),
+		"RepeatCondition":      repeatConditionSchema(),
 		"PreconditionCheck":    preconditionCheckSchema(),
 		"Precondition":         preconditionSchema(),
 		"BranchMatchCondition": branchMatchConditionSchema(),
@@ -305,6 +306,18 @@ func handleBranchSchema() map[string]any {
 		},
 		[]string{"when", "do"},
 		"One branch of a handle step: a condition plus the steps to run when it matches.",
+	)
+}
+
+func repeatConditionSchema() map[string]any {
+	return objectSchema(
+		map[string]any{
+			"visible":    ref("StringOrSelector"),
+			"notVisible": ref("StringOrSelector"),
+			"expr":       stringMinLen(1, "Boolean expression over the script's runtime variables."),
+		},
+		nil,
+		"Condition a repeat loop checks before each iteration. Exactly one of `visible`, `notVisible` or `expr` must be set.",
 	)
 }
 

@@ -1,0 +1,5 @@
+{
+  "name": "invalid-repeat-empty-commands",
+  "description": "a repeat block with an empty commands list must be REJECTED.",
+  "yaml": "- repeat:\n    times: 2\n    commands: []\n"
+}

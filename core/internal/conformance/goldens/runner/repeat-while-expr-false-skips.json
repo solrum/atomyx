@@ -1,0 +1,87 @@
+{
+  "calls": [],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "repeat",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 6,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "repeat: while \"mode == \\\"busy\\\"\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "repeat"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "while"
+        },
+        {
+          "kind": "punct",
+          "text": " "
+        },
+        {
+          "kind": "string",
+          "text": "\"mode == \\\"busy\\\"\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "repeat",
+      "depth": 0,
+      "detail": "repeat: condition ended the loop after 0 iterations",
+      "durationMs": 0,
+      "line": 6,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "repeat: while \"mode == \\\"busy\\\"\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "repeat"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "while"
+        },
+        {
+          "kind": "punct",
+          "text": " "
+        },
+        {
+          "kind": "string",
+          "text": "\"mode == \\\"busy\\\"\""
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 1,
+  "screenshots": [],
+  "scriptName": "repeat expr",
+  "steps": [
+    {
+      "command": "repeat",
+      "detail": "repeat: condition ended the loop after 0 iterations",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    }
+  ],
+  "totalSteps": 1
+}
