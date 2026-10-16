@@ -1,0 +1,11 @@
+{
+  "name": "open-link-unsupported-fails",
+  "description": "openLink fails the step with a coded error, without calling the driver, when the device cannot open links.",
+  "yaml": "appId: com.test\nname: open link unsupported\nenv: {}\n---\n- openLink: myapp://home\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ],
+    "capabilities": { "canOpenLink": false }
+  }
+}

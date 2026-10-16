@@ -36,6 +36,7 @@ var stepCommandOrder = []string{
 	"StopAppStep",
 	"KillAppStep",
 	"ClearStateStep",
+	"OpenLinkStep",
 	"HideKeyboardStep",
 	"EraseTextStep",
 	"ScrollUntilVisibleStep",
@@ -63,6 +64,15 @@ func stepJSONSchemaDefinitions() map[string]any {
 		"StopAppStep":    appLifecycleStepSchema(CommandStopApp, "Stop an app. Behaves the same as `killApp` on every platform."),
 		"KillAppStep":    appLifecycleStepSchema(CommandKillApp, "Terminate an app. Behaves the same as `stopApp` on every platform."),
 		"ClearStateStep": appLifecycleStepSchema(CommandClearState, "Reset an app's data to a clean state."),
+		"OpenLinkStep": objectSchema(
+			map[string]any{
+				"command": constString(CommandOpenLink),
+				"link":    stringMinLen(1, "URL, deep link or universal link to open. It must start with a scheme such as `https:` or `myapp:`."),
+				"appId":   stringMinLen(1, "App that must open the link. When omitted, the device chooses the handler."),
+			},
+			[]string{"command", "link"},
+			"Open a URL, deep link or universal link in the device's handler for it.",
+		),
 		"TapStep": objectSchema(
 			map[string]any{
 				"command":  constString(CommandTap),

@@ -30,6 +30,9 @@ func applyCapabilitiesOverride(d *mock.Driver, o *RunnerCapabilitiesOverride) {
 	if o.CanHideKeyboard != nil {
 		caps.CanHideKeyboard = *o.CanHideKeyboard
 	}
+	if o.CanOpenLink != nil {
+		caps.CanOpenLink = *o.CanOpenLink
+	}
 	if o.CanMultiPointer != nil {
 		caps.CanMultiPointer = *o.CanMultiPointer
 	}

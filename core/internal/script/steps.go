@@ -49,6 +49,7 @@ const (
 	CommandStopApp          = "stopApp"
 	CommandKillApp          = "killApp"
 	CommandClearState       = "clearState"
+	CommandOpenLink         = "openLink"
 
 	CommandHideKeyboard          = "hideKeyboard"
 	CommandEraseText             = "eraseText"
@@ -511,6 +512,19 @@ type ClearStateStep struct {
 
 func (s *ClearStateStep) StepCommand() string { return s.Command }
 func (s *ClearStateStep) isScriptStep()       {}
+
+// OpenLinkStep opens Link, a URL, deep link or universal link, in the
+// device's handler for it. A non-nil AppID names the app that must open
+// it, as an Android package name or an iOS bundle id.
+type OpenLinkStep struct {
+	stepSource
+	Command string  `json:"command"`
+	Link    string  `json:"link"`
+	AppID   *string `json:"appId,omitempty"`
+}
+
+func (s *OpenLinkStep) StepCommand() string { return s.Command }
+func (s *OpenLinkStep) isScriptStep()       {}
 
 // Kinds of value an inputRandom step types.
 const (

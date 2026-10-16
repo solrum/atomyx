@@ -38,7 +38,7 @@ type system enforces it.
 | `disconnect_device` | `core/internal/mcp/select_device_tool.go` | none | `{ok:true, wasActive?}` | `DeviceSession.Current` and `DeviceSession.Disconnect` |
 | `check_health` | `core/internal/mcp/check_health_tool.go` | none | `HealthReport` (selected, healthy, state, code, remedy, warnings), never takes or probes a released, borrowed or lost device | `DeviceSession.CheckHealth` |
 | `list_apps` | `core/internal/mcp/list_apps_tool.go` | none | `{count, apps[], note?}` | `Orchestra.ListApps` |
-| `launch_app` | `core/internal/mcp/launch_app_tool.go` | `appId`, `mode` (`default`, `fresh`, `attach`), `arguments` (name to string, number or boolean) | `{ok, appId}` | `Orchestra.LaunchAppWithOptions` |
+| `launch_app` | `core/internal/mcp/launch_app_tool.go` | `appId`, `mode` (`default`, `fresh`, `attach`), `arguments` (name to string, number or boolean), `link` (opens the link in the app instead of a plain launch, and excludes `arguments` and any `mode` but `default`) | `{ok, appId}` | `Orchestra.LaunchAppWithOptions` |
 | **Screen** | | | | |
 | `get_ui_tree` | `core/internal/mcp/get_ui_tree_tool.go` | `limit`, `includeSystemOverlays` | `{total, returned, truncated, nodes[]}` | `Orchestra.Hierarchy` |
 | `find_element` | `core/internal/mcp/find_element_tool.go` | a `Selector` (id, label, text, value, hint, role, enabled, clickable, focused, nth) | element details plus center, or `{found:false}` | `Orchestra.FindOne` |

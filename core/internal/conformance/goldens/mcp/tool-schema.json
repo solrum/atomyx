@@ -445,7 +445,7 @@
     }
   },
   "launch_app": {
-    "description": "Launch an app on the connected device by its app identifier. The driver brings the app to the foreground; subsequent tool calls operate on its UI. Requires an active device, so call `select_device` first. Use `list_apps` to discover available identifiers. A second default launch of the same app in the same session is skipped, so pass mode `fresh` to force-stop and relaunch it with its data kept. Pass `arguments` to hand named values to the app at launch, for example to start it on a given screen.",
+    "description": "Launch an app on the connected device by its app identifier. The driver brings the app to the foreground; subsequent tool calls operate on its UI. Requires an active device, so call `select_device` first. Use `list_apps` to discover available identifiers. A second default launch of the same app in the same session is skipped, so pass mode `fresh` to force-stop and relaunch it with its data kept. Pass `arguments` to hand named values to the app at launch, for example to start it on a given screen. Pass `link` to open a deep link or URL in the app, which lands it on the link's destination.",
     "inputSchema": {
       "properties": {
         "appId": {
@@ -468,6 +468,10 @@
           },
           "description": "Named values handed to the app at launch, each a string, number or boolean delivered as text. The app reads them at startup. They apply only when the launch starts the app, so a launch with `attach` that finds the app running ignores them. A launch that carries arguments is never skipped as a repeat.",
           "type": "object"
+        },
+        "link": {
+          "description": "A URL, deep link or universal link to open in the app instead of starting it on its home screen, for example `myapp://orders/42`. The app opens on the link's destination. It cannot be combined with `arguments` or a `mode` other than `default`. A device that cannot open links fails with `LINK_UNSUPPORTED`, and a link that no app opens fails with `LINK_NOT_OPENED`. Success means the device accepted the link, so wait for an element on the destination before acting.",
+          "type": "string"
         },
         "mode": {
           "anyOf": [

@@ -1,0 +1,5 @@
+{
+  "name": "invalid-open-link-missing-link",
+  "description": "openLink in its object form without a link must be REJECTED.",
+  "yaml": "- openLink:\n    appId: dev.atomyx.demo\n"
+}

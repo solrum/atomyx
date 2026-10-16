@@ -1,0 +1,10 @@
+{
+  "name": "open-link-in-named-app",
+  "description": "openLink with an app id hands the driver the link and that app.",
+  "yaml": "appId: com.test\nname: open link in app\nenv: {}\n---\n- openLink:\n    link: myapp://home\n    appId: com.other\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

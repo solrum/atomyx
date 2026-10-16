@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"dev.atomyx/internal/driver"
 	mockdriver "dev.atomyx/internal/driver/mock"
 	"dev.atomyx/internal/storage"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 func TestLaunchAppDispatchesToDriver(t *testing.T) {
@@ -189,5 +191,64 @@ func TestLaunchAppRejectsNonScalarArguments(t *testing.T) {
 	}
 	if len(launchAppDriverCalls(drv)) != 0 {
 		t.Fatal("invalid arguments reached the driver")
+	}
+}
+
+func linkLaunchServer(t *testing.T, drv *mockdriver.Driver) (*mcp.ClientSession, context.Context) {
+	t.Helper()
+	drv.Apps = []driver.InstalledApp{{BundleID: "com.example.app"}}
+	cs, ctx := testServer(t, ServerDeps{
+		Probe:   device.NewStaticProbe(),
+		Factory: singleMockDriverFactory{driver: drv},
+		Storage: storage.NewInMemoryStorage(),
+	})
+	selectMockDevice(t, cs, ctx)
+	return cs, ctx
+}
+
+func TestLaunchAppLinkOpensTheLinkInTheApp(t *testing.T) {
+	drv := mockdriver.New()
+	cs, ctx := linkLaunchServer(t, drv)
+
+	result, decoded := callTool(t, cs, ctx, "launch_app", map[string]any{"appId": "com.example.app", "link": "myapp://orders/42?a=1&b=2"})
+	if result.IsError {
+		t.Fatalf("launch_app with link: %v", decoded)
+	}
+	if len(drv.OpenedLinks) != 1 || drv.OpenedLinks[0] != "myapp://orders/42?a=1&b=2" {
+		t.Fatalf("opened links = %v, want the link", drv.OpenedLinks)
+	}
+	if got := len(launchAppDriverCalls(drv)); got != 0 {
+		t.Fatalf("driver launches = %d, want 0 when a link starts the app", got)
+	}
+}
+
+func TestLaunchAppLinkRejectsArgumentsAndModes(t *testing.T) {
+	tests := []map[string]any{
+		{"appId": "com.example.app", "link": "myapp://home", "arguments": map[string]any{"a": "b"}},
+		{"appId": "com.example.app", "link": "myapp://home", "mode": "fresh"},
+		{"appId": "com.example.app", "link": "no scheme"},
+	}
+	for _, args := range tests {
+		drv := mockdriver.New()
+		cs, ctx := linkLaunchServer(t, drv)
+
+		result, decoded := callTool(t, cs, ctx, "launch_app", args)
+		if !result.IsError || decoded["code"] != diag.CodeInvalidArgument {
+			t.Fatalf("launch_app %v: got %v, want INVALID_ARGUMENT", args, decoded)
+		}
+		if len(drv.OpenedLinks) != 0 {
+			t.Fatalf("launch_app %v opened %v, want nothing", args, drv.OpenedLinks)
+		}
+	}
+}
+
+func TestLaunchAppLinkReportsAnUnsupportedDevice(t *testing.T) {
+	drv := mockdriver.New()
+	drv.SetCapabilities(driver.Capabilities{CanOpenLink: false})
+	cs, ctx := linkLaunchServer(t, drv)
+
+	result, decoded := callTool(t, cs, ctx, "launch_app", map[string]any{"appId": "com.example.app", "link": "myapp://home"})
+	if !result.IsError || decoded["code"] != diag.CodeLinkUnsupported {
+		t.Fatalf("launch_app: got %v, want %s", decoded, diag.CodeLinkUnsupported)
 	}
 }

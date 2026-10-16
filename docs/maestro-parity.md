@@ -55,7 +55,7 @@ A Maestro flow that uses only present commands runs as is after a syntax change.
 | `clearState` | `clearState` | Present | Takes an optional app id. On iOS it reinstalls from the configured artifact. |
 | `stopApp` | `stopApp` | Present | Takes an optional app id. |
 | `killApp` | `killApp` | Present | Takes an optional app id. Behaves the same as `stopApp` on every platform. |
-| `openLink` | None | Missing | Needs a link capability on the driver. |
+| `openLink` | `openLink` | Present | Takes a link, or a `link` with an optional `appId`. It has no `autoVerify` or `browser` option. iOS needs 16.4 or later. |
 | `setLocation` | None | Missing | The capability flag exists with no method behind it. |
 | `travel` | None | Missing | Depends on `setLocation`. |
 | `setOrientation` | None | Missing | The capability flag exists with no method behind it. |

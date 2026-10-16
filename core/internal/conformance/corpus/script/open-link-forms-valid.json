@@ -1,0 +1,5 @@
+{
+  "name": "open-link-forms-valid",
+  "description": "openLink parses from a bare link, from an object with a link, and from an object with a link and an app id.",
+  "yaml": "- openLink: atomyxdemo://open/focus\n- openLink:\n    link: https://example.com/a?x=1&y=2\n- openLink:\n    link: atomyxdemo://open/settings\n    appId: dev.atomyx.demo\n"
+}

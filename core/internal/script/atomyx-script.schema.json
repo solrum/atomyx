@@ -528,6 +528,31 @@
       ],
       "type": "object"
     },
+    "OpenLinkStep": {
+      "additionalProperties": false,
+      "description": "Open a URL, deep link or universal link in the device's handler for it.",
+      "properties": {
+        "appId": {
+          "description": "App that must open the link. When omitted, the device chooses the handler.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "command": {
+          "const": "openLink",
+          "type": "string"
+        },
+        "link": {
+          "description": "URL, deep link or universal link to open. It must start with a scheme such as `https:` or `myapp:`.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "command",
+        "link"
+      ],
+      "type": "object"
+    },
     "PinchStep": {
       "additionalProperties": false,
       "description": "Two-finger pinch centered on `center`, moving the contact points from `startGap` apart to `endGap` apart. A selector `center` is resolved to a coordinate at dispatch time.",
@@ -1380,6 +1405,9 @@
         },
         {
           "$ref": "#/definitions/ClearStateStep"
+        },
+        {
+          "$ref": "#/definitions/OpenLinkStep"
         },
         {
           "$ref": "#/definitions/HideKeyboardStep"

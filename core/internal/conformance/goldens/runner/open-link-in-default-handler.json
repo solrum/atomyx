@@ -1,0 +1,79 @@
+{
+  "calls": [
+    {
+      "args": [
+        "myapp://orders/42?tab=all\u0026sort=new",
+        ""
+      ],
+      "method": "openLink"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "openLink",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "openLink: \"myapp://orders/42?tab=all\u0026sort=new\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "openLink"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"myapp://orders/42?tab=all\u0026sort=new\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "openLink",
+      "depth": 0,
+      "detail": "Opened myapp://orders/42?tab=all\u0026sort=new",
+      "durationMs": 0,
+      "line": 5,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "openLink: \"myapp://orders/42?tab=all\u0026sort=new\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "openLink"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"myapp://orders/42?tab=all\u0026sort=new\""
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 1,
+  "screenshots": [],
+  "scriptName": "open link",
+  "steps": [
+    {
+      "command": "openLink",
+      "detail": "Opened myapp://orders/42?tab=all\u0026sort=new",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    }
+  ],
+  "totalSteps": 1
+}

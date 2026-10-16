@@ -102,6 +102,8 @@ func SummarizeStep(step script.ScriptStep) StepSummary {
 		summarizeAppStep(b, "killApp", s.AppID)
 	case *script.ClearStateStep:
 		summarizeAppStep(b, "clearState", s.AppID)
+	case *script.OpenLinkStep:
+		b.kw("openLink").punct(": ").str(s.Link)
 	case *script.HideKeyboardStep:
 		b.kw("hideKeyboard")
 	case *script.EraseTextStep:

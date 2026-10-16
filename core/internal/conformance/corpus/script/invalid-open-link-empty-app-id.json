@@ -1,0 +1,5 @@
+{
+  "name": "invalid-open-link-empty-app-id",
+  "description": "openLink with an explicitly empty app id must be REJECTED.",
+  "yaml": "- openLink:\n    link: myapp://home\n    appId: \"\"\n"
+}

@@ -1,0 +1,5 @@
+{
+  "name": "invalid-open-link-no-scheme",
+  "description": "openLink with a link that has no scheme must be REJECTED.",
+  "yaml": "- openLink: example.com/path\n"
+}

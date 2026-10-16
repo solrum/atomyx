@@ -277,6 +277,34 @@ code and a message telling you to set the `artifact` field.
 - clearState: com.example.other
 ```
 
+### openLink
+
+Open a URL, deep link or universal link in the device's handler for it. The
+step succeeds once the device accepts the link, not once the destination
+screen has finished appearing, so follow it with `waitFor` or an assertion on
+an element of that screen.
+
+```yaml
+- openLink: myapp://orders/42
+- openLink: https://example.com/orders/42?tab=all&sort=new
+- openLink:
+    link: myapp://orders/42
+    appId: com.example.app
+```
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `link` | string | Required. The link to open. It must start with a scheme such as `https:` or `myapp:`, and it can use `${var}` placeholders. |
+| `appId` | string | Optional. The app that must open the link, as an Android package name or an iOS bundle id. Without it the device chooses the handler. |
+
+Rules and behavior:
+
+- A link without a scheme, an empty link, or a link with a control character is rejected when the script is parsed. A link that still holds a `${var}` placeholder is checked again when the step runs.
+- Naming `appId` also avoids the confirmation prompt that a custom scheme can raise when the system picks the handler.
+- A device that cannot open links fails the step with the `LINK_UNSUPPORTED` code. An iOS device older than iOS 16.4 is one of them.
+- A link that no installed app handles fails the step with the `LINK_NOT_OPENED` code.
+- Opening a link in an `appId` counts as launching that app in the flow, so a later `launchApp` of the same app is skipped as a repeat unless it is a fresh launch.
+
 ### tap
 
 Tap an element on screen.

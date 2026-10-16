@@ -258,6 +258,9 @@ func validateStep(step ScriptStep, path string, report reportFunc) {
 	case *ClearStateStep:
 		validateAppID(s.AppID, path, report)
 
+	case *OpenLinkStep:
+		validateOpenLinkStep(s, path, report)
+
 	case *EraseTextStep:
 		validateEraseTextStep(s, path, report)
 

@@ -21,6 +21,12 @@ var launchAppInputSchema = jsObject(map[string]any{
 			"starts the app, so a launch with `attach` that finds the app running ignores them. " +
 			"A launch that carries arguments is never skipped as a repeat.",
 	},
+	"link": jsStringDesc("A URL, deep link or universal link to open in the app instead of " +
+		"starting it on its home screen, for example `myapp://orders/42`. The app opens on the " +
+		"link's destination. It cannot be combined with `arguments` or a `mode` other than " +
+		"`default`. A device that cannot open links fails with `LINK_UNSUPPORTED`, and a link " +
+		"that no app opens fails with `LINK_NOT_OPENED`. Success means the device accepted " +
+		"the link, so wait for an element on the destination before acting."),
 }, "appId")
 
 var launchAppSchema = compileToolSchema("launch_app", launchAppInputSchema)
@@ -29,6 +35,7 @@ type launchAppArgs struct {
 	AppID     string         `json:"appId"`
 	Mode      string         `json:"mode"`
 	Arguments map[string]any `json:"arguments"`
+	Link      string         `json:"link"`
 }
 
 // launchArgumentValues renders each validated argument value as the text
@@ -72,7 +79,8 @@ func registerLaunchAppTool(server *mcp.Server, tc *ToolContext) {
 			"default launch of the same app in the same session is skipped, so " +
 			"pass mode `fresh` to force-stop and relaunch it with its data kept. " +
 			"Pass `arguments` to hand named values to the app at launch, for " +
-			"example to start it on a given screen.",
+			"example to start it on a given screen. Pass `link` to open a deep link " +
+			"or URL in the app, which lands it on the link's destination.",
 		InputSchema: launchAppInputSchema,
 	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		if err := validateToolArguments(launchAppSchema, req.Params.Arguments); err != nil {
@@ -87,7 +95,7 @@ func registerLaunchAppTool(server *mcp.Server, tc *ToolContext) {
 		if err != nil {
 			return errorResult(err), nil
 		}
-		opts := orchestra.LaunchOptions{Mode: launchModeOf(args.Mode), Arguments: launchArgumentValues(args.Arguments)}
+		opts := orchestra.LaunchOptions{Mode: launchModeOf(args.Mode), Arguments: launchArgumentValues(args.Arguments), Link: args.Link}
 		if err := orch.LaunchAppWithOptions(ctx, args.AppID, opts); err != nil {
 			return errorResult(err), nil
 		}

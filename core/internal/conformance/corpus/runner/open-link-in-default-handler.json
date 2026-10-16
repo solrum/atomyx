@@ -1,0 +1,10 @@
+{
+  "name": "open-link-in-default-handler",
+  "description": "openLink hands the link to the driver with no app, so the device picks the handler.",
+  "yaml": "appId: com.test\nname: open link\nenv: {}\n---\n- openLink: myapp://orders/42?tab=all&sort=new\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

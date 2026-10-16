@@ -1,0 +1,79 @@
+{
+  "calls": [
+    {
+      "args": [
+        "myapp://home",
+        "com.other"
+      ],
+      "method": "openLink"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "openLink",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "openLink: \"myapp://home\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "openLink"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"myapp://home\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "openLink",
+      "depth": 0,
+      "detail": "Opened myapp://home",
+      "durationMs": 0,
+      "line": 5,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "openLink: \"myapp://home\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "openLink"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"myapp://home\""
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 1,
+  "screenshots": [],
+  "scriptName": "open link in app",
+  "steps": [
+    {
+      "command": "openLink",
+      "detail": "Opened myapp://home",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    }
+  ],
+  "totalSteps": 1
+}
