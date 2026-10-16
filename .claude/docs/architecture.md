@@ -131,8 +131,8 @@ method:
   within the settle bound fails with `ORIENTATION_NOT_SET`.
 - `CanSetLocation`: `SetLocation` moves the reported position to a latitude
   and longitude, validated by one shared range check. The position persists
-  after the call. A device that cannot, which is a physical phone, fails the
-  call with `LOCATION_UNSUPPORTED`, and a device that refuses the position
+  after the call. A device that cannot, such as a physical Android device or an iPhone older
+  than iOS 16.4, fails the call with `LOCATION_UNSUPPORTED`, and a device that refuses the position
   fails with `LOCATION_NOT_SET`.
 - `CanWaitForIdle`: a native idle-detection primitive. `orchestra`
   falls back to tree-diff polling when absent.

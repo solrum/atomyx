@@ -13,6 +13,12 @@ corresponding area. For the high-level map see
   stable selectors at dump time, uses the cached bounds for gestures,
   and re-resolves a fresh node from the live tree for any action that
   needs one.
+- **Never run `adb shell uiautomator dump` against a device under
+  test.** The command starts the platform UI automation service, which
+  displaces the Atomyx accessibility service. Every route that reads
+  the tree or dispatches a gesture then fails with the agent not
+  ready until the service is enabled again. Read the hierarchy
+  through `get_ui_tree` or the agent's `/tree` route instead.
 - **Declare `mutates` on every new agent route.** `Route.mutates` is
   abstract, so a route cannot compile without a choice. The router
   runs mutating routes one at a time. Mark a route false only when it
@@ -763,6 +769,22 @@ first.
   dispatches through `EventSynthesizer` at a coordinate instead, the
   same path selector-based taps compose through host-side.
 
+- **Event-record pointer coordinates are always in portrait device
+  space.** The system interprets the coordinates of a synthesized
+  event record in portrait whatever orientation the record names, so
+  after a rotation `EventRecordSynthesizer`
+  (`platforms/ios-agent/Tests/Bridge/EventRecordSynthesizer.swift`)
+  maps every point from hierarchy space into portrait device space
+  and the record always names portrait. A gesture path that skips the
+  mapping lands on the wrong point in landscape.
+- **`XCUIDevice` calls must run on the main thread.** Reading or
+  setting `XCUIDevice.shared.orientation` from a background queue
+  asserts and crashes the runner. `DeviceOrientation`
+  (`platforms/ios-agent/Tests/Bridge/DeviceOrientation.swift`) seeds
+  its cache on the main queue, which runs once the serving test
+  starts its main run loop. A new `XCUIDevice` call must hop to the
+  main queue the same way.
+
 ### `XCUIElement.ElementType` naming
 
 - **An unmapped `elementType` renders as `typeNN`, unreadable for
@@ -781,6 +803,13 @@ first.
   directly. A custom-keypad fallback must check `getKeyboard` first
   and branch on visibility rather than assuming every Flutter app
   needs the fallback path.
+- **Flutter on iOS joins merged semantics labels with a newline.** A
+  title and a subtitle that Flutter merges into one node reach the
+  tree as one label such as `Title\nSubtitle`, and the child
+  identifier is dropped. A literal selector equal to one whole segment
+  still matches, and a `{regex, flags}` selector sees the full text
+  with its newline. Never compare a read label to a single-line
+  expectation without taking the first line.
 - **Interactive-type empty wrappers are noise.** Some `button` or
   `cell` elements in a Flutter tree carry an empty identifier, label,
   and value. The Swift-side stable-signal filter keeps them because

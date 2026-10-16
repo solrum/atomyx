@@ -14,10 +14,9 @@ Each row names one Maestro command, the Atomyx way to do it, and a status:
 
 - Present: a YAML step does it today.
 - Partial: the engine or a combination of steps does part of it, but no single step matches.
-- Missing: nothing in Atomyx does it yet. Work to add it is planned.
 - Out of scope: Atomyx does not plan to add it, and the reason is in the row.
 
-A Maestro flow that uses only present commands runs as is after a syntax change. A flow that uses a partial or missing command needs the workaround in the row, or waits for the command to land.
+A Maestro flow that uses only present commands runs as is after a syntax change. A flow that uses a partial command needs the workaround in the row. A flow that uses an out of scope command needs a different approach, and the row gives the reason.
 
 ## Core commands
 
@@ -83,7 +82,7 @@ A Maestro flow that uses only present commands runs as is after a syntax change.
 | Airplane mode | None | Out of scope | No portable control on a non-rooted device. |
 | `clearKeychain` | None | Out of scope | No public API to clear the keychain from a test runner. |
 | Permission grants on a physical iOS device | None | Out of scope | iOS offers no public API to grant a permission from a test runner, so the step fails with `PERMISSIONS_UNSUPPORTED`. |
-| Volume, power and lock keys | None | Missing | `pressKey` does not cover these keys. |
+| Volume, power and lock keys | None | Out of scope | A test runner cannot press hardware keys on iOS, and a portable key set has to work on both platforms, so `pressKey` covers only keys both can send. |
 
 ## References
 
