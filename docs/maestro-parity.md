@@ -57,7 +57,7 @@ A Maestro flow that uses only present commands runs as is after a syntax change.
 | `openLink` | `openLink` | Present | Takes a link, or a `link` with an optional `appId`. It has no `autoVerify` or `browser` option. iOS needs 16.4 or later. |
 | `setLocation` | `setLocation` | Present | Takes `latitude` and `longitude` as an object, not the Maestro text pair. It works on an Android emulator, an iOS simulator and a physical iPhone on iOS 16.4 or later. A physical Android device and an older iPhone fail with `LOCATION_UNSUPPORTED`. The position persists after the script. |
 | `travel` | `travel` | Present | Takes `points` as objects with `latitude` and `longitude`, and an optional `speed` in meters per second. It sets each point after the time the distance takes and does not interpolate between points. The route is limited to 100 points and ten minutes. |
-| `setOrientation` | `setOrientation` | Present | Takes `portrait`, `landscapeLeft` or `landscapeRight`. The rotation persists after the script. There is no upside-down portrait. |
+| `setOrientation` | `setOrientation` | Present | Takes `portrait`, `landscapeLeft` or `landscapeRight`. The step returns once the screen has settled. The rotation persists after the script. There is no upside-down portrait. |
 | `hideKeyboard` | `hideKeyboard` | Present | |
 | `eraseText` | `eraseText` | Present | `charactersToErase` defaults to 50, like Maestro. |
 | `scrollUntilVisible` | `scrollUntilVisible` | Present | Takes a selector and a `down` or `up` direction. It has no timeout or visibility percentage. The search is bounded by a fixed number of swipes. |

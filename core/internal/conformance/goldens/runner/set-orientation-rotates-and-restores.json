@@ -7,19 +7,43 @@
       "method": "setOrientation"
     },
     {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
       "args": [
         "landscapeRight"
       ],
       "method": "setOrientation"
     },
     {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
       "args": [
         "portrait"
       ],
       "method": "setOrientation"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
+    },
+    {
+      "args": [],
+      "method": "hierarchy"
     }
   ],
-  "durationMs": 0,
+  "durationMs": 600,
   "events": [
     {
       "command": "setOrientation",
@@ -50,7 +74,7 @@
       "command": "setOrientation",
       "depth": 0,
       "detail": "Rotated to landscapeLeft",
-      "durationMs": 0,
+      "durationMs": 200,
       "line": 5,
       "ok": true,
       "stepIndex": 0,
@@ -100,7 +124,7 @@
       "command": "setOrientation",
       "depth": 0,
       "detail": "Rotated to landscapeRight",
-      "durationMs": 0,
+      "durationMs": 200,
       "line": 6,
       "ok": true,
       "stepIndex": 1,
@@ -150,7 +174,7 @@
       "command": "setOrientation",
       "depth": 0,
       "detail": "Rotated to portrait",
-      "durationMs": 0,
+      "durationMs": 200,
       "line": 7,
       "ok": true,
       "stepIndex": 2,
@@ -181,21 +205,21 @@
     {
       "command": "setOrientation",
       "detail": "Rotated to landscapeLeft",
-      "durationMs": 0,
+      "durationMs": 200,
       "ok": true,
       "stepIndex": 0
     },
     {
       "command": "setOrientation",
       "detail": "Rotated to landscapeRight",
-      "durationMs": 0,
+      "durationMs": 200,
       "ok": true,
       "stepIndex": 1
     },
     {
       "command": "setOrientation",
       "detail": "Rotated to portrait",
-      "durationMs": 0,
+      "durationMs": 200,
       "ok": true,
       "stepIndex": 2
     }

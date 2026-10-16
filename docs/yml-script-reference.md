@@ -357,7 +357,10 @@ Rotate the device to portrait or to one of the two landscape orientations.
 
 The value is one of `portrait`, `landscapeLeft` (the device turned a
 quarter counterclockwise) and `landscapeRight` (a quarter clockwise). The
-step succeeds once the screen reports the rotated layout.
+step returns once the screen reports the rotated layout and has settled,
+so the next step can tap or read the screen immediately. The settle wait
+is bounded, and a screen that is still moving at the bound does not fail
+the step.
 
 Rules and behavior:
 
