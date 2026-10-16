@@ -59,8 +59,9 @@ xcrun simctl openurl booted atomyxdemo://open/focus
 
 A launcher can start the app directly on a route, which avoids the system
 confirmation a custom URL scheme can raise. Android reads a `route` string
-extra on the launching intent, and iOS reads a `--route <path>` launch
-argument.
+extra on the launching intent, and iOS reads a `--route <path>` or
+`-route <path>` launch argument. A script reaches the same screen with
+`launchApp: {arguments: {route: /focus}}`.
 
 ```bash
 adb shell am start -n dev.atomyx.demo/.MainActivity --es route /focus

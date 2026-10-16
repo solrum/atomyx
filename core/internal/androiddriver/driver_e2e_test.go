@@ -127,6 +127,12 @@ func (f *androidE2EFixture) hooks(t *testing.T) drivertest.Hooks {
 			inst.http.CloseIdleConnections()
 		},
 		FocusInput: f.focusInput,
+		LaunchArguments: &drivertest.LaunchArgumentsFixture{
+			Arguments: map[string]string{"route": androidE2EFocusRoute},
+			Await: func(t *testing.T, d driver.Driver) {
+				drivertest.AwaitFocusedInput(t, d, androidE2EFocusInput)
+			},
+		},
 	}
 	appID := os.Getenv("ATOMYX_ANDROID_INSTALL_APP_ID")
 	if os.Getenv("ATOMYX_ANDROID_INSTALL_APK") != "" && appID != "" {
