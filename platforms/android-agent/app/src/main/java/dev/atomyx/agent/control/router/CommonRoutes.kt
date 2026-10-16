@@ -383,6 +383,18 @@ class KeyRoute : Route {
     }
 }
 
+/**
+ * Reads the optional `arguments` object of a launch request as name to
+ * text pairs. An entry whose value is not a JSON primitive is skipped,
+ * because an intent extra here carries text only.
+ */
+internal fun launchArgumentsFrom(body: JsonObject): Map<String, String> {
+    val arguments = body.get("arguments")?.takeIf { it.isJsonObject }?.asJsonObject ?: return emptyMap()
+    return arguments.entrySet()
+        .filter { it.value.isJsonPrimitive }
+        .associate { it.key to it.value.asString }
+}
+
 class LaunchRoute : Route {
     override val mutates = true
     override val method = NanoHTTPD.Method.POST
@@ -390,7 +402,7 @@ class LaunchRoute : Route {
     override fun handle(request: RouteRequest, services: AtomyxServices): RouteResponse {
         val body = parseBody(request.body)
         val packageName = body.get("packageName").asString
-        return when (val outcome = services.system.launchApp(packageName)) {
+        return when (val outcome = services.system.launchApp(packageName, launchArgumentsFrom(body))) {
             is SystemActionDispatcher.LaunchOutcome.Launched ->
                 RouteResponse.ok(toJson(mapOf("ok" to true)))
             is SystemActionDispatcher.LaunchOutcome.NoLaunchableActivity ->

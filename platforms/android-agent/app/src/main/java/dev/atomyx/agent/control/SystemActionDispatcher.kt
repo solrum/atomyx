@@ -42,10 +42,18 @@ class SystemActionDispatcher(
         data class NoLaunchableActivity(val packageName: String) : LaunchOutcome()
     }
 
-    fun launchApp(packageName: String): LaunchOutcome {
+    /**
+     * Starts [packageName] through its launcher activity. Each entry of
+     * [arguments] is put on the launch intent as a string extra, so the
+     * app reads it from its launching intent at startup. The extras
+     * reach the app only when the launch creates its task, which is why
+     * the host stops a running app before a launch that carries them.
+     */
+    fun launchApp(packageName: String, arguments: Map<String, String> = emptyMap()): LaunchOutcome {
         val intent = service.packageManager.getLaunchIntentForPackage(packageName)
             ?: return LaunchOutcome.NoLaunchableActivity(packageName)
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        arguments.forEach { (name, value) -> intent.putExtra(name, value) }
         service.startActivity(intent)
         return LaunchOutcome.Launched
     }
