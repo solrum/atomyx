@@ -1,0 +1,99 @@
+{
+  "calls": [
+    {
+      "args": [
+        {
+          "latitude": 10,
+          "longitude": 10
+        }
+      ],
+      "method": "setLocation"
+    },
+    {
+      "args": [
+        {
+          "latitude": 10,
+          "longitude": 10.001
+        }
+      ],
+      "method": "setLocation"
+    },
+    {
+      "args": [
+        {
+          "latitude": 10.001,
+          "longitude": 10.001
+        }
+      ],
+      "method": "setLocation"
+    }
+  ],
+  "durationMs": 4415,
+  "events": [
+    {
+      "command": "travel",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "travel: 3 points at 50 m/s",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "travel"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "3 points at 50 m/s"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "travel",
+      "depth": 0,
+      "detail": "Traveled through 3 points to 10.001, 10.001",
+      "durationMs": 4415,
+      "line": 5,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "travel: 3 points at 50 m/s",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "travel"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "3 points at 50 m/s"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 1,
+  "screenshots": [],
+  "scriptName": "travel",
+  "steps": [
+    {
+      "command": "travel",
+      "detail": "Traveled through 3 points to 10.001, 10.001",
+      "durationMs": 4415,
+      "ok": true,
+      "stepIndex": 0
+    }
+  ],
+  "totalSteps": 1
+}

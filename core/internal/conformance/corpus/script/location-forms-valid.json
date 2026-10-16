@@ -1,0 +1,5 @@
+{
+  "name": "location-forms-valid",
+  "description": "setLocation and travel parse, with and without a travel speed.",
+  "yaml": "- setLocation:\n    latitude: -33.8568\n    longitude: 151.2153\n- travel:\n    points:\n      - latitude: 1\n        longitude: 2\n      - latitude: 1.0005\n        longitude: 2\n- travel:\n    speed: 12.5\n    points:\n      - {latitude: 1, longitude: 2}\n      - {latitude: 1.0005, longitude: 2}\n"
+}

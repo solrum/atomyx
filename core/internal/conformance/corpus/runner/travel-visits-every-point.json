@@ -1,0 +1,10 @@
+{
+  "name": "travel-visits-every-point",
+  "description": "travel hands the driver each point in order and leaves the device at the last one.",
+  "yaml": "appId: com.test\nname: travel\nenv: {}\n---\n- travel:\n    speed: 50\n    points:\n      - latitude: 10\n        longitude: 10\n      - latitude: 10\n        longitude: 10.001\n      - latitude: 10.001\n        longitude: 10.001\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

@@ -1437,6 +1437,12 @@
           "$ref": "#/definitions/SetOrientationStep"
         },
         {
+          "$ref": "#/definitions/SetLocationStep"
+        },
+        {
+          "$ref": "#/definitions/TravelStep"
+        },
+        {
           "$ref": "#/definitions/HideKeyboardStep"
         },
         {
@@ -1476,6 +1482,34 @@
       "required": [
         "command",
         "selector"
+      ],
+      "type": "object"
+    },
+    "SetLocationStep": {
+      "additionalProperties": false,
+      "description": "Move the device to a latitude and longitude. The position persists until changed.",
+      "properties": {
+        "command": {
+          "const": "setLocation",
+          "type": "string"
+        },
+        "latitude": {
+          "description": "Latitude in degrees, from -90 to 90. Positive is north.",
+          "maximum": 90,
+          "minimum": -90,
+          "type": "number"
+        },
+        "longitude": {
+          "description": "Longitude in degrees, from -180 to 180. Positive is east.",
+          "maximum": 180,
+          "minimum": -180,
+          "type": "number"
+        }
+      },
+      "required": [
+        "command",
+        "latitude",
+        "longitude"
       ],
       "type": "object"
     },
@@ -1634,6 +1668,54 @@
       "required": [
         "command",
         "selector"
+      ],
+      "type": "object"
+    },
+    "TravelStep": {
+      "additionalProperties": false,
+      "description": "Move the device through a list of positions, waiting between them for the time the distance takes at the given speed.",
+      "properties": {
+        "command": {
+          "const": "travel",
+          "type": "string"
+        },
+        "points": {
+          "description": "Positions to visit in order, from 2 to 100.",
+          "items": {
+            "additionalProperties": false,
+            "description": "One position on the route.",
+            "properties": {
+              "latitude": {
+                "description": "Latitude in degrees, from -90 to 90. Positive is north.",
+                "maximum": 90,
+                "minimum": -90,
+                "type": "number"
+              },
+              "longitude": {
+                "description": "Longitude in degrees, from -180 to 180. Positive is east.",
+                "maximum": 180,
+                "minimum": -180,
+                "type": "number"
+              }
+            },
+            "required": [
+              "latitude",
+              "longitude"
+            ],
+            "type": "object"
+          },
+          "minItems": 2,
+          "type": "array"
+        },
+        "speed": {
+          "description": "Speed in meters per second. Defaults to 4.",
+          "exclusiveMinimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "command",
+        "points"
       ],
       "type": "object"
     },

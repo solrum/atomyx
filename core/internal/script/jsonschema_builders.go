@@ -158,3 +158,11 @@ func permissionsMapSchema(description string) map[string]any {
 		"additionalProperties": map[string]any{"enum": states},
 	}, description)
 }
+
+func latitudeSchema() map[string]any {
+	return numberMinMax(-driver.MaxLatitude, driver.MaxLatitude, "Latitude in degrees, from -90 to 90. Positive is north.")
+}
+
+func longitudeSchema() map[string]any {
+	return numberMinMax(-driver.MaxLongitude, driver.MaxLongitude, "Longitude in degrees, from -180 to 180. Positive is east.")
+}

@@ -264,6 +264,12 @@ func validateStep(step ScriptStep, path string, report reportFunc) {
 	case *SetOrientationStep:
 		validateSetOrientationStep(s, path, report)
 
+	case *SetLocationStep:
+		validateSetLocationStep(s, path, report)
+
+	case *TravelStep:
+		validateTravelStep(s, path, report)
+
 	case *SetPermissionsStep:
 		validateSetPermissionsStep(s, path, report)
 

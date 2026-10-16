@@ -1,0 +1,11 @@
+{
+  "name": "travel-unsupported-fails",
+  "description": "travel fails the step with a coded error, without calling the driver, when the device cannot be moved.",
+  "yaml": "appId: com.test\nname: travel unsupported\nenv: {}\n---\n- travel:\n    points:\n      - latitude: 10\n        longitude: 10\n      - latitude: 10\n        longitude: 10.001\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ],
+    "capabilities": { "canSetLocation": false }
+  }
+}

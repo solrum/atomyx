@@ -1,0 +1,5 @@
+{
+  "name": "invalid-travel-bad-speed",
+  "description": "travel with a speed of zero must be REJECTED.",
+  "yaml": "- travel:\n    speed: 0\n    points:\n      - {latitude: 1, longitude: 2}\n      - {latitude: 1.0005, longitude: 2}\n"
+}

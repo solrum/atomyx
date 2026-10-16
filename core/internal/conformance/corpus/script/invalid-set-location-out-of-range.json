@@ -1,0 +1,5 @@
+{
+  "name": "invalid-set-location-out-of-range",
+  "description": "setLocation with a latitude outside -90 to 90 must be REJECTED.",
+  "yaml": "- setLocation:\n    latitude: 91\n    longitude: 0\n"
+}

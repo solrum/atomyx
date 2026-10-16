@@ -1,0 +1,71 @@
+{
+  "calls": [],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "setLocation",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "setLocation: 37.7749, -122.4194",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "setLocation"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "37.7749, -122.4194"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "setLocation",
+      "depth": 0,
+      "detail": "this device does not allow its location to be set",
+      "durationMs": 0,
+      "line": 5,
+      "ok": false,
+      "stepIndex": 0,
+      "summary": "setLocation: 37.7749, -122.4194",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "setLocation"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "37.7749, -122.4194"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": 0,
+  "ok": false,
+  "passedSteps": 0,
+  "screenshots": [],
+  "scriptName": "move unsupported",
+  "steps": [
+    {
+      "command": "setLocation",
+      "detail": "this device does not allow its location to be set",
+      "durationMs": 0,
+      "ok": false,
+      "stepIndex": 0
+    }
+  ],
+  "totalSteps": 1
+}

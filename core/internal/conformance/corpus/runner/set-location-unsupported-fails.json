@@ -1,0 +1,11 @@
+{
+  "name": "set-location-unsupported-fails",
+  "description": "setLocation fails the step with a coded error, without calling the driver, when the device cannot be moved.",
+  "yaml": "appId: com.test\nname: move unsupported\nenv: {}\n---\n- setLocation:\n    latitude: 37.7749\n    longitude: -122.4194\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ],
+    "capabilities": { "canSetLocation": false }
+  }
+}

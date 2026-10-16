@@ -54,6 +54,8 @@ const (
 	CommandOpenLink         = "openLink"
 	CommandSetPermissions   = "setPermissions"
 	CommandSetOrientation   = "setOrientation"
+	CommandSetLocation      = "setLocation"
+	CommandTravel           = "travel"
 
 	CommandHideKeyboard          = "hideKeyboard"
 	CommandEraseText             = "eraseText"
@@ -554,6 +556,31 @@ type SetOrientationStep struct {
 
 func (s *SetOrientationStep) StepCommand() string { return s.Command }
 func (s *SetOrientationStep) isScriptStep()       {}
+
+// SetLocationStep moves the device to Latitude and Longitude in degrees.
+// The position persists after the step, because nothing restores the
+// earlier one.
+type SetLocationStep struct {
+	stepSource
+	Command   string  `json:"command"`
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+}
+
+func (s *SetLocationStep) StepCommand() string { return s.Command }
+func (s *SetLocationStep) isScriptStep()       {}
+
+// TravelStep moves the device through Points in order at Speed meters
+// per second. The device stays at the last point after the step.
+type TravelStep struct {
+	stepSource
+	Command string            `json:"command"`
+	Points  []driver.Location `json:"points"`
+	Speed   float64           `json:"speed"`
+}
+
+func (s *TravelStep) StepCommand() string { return s.Command }
+func (s *TravelStep) isScriptStep()       {}
 
 // Kinds of value an inputRandom step types.
 const (

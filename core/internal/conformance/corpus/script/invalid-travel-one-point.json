@@ -1,0 +1,5 @@
+{
+  "name": "invalid-travel-one-point",
+  "description": "travel with a single point must be REJECTED, because there is nowhere to go.",
+  "yaml": "- travel:\n    points:\n      - latitude: 1\n        longitude: 2\n"
+}

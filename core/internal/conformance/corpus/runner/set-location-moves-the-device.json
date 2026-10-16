@@ -1,0 +1,10 @@
+{
+  "name": "set-location-moves-the-device",
+  "description": "setLocation hands the driver the latitude and longitude.",
+  "yaml": "appId: com.test\nname: move\nenv: {}\n---\n- setLocation:\n    latitude: 37.7749\n    longitude: -122.4194\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

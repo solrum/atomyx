@@ -1,0 +1,5 @@
+{
+  "name": "invalid-travel-too-long",
+  "description": "travel whose route takes longer than ten minutes must be REJECTED.",
+  "yaml": "- travel:\n    speed: 1\n    points:\n      - {latitude: 0, longitude: 0}\n      - {latitude: 0, longitude: 10}\n"
+}

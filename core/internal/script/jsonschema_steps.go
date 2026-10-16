@@ -1,6 +1,10 @@
 package script
 
-import "fmt"
+import (
+	"fmt"
+
+	"dev.atomyx/internal/driver"
+)
 
 // stepCommandOrder lists every step definition name in the order the
 // ScriptStep union declares its variants, so the
@@ -39,6 +43,8 @@ var stepCommandOrder = []string{
 	"OpenLinkStep",
 	"SetPermissionsStep",
 	"SetOrientationStep",
+	"SetLocationStep",
+	"TravelStep",
 	"HideKeyboardStep",
 	"EraseTextStep",
 	"ScrollUntilVisibleStep",
@@ -92,6 +98,36 @@ func stepJSONSchemaDefinitions() map[string]any {
 			},
 			[]string{"command", "orientation"},
 			"Rotate the device to portrait or to one of the landscape orientations.",
+		),
+		"SetLocationStep": objectSchema(
+			map[string]any{
+				"command":   constString(CommandSetLocation),
+				"latitude":  latitudeSchema(),
+				"longitude": longitudeSchema(),
+			},
+			[]string{"command", "latitude", "longitude"},
+			"Move the device to a latitude and longitude. The position persists until changed.",
+		),
+		"TravelStep": objectSchema(
+			map[string]any{
+				"command": constString(CommandTravel),
+				"points": arraySchema(
+					objectSchema(
+						map[string]any{
+							"latitude":  latitudeSchema(),
+							"longitude": longitudeSchema(),
+						},
+						[]string{"latitude", "longitude"},
+						"One position on the route.",
+					),
+					driver.MinTravelPoints,
+					fmt.Sprintf("Positions to visit in order, from %d to %d.", driver.MinTravelPoints, driver.MaxTravelPoints),
+				),
+				"speed": withDescription(map[string]any{"type": "number", "exclusiveMinimum": 0},
+					fmt.Sprintf("Speed in meters per second. Defaults to %v.", driver.DefaultTravelSpeedMetersPerSecond)),
+			},
+			[]string{"command", "points"},
+			"Move the device through a list of positions, waiting between them for the time the distance takes at the given speed.",
 		),
 		"TapStep": objectSchema(
 			map[string]any{

@@ -1,0 +1,81 @@
+{
+  "calls": [
+    {
+      "args": [
+        {
+          "latitude": 37.7749,
+          "longitude": -122.4194
+        }
+      ],
+      "method": "setLocation"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "setLocation",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "setLocation: 37.7749, -122.4194",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "setLocation"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "37.7749, -122.4194"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "setLocation",
+      "depth": 0,
+      "detail": "Moved to 37.7749, -122.4194",
+      "durationMs": 0,
+      "line": 5,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "setLocation: 37.7749, -122.4194",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "setLocation"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "37.7749, -122.4194"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 1,
+  "screenshots": [],
+  "scriptName": "move",
+  "steps": [
+    {
+      "command": "setLocation",
+      "detail": "Moved to 37.7749, -122.4194",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    }
+  ],
+  "totalSteps": 1
+}

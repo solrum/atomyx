@@ -1,0 +1,49 @@
+{
+  "parsed": {
+    "_stepLines": [
+      1,
+      4,
+      10
+    ],
+    "appId": "",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Untitled script",
+    "steps": [
+      {
+        "command": "setLocation",
+        "latitude": -33.8568,
+        "longitude": 151.2153
+      },
+      {
+        "command": "travel",
+        "points": [
+          {
+            "latitude": 1,
+            "longitude": 2
+          },
+          {
+            "latitude": 1.0005,
+            "longitude": 2
+          }
+        ],
+        "speed": 4
+      },
+      {
+        "command": "travel",
+        "points": [
+          {
+            "latitude": 1,
+            "longitude": 2
+          },
+          {
+            "latitude": 1.0005,
+            "longitude": 2
+          }
+        ],
+        "speed": 12.5
+      }
+    ]
+  },
+  "valid": true
+}

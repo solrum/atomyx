@@ -5,6 +5,7 @@ import (
 	"strings"
 	"unicode/utf16"
 
+	"dev.atomyx/internal/driver"
 	"dev.atomyx/internal/script"
 )
 
@@ -106,6 +107,10 @@ func SummarizeStep(step script.ScriptStep) StepSummary {
 		b.kw("openLink").punct(": ").str(s.Link)
 	case *script.SetOrientationStep:
 		b.kw("setOrientation").punct(": ").str(string(s.Orientation))
+	case *script.SetLocationStep:
+		b.kw("setLocation").punct(": ").rawStr(describeLocation(driver.Location{Latitude: s.Latitude, Longitude: s.Longitude}))
+	case *script.TravelStep:
+		b.kw("travel").punct(": ").rawStr(describeTravel(s))
 	case *script.SetPermissionsStep:
 		summarizeSetPermissions(b, s)
 	case *script.HideKeyboardStep:

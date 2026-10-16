@@ -368,6 +368,49 @@ Rules and behavior:
 - Taps, swipes and other gestures address the rotated screen, so coordinates read from the hierarchy stay valid.
 - The wait reads the screen size, which cannot tell the two landscape orientations apart, so a turn from one landscape to the other returns as soon as the request is accepted.
 
+### setLocation
+
+Move the device to a latitude and longitude, in degrees.
+
+```yaml
+- setLocation:
+    latitude: 37.7749
+    longitude: -122.4194
+```
+
+Rules and behavior:
+
+- `latitude` runs from -90 to 90 and is positive north. `longitude` runs from -180 to 180 and is positive east. Both are required numbers, and a value outside its range is rejected when the script is parsed.
+- The position persists after the script. Nothing restores the earlier position, so a script that moves the device sets it back before it ends. An app that is already running sees the new position on its next location update.
+- An Android emulator and an iOS simulator can be moved. A physical Android device needs a mock location provider installed on the device, and a physical iOS device is not supported, so on either the step fails with the `LOCATION_UNSUPPORTED` code.
+- A device that was reached but refused the position fails the step with the `LOCATION_NOT_SET` code.
+- The app needs the location permission to receive the position. Use [setPermissions](#setpermissions) to grant it first.
+
+### travel
+
+Move the device through a list of positions, waiting between them for the time the distance takes at a given speed.
+
+```yaml
+- travel:
+    speed: 15
+    points:
+      - latitude: 37.7749
+        longitude: -122.4194
+      - latitude: 37.7790
+        longitude: -122.4140
+      - latitude: 37.7840
+        longitude: -122.4090
+```
+
+Rules and behavior:
+
+- `points` is a list of two to 100 positions, each with a `latitude` and a `longitude` like [setLocation](#setlocation).
+- `speed` is in meters per second and defaults to 4. It must be above zero.
+- The step sets the first point at once. It then waits for the great-circle distance to the next point divided by the speed, rounded up to a millisecond, and sets that point, and so on to the last point. The device stays at the last point afterwards.
+- The device jumps from point to point. The step does not interpolate positions between them, so a route that needs smooth movement lists points close together.
+- The waits add up to at most ten minutes. A route that takes longer, for example because of a very low speed, is rejected when the script is parsed.
+- A device that cannot be moved fails the step with the `LOCATION_UNSUPPORTED` code before the first point, the same as [setLocation](#setlocation). A step that fails part way leaves the device at the last point it accepted.
+
 ### tap
 
 Tap an element on screen.

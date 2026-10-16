@@ -1,0 +1,5 @@
+{
+  "name": "invalid-set-location-missing-longitude",
+  "description": "setLocation without a longitude must be REJECTED.",
+  "yaml": "- setLocation:\n    latitude: 1\n"
+}
