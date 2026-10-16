@@ -104,11 +104,18 @@ func TapGestureTarget(t *testing.T, d driver.Driver) {
 }
 
 // findPrefixedText returns the text that follows prefix in the label,
-// text or value of the first node under root that carries it.
+// text or value of the first node under root that carries it. The
+// returned text ends at the first line break.
 func findPrefixedText(root wire.TreeNodeWire, prefix string) (string, bool) {
 	for _, key := range []string{"label", "text", "value"} {
 		if value, ok := root.Attributes[key]; ok && strings.HasPrefix(value, prefix) {
-			return strings.TrimSpace(strings.TrimPrefix(value, prefix)), true
+			rest := strings.TrimPrefix(value, prefix)
+			// Some hosts join merged semantics labels with a newline, so the
+			// value ends at the first line break.
+			if i := strings.IndexByte(rest, '\n'); i >= 0 {
+				rest = rest[:i]
+			}
+			return strings.TrimSpace(rest), true
 		}
 	}
 	for _, child := range root.Children {
