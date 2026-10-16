@@ -49,21 +49,81 @@ func TestIosDriver_SetLocation_SimulatorReportsTheCapability(t *testing.T) {
 	}
 }
 
-func TestIosDriver_SetLocation_PhysicalDeviceIsUnsupported(t *testing.T) {
-	runner := process.NewFake()
-	d := iosdriver.New(newDefaultFakeConn(), runner, iosdriver.Options{Background: process.NewFakeBackground(), UDID: "DEV-1", Kind: iosdriver.KindDevice})
+func newLocationDevice(conn *fakeConn, runner *process.Fake) *iosdriver.IosDriver {
+	return iosdriver.New(conn, runner, iosdriver.Options{Background: process.NewFakeBackground(), UDID: "DEV-1", Kind: iosdriver.KindDevice})
+}
 
-	if d.Capabilities().CanSetLocation {
-		t.Fatal("Capabilities().CanSetLocation = true on a device, want false")
+func TestIosDriver_SetLocation_PhysicalDeviceCallsTheRunner(t *testing.T) {
+	conn := newDefaultFakeConn()
+	runner := process.NewFake()
+	d := newLocationDevice(conn, runner)
+
+	if !d.Capabilities().CanSetLocation {
+		t.Fatal("Capabilities().CanSetLocation = false on a device, want true")
 	}
-	for _, location := range []driver.Location{{Latitude: 1, Longitude: 2}, {Latitude: 99}} {
-		err := d.SetLocation(context.Background(), location)
-		if code, _, _ := diag.Describe(err); code != diag.CodeLocationUnsupported {
-			t.Fatalf("SetLocation(%+v) code = %q (err %v), want %q", location, code, err, diag.CodeLocationUnsupported)
-		}
+	if err := d.SetLocation(context.Background(), driver.Location{Latitude: 10.7769, Longitude: 106.7009}); err != nil {
+		t.Fatalf("SetLocation() error = %v", err)
+	}
+	calls := conn.Calls()
+	if len(calls) != 1 || calls[0].cmdType != "setLocation" {
+		t.Fatalf("calls = %+v, want one setLocation", calls)
+	}
+	want := map[string]any{"latitude": 10.7769, "longitude": 106.7009}
+	if !reflect.DeepEqual(calls[0].args, want) {
+		t.Fatalf("setLocation args = %#v, want %#v", calls[0].args, want)
 	}
 	if got := runner.Invocations(); len(got) != 0 {
-		t.Fatalf("ran %+v, want nothing", got)
+		t.Fatalf("ran %+v, want nothing on the host", got)
+	}
+}
+
+func TestIosDriver_SetLocation_SimulatorDoesNotCallTheRunner(t *testing.T) {
+	conn := newDefaultFakeConn()
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+	if err := d.SetLocation(context.Background(), driver.Location{Latitude: 1, Longitude: 2}); err != nil {
+		t.Fatalf("SetLocation() error = %v", err)
+	}
+	if calls := conn.Calls(); len(calls) != 0 {
+		t.Fatalf("calls = %+v, want none", calls)
+	}
+}
+
+func TestIosDriver_SetLocation_PhysicalDeviceOldOsIsUnsupported(t *testing.T) {
+	conn := newDefaultFakeConn()
+	conn.Respond("setLocation", func(map[string]any) (map[string]any, error) {
+		return map[string]any{"set": false, "reason": "unsupported-os"}, nil
+	})
+	d := newLocationDevice(conn, process.NewFake())
+
+	err := d.SetLocation(context.Background(), driver.Location{Latitude: 1, Longitude: 2})
+	if code, _, _ := diag.Describe(err); code != diag.CodeLocationUnsupported {
+		t.Fatalf("code = %q (err %v), want %q", code, err, diag.CodeLocationUnsupported)
+	}
+}
+
+func TestIosDriver_SetLocation_PhysicalDeviceRefusalIsLocationNotSet(t *testing.T) {
+	conn := newDefaultFakeConn()
+	conn.Respond("setLocation", func(map[string]any) (map[string]any, error) {
+		return map[string]any{"set": false}, nil
+	})
+	d := newLocationDevice(conn, process.NewFake())
+
+	err := d.SetLocation(context.Background(), driver.Location{Latitude: 1, Longitude: 2})
+	if code, _, _ := diag.Describe(err); code != diag.CodeLocationNotSet {
+		t.Fatalf("code = %q (err %v), want %q", code, err, diag.CodeLocationNotSet)
+	}
+}
+
+func TestIosDriver_SetLocation_PhysicalDeviceRejectsAnInvalidPositionBeforeTheRunner(t *testing.T) {
+	conn := newDefaultFakeConn()
+	d := newLocationDevice(conn, process.NewFake())
+
+	err := d.SetLocation(context.Background(), driver.Location{Latitude: 99})
+	if code, _, _ := diag.Describe(err); code != diag.CodeInvalidArgument {
+		t.Fatalf("code = %q (err %v), want %q", code, err, diag.CodeInvalidArgument)
+	}
+	if calls := conn.Calls(); len(calls) != 0 {
+		t.Fatalf("calls = %+v, want none", calls)
 	}
 }
 

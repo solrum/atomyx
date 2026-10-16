@@ -70,6 +70,7 @@ final class AtomyxDriverAgent: XCTestCase {
         registry.register(LaunchAppCommand())
         registry.register(ForceStopAppCommand())
         registry.register(OpenLinkCommand())
+        registry.register(SetLocationCommand())
         registry.register(SetOrientationCommand(tracker: orientation))
         registry.register(TapAtCommand(synthesizer: synthesizer))
         registry.register(LongPressAtCommand(synthesizer: synthesizer))

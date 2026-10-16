@@ -220,6 +220,65 @@ final class CommandHandlerUnitTests: XCTestCase {
         XCTAssertTrue(bridge.openLinkCalls.isEmpty)
     }
 
+    func testSetLocationPassesTheCoordinatesToTheBridge() {
+        let cmd = SetLocationCommand()
+        let bridge = MockXCUIBridge()
+
+        let req = Request(id: 1, type: "setLocation", args: ["latitude": 10.7769, "longitude": 106.7009])
+        let resp = cmd.handle(req, bridge: bridge, state: DriverState())
+
+        XCTAssertTrue(resp.ok)
+        XCTAssertEqual(resp.data["set"] as? Bool, true)
+        XCTAssertEqual(bridge.setLocationCalls.count, 1)
+        XCTAssertEqual(bridge.setLocationCalls.first?.0, 10.7769)
+        XCTAssertEqual(bridge.setLocationCalls.first?.1, 106.7009)
+    }
+
+    func testSetLocationAcceptsWholeNumberCoordinates() {
+        let cmd = SetLocationCommand()
+        let bridge = MockXCUIBridge()
+
+        let req = Request(id: 1, type: "setLocation", args: ["latitude": 10, "longitude": -20])
+        let resp = cmd.handle(req, bridge: bridge, state: DriverState())
+
+        XCTAssertTrue(resp.ok)
+        XCTAssertEqual(bridge.setLocationCalls.first?.0, 10)
+        XCTAssertEqual(bridge.setLocationCalls.first?.1, -20)
+    }
+
+    func testSetLocationReportsAnUnsupportedOs() {
+        let cmd = SetLocationCommand()
+        let bridge = MockXCUIBridge()
+        bridge.setLocationBehavior = { _, _ in .unsupported }
+
+        let req = Request(id: 1, type: "setLocation", args: ["latitude": 1.0, "longitude": 2.0])
+        let resp = cmd.handle(req, bridge: bridge, state: DriverState())
+
+        XCTAssertTrue(resp.ok)
+        XCTAssertEqual(resp.data["set"] as? Bool, false)
+        XCTAssertEqual(resp.data["reason"] as? String, "unsupported-os")
+    }
+
+    func testSetLocationRejectsMissingOrOutOfRangeCoordinates() {
+        let cmd = SetLocationCommand()
+        let bridge = MockXCUIBridge()
+
+        let noLatitude = cmd.handle(Request(id: 1, type: "setLocation", args: ["longitude": 2.0]), bridge: bridge, state: DriverState())
+        let noLongitude = cmd.handle(Request(id: 2, type: "setLocation", args: ["latitude": 1.0]), bridge: bridge, state: DriverState())
+        let badLatitude = cmd.handle(Request(id: 3, type: "setLocation", args: ["latitude": 91.0, "longitude": 0.0]), bridge: bridge, state: DriverState())
+        let badLongitude = cmd.handle(Request(id: 4, type: "setLocation", args: ["latitude": 0.0, "longitude": 181.0]), bridge: bridge, state: DriverState())
+
+        XCTAssertEqual(noLatitude.error, "missing latitude")
+        XCTAssertEqual(noLongitude.error, "missing longitude")
+        XCTAssertFalse(badLatitude.ok)
+        XCTAssertFalse(badLongitude.ok)
+        XCTAssertTrue(bridge.setLocationCalls.isEmpty)
+    }
+
+    func testSetLocationRunsOnTheMainThread() {
+        XCTAssertTrue(SetLocationCommand().requiresMainThread)
+    }
+
     func testLaunchAppHappyPathUpdatesTrackedState() {
         let cmd = LaunchAppCommand()
         let bridge = MockXCUIBridge()
@@ -1511,6 +1570,16 @@ final class MockXCUIBridge: XCUIBridge {
 
     func deviceOrientationRaw() -> Int {
         return reportedDeviceOrientationRaw
+    }
+
+    /// Records every `setLocation` call. The default behavior reports the
+    /// position set.
+    var setLocationCalls: [(Double, Double)] = []
+    var setLocationBehavior: (Double, Double) -> SetLocationResult = { _, _ in .set }
+
+    func setLocation(latitude: Double, longitude: Double) -> SetLocationResult {
+        setLocationCalls.append((latitude, longitude))
+        return setLocationBehavior(latitude, longitude)
     }
 
     func tapAt(app _: XCUIApplication, x: CGFloat, y: CGFloat) {

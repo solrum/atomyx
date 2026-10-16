@@ -8,24 +8,52 @@ import (
 	"dev.atomyx/internal/driver"
 )
 
-// SetLocation moves the reported position of a simulator through the
-// host's location service for the simulator. The adapter reports
-// CanSetLocation only for a simulator, and every other kind fails with
-// diag.CodeLocationUnsupported before the position is looked at.
+// SetLocation moves the reported position of the target. A simulator is
+// moved through the host's location service for the simulator, which
+// works without the runner. A physical device is moved by the runner,
+// which sets the device location through XCUITest.
 //
-// The position persists on the simulator after the call.
+// A physical device on an OS older than iOS 16.4 fails with
+// diag.CodeLocationUnsupported, because the runner cannot set the
+// position there. The position persists on the target after the call.
 func (d *IosDriver) SetLocation(ctx context.Context, location driver.Location) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	if !d.capabilities.CanSetLocation {
-		return diag.NewLocationUnsupported(
-			"the location of a physical device cannot be set from the host")
+		return diag.NewLocationUnsupported("this kind of device cannot have its location set")
 	}
 	if err := driver.ValidateLocation(location); err != nil {
 		return err
 	}
-	return d.setSimulatorLocation(ctx, location)
+	if d.opts.Kind == KindSimulator {
+		return d.setSimulatorLocation(ctx, location)
+	}
+	return d.setDeviceLocation(ctx, location)
+}
+
+type setLocationResponse struct {
+	Set    bool   `json:"set"`
+	Reason string `json:"reason"`
+}
+
+// setDeviceLocation asks the runner to set the device location. A reply
+// that reports the position unset with the unsupported-os reason maps to
+// diag.CodeLocationUnsupported, and any other refusal to
+// diag.CodeLocationNotSet.
+func (d *IosDriver) setDeviceLocation(ctx context.Context, location driver.Location) error {
+	params := map[string]any{"latitude": location.Latitude, "longitude": location.Longitude}
+	var resp setLocationResponse
+	if err := d.conn.CallInto(ctx, "setLocation", params, &resp); err != nil {
+		return d.fail(err)
+	}
+	if resp.Set {
+		return nil
+	}
+	if resp.Reason == unsupportedOSReason {
+		return diag.NewLocationUnsupported("this device needs iOS 16.4 or later to have its location set")
+	}
+	return diag.NewLocationNotSet("the device refused the position", nil)
 }
 
 // setSimulatorLocation runs the simulator's location command with the

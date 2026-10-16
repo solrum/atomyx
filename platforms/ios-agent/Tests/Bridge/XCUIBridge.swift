@@ -1,4 +1,5 @@
 import Foundation
+import CoreLocation
 import XCTest
 
 /// Abstraction over XCUITest API calls for command handlers. Hides the
@@ -23,6 +24,13 @@ import XCTest
 /// the driver can track it as the app under test.
 enum OpenLinkResult {
     case opened(app: XCUIApplication?)
+    case unsupported
+}
+
+/// Result of `setLocation`. `unsupported` means the OS cannot set the
+/// device location through XCUITest, which is permanent for the device.
+enum SetLocationResult {
+    case set
     case unsupported
 }
 
@@ -80,6 +88,12 @@ protocol XCUIBridge {
     /// `unsupported` without opening anything on an OS older than
     /// iOS 16.4, the first release with the XCUITest link API.
     func openLink(url: URL, bundleId: String?) -> OpenLinkResult
+
+    /// Move the device's reported position to the given coordinates.
+    /// Returns `unsupported` without changing anything on an OS older
+    /// than iOS 16.4, the first release with the XCUITest location API.
+    /// Must run on the main thread, because `XCUIDevice` asserts it.
+    func setLocation(latitude: Double, longitude: Double) -> SetLocationResult
 
     /// Ask the system to rotate the device to `orientation`. Returns
     /// once the request is made, not once the interface finished
@@ -244,6 +258,13 @@ final class DefaultXCUIBridge: XCUIBridge {
 
     func deviceOrientationRaw() -> Int {
         return XCUIDevice.shared.orientation.rawValue
+    }
+
+    func setLocation(latitude: Double, longitude: Double) -> SetLocationResult {
+        guard #available(iOS 16.4, *) else { return .unsupported }
+        XCUIDevice.shared.location = XCUILocation(
+            location: CLLocation(latitude: latitude, longitude: longitude))
+        return .set
     }
 
     func tapAt(app: XCUIApplication, x: CGFloat, y: CGFloat) {

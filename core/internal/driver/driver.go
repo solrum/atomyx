@@ -278,7 +278,9 @@ type Driver interface {
 	//   - Android device: not supported, because a physical device
 	//     needs a mock location provider installed on the device.
 	//   - iOS simulator: the host sets the simulator's location.
-	//   - iOS device: not supported.
+	//   - iOS device: the runner sets the device location, which needs
+	//     iOS 16.4 or later. An older OS fails with
+	//     diag.CodeLocationUnsupported.
 	SetLocation(ctx context.Context, location Location) error
 
 	// StopApp stops bundleID. See CurrentForeground for what the

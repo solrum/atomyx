@@ -424,7 +424,9 @@ var boundaryTranslationSkipped = map[string]string{
 	"ClearAppData":   "issues a host subprocess call through process.Runner (xcrun), not the TCP transport this boundary classifies",
 	"IsAppInstalled": "issues a host subprocess call through process.Runner (xcrun), not the TCP transport this boundary classifies",
 	"SetPermissions": "issues a host subprocess call through process.Runner (xcrun), not the TCP transport this boundary classifies",
-	"SetLocation":    "issues a host subprocess call through process.Runner (xcrun), not the TCP transport this boundary classifies",
+	"SetLocation": "a simulator moves through a host subprocess call (xcrun) and a physical device through the wire, " +
+		"and every table driver targets a simulator, so the device wire path is classified by the " +
+		"TestIosDriver_SetLocation_Device tests in fault_injection_location_test.go",
 }
 
 // TestIosDriver_BoundaryTranslation_CoversEveryDriverMethod proves

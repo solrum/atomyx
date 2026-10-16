@@ -136,6 +136,9 @@ func newDefaultFakeConn() *fakeConn {
 		landscape.Store(name != "portrait")
 		return map[string]any{"orientation": name}, nil
 	})
+	c.Respond("setLocation", func(map[string]any) (map[string]any, error) {
+		return map[string]any{"set": true}, nil
+	})
 	c.Respond("openLink", func(map[string]any) (map[string]any, error) {
 		return map[string]any{"opened": true}, nil
 	})
