@@ -62,6 +62,17 @@ final class EventRecordSynthesizer: EventSynthesizer {
 
     let mechanismName = "event-record"
 
+    /// Names the interface orientation on every event record, so the
+    /// system reads the frame coordinates a caller passes in the space
+    /// the screen is currently laid out in. The source is a cache,
+    /// because reading the system's orientation live costs seconds on
+    /// first access and would stall the first gesture of a session.
+    private let orientationSource: InterfaceOrientationSource
+
+    init(orientationSource: InterfaceOrientationSource = DeviceOrientationTracker()) {
+        self.orientationSource = orientationSource
+    }
+
     var probeLog: String? {
         Self.lastProbeLog.isEmpty ? nil : Self.lastProbeLog
     }
@@ -78,7 +89,7 @@ final class EventRecordSynthesizer: EventSynthesizer {
             )
         }
 
-        let orientation = Self.currentInterfaceOrientation()
+        let orientation = orientationSource.interfaceOrientationCode
 
         guard let recordCls = NSClassFromString("XCSynthesizedEventRecord") as? NSObject.Type else {
             throw SynthesizerError.privateSymbolMissing(symbol: "XCSynthesizedEventRecord")
@@ -492,18 +503,4 @@ final class EventRecordSynthesizer: EventSynthesizer {
         return ProbeOutcome(ok: true, log: log)
     }
 
-    /// Returns the orientation hint XCUITest events need so
-    /// taps / drags map correctly across device rotations.
-    /// Hardcoded to portrait (1).
-    ///
-    /// Why hardcoded: `XCUIDevice.shared.orientation` triggers
-    /// a multi-second XPC round-trip on first access (the
-    /// daemon initializes its orientation cache by introspecting
-    /// the UI). That latency exceeds the host's gesture-call
-    /// timeout and breaks the first pointer dispatch of a
-    /// session. Rotation-aware dispatch needs a one-shot cached
-    /// orientation read on a background queue.
-    private static func currentInterfaceOrientation() -> Int {
-        return 1 // portrait
-    }
 }

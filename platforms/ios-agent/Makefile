@@ -228,7 +228,8 @@ test: check-udid $(PROJECT)
 		-scheme $(SCHEME) \
 		-destination '$(DESTINATION)' \
 		-derivedDataPath $(DERIVED) \
-		-only-testing:AtomyxDriverAgent/CommandHandlerUnitTests
+		-only-testing:AtomyxDriverAgent/CommandHandlerUnitTests \
+		-only-testing:AtomyxDriverAgent/DeviceOrientationTests
 
 # build-for-testing output for the simulator destination. A fresh
 # clone has neither $(PROJECT) nor this stamp, so serve's prerequisite
@@ -331,6 +332,7 @@ test-device: check-device $(PROJECT)
 		-destination '$(DEVICE_DESTINATION)' \
 		-derivedDataPath $(DERIVED) \
 		-only-testing:AtomyxDriverAgent/CommandHandlerUnitTests \
+		-only-testing:AtomyxDriverAgent/DeviceOrientationTests \
 		$(SIGN_OVERRIDES)
 
 install-device: build-device

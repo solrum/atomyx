@@ -52,7 +52,9 @@ final class AtomyxDriverAgent: XCTestCase {
         // The factory probes for the multi-pointer-capable backend
         // and falls back to the coordinate backend on probe failure.
         // Backend selection is internal. No user-facing knob.
-        let synthesizer = EventSynthesizerFactory.make()
+        let orientation = DeviceOrientationTracker()
+        orientation.seed { bridge.deviceOrientationRaw() }
+        let synthesizer = EventSynthesizerFactory.make(orientationSource: orientation)
         NSLog("[atomyx] gesture synthesizer mechanism = \(synthesizer.mechanismName)")
 
         // Press-key strategy composition root. Adding a new key =
@@ -67,6 +69,7 @@ final class AtomyxDriverAgent: XCTestCase {
         registry.register(LaunchAppCommand())
         registry.register(ForceStopAppCommand())
         registry.register(OpenLinkCommand())
+        registry.register(SetOrientationCommand(tracker: orientation))
         registry.register(TapAtCommand(synthesizer: synthesizer))
         registry.register(LongPressAtCommand(synthesizer: synthesizer))
         registry.register(SwipeCommand(synthesizer: synthesizer))

@@ -1304,7 +1304,7 @@ final class CommandHandlerUnitTests: XCTestCase {
         // `make()` is internal, with no env var and no overrides. It
         // returns either backend depending on the runtime probe;
         // both implement EventSynthesizer.
-        let syn = EventSynthesizerFactory.make()
+        let syn = EventSynthesizerFactory.make(orientationSource: DeviceOrientationTracker())
         XCTAssertTrue(syn is CoordinateSynthesizer || syn is EventRecordSynthesizer)
     }
 
@@ -1497,6 +1497,20 @@ final class MockXCUIBridge: XCUIBridge {
     func openLink(url: URL, bundleId: String?) -> OpenLinkResult {
         openLinkCalls.append((url, bundleId))
         return openLinkBehavior(url, bundleId)
+    }
+
+    /// Records every orientation the runner asked the system to apply,
+    /// and reports `reportedDeviceOrientationRaw` as the system's own
+    /// reading.
+    var setOrientationCalls: [DeviceOrientation] = []
+    var reportedDeviceOrientationRaw = 1
+
+    func setDeviceOrientation(_ orientation: DeviceOrientation) {
+        setOrientationCalls.append(orientation)
+    }
+
+    func deviceOrientationRaw() -> Int {
+        return reportedDeviceOrientationRaw
     }
 
     func tapAt(app _: XCUIApplication, x: CGFloat, y: CGFloat) {

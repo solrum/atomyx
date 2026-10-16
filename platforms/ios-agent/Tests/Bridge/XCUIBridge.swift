@@ -81,6 +81,16 @@ protocol XCUIBridge {
     /// iOS 16.4, the first release with the XCUITest link API.
     func openLink(url: URL, bundleId: String?) -> OpenLinkResult
 
+    /// Ask the system to rotate the device to `orientation`. Returns
+    /// once the request is made, not once the interface finished
+    /// rotating.
+    func setDeviceOrientation(_ orientation: DeviceOrientation)
+
+    /// Raw `UIDeviceOrientation` value the system reports. The first
+    /// read in a session takes several seconds, so callers other than
+    /// the one-time seed avoid it.
+    func deviceOrientationRaw() -> Int
+
     /// Terminate an app by bundle id. Creates a fresh reference
     /// internally, so the caller does not need to hold one. Safe to call
     /// on an app that isn't running.
@@ -225,6 +235,15 @@ final class DefaultXCUIBridge: XCUIBridge {
         }
         XCUIDevice.shared.system.open(url)
         return .opened(app: nil)
+    }
+
+    func setDeviceOrientation(_ orientation: DeviceOrientation) {
+        guard let target = UIDeviceOrientation(rawValue: orientation.deviceOrientationRaw) else { return }
+        XCUIDevice.shared.orientation = target
+    }
+
+    func deviceOrientationRaw() -> Int {
+        return XCUIDevice.shared.orientation.rawValue
     }
 
     func tapAt(app: XCUIApplication, x: CGFloat, y: CGFloat) {

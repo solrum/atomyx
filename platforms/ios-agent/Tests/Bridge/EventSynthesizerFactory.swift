@@ -13,9 +13,9 @@ import Foundation
 /// Mechanism naming is owned by the backend itself. This factory
 /// does not branch on concrete types.
 enum EventSynthesizerFactory {
-    static func make() -> EventSynthesizer {
+    static func make(orientationSource: InterfaceOrientationSource) -> EventSynthesizer {
         if EventRecordSynthesizer.isAvailable {
-            return EventRecordSynthesizer()
+            return EventRecordSynthesizer(orientationSource: orientationSource)
         }
         return CoordinateSynthesizer()
     }
