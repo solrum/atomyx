@@ -497,12 +497,17 @@ ignored:
 - `ios`: the id is a physical device UDID.
 
 A soak count of 0 skips the soak. For each entry the script prepares the
-device (`atomyx setup` and the demo APK on Android, the runner served on port
-22087 on iOS, the demo app on a simulator when built), runs `make e2e` with the
+device (`atomyx setup` and the demo APK on Android, the demo app on a simulator
+when built, the runner served for iOS), runs `make e2e` with the
 environment the platform needs, runs `scripts/soak.sh`, and stops the runner,
-emulator, or simulator it started. Build the demo app first with the `demo-*`
-targets so the install fixtures exist. An iOS entry is skipped, and reported as
-skipped, when something already listens on port 22087. A failing entry never
+emulator, or simulator it started. A simulator runner is ready when port 22087
+accepts a connection. A physical device runner is ready when `driver listening`
+appears in the entry's `setup.log`, because the driver opens the host side
+tunnel later. Both waits are bounded by 600 seconds, and
+`ATOMYX_NIGHTLY_RUNNER_WAIT_S` overrides the bound. Build the demo app first with the `demo-*`
+targets so the install fixtures exist. An iOS or simulator entry is skipped, and reported as
+skipped, when something already listens on port 22087, because the driver
+binds its host tunnel on that port. A failing entry never
 stops the next one, and `SIGINT` or `SIGTERM` tears down the entry in flight.
 
 `--dry-run` validates the matrix and prints the commands per entry without

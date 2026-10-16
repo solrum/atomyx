@@ -141,8 +141,17 @@ cat > "$fakes/make" <<'FAKE'
 echo "make $*" >> "$FAKE_LOG"
 case "$*" in
   *" e2e "* | *" e2e")
-    echo "env ATOMYX_ANDROID_SERIAL=${ATOMYX_ANDROID_SERIAL:-} ATOMYX_IOS_SIM_UDID=${ATOMYX_IOS_SIM_UDID:-}" >> "$FAKE_LOG"
+    echo "env ATOMYX_ANDROID_SERIAL=${ATOMYX_ANDROID_SERIAL:-} ATOMYX_IOS_SIM_UDID=${ATOMYX_IOS_SIM_UDID:-} ATOMYX_IOS_DEVICE_UDID=${ATOMYX_IOS_DEVICE_UDID:-}" >> "$FAKE_LOG"
     echo "pass: 7"; echo "fail: 0"; echo "skip: 2"; echo "skip-gate: pass"
+    ;;
+  *serve-device*)
+    if [ "${FAKE_DEVICE_SERVE:-print}" = "print" ]; then
+      echo "[atomyx] driver listening on 127.0.0.1:22087"
+    fi
+    echo $$ > "$FAKE_DEVICE_PID"
+    trap 'rm -f "$FAKE_DEVICE_PID"; exit 0' TERM
+    sleep 600 &
+    wait
     ;;
   *serve*)
     echo 4242 > "$FAKE_RUNNER_FLAG"
@@ -160,6 +169,7 @@ printf 'passed: 3\nfailed: 0\ninfraFailures: 0\ninfraFailureRate: 0.000000\n' > 
 FAKE
 chmod +x "$fakes"/*
 export FAKE_RUNNER_FLAG="$work/runner.flag"
+export FAKE_DEVICE_PID="$work/device.pid"
 
 run_real() {
   local name="$1" content="$2"
@@ -192,11 +202,36 @@ done
 
 run_real iossim $'iossim SIM-1 1\n'
 [ "$real_status" -eq 0 ] || fail "real iossim: exit $real_status, want 0"
-expect_log "real iossim" "env ATOMYX_ANDROID_SERIAL= ATOMYX_IOS_SIM_UDID=SIM-1"
+expect_log "real iossim" "env ATOMYX_ANDROID_SERIAL= ATOMYX_IOS_SIM_UDID=SIM-1 "
 expect_log "real iossim" "soak iossim SIM-1 1"
 if [ -e "$FAKE_RUNNER_FLAG" ]; then
   fail "real iossim: the runner was not torn down"
 fi
+
+# A physical device runner has no host listener, so readiness is the
+# runner's announcement in the setup log.
+export ATOMYX_NIGHTLY_RUNNER_WAIT_S=4
+rm -f "$FAKE_DEVICE_PID"
+FAKE_DEVICE_SERVE=print run_real iosready $'ios DEV-1 1\n'
+[ "$real_status" -eq 0 ] || fail "real ios ready: exit $real_status, want 0"
+expect_log "real ios ready" "serve-device DEVICE_UDID=DEV-1"
+expect_log "real ios ready" "ATOMYX_IOS_DEVICE_UDID=DEV-1"
+expect_log "real ios ready" "soak ios DEV-1 1"
+if [ -e "$FAKE_DEVICE_PID" ]; then
+  fail "real ios ready: the serve process was not torn down"
+fi
+
+FAKE_DEVICE_SERVE=silent run_real iossilent $'ios DEV-1 1\n'
+[ "$real_status" -eq 1 ] || fail "real ios silent: exit $real_status, want 1"
+grep -q "did not report 'driver listening' within 4s" "$work/real-iossilent.out" \
+  || fail "real ios silent: no readiness timeout reported"
+if grep -q ' e2e ' "$FAKE_LOG"; then
+  fail "real ios silent: e2e ran although the runner never became ready"
+fi
+if [ -e "$FAKE_DEVICE_PID" ]; then
+  fail "real ios silent: the serve process was not torn down"
+fi
+unset ATOMYX_NIGHTLY_RUNNER_WAIT_S
 
 # A runner that already listens makes the iOS entry skipped, and a
 # failing e2e leg is recorded without stopping the next entry.

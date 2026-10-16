@@ -20,8 +20,17 @@
 # Per entry the script sets the device up, runs 'make e2e', runs
 # scripts/soak.sh when the count is above 0, then tears down only what
 # that entry started. A failing entry is recorded and the next entry
-# still runs. An iOS entry is skipped when something already listens on
-# the runner port, because that runner belongs to someone else.
+# still runs. An iOS or iOS simulator entry is skipped when something
+# already listens on the runner port, because that listener belongs to
+# someone else.
+#
+# Runner readiness differs by kind:
+#   iossim  the runner listens on the host port, so readiness is a
+#           connection to 127.0.0.1:22087
+#   ios     the runner listens on the device, and the host side tunnel is
+#           opened later by the driver, so readiness is the runner's
+#           "driver listening" line in the entry's setup log while the
+#           serve process is alive
 #
 # --dry-run validates the matrix and prints the plan per entry without
 # touching any device, directory, or process.
@@ -30,6 +39,7 @@
 #   ATOMYX_NIGHTLY_RESULTS_DIR  parent of the run directory, default e2e-results/nightly
 #   ATOMYX_BIN                  atomyx binary used for setup, default core/bin/atomyx
 #   ATOMYX_SOAK_BIN             soak script, default scripts/soak.sh
+#   ATOMYX_NIGHTLY_RUNNER_WAIT_S  runner readiness bound in seconds, default 600
 #
 # Exit codes:
 #   0  every entry is ok
@@ -44,7 +54,9 @@ set -euo pipefail
 
 readonly RUNNER_HOST="127.0.0.1"
 readonly RUNNER_PORT="22087"
-readonly RUNNER_WAIT_S=600
+readonly RUNNER_WAIT_S="${ATOMYX_NIGHTLY_RUNNER_WAIT_S:-600}"
+readonly RUNNER_READY_MARKER="driver listening"
+readonly RUNNER_POLL_S=2
 readonly RUNNER_RELEASE_WAIT_S=15
 readonly EMULATOR_BOOT_WAIT_S=300
 readonly EMULATOR_FIRST_PORT=5554
@@ -181,10 +193,10 @@ if [ "$dry_run" -eq 1 ]; then
         ;;
       ios)
         echo "  guard: skip when ${RUNNER_HOST}:${RUNNER_PORT} already listens"
-        echo "  setup: make -C platforms/ios-agent serve-device DEVICE_UDID=${id}, wait up to ${RUNNER_WAIT_S}s for the runner"
+        echo "  setup: make -C platforms/ios-agent serve-device DEVICE_UDID=${id}, wait up to ${RUNNER_WAIT_S}s for '${RUNNER_READY_MARKER}' in the setup log"
         echo "  e2e: ATOMYX_IOS_DEVICE_UDID=${id} make e2e PLATFORM=ios"
         [ "$count" -gt 0 ] && echo "  soak: scripts/soak.sh ios ${id} ${count}"
-        echo "  teardown: stop the runner and its children"
+        echo "  teardown: stop the serve process and the build processes it started"
         ;;
     esac
   done
@@ -210,6 +222,7 @@ emulator_pid=""
 emulator_serial=""
 booted_sim=""
 runner_listener=""
+runner_kind=""
 device_id=""
 fail_reason=""
 
@@ -252,7 +265,10 @@ cleanup() {
     kill_tree "$runner_pid"
     wait "$runner_pid" 2>/dev/null || true
     runner_pid=""
-    release_runner_port
+    if [ "$runner_kind" != "ios" ]; then
+      release_runner_port
+    fi
+    runner_kind=""
   fi
   if [ -n "$emulator_serial" ]; then
     adb -s "$emulator_serial" emu kill >/dev/null 2>&1 || true
@@ -294,8 +310,28 @@ wait_for_runner() {
       fail_reason="the runner did not listen on ${RUNNER_HOST}:${RUNNER_PORT} within ${RUNNER_WAIT_S}s"
       return 1
     fi
-    sleep 2
-    waited=$((waited + 2))
+    sleep "$RUNNER_POLL_S"
+    waited=$((waited + RUNNER_POLL_S))
+  done
+}
+
+# A physical device runner listens on the device, and the host side
+# tunnel is opened by the driver when it connects, so no host listener
+# exists to probe. The runner announces readiness in its own output,
+# which the serve make writes to the entry's setup log.
+wait_for_device_runner() {
+  local log="$1" waited=0
+  while ! grep -q "$RUNNER_READY_MARKER" "$log" 2>/dev/null; do
+    if ! kill -0 "$runner_pid" 2>/dev/null; then
+      fail_reason="the runner process exited before it reported '${RUNNER_READY_MARKER}'"
+      return 1
+    fi
+    if [ "$waited" -ge "$RUNNER_WAIT_S" ]; then
+      fail_reason="the runner did not report '${RUNNER_READY_MARKER}' within ${RUNNER_WAIT_S}s"
+      return 1
+    fi
+    sleep "$RUNNER_POLL_S"
+    waited=$((waited + RUNNER_POLL_S))
   done
 }
 
@@ -402,8 +438,8 @@ prepare_entry() {
     ios)
       make -C "${repo_root}/platforms/ios-agent" serve-device DEVICE_UDID="$device_id" >> "$log" 2>&1 &
       runner_pid=$!
-      wait_for_runner || return 1
-      runner_listener="$(listening_pid)"
+      runner_kind="ios"
+      wait_for_device_runner "$log" || return 1
       ;;
   esac
 }
@@ -450,6 +486,10 @@ for i in "${!kinds[@]}"; do
 
   echo "entry ${index}: ${kind} ${id} soak=${count}"
 
+  # The host port guard applies to a physical device too, because the
+  # driver binds a host tunnel on this same port to reach the device. A
+  # foreign listener there, such as a simulator runner or another
+  # tunnel, would make the driver talk to the wrong target.
   if { [ "$platform" = "ios" ] || [ "$platform" = "iossim" ]; } && runner_listening; then
     status="skipped"
     reason="port ${RUNNER_PORT} is already in use by another runner"
