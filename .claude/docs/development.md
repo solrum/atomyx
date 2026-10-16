@@ -447,6 +447,12 @@ A stop that fails counts as an infrastructure failure of that iteration, is
 recorded in `iterations.txt` with exit code 125, skips the run, and is counted
 in `resetFailures`, `infraFailures`, and `attempts` of the summary.
 
+A failed run whose log has no `Run folder:` line failed before a run folder
+existed, for example because the device or the runner could not be reached.
+`atomyx runs stats` never sees such a run, so the script counts it as an
+infrastructure failure and in `attempts`, and reports the count as
+`unrecordedFailures`.
+
 The script uses `core/bin/atomyx` (`ATOMYX_BIN` overrides it, `make build-core`
 builds it), runs the flow `count` times, and keeps going after a failed
 iteration. Results land in `e2e-results/soak/<UTC timestamp>-<platform>/`:
@@ -458,7 +464,8 @@ iteration. Results land in `e2e-results/soak/<UTC timestamp>-<platform>/`:
   soak never writes into `~/.atomyx`.
 - `summary.txt` holds the platform, the total, passed, and failed counts, and
   `infraFailures`, `attempts`, and `infraFailureRate` read from
-  `atomyx runs stats --json` plus the reset failures, and `resetFailures`.
+  `atomyx runs stats --json` plus the reset failures and the unrecorded failures, and `resetFailures` and
+  `unrecordedFailures`.
 
 The exit status is 0 when the infrastructure failure rate is at or below the
 limit and 1 when it is above, or when the statistics cannot be read. The limit

@@ -21,7 +21,9 @@
 # device (android and iossim), so a failed iteration cannot leave the app
 # on a screen that breaks the next one. A stop that fails counts as an
 # infrastructure failure of that iteration, is recorded with exit code
-# 125, and no run is attempted. The ios leg has no host tool that stops an
+# 125, and no run is attempted. A failed run that left no run folder
+# counts as an infrastructure failure too, because the run statistics
+# never see it. The ios leg has no host tool that stops an
 # app by bundle id, so it relies on the flow's own precondition alone.
 # A failed iteration never stops the loop. The report lands in
 # <results dir>/<UTC timestamp>-<platform>/ with one log per iteration,
@@ -100,6 +102,7 @@ total=0
 passed=0
 failed=0
 reset_failures=0
+unrecorded_failures=0
 readonly RESET_FAILED_CODE=125
 
 # Stops the app under test so the next run starts from a cold launch.
@@ -154,6 +157,9 @@ while [ "$i" -le "$count" ] && [ "$interrupted" -eq 0 ]; do
     passed=$((passed + 1))
   else
     failed=$((failed + 1))
+    if ! grep -q '^Run folder: ' "$log"; then
+      unrecorded_failures=$((unrecorded_failures + 1))
+    fi
   fi
   echo "${i} ${code}" >> "${out_dir}/iterations.txt"
   echo "run ${i}/${count}: exit ${code}"
@@ -186,11 +192,15 @@ if [ -z "$infra" ] || [ -z "$attempts" ] || [ -z "$rate" ]; then
 fi
 
 over_limit=0
-# Reset failures never reach atomyx, so they are added to both the
-# numerator and the denominator of the rate.
+# Reset failures never reach atomyx, and a failed run that left no run
+# folder (the device or the runner could not be reached before the run
+# began) is invisible to the run statistics. Both are infrastructure
+# failures, so they are added to the numerator and the denominator of
+# the rate.
 if [ "$stats_ok" -eq 1 ]; then
-  infra=$((infra + reset_failures))
-  attempts=$((attempts + reset_failures))
+  unseen=$((reset_failures + unrecorded_failures))
+  infra=$((infra + unseen))
+  attempts=$((attempts + unseen))
   rate="$(awk -v i="$infra" -v a="$attempts" 'BEGIN { printf "%.6f", (a > 0) ? i / a : 0 }')"
   over_limit="$(awk -v r="$rate" -v m="$max_rate" 'BEGIN { print (r + 0 > m + 0) ? 1 : 0 }')"
 fi
@@ -219,6 +229,7 @@ fi
     echo "infraFailureRate: unavailable"
   fi
   echo "resetFailures: ${reset_failures}"
+  echo "unrecordedFailures: ${unrecorded_failures}"
   echo "maxInfraFailureRate: ${max_rate}"
   if [ "$interrupted" -eq 1 ]; then
     echo "interrupted: yes"

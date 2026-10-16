@@ -42,12 +42,17 @@ case "${1:-}" in
     echo "$outcome" >> "$state.history"
     echo "storage: ${ATOMYX_STORAGE_DIR:-unset}" > "$state.storage"
     if [ -n "${FAKE_RUN_SLEEP:-}" ]; then sleep "$FAKE_RUN_SLEEP"; fi
+    if [ "$outcome" = "noconnect" ]; then
+      echo "error [AGENT_UNREACHABLE]: could not reach the agent" >&2
+      exit 1
+    fi
+    echo "Run folder: /fake/run" >&2
     [ "$outcome" = "pass" ] && exit 0
     exit 1
     ;;
   runs)
     if [ -n "${FAKE_STATS_FAIL:-}" ]; then exit 1; fi
-    attempts="$(wc -l < "$state.history" | tr -d ' ')"
+    attempts="$(grep -vc '^noconnect$' "$state.history" || true)"
     infra="$(grep -c '^infra$' "$state.history" || true)"
     rate="$(awk -v i="$infra" -v a="$attempts" 'BEGIN { printf "%.6f", (a > 0) ? i / a : 0 }')"
     cat <<JSON
@@ -144,6 +149,15 @@ expect_line "infra" "failed: 1"
 expect_line "infra" "infraFailures: 1"
 expect_line "infra" "attempts: 10"
 expect_line "infra" "infraFailureRate: 0.100000"
+
+run_soak noconnect "noconnect noconnect pass pass" 4
+expect_status "runs that never connected exceed the default" 1
+expect_line "no run folder" "total: 4"
+expect_line "no run folder" "failed: 2"
+expect_line "no run folder" "infraFailures: 2"
+expect_line "no run folder" "unrecordedFailures: 2"
+expect_line "no run folder" "attempts: 4"
+expect_line "no run folder" "infraFailureRate: 0.500000"
 
 run_soak infraok "pass infra pass pass pass" 5 "0.5"
 expect_status "rate under an explicit threshold passes" 0
