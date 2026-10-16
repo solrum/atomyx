@@ -1,0 +1,5 @@
+{
+  "name": "set-orientation-forms-valid",
+  "description": "setOrientation parses from each of the three orientation names.",
+  "yaml": "- setOrientation: portrait\n- setOrientation: landscapeLeft\n- setOrientation: landscapeRight\n"
+}

@@ -1,0 +1,204 @@
+{
+  "calls": [
+    {
+      "args": [
+        "landscapeLeft"
+      ],
+      "method": "setOrientation"
+    },
+    {
+      "args": [
+        "landscapeRight"
+      ],
+      "method": "setOrientation"
+    },
+    {
+      "args": [
+        "portrait"
+      ],
+      "method": "setOrientation"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "setOrientation",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "setOrientation: \"landscapeLeft\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "setOrientation"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"landscapeLeft\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "setOrientation",
+      "depth": 0,
+      "detail": "Rotated to landscapeLeft",
+      "durationMs": 0,
+      "line": 5,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "setOrientation: \"landscapeLeft\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "setOrientation"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"landscapeLeft\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "setOrientation",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 6,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "setOrientation: \"landscapeRight\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "setOrientation"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"landscapeRight\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "setOrientation",
+      "depth": 0,
+      "detail": "Rotated to landscapeRight",
+      "durationMs": 0,
+      "line": 6,
+      "ok": true,
+      "stepIndex": 1,
+      "summary": "setOrientation: \"landscapeRight\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "setOrientation"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"landscapeRight\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "setOrientation",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 7,
+      "ok": null,
+      "stepIndex": 2,
+      "summary": "setOrientation: \"portrait\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "setOrientation"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"portrait\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "setOrientation",
+      "depth": 0,
+      "detail": "Rotated to portrait",
+      "durationMs": 0,
+      "line": 7,
+      "ok": true,
+      "stepIndex": 2,
+      "summary": "setOrientation: \"portrait\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "setOrientation"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"portrait\""
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 3,
+  "screenshots": [],
+  "scriptName": "rotate",
+  "steps": [
+    {
+      "command": "setOrientation",
+      "detail": "Rotated to landscapeLeft",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    },
+    {
+      "command": "setOrientation",
+      "detail": "Rotated to landscapeRight",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 1
+    },
+    {
+      "command": "setOrientation",
+      "detail": "Rotated to portrait",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 2
+    }
+  ],
+  "totalSteps": 3
+}

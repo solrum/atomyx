@@ -58,7 +58,7 @@ A Maestro flow that uses only present commands runs as is after a syntax change.
 | `openLink` | `openLink` | Present | Takes a link, or a `link` with an optional `appId`. It has no `autoVerify` or `browser` option. iOS needs 16.4 or later. |
 | `setLocation` | None | Missing | The capability flag exists with no method behind it. |
 | `travel` | None | Missing | Depends on `setLocation`. |
-| `setOrientation` | None | Missing | The capability flag exists with no method behind it. |
+| `setOrientation` | `setOrientation` | Present | Takes `portrait`, `landscapeLeft` or `landscapeRight`. The rotation persists after the script. There is no upside-down portrait. |
 | `hideKeyboard` | `hideKeyboard` | Present | |
 | `eraseText` | `eraseText` | Present | `charactersToErase` defaults to 50, like Maestro. |
 | `scrollUntilVisible` | `scrollUntilVisible` | Present | Takes a selector and a `down` or `up` direction. It has no timeout or visibility percentage. The search is bounded by a fixed number of swipes. |

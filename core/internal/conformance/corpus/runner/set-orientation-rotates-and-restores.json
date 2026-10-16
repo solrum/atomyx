@@ -1,0 +1,10 @@
+{
+  "name": "set-orientation-rotates-and-restores",
+  "description": "setOrientation hands each orientation to the driver in order, so a script can rotate and turn back.",
+  "yaml": "appId: com.test\nname: rotate\nenv: {}\n---\n- setOrientation: landscapeLeft\n- setOrientation: landscapeRight\n- setOrientation: portrait\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

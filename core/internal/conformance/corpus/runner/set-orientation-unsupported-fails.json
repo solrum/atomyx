@@ -1,0 +1,11 @@
+{
+  "name": "set-orientation-unsupported-fails",
+  "description": "setOrientation fails the step with a coded error, without calling the driver, when the device cannot be rotated.",
+  "yaml": "appId: com.test\nname: rotate unsupported\nenv: {}\n---\n- setOrientation: landscapeLeft\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ],
+    "capabilities": { "canSetOrientation": false }
+  }
+}

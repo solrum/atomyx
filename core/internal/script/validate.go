@@ -261,6 +261,9 @@ func validateStep(step ScriptStep, path string, report reportFunc) {
 	case *OpenLinkStep:
 		validateOpenLinkStep(s, path, report)
 
+	case *SetOrientationStep:
+		validateSetOrientationStep(s, path, report)
+
 	case *SetPermissionsStep:
 		validateSetPermissionsStep(s, path, report)
 

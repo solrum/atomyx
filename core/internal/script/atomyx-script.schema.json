@@ -1434,6 +1434,9 @@
           "$ref": "#/definitions/SetPermissionsStep"
         },
         {
+          "$ref": "#/definitions/SetOrientationStep"
+        },
+        {
           "$ref": "#/definitions/HideKeyboardStep"
         },
         {
@@ -1473,6 +1476,30 @@
       "required": [
         "command",
         "selector"
+      ],
+      "type": "object"
+    },
+    "SetOrientationStep": {
+      "additionalProperties": false,
+      "description": "Rotate the device to portrait or to one of the landscape orientations.",
+      "properties": {
+        "command": {
+          "const": "setOrientation",
+          "type": "string"
+        },
+        "orientation": {
+          "description": "Orientation to rotate the device to. It persists until changed.",
+          "enum": [
+            "portrait",
+            "landscapeLeft",
+            "landscapeRight"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "command",
+        "orientation"
       ],
       "type": "object"
     },

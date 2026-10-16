@@ -104,6 +104,8 @@ func SummarizeStep(step script.ScriptStep) StepSummary {
 		summarizeAppStep(b, "clearState", s.AppID)
 	case *script.OpenLinkStep:
 		b.kw("openLink").punct(": ").str(s.Link)
+	case *script.SetOrientationStep:
+		b.kw("setOrientation").punct(": ").str(string(s.Orientation))
 	case *script.SetPermissionsStep:
 		summarizeSetPermissions(b, s)
 	case *script.HideKeyboardStep:

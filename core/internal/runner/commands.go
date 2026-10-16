@@ -37,6 +37,7 @@ func DefaultCommands() []CommandDefinition {
 		ClearStateCommand{},
 		OpenLinkCommand{},
 		SetPermissionsCommand{},
+		SetOrientationCommand{},
 		HideKeyboardCommand{},
 		EraseTextCommand{},
 		ScrollUntilVisibleCommand{},

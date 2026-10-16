@@ -1,0 +1,5 @@
+{
+  "name": "invalid-set-orientation-unknown-name",
+  "description": "setOrientation with a name that is not an orientation must be REJECTED.",
+  "yaml": "- setOrientation: sideways\n"
+}

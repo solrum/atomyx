@@ -38,6 +38,7 @@ var stepCommandOrder = []string{
 	"ClearStateStep",
 	"OpenLinkStep",
 	"SetPermissionsStep",
+	"SetOrientationStep",
 	"HideKeyboardStep",
 	"EraseTextStep",
 	"ScrollUntilVisibleStep",
@@ -83,6 +84,14 @@ func stepJSONSchemaDefinitions() map[string]any {
 			},
 			[]string{"command", "permissions"},
 			"Grant or revoke app permissions without a prompt.",
+		),
+		"SetOrientationStep": objectSchema(
+			map[string]any{
+				"command":     constString(CommandSetOrientation),
+				"orientation": stringEnum(orientationNames(), "Orientation to rotate the device to. It persists until changed."),
+			},
+			[]string{"command", "orientation"},
+			"Rotate the device to portrait or to one of the landscape orientations.",
 		),
 		"TapStep": objectSchema(
 			map[string]any{

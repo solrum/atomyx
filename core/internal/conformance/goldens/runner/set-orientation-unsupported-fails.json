@@ -1,0 +1,71 @@
+{
+  "calls": [],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "setOrientation",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "setOrientation: \"landscapeLeft\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "setOrientation"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"landscapeLeft\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "setOrientation",
+      "depth": 0,
+      "detail": "this device cannot be rotated",
+      "durationMs": 0,
+      "line": 5,
+      "ok": false,
+      "stepIndex": 0,
+      "summary": "setOrientation: \"landscapeLeft\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "setOrientation"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"landscapeLeft\""
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": 0,
+  "ok": false,
+  "passedSteps": 0,
+  "screenshots": [],
+  "scriptName": "rotate unsupported",
+  "steps": [
+    {
+      "command": "setOrientation",
+      "detail": "this device cannot be rotated",
+      "durationMs": 0,
+      "ok": false,
+      "stepIndex": 0
+    }
+  ],
+  "totalSteps": 1
+}

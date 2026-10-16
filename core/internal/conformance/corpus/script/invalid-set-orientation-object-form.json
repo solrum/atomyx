@@ -1,0 +1,5 @@
+{
+  "name": "invalid-set-orientation-object-form",
+  "description": "setOrientation written as an object instead of a bare orientation name must be REJECTED.",
+  "yaml": "- setOrientation:\n    orientation: portrait\n"
+}

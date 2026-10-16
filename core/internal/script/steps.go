@@ -53,6 +53,7 @@ const (
 	CommandClearState       = "clearState"
 	CommandOpenLink         = "openLink"
 	CommandSetPermissions   = "setPermissions"
+	CommandSetOrientation   = "setOrientation"
 
 	CommandHideKeyboard          = "hideKeyboard"
 	CommandEraseText             = "eraseText"
@@ -542,6 +543,17 @@ type SetPermissionsStep struct {
 
 func (s *SetPermissionsStep) StepCommand() string { return s.Command }
 func (s *SetPermissionsStep) isScriptStep()       {}
+
+// SetOrientationStep rotates the device to Orientation. The rotation
+// persists after the step, because nothing restores the earlier one.
+type SetOrientationStep struct {
+	stepSource
+	Command     string             `json:"command"`
+	Orientation driver.Orientation `json:"orientation"`
+}
+
+func (s *SetOrientationStep) StepCommand() string { return s.Command }
+func (s *SetOrientationStep) isScriptStep()       {}
 
 // Kinds of value an inputRandom step types.
 const (

@@ -345,6 +345,29 @@ Rules and behavior:
 - A request that reached the device but changed nothing, such as an app that does not declare the permission, fails the step with the `PERMISSION_NOT_SET` code.
 - Denying a permission revokes it, so the app sees it as not granted and may ask again. There is no state that resets a permission to the undecided state.
 
+### setOrientation
+
+Rotate the device to portrait or to one of the two landscape orientations.
+
+```yaml
+- setOrientation: landscapeLeft
+- tap: "Play"
+- setOrientation: portrait
+```
+
+The value is one of `portrait`, `landscapeLeft` (the device turned a
+quarter counterclockwise) and `landscapeRight` (a quarter clockwise). The
+step succeeds once the screen reports the rotated layout.
+
+Rules and behavior:
+
+- An unknown name is rejected when the script is parsed. Upside-down portrait is not offered.
+- The rotation persists after the script. Nothing restores the earlier orientation, so a script that rotates the device turns it back before it ends. On Android, automatic rotation also stays off.
+- A device that cannot be rotated fails the step with the `ORIENTATION_UNSUPPORTED` code.
+- A screen that does not take the layout within 10 seconds fails the step with the `ORIENTATION_NOT_SET` code. A foreground app that supports only one orientation is the usual cause.
+- Taps, swipes and other gestures address the rotated screen, so coordinates read from the hierarchy stay valid.
+- The wait reads the screen size, which cannot tell the two landscape orientations apart, so a turn from one landscape to the other returns as soon as the request is accepted.
+
 ### tap
 
 Tap an element on screen.
