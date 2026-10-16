@@ -54,6 +54,7 @@ final class AtomyxDriverAgent: XCTestCase {
         // Backend selection is internal. No user-facing knob.
         let orientation = DeviceOrientationTracker()
         orientation.seed { bridge.deviceOrientationRaw() }
+        orientation.seedPortraitSize { DriverState.springboard().frame.size }
         let synthesizer = EventSynthesizerFactory.make(orientationSource: orientation)
         NSLog("[atomyx] gesture synthesizer mechanism = \(synthesizer.mechanismName)")
 

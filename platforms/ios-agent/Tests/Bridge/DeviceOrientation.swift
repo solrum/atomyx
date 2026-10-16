@@ -22,15 +22,7 @@ enum DeviceOrientation: String, CaseIterable {
     }
 }
 
-/// Maps device orientations to the interface orientation code that a
-/// synthesized pointer event record carries.
-///
-/// The system interprets event coordinates in the space of the interface
-/// orientation named by the record, and element frames read from the
-/// accessibility tree are already in that space. A record therefore needs
-/// the true interface orientation and the frame coordinates unchanged.
-/// A record that names portrait while the interface is in landscape lands
-/// the touch on the wrong point.
+/// Maps device orientations to interface orientation codes.
 ///
 /// `UIInterfaceOrientation` swaps its two landscape cases relative to
 /// `UIDeviceOrientation`, because the interface rotates against the
@@ -65,6 +57,59 @@ enum InterfaceOrientationCode {
 /// Supplies the interface orientation code for the gesture synthesizer.
 protocol InterfaceOrientationSource: AnyObject {
     var interfaceOrientationCode: Int { get }
+
+    /// Screen size in points with the shorter side as width, or nil
+    /// until it has been read.
+    var portraitSize: CGSize? { get }
+}
+
+/// Maps points from hierarchy space, the space element frames are read
+/// in, into portrait device space, the space a synthesized pointer event
+/// record interprets its coordinates in whatever orientation it names.
+///
+/// With `W` and `H` the portrait width and height in points:
+///
+/// - Portrait: a point is unchanged.
+/// - Device landscape-left (interface code 3): `(x, y)` becomes `(W - y, x)`.
+/// - Device landscape-right (interface code 4): `(x, y)` becomes `(y, H - x)`.
+///
+/// Any other code, and an unknown screen size, leave points unchanged.
+enum PortraitSpace {
+    static func map(
+        _ point: CGPoint,
+        interfaceOrientationCode code: Int,
+        portraitSize size: CGSize?
+    ) -> CGPoint {
+        guard let size = size else { return point }
+        let w = min(size.width, size.height)
+        let h = max(size.width, size.height)
+        switch code {
+        case InterfaceOrientationCode.landscapeRight:
+            return CGPoint(x: w - point.y, y: point.x)
+        case InterfaceOrientationCode.landscapeLeft:
+            return CGPoint(x: point.y, y: h - point.x)
+        default:
+            return point
+        }
+    }
+
+    /// Maps every waypoint of every pointer path.
+    static func map(
+        _ pointers: [PointerPath],
+        interfaceOrientationCode code: Int,
+        portraitSize size: CGSize?
+    ) -> [PointerPath] {
+        return pointers.map { pointer in
+            PointerPath(id: pointer.id, waypoints: pointer.waypoints.map { wp in
+                Waypoint(
+                    phase: wp.phase,
+                    point: map(wp.point, interfaceOrientationCode: code, portraitSize: size),
+                    atOffsetSeconds: wp.atOffsetSeconds,
+                    pressure: wp.pressure
+                )
+            })
+        }
+    }
 }
 
 /// Holds the last known device orientation so a gesture never has to ask
@@ -80,11 +125,37 @@ final class DeviceOrientationTracker: InterfaceOrientationSource {
     private let lock = NSLock()
     private var code = InterfaceOrientationCode.portrait
     private var known = false
+    private var size: CGSize?
 
     var interfaceOrientationCode: Int {
         lock.lock()
         defer { lock.unlock() }
         return code
+    }
+
+    var portraitSize: CGSize? {
+        lock.lock()
+        defer { lock.unlock() }
+        return size
+    }
+
+    /// Reads the screen size on the main queue and caches it with the
+    /// shorter side as width. The call returns immediately, and the read
+    /// runs once the main run loop is serving.
+    func seedPortraitSize(
+        on queue: DispatchQueue = DispatchQueue.main,
+        read: @escaping () -> CGSize
+    ) {
+        queue.async { [weak self] in
+            let raw = read()
+            guard raw.width > 0, raw.height > 0, let self = self else { return }
+            self.lock.lock()
+            defer { self.lock.unlock() }
+            self.size = CGSize(
+                width: min(raw.width, raw.height),
+                height: max(raw.width, raw.height)
+            )
+        }
     }
 
     /// Records the orientation the runner just set, replacing any seed.

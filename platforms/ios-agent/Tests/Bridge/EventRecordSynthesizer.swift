@@ -62,9 +62,11 @@ final class EventRecordSynthesizer: EventSynthesizer {
 
     let mechanismName = "event-record"
 
-    /// Names the interface orientation on every event record, so the
-    /// system reads the frame coordinates a caller passes in the space
-    /// the screen is currently laid out in. The source is a cache,
+    /// Supplies the current interface orientation and the portrait screen
+    /// size. The system interprets event record coordinates in portrait
+    /// device space whatever interface orientation the record names, so
+    /// every point is mapped from hierarchy space into portrait device
+    /// space and the record always names portrait. The source is a cache,
     /// because reading the system's orientation live costs seconds on
     /// first access and would stall the first gesture of a session.
     private let orientationSource: InterfaceOrientationSource
@@ -77,19 +79,24 @@ final class EventRecordSynthesizer: EventSynthesizer {
         Self.lastProbeLog.isEmpty ? nil : Self.lastProbeLog
     }
 
-    func dispatch(pointers: [PointerPath]) throws -> [Data] {
+    func dispatch(pointers inputPointers: [PointerPath]) throws -> [Data] {
         guard Self.isAvailable else {
             throw SynthesizerError.privateSymbolMissing(
                 symbol: "XCSynthesizedEventRecord (see probe log)"
             )
         }
-        guard !pointers.isEmpty else {
+        guard !inputPointers.isEmpty else {
             throw SynthesizerError.patternNotExpressible(
                 reason: "dispatch requires at least one pointer path"
             )
         }
 
-        let orientation = orientationSource.interfaceOrientationCode
+        let pointers = PortraitSpace.map(
+            inputPointers,
+            interfaceOrientationCode: orientationSource.interfaceOrientationCode,
+            portraitSize: orientationSource.portraitSize
+        )
+        let orientation = InterfaceOrientationCode.portrait
 
         guard let recordCls = NSClassFromString("XCSynthesizedEventRecord") as? NSObject.Type else {
             throw SynthesizerError.privateSymbolMissing(symbol: "XCSynthesizedEventRecord")

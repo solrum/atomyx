@@ -175,6 +175,75 @@ final class DeviceOrientationTests: XCTestCase {
         XCTAssertEqual(tracker.interfaceOrientationCode, InterfaceOrientationCode.portrait)
     }
 
+    // MARK: - Portrait space mapping
+
+    private let portraitSize = CGSize(width: 440, height: 956)
+    private let landscapePoint = CGPoint(x: 478, y: 178)
+
+    func testPortraitLeavesPointsUnchanged() {
+        let mapped = PortraitSpace.map(
+            landscapePoint,
+            interfaceOrientationCode: InterfaceOrientationCode.portrait,
+            portraitSize: portraitSize
+        )
+        XCTAssertEqual(mapped, landscapePoint)
+    }
+
+    func testDeviceLandscapeLeftMapsIntoPortraitSpace() {
+        let code = InterfaceOrientationCode.code(for: .landscapeLeft)
+        let mapped = PortraitSpace.map(landscapePoint, interfaceOrientationCode: code, portraitSize: portraitSize)
+        XCTAssertEqual(mapped, CGPoint(x: 262, y: 478))
+    }
+
+    func testDeviceLandscapeRightMapsIntoPortraitSpace() {
+        let code = InterfaceOrientationCode.code(for: .landscapeRight)
+        let mapped = PortraitSpace.map(landscapePoint, interfaceOrientationCode: code, portraitSize: portraitSize)
+        XCTAssertEqual(mapped, CGPoint(x: 178, y: 478))
+    }
+
+    func testUnknownSizeLeavesPointsUnchanged() {
+        let mapped = PortraitSpace.map(
+            landscapePoint,
+            interfaceOrientationCode: InterfaceOrientationCode.landscapeRight,
+            portraitSize: nil
+        )
+        XCTAssertEqual(mapped, landscapePoint)
+    }
+
+    func testEveryWaypointOfEveryPointerIsMapped() {
+        let pointers = [
+            PointerPath(id: "a", waypoints: [
+                Waypoint(phase: .down, point: CGPoint(x: 478, y: 178), atOffsetSeconds: 0, pressure: nil),
+                Waypoint(phase: .up, point: CGPoint(x: 100, y: 50), atOffsetSeconds: 0.2, pressure: 0.5),
+            ]),
+            PointerPath(id: "b", waypoints: [
+                Waypoint(phase: .down, point: CGPoint(x: 10, y: 20), atOffsetSeconds: 0, pressure: nil),
+            ]),
+        ]
+
+        let mapped = PortraitSpace.map(
+            pointers,
+            interfaceOrientationCode: InterfaceOrientationCode.landscapeRight,
+            portraitSize: portraitSize
+        )
+
+        XCTAssertEqual(mapped.map { $0.id }, ["a", "b"])
+        XCTAssertEqual(mapped[0].waypoints.map { $0.point }, [CGPoint(x: 262, y: 478), CGPoint(x: 390, y: 100)])
+        XCTAssertEqual(mapped[1].waypoints.map { $0.point }, [CGPoint(x: 420, y: 10)])
+        XCTAssertEqual(mapped[0].waypoints[1].phase, .up)
+        XCTAssertEqual(mapped[0].waypoints[1].atOffsetSeconds, 0.2)
+        XCTAssertEqual(mapped[0].waypoints[1].pressure, 0.5)
+    }
+
+    func testSeedPortraitSizeCachesTheShorterSideAsWidth() {
+        let tracker = DeviceOrientationTracker()
+        XCTAssertNil(tracker.portraitSize)
+        let queue = DispatchQueue(label: "size-seed-test")
+        tracker.seedPortraitSize(on: queue) { CGSize(width: 956, height: 440) }
+        queue.sync {}
+        XCTAssertEqual(tracker.portraitSize, CGSize(width: 440, height: 956))
+    }
+
     // MARK: - Synthesizer wiring
 
     func testEventRecordSynthesizerAcceptsAnyOrientationSource() {
