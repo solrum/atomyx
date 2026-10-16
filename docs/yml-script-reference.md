@@ -382,7 +382,7 @@ Rules and behavior:
 
 - `latitude` runs from -90 to 90 and is positive north. `longitude` runs from -180 to 180 and is positive east. Both are required numbers, and a value outside its range is rejected when the script is parsed.
 - The position persists after the script. Nothing restores the earlier position, so a script that moves the device sets it back before it ends. An app that is already running sees the new position on its next location update.
-- An Android emulator and an iOS simulator can be moved. A physical Android device needs a mock location provider installed on the device, and a physical iOS device is not supported, so on either the step fails with the `LOCATION_UNSUPPORTED` code.
+- An Android emulator, an iOS simulator and a physical iOS device can be moved. A physical Android device needs a mock location provider installed on the device, so on that device the step fails with the `LOCATION_UNSUPPORTED` code. A physical iOS device can be moved on iOS 16.4 or later, and on an older OS the step fails with the same code.
 - A device that was reached but refused the position fails the step with the `LOCATION_NOT_SET` code.
 - The app needs the location permission to receive the position. Use [setPermissions](#setpermissions) to grant it first.
 

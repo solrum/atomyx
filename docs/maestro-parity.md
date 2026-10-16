@@ -56,7 +56,7 @@ A Maestro flow that uses only present commands runs as is after a syntax change.
 | `stopApp` | `stopApp` | Present | Takes an optional app id. |
 | `killApp` | `killApp` | Present | Takes an optional app id. Behaves the same as `stopApp` on every platform. |
 | `openLink` | `openLink` | Present | Takes a link, or a `link` with an optional `appId`. It has no `autoVerify` or `browser` option. iOS needs 16.4 or later. |
-| `setLocation` | `setLocation` | Present | Takes `latitude` and `longitude` as an object, not the Maestro text pair. It works on an Android emulator and an iOS simulator. A physical device fails with `LOCATION_UNSUPPORTED`. The position persists after the script. |
+| `setLocation` | `setLocation` | Present | Takes `latitude` and `longitude` as an object, not the Maestro text pair. It works on an Android emulator, an iOS simulator and a physical iPhone on iOS 16.4 or later. A physical Android device and an older iPhone fail with `LOCATION_UNSUPPORTED`. The position persists after the script. |
 | `travel` | `travel` | Present | Takes `points` as objects with `latitude` and `longitude`, and an optional `speed` in meters per second. It sets each point after the time the distance takes and does not interpolate between points. The route is limited to 100 points and ten minutes. |
 | `setOrientation` | `setOrientation` | Present | Takes `portrait`, `landscapeLeft` or `landscapeRight`. The rotation persists after the script. There is no upside-down portrait. |
 | `hideKeyboard` | `hideKeyboard` | Present | |
