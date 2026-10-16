@@ -226,6 +226,18 @@ func (f *fakeTransport) Screenshot(context.Context) (transport.ScreenshotRespons
 
 var _ androiddriver.Transport = (*fakeTransport)(nil)
 
+// rotate turns the staged screen to the layout a user_rotation value
+// stands for: 0 is portrait and any other value is landscape.
+func (f *fakeTransport) rotate(rotation string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if rotation == "0" {
+		f.treeResp = screenTree(1080, 2400)
+		return
+	}
+	f.treeResp = screenTree(2400, 1080)
+}
+
 // contractRunner is a stateful process.Runner test double that tracks
 // installed app ids across install / uninstall / list-packages calls,
 // the way a real device does, so the driver contract suite's install
@@ -237,6 +249,9 @@ type contractRunner struct {
 	// onForceStop, when set, observes each package passed to
 	// "am force-stop".
 	onForceStop func(pkg string)
+	// onRotation, when set, observes each value written to the
+	// user_rotation setting.
+	onRotation func(rotation string)
 }
 
 func newContractRunner() *contractRunner {
@@ -253,6 +268,10 @@ func (r *contractRunner) Run(ctx context.Context, name string, args ...string) (
 	case len(args) == 6 && args[2] == "shell" && args[3] == "am" && args[4] == "force-stop":
 		if r.onForceStop != nil {
 			r.onForceStop(args[5])
+		}
+	case len(args) == 8 && args[2] == "shell" && args[3] == "settings" && args[4] == "put" && args[6] == "user_rotation":
+		if r.onRotation != nil {
+			r.onRotation(args[7])
 		}
 	case len(args) == 5 && args[2] == "install":
 		r.installed[args[4]] = true
@@ -278,6 +297,7 @@ func TestAndroidDriver_SatisfiesContract(t *testing.T) {
 		tr = newFakeTransport()
 		runner := newContractRunner()
 		runner.onForceStop = tr.clearForeground
+		runner.onRotation = tr.rotate
 		return androiddriver.New(tr, runner, androiddriver.Options{Serial: "emulator-5554"})
 	}, drivertest.WithSyntheticFixtures(drivertest.Hooks{
 		DeviceCalls: func() int { return int(tr.calls.Load()) },

@@ -92,8 +92,12 @@ type Driver struct {
 	// SetPermissions, in call order.
 	PermissionChanges []PermissionChange
 
+	// Orientations records the orientations passed to SetOrientation,
+	// in call order.
+	Orientations []driver.Orientation
+
 	// ScreenshotErr, SwipeErr, PressKeyErr, LaunchAppErr, ListAppsErr,
-	// OpenLinkErr, SetPermissionsErr, and PingErr, when set, make the matching method return that
+	// OpenLinkErr, SetPermissionsErr, SetOrientationErr, and PingErr, when set, make the matching method return that
 	// error instead of its normal result, so a test can drive a
 	// caller's error-surfacing path without a real device.
 	ScreenshotErr     error
@@ -103,6 +107,7 @@ type Driver struct {
 	ListAppsErr       error
 	OpenLinkErr       error
 	SetPermissionsErr error
+	SetOrientationErr error
 	PingErr           error
 
 	// Agent is the AgentInfo the mock reports, settable so a test can
@@ -117,10 +122,9 @@ type Call struct {
 }
 
 // New constructs a Driver with the default capability set: screen
-// capture, text erase, keyboard dismissal, and foreground query
-// supported; idle wait, location, orientation, multi-pointer, and
-// pressure not supported; back, home, and enter as the supported key
-// codes.
+// capture, text erase, keyboard dismissal, orientation, and foreground
+// query supported; idle wait, location, multi-pointer, and pressure not
+// supported; back, home, and enter as the supported key codes.
 func New() *Driver {
 	return &Driver{
 		capabilities: driver.Capabilities{
@@ -128,7 +132,7 @@ func New() *Driver {
 			CanEraseText:       true,
 			CanWaitForIdle:     false,
 			CanSetLocation:     false,
-			CanSetOrientation:  false,
+			CanSetOrientation:  true,
 			CanHideKeyboard:    true,
 			CanOpenLink:        true,
 			CanSetPermissions:  true,
@@ -609,5 +613,31 @@ func (d *Driver) SetPermissions(ctx context.Context, appID string, permissions m
 		return d.SetPermissionsErr
 	}
 	d.PermissionChanges = append(d.PermissionChanges, PermissionChange{AppID: appID, Permissions: copied})
+	return nil
+}
+
+// SetOrientation validates orientation, records it in Orientations, and
+// turns Screen so ScreenSize reports the rotated layout, as a device
+// does. It fails with diag.CodeOrientationUnsupported when the reported
+// capabilities report CanSetOrientation false, the same caller-must-check
+// contract the real adapters honor.
+func (d *Driver) SetOrientation(ctx context.Context, orientation driver.Orientation) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if !d.capabilities.CanSetOrientation {
+		return diag.NewOrientationUnsupported("")
+	}
+	if err := driver.ValidateOrientation(orientation); err != nil {
+		return err
+	}
+	d.record("SetOrientation", orientation)
+	if d.SetOrientationErr != nil {
+		return d.SetOrientationErr
+	}
+	d.Orientations = append(d.Orientations, orientation)
+	if !driver.SizeMatchesOrientation(orientation, d.Screen) {
+		d.Screen = wire.Size{Width: d.Screen.Height, Height: d.Screen.Width}
+	}
 	return nil
 }

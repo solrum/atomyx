@@ -7,5 +7,5 @@ package dev.atomyx.agent.control
  * incompatibly.
  */
 object AgentProtocol {
-    const val AGENT_PROTOCOL_VERSION = 3
+    const val AGENT_PROTOCOL_VERSION = 4
 }

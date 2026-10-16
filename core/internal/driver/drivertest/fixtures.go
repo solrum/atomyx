@@ -49,6 +49,12 @@ func WithSyntheticFixtures(h Hooks) Hooks {
 			Await:      func(*testing.T, driver.Driver, bool) {},
 		}
 	}
+	if h.Orientation == nil {
+		h.Orientation = &OrientationFixture{
+			Arguments:   map[string]string{"route": "/gestures"},
+			TapAndAwait: func(*testing.T, driver.Driver) {},
+		}
+	}
 	if h.Install == nil {
 		h.Install = &InstallFixture{Source: syntheticAppID, AppID: syntheticAppID}
 	}

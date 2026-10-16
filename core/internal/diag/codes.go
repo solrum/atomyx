@@ -40,6 +40,8 @@ func Codes() []string {
 		CodeLinkNotOpened,
 		CodePermissionsUnsupported,
 		CodePermissionNotSet,
+		CodeOrientationUnsupported,
+		CodeOrientationNotSet,
 		CodeInputNotFocused,
 		CodeElementNotFound,
 	}

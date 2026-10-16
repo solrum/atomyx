@@ -68,6 +68,10 @@ const (
 	// is wired without a Permissions fixture.
 	SkipNoPermissionsFixture SkipKey = "no-permissions-fixture"
 
+	// SkipNoOrientationFixture marks a driver that can set the
+	// orientation but is wired without an Orientation fixture.
+	SkipNoOrientationFixture SkipKey = "no-orientation-fixture"
+
 	// SkipNoFailPing marks a driver wired without a FailPing hook.
 	SkipNoFailPing SkipKey = "no-fail-ping"
 

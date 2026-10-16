@@ -157,6 +157,14 @@ const (
 	// permission request changed nothing, for example because the app
 	// is not installed or does not declare the permission.
 	CodePermissionNotSet = "PERMISSION_NOT_SET"
+	// CodeOrientationUnsupported means the target device cannot be
+	// rotated by the driver. The condition is permanent for that
+	// device, so retrying cannot help.
+	CodeOrientationUnsupported = "ORIENTATION_UNSUPPORTED"
+	// CodeOrientationNotSet means the device was reached but the screen
+	// never took the requested orientation, for example because the
+	// foreground app only supports another one.
+	CodeOrientationNotSet = "ORIENTATION_NOT_SET"
 	// CodeInputNotFocused means a type action found its field but the
 	// field never took input focus, so nothing was typed. The screen
 	// did not offer the field in a focusable state, which is a property

@@ -103,6 +103,11 @@ type Hooks struct {
 	// the permissions case on a driver that can set permissions.
 	Permissions *PermissionsFixture
 
+	// Orientation describes how to prove that rotating the device keeps
+	// gestures on target in LaunchableAppID. A nil value skips that part
+	// of the orientation case on a driver that can set the orientation.
+	Orientation *OrientationFixture
+
 	// ClearableAppID is an app id installed on the target whose data
 	// may be wiped. An empty value skips the clear app data case.
 	ClearableAppID string
@@ -191,6 +196,8 @@ func Run(t *testing.T, newDriver Factory, hooks Hooks) {
 	t.Run("open link reaches the app", func(t *testing.T) { testOpenLinkReachesTheApp(t, tracked(t, newDriver), hooks) })
 	t.Run("set permissions matches capability", func(t *testing.T) { testSetPermissionsMatchesCapability(t, tracked(t, newDriver)) })
 	t.Run("set permissions reaches the app", func(t *testing.T) { testSetPermissionsReachesTheApp(t, tracked(t, newDriver), hooks) })
+	t.Run("set orientation matches capability", func(t *testing.T) { testSetOrientationMatchesCapability(t, tracked(t, newDriver)) })
+	t.Run("set orientation keeps gestures on target", func(t *testing.T) { testSetOrientationReachesTheApp(t, tracked(t, newDriver), hooks) })
 	t.Run("clear app data succeeds with a source", func(t *testing.T) { testClearAppDataSucceedsWithSource(t, tracked(t, newDriver), hooks) })
 	t.Run("install uninstall roundtrip", func(t *testing.T) { testInstallUninstallRoundtrip(t, tracked(t, newDriver), hooks) })
 }
@@ -363,6 +370,9 @@ func testContextCancellation(t *testing.T, newDriver Factory) {
 		}},
 		{"OpenLink", func(ctx context.Context, d driver.Driver) error {
 			return d.OpenLink(ctx, "dev-atomyx-drivertest://cancel", driver.OpenLinkOptions{})
+		}},
+		{"SetOrientation", func(ctx context.Context, d driver.Driver) error {
+			return d.SetOrientation(ctx, driver.OrientationLandscapeLeft)
 		}},
 		{"SetPermissions", func(ctx context.Context, d driver.Driver) error {
 			return d.SetPermissions(ctx, "dev.atomyx.drivertest.cancel", map[driver.Permission]driver.PermissionState{driver.PermissionCamera: driver.PermissionAllow})

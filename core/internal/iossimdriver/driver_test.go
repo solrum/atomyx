@@ -8,6 +8,7 @@ import (
 	"net"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -128,8 +129,17 @@ var _ iosdriver.Conn = (*fakeConn)(nil)
 // touch path also depends on it for normalization.
 func newDefaultFakeConn() *fakeConn {
 	c := newFakeConn()
+	var landscape atomic.Bool
 	c.Respond("getScreenSize", func(map[string]any) (map[string]any, error) {
+		if landscape.Load() {
+			return map[string]any{"width": 844.0, "height": 390.0}, nil
+		}
 		return map[string]any{"width": 390.0, "height": 844.0}, nil
+	})
+	c.Respond("setOrientation", func(args map[string]any) (map[string]any, error) {
+		name, _ := args["orientation"].(string)
+		landscape.Store(name != "portrait")
+		return map[string]any{"orientation": name}, nil
 	})
 	c.Respond("openLink", func(map[string]any) (map[string]any, error) {
 		return map[string]any{"opened": true}, nil
@@ -675,5 +685,41 @@ func TestIosSimDriver_ClearAppData_WithoutSourceReportsInvalidArgument(t *testin
 	}
 	if remedy == "" {
 		t.Fatal("remedy is empty, want the config field to set")
+	}
+}
+
+// TestIosSimDriver_SetOrientation_DropsTheCachedScreenSize proves a tap
+// after a rotation normalizes against the rotated size without waiting
+// for the cache to expire.
+func TestIosSimDriver_SetOrientation_DropsTheCachedScreenSize(t *testing.T) {
+	conn := newDefaultFakeConn()
+	clientConn, serverConn := net.Pipe()
+	srv := newFakeHidServer(serverConn)
+	go srv.run()
+	defer func() { _ = clientConn.Close() }()
+
+	d, err := iossimdriver.New(conn, process.NewFake(), &fakeDialer{conn: clientConn}, iossimdriver.Options{
+		Options: iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator, Clock: clock.NewFakeClock(0)},
+		HidPort: 1,
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	if err := d.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	if err := d.Tap(context.Background(), wireBuildPoint(195, 422)); err != nil {
+		t.Fatalf("Tap() error = %v", err)
+	}
+	if err := d.SetOrientation(context.Background(), driver.OrientationLandscapeLeft); err != nil {
+		t.Fatalf("SetOrientation() error = %v", err)
+	}
+	if err := d.Tap(context.Background(), wireBuildPoint(422, 195)); err != nil {
+		t.Fatalf("Tap() after rotation error = %v", err)
+	}
+	received := srv.Received()
+	last := received[len(received)-1]
+	if last["x"] != 0.5 || last["y"] != 0.5 {
+		t.Fatalf("tap after rotation = %+v, want x=0.5 y=0.5 against the rotated size", last)
 	}
 }

@@ -282,6 +282,9 @@ var wireCallMethodCases = []struct {
 	{"OpenLink", func(ctx context.Context, d driver.Driver) error {
 		return d.OpenLink(ctx, "faultinjection://home", driver.OpenLinkOptions{})
 	}},
+	{"SetOrientation", func(ctx context.Context, d driver.Driver) error {
+		return d.SetOrientation(ctx, driver.OrientationLandscapeLeft)
+	}},
 	{"StopApp", func(ctx context.Context, d driver.Driver) error {
 		return d.StopApp(ctx, "dev.atomyx.faultinjection")
 	}},

@@ -2,7 +2,6 @@ package drivertest
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
@@ -85,17 +84,7 @@ func AwaitPermissionStatus(t *testing.T, d driver.Driver, wantGranted bool) {
 // findPermissionStatus returns the status text of the first node under
 // root whose label or text carries the permission status prefix.
 func findPermissionStatus(root wire.TreeNodeWire) (string, bool) {
-	for _, key := range []string{"label", "text", "value"} {
-		if value, ok := root.Attributes[key]; ok && strings.HasPrefix(value, permissionStatusPrefix) {
-			return strings.TrimSpace(strings.TrimPrefix(value, permissionStatusPrefix)), true
-		}
-	}
-	for _, child := range root.Children {
-		if status, ok := findPermissionStatus(child); ok {
-			return status, true
-		}
-	}
-	return "", false
+	return findPrefixedText(root, permissionStatusPrefix)
 }
 
 // testSetPermissionsMatchesCapability checks the unsupported-versus-failed

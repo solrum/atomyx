@@ -249,3 +249,8 @@ func (o *observingCore) SetPermissions(ctx context.Context, appID string, permis
 	defer o.mutate()()
 	return o.inner.SetPermissions(ctx, appID, permissions)
 }
+
+func (o *observingCore) SetOrientation(ctx context.Context, orientation driver.Orientation) error {
+	defer o.mutate()()
+	return o.inner.SetOrientation(ctx, orientation)
+}

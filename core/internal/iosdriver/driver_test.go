@@ -14,9 +14,11 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"dev.atomyx/internal/clock"
 	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/driver"
 	"dev.atomyx/internal/driver/drivertest"
@@ -122,8 +124,17 @@ var _ iosdriver.Conn = (*fakeConn)(nil)
 // successful app-launch and stop commands.
 func newDefaultFakeConn() *fakeConn {
 	c := newFakeConn()
+	var landscape atomic.Bool
 	c.Respond("getScreenSize", func(map[string]any) (map[string]any, error) {
+		if landscape.Load() {
+			return map[string]any{"width": 2340.0, "height": 1080.0}, nil
+		}
 		return map[string]any{"width": 1080.0, "height": 2340.0}, nil
+	})
+	c.Respond("setOrientation", func(args map[string]any) (map[string]any, error) {
+		name, _ := args["orientation"].(string)
+		landscape.Store(name != "portrait")
+		return map[string]any{"orientation": name}, nil
 	})
 	c.Respond("openLink", func(map[string]any) (map[string]any, error) {
 		return map[string]any{"opened": true}, nil
@@ -1682,5 +1693,48 @@ func TestIosDriver_OpenLink_RejectsAnInvalidLinkBeforeTheDevice(t *testing.T) {
 	}
 	if len(conn.Calls()) != 0 {
 		t.Fatalf("calls = %+v, want none", conn.Calls())
+	}
+}
+
+func TestIosDriver_SetOrientation_SendsTheNameThenWaitsForTheRotatedSize(t *testing.T) {
+	conn := newDefaultFakeConn()
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+
+	if err := d.SetOrientation(context.Background(), driver.OrientationLandscapeRight); err != nil {
+		t.Fatalf("SetOrientation() error = %v", err)
+	}
+	calls := conn.Calls()
+	if len(calls) < 2 || calls[0].cmdType != "setOrientation" || calls[1].cmdType != "getScreenSize" {
+		t.Fatalf("calls = %+v, want setOrientation then getScreenSize", calls)
+	}
+	if want := map[string]any{"orientation": "landscapeRight"}; !reflect.DeepEqual(calls[0].args, want) {
+		t.Fatalf("setOrientation args = %#v, want %#v", calls[0].args, want)
+	}
+}
+
+func TestIosDriver_SetOrientation_RejectsAnUnknownNameBeforeTheRunner(t *testing.T) {
+	conn := newDefaultFakeConn()
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+
+	err := d.SetOrientation(context.Background(), "sideways")
+	if code, _, _ := diag.Describe(err); code != diag.CodeInvalidArgument {
+		t.Fatalf("SetOrientation() code = %q (err %v), want %q", code, err, diag.CodeInvalidArgument)
+	}
+	if calls := conn.Calls(); len(calls) != 0 {
+		t.Fatalf("calls = %+v, want none", calls)
+	}
+}
+
+func TestIosDriver_SetOrientation_AnAppThatKeepsItsLayoutIsOrientationNotSet(t *testing.T) {
+	conn := newDefaultFakeConn()
+	conn.Respond("setOrientation", func(map[string]any) (map[string]any, error) {
+		return map[string]any{}, nil
+	})
+	fakeClock := clock.NewFakeClock(0)
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator, Clock: fakeClock})
+
+	err := d.SetOrientation(context.Background(), driver.OrientationLandscapeLeft)
+	if code, _, _ := diag.Describe(err); code != diag.CodeOrientationNotSet {
+		t.Fatalf("SetOrientation() code = %q (err %v), want %q", code, err, diag.CodeOrientationNotSet)
 	}
 }

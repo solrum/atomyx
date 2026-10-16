@@ -224,6 +224,39 @@ type Driver interface {
 	//     to change an app's permissions from outside the app.
 	SetPermissions(ctx context.Context, appID string, permissions map[Permission]PermissionState) error
 
+	// SetOrientation rotates the device to orientation and returns once
+	// ScreenSize and Hierarchy report the rotated layout: wider than
+	// tall for a landscape orientation and taller than wide for
+	// portrait. A caller reads the resulting orientation through
+	// ScreenSize, so the port has no separate getter. The size cannot
+	// tell landscapeLeft from landscapeRight, so a request to turn from
+	// one landscape to the other returns as soon as the call is
+	// accepted.
+	//
+	// The rotation persists after the call. Nothing restores the
+	// earlier orientation when the session ends, so a caller that
+	// changes it puts it back.
+	//
+	// A caller checks Capabilities().CanSetOrientation first. An adapter
+	// that reports it false fails with diag.CodeOrientationUnsupported.
+	// An unknown orientation fails with diag.CodeInvalidArgument before
+	// the device is touched, see ValidateOrientation. A device that
+	// accepted the request but whose screen did not reach the requested
+	// layout within OrientationSettleTimeoutMs, for example because the
+	// foreground app only supports another orientation, fails with
+	// diag.CodeOrientationNotSet.
+	//
+	// Platform notes (expand this list when adding support):
+	//
+	//   - Android: the host turns off automatic rotation, then sets the
+	//     rotation the orientation maps to. The rotation stays fixed
+	//     until the user or another call changes it, and automatic
+	//     rotation stays off.
+	//   - iOS: the runner sets the device orientation and remembers it
+	//     for gestures. An orientation change made by hand is not
+	//     observed by the runner until the next SetOrientation.
+	SetOrientation(ctx context.Context, orientation Orientation) error
+
 	// StopApp stops bundleID. See CurrentForeground for what the
 	// foreground report guarantees once StopApp returns nil.
 	StopApp(ctx context.Context, bundleID string) error

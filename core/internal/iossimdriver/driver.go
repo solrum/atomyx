@@ -339,3 +339,14 @@ func (d *IosSimDriver) RestoreLaunchedApp(ctx context.Context, bundleID, fromRun
 func (d *IosSimDriver) SetPermissions(ctx context.Context, appID string, permissions map[driver.Permission]driver.PermissionState) error {
 	return d.delegate.SetPermissions(ctx, appID, permissions)
 }
+
+// SetOrientation rotates the simulator through the delegate, then drops
+// the cached screen size, because the HID coordinates are normalized
+// against a size that the rotation swaps. The cache is dropped even
+// when the delegate fails, since a rotation that timed out may still
+// have happened.
+func (d *IosSimDriver) SetOrientation(ctx context.Context, orientation driver.Orientation) error {
+	err := d.delegate.SetOrientation(ctx, orientation)
+	d.cachedSizeSet = false
+	return err
+}

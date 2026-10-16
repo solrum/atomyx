@@ -21,7 +21,7 @@ func TestDefaultCapabilities(t *testing.T) {
 		CanEraseText:      true,
 		CanWaitForIdle:    false,
 		CanSetLocation:    false,
-		CanSetOrientation: false,
+		CanSetOrientation: true,
 		CanHideKeyboard:   true,
 		CanMultiPointer:   false,
 		CanPressure:       false,
@@ -595,5 +595,68 @@ func TestSetPermissions_RejectsInvalidInputAndSurfacesTheInjectedError(t *testin
 	err := d.SetPermissions(context.Background(), "com.example.app", map[driver.Permission]driver.PermissionState{driver.PermissionCamera: driver.PermissionAllow})
 	if !errors.Is(err, d.SetPermissionsErr) {
 		t.Fatalf("SetPermissions() error = %v, want the injected error", err)
+	}
+}
+
+func TestSetOrientation_RecordsTheOrientationAndTurnsTheScreen(t *testing.T) {
+	d := New()
+	ctx := context.Background()
+	portrait := d.Screen
+
+	if err := d.SetOrientation(ctx, driver.OrientationLandscapeLeft); err != nil {
+		t.Fatalf("SetOrientation(landscapeLeft) error = %v", err)
+	}
+	size, _ := d.ScreenSize(ctx)
+	if size.Width != portrait.Height || size.Height != portrait.Width {
+		t.Fatalf("ScreenSize() = %+v after landscape, want the portrait size turned", size)
+	}
+	if err := d.SetOrientation(ctx, driver.OrientationLandscapeRight); err != nil {
+		t.Fatalf("SetOrientation(landscapeRight) error = %v", err)
+	}
+	if size, _ = d.ScreenSize(ctx); size.Width <= size.Height {
+		t.Fatalf("ScreenSize() = %+v after a second landscape, want it unchanged", size)
+	}
+	if err := d.SetOrientation(ctx, driver.OrientationPortrait); err != nil {
+		t.Fatalf("SetOrientation(portrait) error = %v", err)
+	}
+	if size, _ = d.ScreenSize(ctx); size != portrait {
+		t.Fatalf("ScreenSize() = %+v after portrait, want %+v", size, portrait)
+	}
+	want := []driver.Orientation{driver.OrientationLandscapeLeft, driver.OrientationLandscapeRight, driver.OrientationPortrait}
+	if len(d.Orientations) != len(want) {
+		t.Fatalf("Orientations = %v, want %v", d.Orientations, want)
+	}
+	for i := range want {
+		if d.Orientations[i] != want[i] {
+			t.Fatalf("Orientations = %v, want %v", d.Orientations, want)
+		}
+	}
+	if last := d.Calls[len(d.Calls)-1]; last.Method != "SetOrientation" || last.Args[0] != driver.OrientationPortrait {
+		t.Fatalf("last call = %+v, want SetOrientation to portrait", last)
+	}
+}
+
+func TestSetOrientation_FailsAsUnsupportedWhenTheCapabilityIsOff(t *testing.T) {
+	d := New()
+	d.SetCapabilities(driver.Capabilities{CanSetOrientation: false})
+
+	err := d.SetOrientation(context.Background(), driver.OrientationLandscapeLeft)
+	if code, _, _ := diag.Describe(err); code != diag.CodeOrientationUnsupported {
+		t.Fatalf("SetOrientation() code = %q (err %v), want %q", code, err, diag.CodeOrientationUnsupported)
+	}
+	if len(d.Orientations) != 0 {
+		t.Fatalf("Orientations = %v, want none", d.Orientations)
+	}
+}
+
+func TestSetOrientation_RejectsInvalidInputAndSurfacesTheInjectedError(t *testing.T) {
+	d := New()
+	err := d.SetOrientation(context.Background(), "sideways")
+	if code, _, _ := diag.Describe(err); code != diag.CodeInvalidArgument {
+		t.Fatalf("SetOrientation(sideways) code = %q (err %v), want %q", code, err, diag.CodeInvalidArgument)
+	}
+	d.SetOrientationErr = errors.New("injected")
+	if err := d.SetOrientation(context.Background(), driver.OrientationLandscapeLeft); !errors.Is(err, d.SetOrientationErr) {
+		t.Fatalf("SetOrientation() error = %v, want the injected error", err)
 	}
 }

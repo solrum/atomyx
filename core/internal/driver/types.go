@@ -7,12 +7,17 @@ import "dev.atomyx/internal/wire"
 // supported Driver method and fall back to a portable
 // implementation when a flag is false.
 type Capabilities struct {
-	CanScreenshot     bool `json:"canScreenshot"`
-	CanEraseText      bool `json:"canEraseText"`
-	CanWaitForIdle    bool `json:"canWaitForIdle"`
-	CanSetLocation    bool `json:"canSetLocation"`
+	CanScreenshot   bool `json:"canScreenshot"`
+	CanEraseText    bool `json:"canEraseText"`
+	CanWaitForIdle  bool `json:"canWaitForIdle"`
+	CanSetLocation  bool `json:"canSetLocation"`
+	CanHideKeyboard bool `json:"canHideKeyboard"`
+
+	// CanSetOrientation reports whether Driver.SetOrientation is
+	// supported. When false, SetOrientation fails with
+	// diag.CodeOrientationUnsupported, so a caller can tell an
+	// unsupported device from a rotation that did not take.
 	CanSetOrientation bool `json:"canSetOrientation"`
-	CanHideKeyboard   bool `json:"canHideKeyboard"`
 
 	// CanOpenLink reports whether Driver.OpenLink is supported. When
 	// false, OpenLink fails with diag.CodeLinkUnsupported, so a caller

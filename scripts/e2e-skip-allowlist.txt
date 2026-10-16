@@ -37,3 +37,4 @@ ios no-install-fixture needs the signed demo build on the device
 ios no-focus-input needs the signed demo build on the device
 ios no-launch-arguments-fixture needs the signed demo build on the device
 ios no-open-link-fixture needs the signed demo build on the device
+ios no-orientation-fixture needs the signed demo build on the device

@@ -123,6 +123,12 @@ method:
   that has no permission for a requested name, fails the call with
   `PERMISSIONS_UNSUPPORTED`. A request that reached the device but changed
   nothing fails with `PERMISSION_NOT_SET`.
+- `CanSetOrientation`: `SetOrientation` rotates the device to portrait,
+  landscapeLeft or landscapeRight and returns once `ScreenSize` reports
+  the rotated layout, so the port has no orientation getter. The rotation
+  persists after the call. A device that cannot fails the call with
+  `ORIENTATION_UNSUPPORTED`, and a screen that never takes the layout
+  within the settle bound fails with `ORIENTATION_NOT_SET`.
 - `CanWaitForIdle`: a native idle-detection primitive. `orchestra`
   falls back to tree-diff polling when absent.
 - `CanMultiPointer`: multi-pointer gesture dispatch (pinch, rotate,

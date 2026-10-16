@@ -26,6 +26,7 @@ const (
 	iosE2EFocusInput      = "focus-input"
 	iosE2EFocusLink       = "atomyxdemo://open/focus"
 	iosE2EPermissionRoute = "/permission"
+	iosE2EGesturesRoute   = "/gestures"
 )
 
 // iosE2EFixture builds drivers for the corpus and remembers the latest
@@ -170,6 +171,11 @@ func simulatorDemoHooks(t *testing.T, udid string) drivertest.Hooks {
 			Permission: driver.PermissionLocation,
 			Arguments:  map[string]string{"route": iosE2EPermissionRoute},
 			Await:      drivertest.AwaitPermissionStatus,
+		},
+		Orientation: &drivertest.OrientationFixture{
+			Arguments:   map[string]string{"route": iosE2EGesturesRoute},
+			SettlePause: drivertest.RotationAnimationPause,
+			TapAndAwait: drivertest.TapGestureTarget,
 		},
 	}
 }
