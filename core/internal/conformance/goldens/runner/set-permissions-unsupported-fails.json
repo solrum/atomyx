@@ -1,0 +1,71 @@
+{
+  "calls": [],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "setPermissions",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "setPermissions: camera=allow",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "setPermissions"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "camera=allow"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "setPermissions",
+      "depth": 0,
+      "detail": "this device does not allow permissions to be set",
+      "durationMs": 0,
+      "line": 5,
+      "ok": false,
+      "stepIndex": 0,
+      "summary": "setPermissions: camera=allow",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "setPermissions"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "camera=allow"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": 0,
+  "ok": false,
+  "passedSteps": 0,
+  "screenshots": [],
+  "scriptName": "set permissions unsupported",
+  "steps": [
+    {
+      "command": "setPermissions",
+      "detail": "this device does not allow permissions to be set",
+      "durationMs": 0,
+      "ok": false,
+      "stepIndex": 0
+    }
+  ],
+  "totalSteps": 1
+}

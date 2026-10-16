@@ -492,6 +492,27 @@
           "const": "launchApp",
           "type": "string"
         },
+        "permissions": {
+          "additionalProperties": {
+            "enum": [
+              "allow",
+              "deny"
+            ]
+          },
+          "description": "Permissions to grant (`allow`) or revoke (`deny`) before the app starts, keyed by permission name. A launch that reuses a running instance cannot set them, and a launch that sets them is never skipped as a repeat.",
+          "propertyNames": {
+            "enum": [
+              "camera",
+              "location",
+              "microphone",
+              "photos",
+              "contacts",
+              "calendar",
+              "notifications"
+            ]
+          },
+          "type": "object"
+        },
         "stopApp": {
           "description": "When true, force-stop a running instance before launching. When false, reuse a running instance. When omitted, the run's launch policy applies.",
           "type": "boolean"
@@ -1410,6 +1431,9 @@
           "$ref": "#/definitions/OpenLinkStep"
         },
         {
+          "$ref": "#/definitions/SetPermissionsStep"
+        },
+        {
           "$ref": "#/definitions/HideKeyboardStep"
         },
         {
@@ -1449,6 +1473,47 @@
       "required": [
         "command",
         "selector"
+      ],
+      "type": "object"
+    },
+    "SetPermissionsStep": {
+      "additionalProperties": false,
+      "description": "Grant or revoke app permissions without a prompt.",
+      "properties": {
+        "appId": {
+          "description": "App whose permissions change. Defaults to the script's `appId`.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "command": {
+          "const": "setPermissions",
+          "type": "string"
+        },
+        "permissions": {
+          "additionalProperties": {
+            "enum": [
+              "allow",
+              "deny"
+            ]
+          },
+          "description": "Permissions to grant (`allow`) or revoke (`deny`), keyed by permission name. At least one is required.",
+          "propertyNames": {
+            "enum": [
+              "camera",
+              "location",
+              "microphone",
+              "photos",
+              "contacts",
+              "calendar",
+              "notifications"
+            ]
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "command",
+        "permissions"
       ],
       "type": "object"
     },

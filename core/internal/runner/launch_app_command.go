@@ -53,7 +53,7 @@ func resolveLaunchPolicy(s *script.LaunchAppStep, ctx *CommandContext) launchPol
 // the runner omits the step rather than executing and reporting a
 // redundant success. An explicit fresh launch (noReset false) always
 // force-stops and relaunches, so it is never skipped, a launch that
-// carries arguments is never skipped either, and an empty
+// carries arguments or permissions is never skipped either, and an empty
 // appId is left to Execute to report as the configuration failure it
 // is.
 func (LaunchAppCommand) shouldSkip(step script.ScriptStep, ctx *CommandContext) bool {
@@ -63,7 +63,7 @@ func (LaunchAppCommand) shouldSkip(step script.ScriptStep, ctx *CommandContext) 
 	}
 	launch := step.(*script.LaunchAppStep)
 	policy := resolveLaunchPolicy(launch, ctx)
-	dedup := (policy.noReset == nil || *policy.noReset) && len(launch.Arguments) == 0
+	dedup := (policy.noReset == nil || *policy.noReset) && len(launch.Arguments) == 0 && len(launch.Permissions) == 0
 	return dedup && ctx.Orchestra.IsLaunched(appID)
 }
 
@@ -92,8 +92,9 @@ func (LaunchAppCommand) Execute(step script.ScriptStep, ctx *CommandContext) Com
 	// wrong target, not a bug in this handler, so it fails the step
 	// like any other failing command instead of propagating as a panic.
 	opts := orchestra.LaunchOptions{
-		Mode:      orchestra.LaunchModeFromNoReset(policy.noReset),
-		Arguments: step.(*script.LaunchAppStep).Arguments,
+		Mode:        orchestra.LaunchModeFromNoReset(policy.noReset),
+		Arguments:   step.(*script.LaunchAppStep).Arguments,
+		Permissions: step.(*script.LaunchAppStep).Permissions,
 	}
 	if err := ctx.Orchestra.LaunchAppWithOptions(ctx.Context, appID, opts); err != nil {
 		if result, ok := commandFailureFor(err); ok {

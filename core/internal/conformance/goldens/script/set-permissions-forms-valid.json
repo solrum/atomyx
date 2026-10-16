@@ -1,0 +1,36 @@
+{
+  "parsed": {
+    "_stepLines": [
+      1,
+      5,
+      9
+    ],
+    "appId": "",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Untitled script",
+    "steps": [
+      {
+        "command": "setPermissions",
+        "permissions": {
+          "camera": "allow",
+          "location": "deny"
+        }
+      },
+      {
+        "appId": "dev.atomyx.demo",
+        "command": "setPermissions",
+        "permissions": {
+          "notifications": "allow"
+        }
+      },
+      {
+        "command": "launchApp",
+        "permissions": {
+          "photos": "allow"
+        }
+      }
+    ]
+  },
+  "valid": true
+}

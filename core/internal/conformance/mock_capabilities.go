@@ -33,6 +33,9 @@ func applyCapabilitiesOverride(d *mock.Driver, o *RunnerCapabilitiesOverride) {
 	if o.CanOpenLink != nil {
 		caps.CanOpenLink = *o.CanOpenLink
 	}
+	if o.CanSetPermissions != nil {
+		caps.CanSetPermissions = *o.CanSetPermissions
+	}
 	if o.CanMultiPointer != nil {
 		caps.CanMultiPointer = *o.CanMultiPointer
 	}

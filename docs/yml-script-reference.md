@@ -203,7 +203,7 @@ Launch the app specified in `appId`.
 - launchApp
 ```
 
-Three optional fields change how the app starts. A field a step leaves out
+Four optional fields change how the app starts. A field a step leaves out
 falls back to the project launch policy, so a bare `launchApp` behaves as
 the policy says.
 
@@ -217,6 +217,10 @@ the policy says.
       route: /focus
       retries: 3
       debug: true
+- launchApp:
+    permissions:
+      location: allow
+      notifications: deny
 ```
 
 | Field | Type | Effect |
@@ -224,6 +228,7 @@ the policy says.
 | `clearState` | boolean | `true` clears the app's data and then launches it fresh. `false` skips a data clear that the launch policy asks for. |
 | `stopApp` | boolean | `true` force-stops a running instance, then launches again. `false` reuses a running instance. |
 | `arguments` | mapping | Named values handed to the app at launch. Each value is a string, number or boolean and reaches the app as text. |
+| `permissions` | mapping | Permissions to grant (`allow`) or revoke (`deny`) before the app starts, keyed by permission name. See [setPermissions](#setpermissions) for the names. |
 
 How `arguments` reach the app:
 
@@ -234,10 +239,12 @@ Rules:
 
 - `clearState: true` together with `stopApp: false` is rejected, because clearing data stops the app.
 - `arguments` together with `stopApp: false` is rejected, because a reused instance never receives them.
+- `permissions` together with `stopApp: false` is rejected, because a reused instance may keep its earlier view of them.
+- A launch that carries `permissions` sets them first and always runs, even when it repeats an earlier launch of the same app.
 - An arguments name must not be empty and must not contain `=`.
 - Arguments take effect only when the launch starts the app. A project launch policy that attaches to a running instance ignores them.
 - A launch that carries `arguments` always runs, even when it repeats an earlier launch of the same app.
-- A `launchApp` that would only repeat an earlier launch of the same app in the flow is skipped. A launch with `stopApp: true`, `clearState: true` or `arguments` always runs.
+- A `launchApp` that would only repeat an earlier launch of the same app in the flow is skipped. A launch with `stopApp: true`, `clearState: true`, `arguments` or `permissions` always runs.
 - A `launchApp` after a `stopApp`, `killApp` or `clearState` of the same app runs again.
 - On iOS, `clearState` reinstalls the app and needs the app's `artifact` in the project config. The step fails with the `INVALID_ARGUMENT` code when none is configured.
 
@@ -304,6 +311,39 @@ Rules and behavior:
 - A device that cannot open links fails the step with the `LINK_UNSUPPORTED` code. An iOS device older than iOS 16.4 is one of them.
 - A link that no installed app handles fails the step with the `LINK_NOT_OPENED` code.
 - Opening a link in an `appId` counts as launching that app in the flow, so a later `launchApp` of the same app is skipped as a repeat unless it is a fresh launch.
+
+### setPermissions
+
+Grant or revoke permissions of an app without a prompt. Without an app id,
+the step acts on the script's `appId`. Set permissions before launching the
+app, because a running app may keep its earlier view of a permission.
+
+```yaml
+- setPermissions:
+    permissions:
+      camera: allow
+      location: deny
+- setPermissions:
+    appId: com.example.other
+    permissions:
+      notifications: allow
+```
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `permissions` | mapping | Required. Permission names mapped to `allow` or `deny`. At least one entry. |
+| `appId` | string | Optional. The app whose permissions change. Defaults to the script's `appId`. |
+
+The permission names are `camera`, `location`, `microphone`, `photos`,
+`contacts`, `calendar` and `notifications`. The same mapping works as the
+`permissions` field of `launchApp`.
+
+Rules and behavior:
+
+- An unknown permission name, a state other than `allow` or `deny`, and an empty mapping are rejected when the script is parsed.
+- A device that cannot set a requested permission fails the step with the `PERMISSIONS_UNSUPPORTED` code before it changes anything. A physical iOS device sets none, the iOS simulator has no camera and no notification control, and Android before version 13 has no notification permission.
+- A request that reached the device but changed nothing, such as an app that does not declare the permission, fails the step with the `PERMISSION_NOT_SET` code.
+- Denying a permission revokes it, so the app sees it as not granted and may ask again. There is no state that resets a permission to the undecided state.
 
 ### tap
 

@@ -1,0 +1,5 @@
+{
+  "name": "set-permissions-forms-valid",
+  "description": "setPermissions parses with the script's app and with an app id, and launchApp parses a permissions mapping.",
+  "yaml": "- setPermissions:\n    permissions:\n      camera: allow\n      location: deny\n- setPermissions:\n    appId: dev.atomyx.demo\n    permissions:\n      notifications: allow\n- launchApp:\n    permissions:\n      photos: allow\n"
+}

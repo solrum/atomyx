@@ -37,6 +37,7 @@ var stepCommandOrder = []string{
 	"KillAppStep",
 	"ClearStateStep",
 	"OpenLinkStep",
+	"SetPermissionsStep",
 	"HideKeyboardStep",
 	"EraseTextStep",
 	"ScrollUntilVisibleStep",
@@ -53,10 +54,11 @@ func stepJSONSchemaDefinitions() map[string]any {
 	return map[string]any{
 		"LaunchAppStep": objectSchema(
 			map[string]any{
-				"command":    constString(CommandLaunchApp),
-				"clearState": booleanSchema("When true, clear the app's data and start it fresh. Cannot be combined with `stopApp: false`."),
-				"stopApp":    booleanSchema("When true, force-stop a running instance before launching. When false, reuse a running instance. When omitted, the run's launch policy applies."),
-				"arguments":  scalarMapSchema("Named values handed to the app at launch. Each value is a string, number or boolean, delivered as text. They take effect only when the launch starts the app, so a launch that reuses a running instance ignores them."),
+				"command":     constString(CommandLaunchApp),
+				"clearState":  booleanSchema("When true, clear the app's data and start it fresh. Cannot be combined with `stopApp: false`."),
+				"stopApp":     booleanSchema("When true, force-stop a running instance before launching. When false, reuse a running instance. When omitted, the run's launch policy applies."),
+				"arguments":   scalarMapSchema("Named values handed to the app at launch. Each value is a string, number or boolean, delivered as text. They take effect only when the launch starts the app, so a launch that reuses a running instance ignores them."),
+				"permissions": permissionsMapSchema("Permissions to grant (`allow`) or revoke (`deny`) before the app starts, keyed by permission name. A launch that reuses a running instance cannot set them, and a launch that sets them is never skipped as a repeat."),
 			},
 			[]string{"command"},
 			"Launch (or relaunch) the app declared at the top of the script via `appId`.",
@@ -72,6 +74,15 @@ func stepJSONSchemaDefinitions() map[string]any {
 			},
 			[]string{"command", "link"},
 			"Open a URL, deep link or universal link in the device's handler for it.",
+		),
+		"SetPermissionsStep": objectSchema(
+			map[string]any{
+				"command":     constString(CommandSetPermissions),
+				"appId":       stringMinLen(1, "App whose permissions change. Defaults to the script's `appId`."),
+				"permissions": permissionsMapSchema("Permissions to grant (`allow`) or revoke (`deny`), keyed by permission name. At least one is required."),
+			},
+			[]string{"command", "permissions"},
+			"Grant or revoke app permissions without a prompt.",
 		),
 		"TapStep": objectSchema(
 			map[string]any{

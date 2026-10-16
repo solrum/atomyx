@@ -1,0 +1,10 @@
+{
+  "name": "set-permissions-named-app",
+  "description": "setPermissions with an app id changes that app's permissions instead of the script's app.",
+  "yaml": "appId: com.test\nname: set permissions in app\nenv: {}\n---\n- setPermissions:\n    appId: com.other\n    permissions:\n      photos: allow\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

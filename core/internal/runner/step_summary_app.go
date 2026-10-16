@@ -25,6 +25,9 @@ func summarizeLaunchApp(b *tokenBuilder, s *script.LaunchAppStep) {
 		names := driver.SortedLaunchArgumentKeys(s.Arguments)
 		options = append(options, "arguments="+strings.Join(names, "|"))
 	}
+	if len(s.Permissions) > 0 {
+		options = append(options, "permissions="+describePermissions(s.Permissions))
+	}
 	if len(options) > 0 {
 		b.punct(": ").rawStr(strings.Join(options, ", "))
 	}
@@ -37,4 +40,15 @@ func summarizeAppStep(b *tokenBuilder, command string, appID *string) {
 	if appID != nil {
 		b.punct(": ").str(*appID)
 	}
+}
+
+// summarizeSetPermissions renders a setPermissions step as its command
+// name, the app it targets when the step names one, and the permissions
+// it sets.
+func summarizeSetPermissions(b *tokenBuilder, s *script.SetPermissionsStep) {
+	b.kw("setPermissions").punct(": ")
+	if s.AppID != nil {
+		b.str(*s.AppID).punct(" ")
+	}
+	b.rawStr(describePermissions(s.Permissions))
 }

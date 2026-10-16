@@ -252,3 +252,62 @@ func TestLaunchAppLinkReportsAnUnsupportedDevice(t *testing.T) {
 		t.Fatalf("launch_app: got %v, want %s", decoded, diag.CodeLinkUnsupported)
 	}
 }
+
+func TestLaunchAppPermissionsAreAppliedBeforeTheLaunch(t *testing.T) {
+	drv := mockdriver.New()
+	cs, ctx := linkLaunchServer(t, drv)
+
+	result, decoded := callTool(t, cs, ctx, "launch_app", map[string]any{
+		"appId":       "com.example.app",
+		"permissions": map[string]any{"camera": "allow", "location": "deny"},
+	})
+	if result.IsError {
+		t.Fatalf("launch_app with permissions: %v", decoded)
+	}
+	if len(drv.PermissionChanges) != 1 {
+		t.Fatalf("permission changes = %+v, want one", drv.PermissionChanges)
+	}
+	change := drv.PermissionChanges[0]
+	if change.AppID != "com.example.app" || change.Permissions[driver.PermissionCamera] != driver.PermissionAllow || change.Permissions[driver.PermissionLocation] != driver.PermissionDeny {
+		t.Fatalf("permission change = %+v, want camera allow and location deny for the app", change)
+	}
+	if got := len(launchAppDriverCalls(drv)); got != 1 {
+		t.Fatalf("driver launches = %d, want 1", got)
+	}
+}
+
+func TestLaunchAppRejectsUnknownPermissionNamesAndStates(t *testing.T) {
+	tests := []map[string]any{
+		{"appId": "com.example.app", "permissions": map[string]any{"bluetooth": "allow"}},
+		{"appId": "com.example.app", "permissions": map[string]any{"camera": "maybe"}},
+	}
+	for _, args := range tests {
+		drv := mockdriver.New()
+		cs, ctx := linkLaunchServer(t, drv)
+
+		result, decoded := callTool(t, cs, ctx, "launch_app", args)
+		if !result.IsError || decoded["code"] != diag.CodeInvalidArgument {
+			t.Fatalf("launch_app %v: got %v, want INVALID_ARGUMENT", args, decoded)
+		}
+		if len(drv.PermissionChanges) != 0 || len(launchAppDriverCalls(drv)) != 0 {
+			t.Fatalf("launch_app %v reached the device", args)
+		}
+	}
+}
+
+func TestLaunchAppPermissionsReportAnUnsupportedDevice(t *testing.T) {
+	drv := mockdriver.New()
+	drv.SetCapabilities(driver.Capabilities{CanSetPermissions: false})
+	cs, ctx := linkLaunchServer(t, drv)
+
+	result, decoded := callTool(t, cs, ctx, "launch_app", map[string]any{
+		"appId":       "com.example.app",
+		"permissions": map[string]any{"camera": "allow"},
+	})
+	if !result.IsError || decoded["code"] != diag.CodePermissionsUnsupported {
+		t.Fatalf("launch_app: got %v, want %s", decoded, diag.CodePermissionsUnsupported)
+	}
+	if len(launchAppDriverCalls(drv)) != 0 {
+		t.Fatal("the app was launched although its permissions could not be set")
+	}
+}

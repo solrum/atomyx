@@ -1,0 +1,11 @@
+{
+  "name": "set-permissions-unsupported-fails",
+  "description": "setPermissions fails the step with a coded error, without calling the driver, when the device cannot set permissions.",
+  "yaml": "appId: com.test\nname: set permissions unsupported\nenv: {}\n---\n- setPermissions:\n    permissions:\n      camera: allow\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ],
+    "capabilities": { "canSetPermissions": false }
+  }
+}

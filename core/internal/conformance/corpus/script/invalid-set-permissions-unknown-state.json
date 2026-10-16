@@ -1,0 +1,5 @@
+{
+  "name": "invalid-set-permissions-unknown-state",
+  "description": "setPermissions with a state other than allow or deny must be REJECTED.",
+  "yaml": "- setPermissions:\n    permissions:\n      camera: maybe\n"
+}

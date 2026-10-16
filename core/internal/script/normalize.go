@@ -50,6 +50,7 @@ func init() {
 		CommandKillApp:          normalizeKillApp,
 		CommandClearState:       normalizeClearState,
 		CommandOpenLink:         normalizeOpenLink,
+		CommandSetPermissions:   normalizeSetPermissions,
 
 		CommandHideKeyboard:          normalizeHideKeyboard,
 		CommandEraseText:             normalizeEraseText,

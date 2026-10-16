@@ -1,0 +1,10 @@
+{
+  "name": "set-permissions-script-app",
+  "description": "setPermissions hands the driver the script's app and every named permission with its state.",
+  "yaml": "appId: com.test\nname: set permissions\nenv: {}\n---\n- setPermissions:\n    permissions:\n      camera: allow\n      location: deny\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "name": "invalid-launch-app-permissions-reuse",
+  "description": "launchApp with permissions and stopApp false must be REJECTED, because a reused instance may keep its earlier view of them.",
+  "yaml": "- launchApp:\n    stopApp: false\n    permissions:\n      camera: allow\n"
+}

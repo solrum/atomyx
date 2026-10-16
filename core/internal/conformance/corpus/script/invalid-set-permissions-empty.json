@@ -1,0 +1,5 @@
+{
+  "name": "invalid-set-permissions-empty",
+  "description": "setPermissions with no permission must be REJECTED.",
+  "yaml": "- setPermissions:\n    permissions: {}\n"
+}

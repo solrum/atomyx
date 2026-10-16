@@ -6,8 +6,9 @@ import "dev.atomyx/internal/driver"
 // contradict themselves. Clearing an app's data needs the app stopped,
 // so it cannot be combined with reusing the running instance. Launch
 // arguments only reach a new start of the app, so they cannot be
-// combined with reusing the running instance either. It also rejects
-// an arguments key that cannot reach the app.
+// combined with reusing the running instance either, and neither can
+// permissions, because a running app may keep its earlier view of them.
+// It also rejects an arguments key that cannot reach the app.
 func validateLaunchAppStep(s *LaunchAppStep, path string, report reportFunc) {
 	if s.ClearState != nil && *s.ClearState && s.StopApp != nil && !*s.StopApp {
 		report("%s: clearState: true cannot be combined with stopApp: false, because clearing data stops the app", path)
@@ -17,6 +18,14 @@ func validateLaunchAppStep(s *LaunchAppStep, path string, report reportFunc) {
 	}
 	if err := driver.ValidateLaunchArguments(s.Arguments); err != nil {
 		report("%s.arguments: %s", path, err.Error())
+	}
+	if len(s.Permissions) > 0 {
+		if s.StopApp != nil && !*s.StopApp {
+			report("%s: permissions cannot be combined with stopApp: false, because a reused instance may keep its earlier view of them", path)
+		}
+		if err := driver.ValidatePermissions(s.Permissions); err != nil {
+			report("%s.permissions: %s", path, err.Error())
+		}
 	}
 }
 

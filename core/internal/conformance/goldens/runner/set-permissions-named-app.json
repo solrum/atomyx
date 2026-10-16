@@ -1,0 +1,97 @@
+{
+  "calls": [
+    {
+      "args": [
+        "com.other",
+        {
+          "photos": "allow"
+        }
+      ],
+      "method": "setPermissions"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "setPermissions",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "setPermissions: \"com.other\" photos=allow",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "setPermissions"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"com.other\""
+        },
+        {
+          "kind": "punct",
+          "text": " "
+        },
+        {
+          "kind": "string",
+          "text": "photos=allow"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "setPermissions",
+      "depth": 0,
+      "detail": "Set photos=allow for com.other",
+      "durationMs": 0,
+      "line": 5,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "setPermissions: \"com.other\" photos=allow",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "setPermissions"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"com.other\""
+        },
+        {
+          "kind": "punct",
+          "text": " "
+        },
+        {
+          "kind": "string",
+          "text": "photos=allow"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 1,
+  "screenshots": [],
+  "scriptName": "set permissions in app",
+  "steps": [
+    {
+      "command": "setPermissions",
+      "detail": "Set photos=allow for com.other",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    }
+  ],
+  "totalSteps": 1
+}

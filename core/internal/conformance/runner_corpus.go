@@ -23,6 +23,7 @@ type RunnerCapabilitiesOverride struct {
 	CanSetOrientation *bool    `json:"canSetOrientation,omitempty"`
 	CanHideKeyboard   *bool    `json:"canHideKeyboard,omitempty"`
 	CanOpenLink       *bool    `json:"canOpenLink,omitempty"`
+	CanSetPermissions *bool    `json:"canSetPermissions,omitempty"`
 	CanMultiPointer   *bool    `json:"canMultiPointer,omitempty"`
 	CanPressure       *bool    `json:"canPressure,omitempty"`
 	SupportedKeyCodes []string `json:"supportedKeyCodes,omitempty"`

@@ -1,0 +1,10 @@
+{
+  "name": "launch-app-permissions",
+  "description": "launchApp with permissions sets them before it launches the app, and the launch is not skipped as a repeat.",
+  "yaml": "appId: com.test\nname: launch with permissions\nenv: {}\n---\n- launchApp\n- launchApp:\n    permissions:\n      location: allow\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

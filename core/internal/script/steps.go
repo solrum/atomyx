@@ -1,5 +1,7 @@
 package script
 
+import "dev.atomyx/internal/driver"
+
 // ScriptStep is the discriminated union of every canonical step kind
 // the runner accepts. Adding a new step kind means adding a new struct
 // implementing this
@@ -50,6 +52,7 @@ const (
 	CommandKillApp          = "killApp"
 	CommandClearState       = "clearState"
 	CommandOpenLink         = "openLink"
+	CommandSetPermissions   = "setPermissions"
 
 	CommandHideKeyboard          = "hideKeyboard"
 	CommandEraseText             = "eraseText"
@@ -70,12 +73,14 @@ const RepeatWhileIterationLimit = 50
 // launch, and StopApp false reuses a running instance. A nil option
 // leaves the run's configured launch policy in effect. Arguments are
 // named values, rendered as text, that the app reads at startup.
+// Permissions are granted or revoked before the app starts.
 type LaunchAppStep struct {
 	stepSource
-	Command    string            `json:"command"`
-	ClearState *bool             `json:"clearState,omitempty"`
-	StopApp    *bool             `json:"stopApp,omitempty"`
-	Arguments  map[string]string `json:"arguments,omitempty"`
+	Command     string                                       `json:"command"`
+	ClearState  *bool                                        `json:"clearState,omitempty"`
+	StopApp     *bool                                        `json:"stopApp,omitempty"`
+	Arguments   map[string]string                            `json:"arguments,omitempty"`
+	Permissions map[driver.Permission]driver.PermissionState `json:"permissions,omitempty"`
 }
 
 func (s *LaunchAppStep) StepCommand() string { return s.Command }
@@ -525,6 +530,18 @@ type OpenLinkStep struct {
 
 func (s *OpenLinkStep) StepCommand() string { return s.Command }
 func (s *OpenLinkStep) isScriptStep()       {}
+
+// SetPermissionsStep grants or revokes Permissions of an app without a
+// prompt. A nil AppID means the script's own app.
+type SetPermissionsStep struct {
+	stepSource
+	Command     string                                       `json:"command"`
+	AppID       *string                                      `json:"appId,omitempty"`
+	Permissions map[driver.Permission]driver.PermissionState `json:"permissions"`
+}
+
+func (s *SetPermissionsStep) StepCommand() string { return s.Command }
+func (s *SetPermissionsStep) isScriptStep()       {}
 
 // Kinds of value an inputRandom step types.
 const (

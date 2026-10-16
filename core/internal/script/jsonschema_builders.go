@@ -1,5 +1,7 @@
 package script
 
+import "dev.atomyx/internal/driver"
+
 // ref returns a JSON Schema `$ref` pointing at the named entry under
 // this document's own "definitions" map.
 func ref(name string) map[string]any {
@@ -136,5 +138,23 @@ func scalarMapSchema(description string) map[string]any {
 				map[string]any{"type": "boolean"},
 			},
 		},
+	}, description)
+}
+
+// permissionsMapSchema is a record from a known permission name to a
+// permission state.
+func permissionsMapSchema(description string) map[string]any {
+	names := make([]string, 0, len(driver.AllPermissions()))
+	for _, p := range driver.AllPermissions() {
+		names = append(names, string(p))
+	}
+	states := make([]string, 0, len(driver.AllPermissionStates()))
+	for _, s := range driver.AllPermissionStates() {
+		states = append(states, string(s))
+	}
+	return withDescription(map[string]any{
+		"type":                 "object",
+		"propertyNames":        map[string]any{"enum": names},
+		"additionalProperties": map[string]any{"enum": states},
 	}, description)
 }

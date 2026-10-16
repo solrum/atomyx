@@ -5,7 +5,7 @@ import "strings"
 // Normalizers for the steps that control an app's process and data.
 
 // normalizeLaunchApp accepts a bare `launchApp` or an object with the
-// optional fields `clearState`, `stopApp` and `arguments`.
+// optional fields `clearState`, `stopApp`, `arguments` and `permissions`.
 func normalizeLaunchApp(value any) (ScriptStep, error) {
 	step := &LaunchAppStep{Command: CommandLaunchApp}
 	if value == nil {
@@ -13,7 +13,7 @@ func normalizeLaunchApp(value any) (ScriptStep, error) {
 	}
 	m, ok := asMap(value)
 	if !ok {
-		return nil, newParseError("launchApp: expected no value or an object with `clearState`, `stopApp` and `arguments`, got %s", goType(value))
+		return nil, newParseError("launchApp: expected no value or an object with `clearState`, `stopApp`, `arguments` and `permissions`, got %s", goType(value))
 	}
 	clearState, err := normalizeBoolField(m["clearState"], "launchApp.clearState")
 	if err != nil {
@@ -27,9 +27,14 @@ func normalizeLaunchApp(value any) (ScriptStep, error) {
 	if err != nil {
 		return nil, err
 	}
+	permissions, err := normalizePermissions(m["permissions"], "launchApp.permissions")
+	if err != nil {
+		return nil, err
+	}
 	step.ClearState = clearState
 	step.StopApp = stopApp
 	step.Arguments = arguments
+	step.Permissions = permissions
 	return step, nil
 }
 

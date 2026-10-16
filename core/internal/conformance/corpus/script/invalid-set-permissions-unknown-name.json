@@ -1,0 +1,5 @@
+{
+  "name": "invalid-set-permissions-unknown-name",
+  "description": "setPermissions with a permission name no platform knows must be REJECTED.",
+  "yaml": "- setPermissions:\n    permissions:\n      bluetooth: allow\n"
+}

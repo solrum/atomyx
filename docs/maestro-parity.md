@@ -25,7 +25,7 @@ A Maestro flow that uses only present commands runs as is after a syntax change.
 | --- | --- | --- | --- |
 | `launchApp` | `launchApp` | Present | Accepts `clearState` and `stopApp: false`. A field left out follows the project launch policy. |
 | `launchApp` with arguments | `launchApp` with `arguments` | Present | A mapping of names to string, number or boolean values. Android delivers them as intent extras and iOS as launch environment and `-name value` launch arguments. |
-| `launchApp` with permissions | None | Missing | Needs a permission capability on the driver. |
+| `launchApp` with permissions | `launchApp` with `permissions`, or the `setPermissions` step | Present | A mapping of permission names to `allow` or `deny`, applied before the app starts. The names are camera, location, microphone, photos, contacts, calendar and notifications. It has no `all` key and no `unset` state. The iOS simulator has no camera and no notification control, and a physical iOS device allows none, so those fail with `PERMISSIONS_UNSUPPORTED`. |
 | `tapOn` | `tap` | Present | Selector fields are literal strings, or `{regex, flags}` for a pattern. |
 | `inputText` | `type` | Present | Clears the field first by default and interpolates `${var}`. |
 | `assertVisible` | `assertVisible` | Present | Accepts `timeout` to poll. |
@@ -82,7 +82,7 @@ A Maestro flow that uses only present commands runs as is after a syntax change.
 | `addMedia` | None | Out of scope | Revisit when real flows show demand. |
 | Airplane mode | None | Out of scope | No portable control on a non-rooted device. |
 | `clearKeychain` | None | Out of scope | No public API to clear the keychain from a test runner. |
-| Permission grants on a physical iOS device | None | Out of scope | iOS offers no public API to grant a permission from a test runner. |
+| Permission grants on a physical iOS device | None | Out of scope | iOS offers no public API to grant a permission from a test runner, so the step fails with `PERMISSIONS_UNSUPPORTED`. |
 | Volume, power and lock keys | None | Missing | `pressKey` does not cover these keys. |
 
 ## References
