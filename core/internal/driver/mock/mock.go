@@ -96,8 +96,12 @@ type Driver struct {
 	// in call order.
 	Orientations []driver.Orientation
 
+	// Locations records the positions passed to SetLocation, in call
+	// order.
+	Locations []driver.Location
+
 	// ScreenshotErr, SwipeErr, PressKeyErr, LaunchAppErr, ListAppsErr,
-	// OpenLinkErr, SetPermissionsErr, SetOrientationErr, and PingErr, when set, make the matching method return that
+	// OpenLinkErr, SetPermissionsErr, SetOrientationErr, SetLocationErr, and PingErr, when set, make the matching method return that
 	// error instead of its normal result, so a test can drive a
 	// caller's error-surfacing path without a real device.
 	ScreenshotErr     error
@@ -108,6 +112,7 @@ type Driver struct {
 	OpenLinkErr       error
 	SetPermissionsErr error
 	SetOrientationErr error
+	SetLocationErr    error
 	PingErr           error
 
 	// Agent is the AgentInfo the mock reports, settable so a test can
@@ -131,7 +136,7 @@ func New() *Driver {
 			CanScreenshot:      true,
 			CanEraseText:       true,
 			CanWaitForIdle:     false,
-			CanSetLocation:     false,
+			CanSetLocation:     true,
 			CanSetOrientation:  true,
 			CanHideKeyboard:    true,
 			CanOpenLink:        true,
@@ -639,5 +644,28 @@ func (d *Driver) SetOrientation(ctx context.Context, orientation driver.Orientat
 	if !driver.SizeMatchesOrientation(orientation, d.Screen) {
 		d.Screen = wire.Size{Width: d.Screen.Height, Height: d.Screen.Width}
 	}
+	return nil
+}
+
+// SetLocation validates location, records it in Locations, and returns
+// SetLocationErr when one is set. It fails with
+// diag.CodeLocationUnsupported when the reported capabilities report
+// CanSetLocation false, before it looks at location, the same
+// caller-must-check contract the real adapters honor.
+func (d *Driver) SetLocation(ctx context.Context, location driver.Location) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if !d.capabilities.CanSetLocation {
+		return diag.NewLocationUnsupported("")
+	}
+	if err := driver.ValidateLocation(location); err != nil {
+		return err
+	}
+	d.record("SetLocation", location)
+	if d.SetLocationErr != nil {
+		return d.SetLocationErr
+	}
+	d.Locations = append(d.Locations, location)
 	return nil
 }

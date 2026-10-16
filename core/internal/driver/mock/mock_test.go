@@ -20,7 +20,7 @@ func TestDefaultCapabilities(t *testing.T) {
 		CanScreenshot:     true,
 		CanEraseText:      true,
 		CanWaitForIdle:    false,
-		CanSetLocation:    false,
+		CanSetLocation:    true,
 		CanSetOrientation: true,
 		CanHideKeyboard:   true,
 		CanMultiPointer:   false,
@@ -658,5 +658,47 @@ func TestSetOrientation_RejectsInvalidInputAndSurfacesTheInjectedError(t *testin
 	d.SetOrientationErr = errors.New("injected")
 	if err := d.SetOrientation(context.Background(), driver.OrientationLandscapeLeft); !errors.Is(err, d.SetOrientationErr) {
 		t.Fatalf("SetOrientation() error = %v, want the injected error", err)
+	}
+}
+
+func TestSetLocation_RecordsThePosition(t *testing.T) {
+	d := New()
+	want := driver.Location{Latitude: 37.7749, Longitude: -122.4194}
+	if err := d.SetLocation(context.Background(), want); err != nil {
+		t.Fatalf("SetLocation() error = %v", err)
+	}
+	if len(d.Locations) != 1 || d.Locations[0] != want {
+		t.Fatalf("Locations = %v, want [%v]", d.Locations, want)
+	}
+	if last := d.Calls[len(d.Calls)-1]; last.Method != "SetLocation" || last.Args[0] != want {
+		t.Fatalf("last call = %+v, want SetLocation at %v", last, want)
+	}
+}
+
+func TestSetLocation_FailsAsUnsupportedWhenTheCapabilityIsOff(t *testing.T) {
+	d := New()
+	d.SetCapabilities(driver.Capabilities{CanSetLocation: false})
+
+	err := d.SetLocation(context.Background(), driver.Location{Latitude: 1, Longitude: 2})
+	if code, _, _ := diag.Describe(err); code != diag.CodeLocationUnsupported {
+		t.Fatalf("SetLocation() code = %q (err %v), want %q", code, err, diag.CodeLocationUnsupported)
+	}
+	if len(d.Locations) != 0 {
+		t.Fatalf("Locations = %v, want none", d.Locations)
+	}
+}
+
+func TestSetLocation_RejectsInvalidInputAndSurfacesTheInjectedError(t *testing.T) {
+	d := New()
+	err := d.SetLocation(context.Background(), driver.Location{Latitude: 91})
+	if code, _, _ := diag.Describe(err); code != diag.CodeInvalidArgument {
+		t.Fatalf("SetLocation(91) code = %q (err %v), want %q", code, err, diag.CodeInvalidArgument)
+	}
+	d.SetLocationErr = errors.New("injected")
+	if err := d.SetLocation(context.Background(), driver.Location{}); !errors.Is(err, d.SetLocationErr) {
+		t.Fatalf("SetLocation() error = %v, want the injected error", err)
+	}
+	if len(d.Locations) != 0 {
+		t.Fatalf("Locations = %v, want none", d.Locations)
 	}
 }

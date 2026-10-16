@@ -173,7 +173,7 @@ func New(conn Conn, proc process.Runner, opts Options) *IosDriver {
 			CanScreenshot:      true,
 			CanEraseText:       true,
 			CanWaitForIdle:     false,
-			CanSetLocation:     false,
+			CanSetLocation:     opts.Kind == KindSimulator,
 			CanSetOrientation:  true,
 			CanHideKeyboard:    true,
 			CanOpenLink:        true,

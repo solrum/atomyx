@@ -198,6 +198,8 @@ func Run(t *testing.T, newDriver Factory, hooks Hooks) {
 	t.Run("set permissions reaches the app", func(t *testing.T) { testSetPermissionsReachesTheApp(t, tracked(t, newDriver), hooks) })
 	t.Run("set orientation matches capability", func(t *testing.T) { testSetOrientationMatchesCapability(t, tracked(t, newDriver)) })
 	t.Run("set orientation keeps gestures on target", func(t *testing.T) { testSetOrientationReachesTheApp(t, tracked(t, newDriver), hooks) })
+	t.Run("set location matches capability", func(t *testing.T) { testSetLocationMatchesCapability(t, tracked(t, newDriver)) })
+	t.Run("set location reaches the device", func(t *testing.T) { testSetLocationReachesTheDevice(t, tracked(t, newDriver)) })
 	t.Run("clear app data succeeds with a source", func(t *testing.T) { testClearAppDataSucceedsWithSource(t, tracked(t, newDriver), hooks) })
 	t.Run("install uninstall roundtrip", func(t *testing.T) { testInstallUninstallRoundtrip(t, tracked(t, newDriver), hooks) })
 }
@@ -373,6 +375,9 @@ func testContextCancellation(t *testing.T, newDriver Factory) {
 		}},
 		{"SetOrientation", func(ctx context.Context, d driver.Driver) error {
 			return d.SetOrientation(ctx, driver.OrientationLandscapeLeft)
+		}},
+		{"SetLocation", func(ctx context.Context, d driver.Driver) error {
+			return d.SetLocation(ctx, driver.Location{Latitude: 1, Longitude: 2})
 		}},
 		{"SetPermissions", func(ctx context.Context, d driver.Driver) error {
 			return d.SetPermissions(ctx, "dev.atomyx.drivertest.cancel", map[driver.Permission]driver.PermissionState{driver.PermissionCamera: driver.PermissionAllow})

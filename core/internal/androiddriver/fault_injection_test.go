@@ -291,6 +291,7 @@ var boundaryTranslationSkipped = map[string]string{
 	"OpenLink":       "issues a host subprocess call through process.Runner (adb), not the HTTP transport this boundary classifies",
 	"SetPermissions": "issues a host subprocess call through process.Runner (adb), not the HTTP transport this boundary classifies",
 	"SetOrientation": "issues a host subprocess call through process.Runner (adb), not the HTTP transport this boundary classifies",
+	"SetLocation":    "issues a host subprocess call through process.Runner (adb), not the HTTP transport this boundary classifies",
 	"StopApp":        "issues a host subprocess call through process.Runner (adb), not the HTTP transport this boundary classifies",
 	"KillApp":        "issues a host subprocess call through process.Runner (adb), not the HTTP transport this boundary classifies",
 }

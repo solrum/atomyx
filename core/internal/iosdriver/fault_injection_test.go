@@ -285,6 +285,9 @@ var wireCallMethodCases = []struct {
 	{"SetOrientation", func(ctx context.Context, d driver.Driver) error {
 		return d.SetOrientation(ctx, driver.OrientationLandscapeLeft)
 	}},
+	{"SetLocation", func(ctx context.Context, d driver.Driver) error {
+		return d.SetLocation(ctx, driver.Location{Latitude: 1, Longitude: 2})
+	}},
 	{"StopApp", func(ctx context.Context, d driver.Driver) error {
 		return d.StopApp(ctx, "dev.atomyx.faultinjection")
 	}},

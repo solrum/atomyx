@@ -60,6 +60,8 @@ var codeClasses = map[string]Class{
 	diag.CodePermissionNotSet:          ClassTest,
 	diag.CodeOrientationUnsupported:    ClassTest,
 	diag.CodeOrientationNotSet:         ClassTest,
+	diag.CodeLocationUnsupported:       ClassTest,
+	diag.CodeLocationNotSet:            ClassTest,
 	diag.CodeInputNotFocused:           ClassTest,
 	diag.CodeElementNotFound:           ClassTest,
 }

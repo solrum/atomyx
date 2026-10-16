@@ -165,6 +165,15 @@ const (
 	// never took the requested orientation, for example because the
 	// foreground app only supports another one.
 	CodeOrientationNotSet = "ORIENTATION_NOT_SET"
+	// CodeLocationUnsupported means the target device cannot have its
+	// location set by the driver, for example a physical phone that has
+	// no mock location provider. The condition is permanent for that
+	// device, so retrying cannot help.
+	CodeLocationUnsupported = "LOCATION_UNSUPPORTED"
+	// CodeLocationNotSet means the device was reached but a location
+	// request changed nothing, for example because the emulator console
+	// or the simulator refused the coordinates.
+	CodeLocationNotSet = "LOCATION_NOT_SET"
 	// CodeInputNotFocused means a type action found its field but the
 	// field never took input focus, so nothing was typed. The screen
 	// did not offer the field in a focusable state, which is a property

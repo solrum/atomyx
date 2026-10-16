@@ -143,7 +143,7 @@ func New(t Transport, proc process.Runner, opts Options) *AndroidDriver {
 			CanScreenshot:      true,
 			CanEraseText:       true,
 			CanWaitForIdle:     false,
-			CanSetLocation:     false,
+			CanSetLocation:     isEmulatorSerial(opts.Serial),
 			CanSetOrientation:  true,
 			CanHideKeyboard:    true,
 			CanOpenLink:        true,
@@ -932,7 +932,7 @@ func (d *AndroidDriver) DeviceInfo(ctx context.Context) (driver.DeviceInfo, erro
 		return driver.DeviceInfo{}, err
 	}
 	kind := driver.DeviceKindDevice
-	if strings.HasPrefix(d.opts.Serial, "emulator-") {
+	if isEmulatorSerial(d.opts.Serial) {
 		kind = driver.DeviceKindEmulator
 	}
 	return driver.DeviceInfo{

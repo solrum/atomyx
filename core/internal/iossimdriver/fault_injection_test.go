@@ -138,6 +138,7 @@ var boundaryTranslationSkipped = map[string]string{
 	"OpenLink":          "delegates entirely to the embedded IosDriver's own fail boundary",
 	"SetPermissions":    "delegates entirely to the embedded IosDriver's own fail boundary",
 	"SetOrientation":    "delegates entirely to the embedded IosDriver's own fail boundary",
+	"SetLocation":       "delegates entirely to the embedded IosDriver's own fail boundary",
 	"StopApp":           "delegates entirely to the embedded IosDriver's own fail boundary",
 	"KillApp":           "delegates entirely to the embedded IosDriver's own fail boundary",
 	"CurrentForeground": "delegates entirely to the embedded IosDriver's own fail boundary",

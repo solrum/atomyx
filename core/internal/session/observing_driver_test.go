@@ -62,6 +62,7 @@ var driverMethodClasses = map[string]methodClass{
 	"OpenLink":          classMutating,
 	"SetPermissions":    classMutating,
 	"SetOrientation":    classMutating,
+	"SetLocation":       classMutating,
 }
 
 var streamingMethodClasses = map[string]methodClass{

@@ -129,6 +129,11 @@ method:
   persists after the call. A device that cannot fails the call with
   `ORIENTATION_UNSUPPORTED`, and a screen that never takes the layout
   within the settle bound fails with `ORIENTATION_NOT_SET`.
+- `CanSetLocation`: `SetLocation` moves the reported position to a latitude
+  and longitude, validated by one shared range check. The position persists
+  after the call. A device that cannot, which is a physical phone, fails the
+  call with `LOCATION_UNSUPPORTED`, and a device that refuses the position
+  fails with `LOCATION_NOT_SET`.
 - `CanWaitForIdle`: a native idle-detection primitive. `orchestra`
   falls back to tree-diff polling when absent.
 - `CanMultiPointer`: multi-pointer gesture dispatch (pinch, rotate,

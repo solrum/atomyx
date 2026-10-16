@@ -254,3 +254,8 @@ func (o *observingCore) SetOrientation(ctx context.Context, orientation driver.O
 	defer o.mutate()()
 	return o.inner.SetOrientation(ctx, orientation)
 }
+
+func (o *observingCore) SetLocation(ctx context.Context, location driver.Location) error {
+	defer o.mutate()()
+	return o.inner.SetLocation(ctx, location)
+}

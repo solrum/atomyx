@@ -350,3 +350,7 @@ func (d *IosSimDriver) SetOrientation(ctx context.Context, orientation driver.Or
 	d.cachedSizeSet = false
 	return err
 }
+
+func (d *IosSimDriver) SetLocation(ctx context.Context, location driver.Location) error {
+	return d.delegate.SetLocation(ctx, location)
+}

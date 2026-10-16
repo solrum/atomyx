@@ -257,6 +257,30 @@ type Driver interface {
 	//     observed by the runner until the next SetOrientation.
 	SetOrientation(ctx context.Context, orientation Orientation) error
 
+	// SetLocation moves the device's reported position to location. The
+	// position persists after the call, and nothing restores the earlier
+	// one when the session ends, so a caller that changes it puts it
+	// back. An app that was already running receives the new position
+	// on its next location update.
+	//
+	// A caller checks Capabilities().CanSetLocation first. An adapter
+	// that reports it false fails with diag.CodeLocationUnsupported
+	// before it looks at location. A latitude or longitude outside its
+	// range, or one that is not finite, fails with
+	// diag.CodeInvalidArgument before the device is touched, see
+	// ValidateLocation. A device that was reached but refused the
+	// position fails with diag.CodeLocationNotSet.
+	//
+	// Platform notes (expand this list when adding support):
+	//
+	//   - Android emulator: the host sends the position to the emulator
+	//     console.
+	//   - Android device: not supported, because a physical device
+	//     needs a mock location provider installed on the device.
+	//   - iOS simulator: the host sets the simulator's location.
+	//   - iOS device: not supported.
+	SetLocation(ctx context.Context, location Location) error
+
 	// StopApp stops bundleID. See CurrentForeground for what the
 	// foreground report guarantees once StopApp returns nil.
 	StopApp(ctx context.Context, bundleID string) error
