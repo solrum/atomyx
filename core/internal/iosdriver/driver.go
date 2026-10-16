@@ -387,20 +387,28 @@ func (d *IosDriver) Ping(ctx context.Context) error {
 var listRunningUIKitBundleIDsPattern = regexp.MustCompile(`UIKitApplication:([^\s\[]+)`)
 
 // Hierarchy captures the current UI snapshot via dumpRawTree. When no
-// app has been launched through this driver yet and it targets a
-// simulator, it first queries currently running UIKit bundle ids via
-// the injected Runner and passes them as candidates, so the runner
-// can pick whichever is in the foreground without an explicit
-// LaunchApp round-trip. That query is best effort: a failure yields
-// no candidates rather than surfacing an error, since Hierarchy can
-// still proceed on the runner's own fallback path.
+// app has been launched through this driver yet, it first gathers
+// candidate bundle ids through the injected Runner and passes them to
+// the runner, so it can pick whichever is in the foreground without
+// an explicit LaunchApp round-trip.
+//
+// Candidate sources by target kind:
+//
+//   - Simulator: the UIKit applications currently running.
+//   - Physical device: the installed applications, because a device
+//     exposes no list of running bundle ids. The runner probes each
+//     one's state and binds only to the one in the foreground.
+//
+// Gathering is best effort: a failure yields no candidates rather
+// than surfacing an error, since Hierarchy can still proceed on the
+// runner's own fallback path.
 func (d *IosDriver) Hierarchy(ctx context.Context) (wire.TreeNodeWire, error) {
 	if err := ctx.Err(); err != nil {
 		return wire.TreeNodeWire{}, err
 	}
 	args := map[string]any{}
-	if d.lastLaunchedBundleID == "" && d.opts.Kind == KindSimulator {
-		if candidates := d.listRunningUIKitBundleIDs(ctx); len(candidates) > 0 {
+	if d.lastLaunchedBundleID == "" {
+		if candidates := d.hierarchyCandidates(ctx); len(candidates) > 0 {
 			args["bundleIdCandidates"] = candidates
 		}
 	}
@@ -416,6 +424,22 @@ func (d *IosDriver) Hierarchy(ctx context.Context) (wire.TreeNodeWire, error) {
 		root = &IosRawElement{ElementType: stringPtr("other")}
 	}
 	return NormalizeIosTree(*root), nil
+}
+
+func (d *IosDriver) hierarchyCandidates(ctx context.Context) []string {
+	if d.opts.Kind == KindSimulator {
+		return d.listRunningUIKitBundleIDs(ctx)
+	}
+	apps, err := d.fetchDeviceApps(ctx)
+	if err != nil {
+		return nil
+	}
+	ids := make([]string, 0, len(apps))
+	for _, a := range apps {
+		ids = append(ids, a.BundleID)
+	}
+	sort.Strings(ids)
+	return ids
 }
 
 func (d *IosDriver) listRunningUIKitBundleIDs(ctx context.Context) []string {

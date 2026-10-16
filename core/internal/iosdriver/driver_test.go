@@ -1399,12 +1399,50 @@ func TestIosDriver_Hierarchy_SkipsBundleQueryOnceAppIsTracked(t *testing.T) {
 	}
 }
 
-func TestIosDriver_Hierarchy_Device_NeverQueriesRunningBundleIds(t *testing.T) {
+func TestIosDriver_Hierarchy_Device_PassesInstalledBundleIdsWhenNoneTracked(t *testing.T) {
 	runner := process.NewFake()
+	runner.Stub(
+		process.ExactMatch("xcrun", "devicectl", "device", "info", "apps", "--device", "DEV-1", "--include-default-apps", "--json-output", "-"),
+		process.Result{Stdout: `{"result":{"apps":[{"bundleIdentifier":"dev.atomyx.demo","name":"Demo"},{"bundleIdentifier":"com.apple.Preferences","name":"Settings"}]}}`},
+		nil,
+	)
+	conn := newFakeConn()
+	dumpRawTreeCalls := 0
+	conn.Respond("dumpRawTree", func(args map[string]any) (map[string]any, error) {
+		dumpRawTreeCalls++
+		if dumpRawTreeCalls == 1 {
+			candidates, _ := args["bundleIdCandidates"].([]string)
+			if len(candidates) != 2 || candidates[0] != "com.apple.Preferences" || candidates[1] != "dev.atomyx.demo" {
+				t.Fatalf("dumpRawTree args = %+v, want the installed bundle ids as candidates", args)
+			}
+		} else if _, present := args["bundleIdCandidates"]; present {
+			t.Fatalf("dumpRawTree args = %+v, want no bundleIdCandidates once an app is tracked", args)
+		}
+		return map[string]any{"bundleId": "dev.atomyx.demo", "root": map[string]any{"elementType": "window"}}, nil
+	})
+	d := iosdriver.New(conn, runner, iosdriver.Options{Background: process.NewFakeBackground(), UDID: "DEV-1", Kind: iosdriver.KindDevice})
+
+	for i := 0; i < 2; i++ {
+		if _, err := d.Hierarchy(context.Background()); err != nil {
+			t.Fatalf("Hierarchy() call %d error = %v", i+1, err)
+		}
+	}
+	if len(runner.Invocations()) != 1 {
+		t.Fatalf("invocations = %+v, want the installed app query to run only once", runner.Invocations())
+	}
+}
+
+func TestIosDriver_Hierarchy_Device_ProceedsWithoutCandidatesWhenAppQueryFails(t *testing.T) {
+	runner := process.NewFake()
+	runner.Stub(
+		process.ExactMatch("xcrun", "devicectl", "device", "info", "apps", "--device", "DEV-1", "--include-default-apps", "--json-output", "-"),
+		process.Result{},
+		errors.New("device unreachable"),
+	)
 	conn := newFakeConn()
 	conn.Respond("dumpRawTree", func(args map[string]any) (map[string]any, error) {
 		if _, present := args["bundleIdCandidates"]; present {
-			t.Fatalf("dumpRawTree args = %+v, want no bundleIdCandidates on a device driver", args)
+			t.Fatalf("dumpRawTree args = %+v, want no bundleIdCandidates after a failed app query", args)
 		}
 		return map[string]any{"root": map[string]any{"elementType": "window"}}, nil
 	})
@@ -1412,9 +1450,6 @@ func TestIosDriver_Hierarchy_Device_NeverQueriesRunningBundleIds(t *testing.T) {
 
 	if _, err := d.Hierarchy(context.Background()); err != nil {
 		t.Fatalf("Hierarchy() error = %v", err)
-	}
-	if len(runner.Invocations()) != 0 {
-		t.Fatalf("invocations = %+v, want no launchctl query on a device driver", runner.Invocations())
 	}
 }
 
