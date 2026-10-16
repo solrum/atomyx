@@ -212,7 +212,7 @@ type conditionalCommand interface {
 	// entirely rather than executed. The runner calls this before
 	// emitting StepStarted, so a true result means Execute never runs
 	// for this step.
-	shouldSkip(ctx *CommandContext) bool
+	shouldSkip(step script.ScriptStep, ctx *CommandContext) bool
 }
 
 // markSecret records whether the variable name now holds a secret. A

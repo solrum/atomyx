@@ -1,0 +1,5 @@
+{
+  "name": "launch-app-options-valid",
+  "description": "launchApp parses bare and with each of its clearState and stopApp options.",
+  "yaml": "- launchApp\n- launchApp:\n    clearState: true\n- launchApp:\n    stopApp: false\n- launchApp:\n    clearState: false\n    stopApp: true\n"
+}

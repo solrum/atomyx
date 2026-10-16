@@ -203,6 +203,64 @@ Launch the app specified in `appId`.
 - launchApp
 ```
 
+Two optional fields change how the app starts. A field a step leaves out
+falls back to the project launch policy, so a bare `launchApp` behaves as
+the policy says.
+
+```yaml
+- launchApp:
+    clearState: true
+- launchApp:
+    stopApp: false
+```
+
+| Field | Type | Effect |
+| --- | --- | --- |
+| `clearState` | boolean | `true` clears the app's data and then launches it fresh. `false` skips a data clear that the launch policy asks for. |
+| `stopApp` | boolean | `true` force-stops a running instance, then launches again. `false` reuses a running instance. |
+
+Rules:
+
+- `clearState: true` together with `stopApp: false` is rejected, because clearing data stops the app.
+- A `launchApp` that would only repeat an earlier launch of the same app in the flow is skipped. A launch with `stopApp: true` or `clearState: true` always runs.
+- A `launchApp` after a `stopApp`, `killApp` or `clearState` of the same app runs again.
+- On iOS, `clearState` reinstalls the app and needs the app's `artifact` in the project config. The step fails when none is configured.
+
+### stopApp
+
+Stop an app. Without an app id, the step acts on the script's `appId`.
+
+```yaml
+- stopApp
+- stopApp: com.example.other
+- stopApp:
+    appId: com.example.other
+```
+
+### killApp
+
+Terminate an app. The argument forms are the same as `stopApp`. Every
+platform adapter runs the same device operation for `killApp` as for
+`stopApp`, so the two steps behave identically. Use whichever reads
+better in the script.
+
+```yaml
+- killApp
+- killApp: com.example.other
+```
+
+### clearState
+
+Reset an app's data to a clean state. The argument forms are the same as
+`stopApp`. The app stays installed on Android. On iOS the app is
+reinstalled from the app's `artifact` in the project config, and the step
+fails when none is configured.
+
+```yaml
+- clearState
+- clearState: com.example.other
+```
+
 ### tap
 
 Tap an element on screen.

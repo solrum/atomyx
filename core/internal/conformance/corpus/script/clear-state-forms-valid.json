@@ -1,0 +1,5 @@
+{
+  "name": "clear-state-forms-valid",
+  "description": "clearState parses bare, with an app id string, and with an appId object.",
+  "yaml": "- clearState\n- clearState: com.example.other\n- clearState:\n    appId: com.example.third\n"
+}

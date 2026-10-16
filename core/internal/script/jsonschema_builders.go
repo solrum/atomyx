@@ -41,6 +41,10 @@ func stringEnum(values []string, description string) map[string]any {
 	return m
 }
 
+func booleanSchema(description string) map[string]any {
+	return withDescription(map[string]any{"type": "boolean"}, description)
+}
+
 func constString(value string) map[string]any {
 	return map[string]any{"type": "string", "const": value}
 }

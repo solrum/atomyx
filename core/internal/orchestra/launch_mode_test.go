@@ -122,3 +122,36 @@ func TestLaunchModeFromNoReset(t *testing.T) {
 		t.Fatalf("false: %s", got)
 	}
 }
+
+func TestAppTermination_AllowsTheNextLaunchToRun(t *testing.T) {
+	terminations := map[string]func(*Orchestra) error{
+		"StopApp": func(o *Orchestra) error { return o.StopApp(context.Background(), launchModeAppID) },
+		"KillApp": func(o *Orchestra) error { return o.KillApp(context.Background(), launchModeAppID) },
+		"ClearAppData": func(o *Orchestra) error {
+			return o.ClearAppData(context.Background(), launchModeAppID, driver.ClearAppDataOptions{})
+		},
+	}
+	for name, terminate := range terminations {
+		t.Run(name, func(t *testing.T) {
+			o, d := newLaunchModeOrchestra()
+			if err := o.LaunchAppWithMode(context.Background(), launchModeAppID, LaunchModeDefault); err != nil {
+				t.Fatalf("first launch: %v", err)
+			}
+			if !o.IsLaunched(launchModeAppID) {
+				t.Fatalf("the app must count as launched after the first launch")
+			}
+			if err := terminate(o); err != nil {
+				t.Fatalf("%s: %v", name, err)
+			}
+			if o.IsLaunched(launchModeAppID) {
+				t.Fatalf("the app must not count as launched after %s", name)
+			}
+			if err := o.LaunchAppWithMode(context.Background(), launchModeAppID, LaunchModeDefault); err != nil {
+				t.Fatalf("second launch: %v", err)
+			}
+			if got := len(launchCalls(d)); got != 2 {
+				t.Fatalf("got %d driver launches, want 2", got)
+			}
+		})
+	}
+}

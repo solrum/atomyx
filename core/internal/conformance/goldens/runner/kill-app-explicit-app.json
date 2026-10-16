@@ -1,0 +1,78 @@
+{
+  "calls": [
+    {
+      "args": [
+        "com.other"
+      ],
+      "method": "killApp"
+    }
+  ],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "killApp",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "killApp: \"com.other\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "killApp"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"com.other\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "killApp",
+      "depth": 0,
+      "detail": "Killed com.other",
+      "durationMs": 0,
+      "line": 5,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "killApp: \"com.other\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "killApp"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "\"com.other\""
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 1,
+  "screenshots": [],
+  "scriptName": "kill app",
+  "steps": [
+    {
+      "command": "killApp",
+      "detail": "Killed com.other",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    }
+  ],
+  "totalSteps": 1
+}

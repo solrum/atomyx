@@ -95,7 +95,13 @@ func SummarizeStep(step script.ScriptStep) StepSummary {
 	case *script.BackStep:
 		b.kw("back")
 	case *script.LaunchAppStep:
-		b.kw("launchApp")
+		summarizeLaunchApp(b, s)
+	case *script.StopAppStep:
+		summarizeAppStep(b, "stopApp", s.AppID)
+	case *script.KillAppStep:
+		summarizeAppStep(b, "killApp", s.AppID)
+	case *script.ClearStateStep:
+		summarizeAppStep(b, "clearState", s.AppID)
 	case *script.CaptureStep:
 		b.kw("capture").punct(": ").id(s.As).punct(" ← ").str(s.Pattern)
 	case *script.HandleStep:

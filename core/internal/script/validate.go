@@ -246,7 +246,19 @@ func validateStep(step ScriptStep, path string, report reportFunc) {
 	case *RetryStep:
 		validateRetryStep(s, path, report)
 
-	case *LaunchAppStep, *BackStep, *ScreenshotStep:
+	case *LaunchAppStep:
+		validateLaunchAppStep(s, path, report)
+
+	case *StopAppStep:
+		validateAppID(s.AppID, path, report)
+
+	case *KillAppStep:
+		validateAppID(s.AppID, path, report)
+
+	case *ClearStateStep:
+		validateAppID(s.AppID, path, report)
+
+	case *BackStep, *ScreenshotStep:
 		// No per-step constraints beyond the discriminant.
 	}
 }

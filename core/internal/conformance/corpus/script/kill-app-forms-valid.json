@@ -1,0 +1,5 @@
+{
+  "name": "kill-app-forms-valid",
+  "description": "killApp parses bare, with an app id string, and with an appId object.",
+  "yaml": "- killApp\n- killApp: com.example.other\n- killApp:\n    appId: com.example.third\n"
+}

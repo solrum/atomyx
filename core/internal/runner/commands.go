@@ -32,5 +32,8 @@ func DefaultCommands() []CommandDefinition {
 		RotateCommand{},
 		RepeatCommand{},
 		RetryCommand{},
+		StopAppCommand{},
+		KillAppCommand{},
+		ClearStateCommand{},
 	}
 }

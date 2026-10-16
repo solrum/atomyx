@@ -1,0 +1,10 @@
+{
+  "name": "stop-app-then-launch-reruns",
+  "description": "a launchApp after a stopApp runs again instead of being skipped as a repeat launch.",
+  "yaml": "appId: com.test\nname: stop then launch\nenv: {}\n---\n- launchApp\n- stopApp\n- launchApp\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "name": "invalid-launch-app-option-not-boolean",
+  "description": "launchApp with a non-boolean stopApp must be REJECTED.",
+  "yaml": "- launchApp:\n    stopApp: sometimes\n"
+}

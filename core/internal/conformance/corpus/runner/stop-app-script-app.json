@@ -1,0 +1,10 @@
+{
+  "name": "stop-app-script-app",
+  "description": "stopApp without an app id stops the script's own app.",
+  "yaml": "appId: com.test\nname: stop app\nenv: {}\n---\n- launchApp\n- stopApp\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

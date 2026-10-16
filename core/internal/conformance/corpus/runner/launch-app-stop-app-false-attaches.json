@@ -1,0 +1,10 @@
+{
+  "name": "launch-app-stop-app-false-attaches",
+  "description": "launchApp with stopApp false launches in attach mode, and a repeat of it is skipped.",
+  "yaml": "appId: com.test\nname: launch attach\nenv: {}\n---\n- launchApp:\n    stopApp: false\n- launchApp:\n    stopApp: false\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

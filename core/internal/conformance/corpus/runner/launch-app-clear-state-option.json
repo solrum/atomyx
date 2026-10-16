@@ -1,0 +1,10 @@
+{
+  "name": "launch-app-clear-state-option",
+  "description": "launchApp with clearState true clears the app's data and then launches it fresh.",
+  "yaml": "appId: com.test\nname: launch clear\nenv: {}\n---\n- launchApp:\n    clearState: true\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}

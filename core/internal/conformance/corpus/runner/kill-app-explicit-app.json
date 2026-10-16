@@ -1,0 +1,11 @@
+{
+  "name": "kill-app-explicit-app",
+  "description": "killApp with an app id kills that app and not the script's own.",
+  "yaml": "appId: com.test\nname: kill app\nenv: {}\n---\n- killApp: com.other\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ],
+    "apps": ["com.test", "com.other"]
+  }
+}

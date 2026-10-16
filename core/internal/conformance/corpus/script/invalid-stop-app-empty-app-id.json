@@ -1,0 +1,5 @@
+{
+  "name": "invalid-stop-app-empty-app-id",
+  "description": "stopApp with an explicitly empty app id must be REJECTED.",
+  "yaml": "- stopApp: \"\"\n"
+}

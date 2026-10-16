@@ -46,6 +46,9 @@ func init() {
 		CommandRotate:           normalizeRotate,
 		CommandRepeat:           normalizeRepeat,
 		CommandRetry:            normalizeRetry,
+		CommandStopApp:          normalizeStopApp,
+		CommandKillApp:          normalizeKillApp,
+		CommandClearState:       normalizeClearState,
 	}
 }
 

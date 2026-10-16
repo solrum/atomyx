@@ -1,0 +1,5 @@
+{
+  "name": "invalid-launch-app-clear-state-with-attach",
+  "description": "launchApp with clearState true and stopApp false contradicts itself and must be REJECTED.",
+  "yaml": "- launchApp:\n    clearState: true\n    stopApp: false\n"
+}

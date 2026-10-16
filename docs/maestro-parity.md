@@ -23,7 +23,7 @@ A Maestro flow that uses only present commands runs as is after a syntax change.
 
 | Maestro command | Atomyx equivalent | Status | Note |
 | --- | --- | --- | --- |
-| `launchApp` | `launchApp` | Partial | The step takes no parameters. Launch mode and data clearing come from the project launch policy. |
+| `launchApp` | `launchApp` | Present | Accepts `clearState` and `stopApp: false`. A field left out follows the project launch policy. |
 | `launchApp` with arguments | None | Missing | The driver port carries arguments, but neither real adapter delivers them. |
 | `launchApp` with permissions | None | Missing | Needs a permission capability on the driver. |
 | `tapOn` | `tap` | Present | Selector fields are literal strings, or `{regex, flags}` for a pattern. |
@@ -52,9 +52,9 @@ A Maestro flow that uses only present commands runs as is after a syntax change.
 
 | Maestro command | Atomyx equivalent | Status | Note |
 | --- | --- | --- | --- |
-| `clearState` | None as a step | Partial | The driver clears app data and the launch policy can request it. No step exposes it. |
-| `stopApp` | None as a step | Partial | The engine stops an app. No step exposes it. |
-| `killApp` | None as a step | Partial | The engine kills an app. No step exposes it. |
+| `clearState` | `clearState` | Present | Takes an optional app id. On iOS it reinstalls from the configured artifact. |
+| `stopApp` | `stopApp` | Present | Takes an optional app id. |
+| `killApp` | `killApp` | Present | Takes an optional app id. Behaves the same as `stopApp` on every platform. |
 | `openLink` | None | Missing | Needs a link capability on the driver. |
 | `setLocation` | None | Missing | The capability flag exists with no method behind it. |
 | `travel` | None | Missing | Depends on `setLocation`. |

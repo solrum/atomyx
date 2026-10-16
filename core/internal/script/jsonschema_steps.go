@@ -33,6 +33,9 @@ var stepCommandOrder = []string{
 	"RotateStep",
 	"RepeatStep",
 	"RetryStep",
+	"StopAppStep",
+	"KillAppStep",
+	"ClearStateStep",
 }
 
 // captureVarPattern is the shape a capture-bound variable name must
@@ -43,10 +46,17 @@ var captureVarPattern = captureVarRegex.String()
 func stepJSONSchemaDefinitions() map[string]any {
 	return map[string]any{
 		"LaunchAppStep": objectSchema(
-			map[string]any{"command": constString(CommandLaunchApp)},
+			map[string]any{
+				"command":    constString(CommandLaunchApp),
+				"clearState": booleanSchema("When true, clear the app's data and start it fresh. Cannot be combined with `stopApp: false`."),
+				"stopApp":    booleanSchema("When true, force-stop a running instance before launching. When false, reuse a running instance. When omitted, the run's launch policy applies."),
+			},
 			[]string{"command"},
 			"Launch (or relaunch) the app declared at the top of the script via `appId`.",
 		),
+		"StopAppStep":    appLifecycleStepSchema(CommandStopApp, "Stop an app. Behaves the same as `killApp` on every platform."),
+		"KillAppStep":    appLifecycleStepSchema(CommandKillApp, "Terminate an app. Behaves the same as `stopApp` on every platform."),
+		"ClearStateStep": appLifecycleStepSchema(CommandClearState, "Reset an app's data to a clean state."),
 		"TapStep": objectSchema(
 			map[string]any{
 				"command":  constString(CommandTap),
@@ -274,6 +284,19 @@ func stepJSONSchemaDefinitions() map[string]any {
 			"Run `commands`. When any step fails, run the whole list again from its first step, up to `maxRetries` extra attempts.",
 		),
 	}
+}
+
+// appLifecycleStepSchema is the schema of a step that acts on one app,
+// identified by an optional `appId` that defaults to the script's own.
+func appLifecycleStepSchema(command, description string) map[string]any {
+	return objectSchema(
+		map[string]any{
+			"command": constString(command),
+			"appId":   stringMinLen(1, "App to act on. Defaults to the script's `appId`."),
+		},
+		[]string{"command"},
+		description,
+	)
 }
 
 func readFieldValues() []string {

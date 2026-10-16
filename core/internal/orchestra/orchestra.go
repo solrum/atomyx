@@ -689,7 +689,9 @@ func (o *Orchestra) ResetLaunchedApps() {
 	o.launchedApps = make(map[string]struct{})
 }
 
-// StopApp stops appID.
+// StopApp stops appID. The app no longer counts as launched in the
+// current flow, so the next default or attach LaunchApp starts it again
+// instead of being skipped.
 func (o *Orchestra) StopApp(ctx context.Context, appID string) error {
 	if err := validateAppID(appID); err != nil {
 		return err
@@ -698,10 +700,12 @@ func (o *Orchestra) StopApp(ctx context.Context, appID string) error {
 		return err
 	}
 	o.maybeKeyboardOpen = false
+	o.releaseLaunchClaim(appID)
 	return nil
 }
 
-// KillApp forcibly terminates appID.
+// KillApp forcibly terminates appID. Like StopApp, it clears appID's
+// launched state in the current flow.
 func (o *Orchestra) KillApp(ctx context.Context, appID string) error {
 	if err := validateAppID(appID); err != nil {
 		return err
@@ -710,6 +714,7 @@ func (o *Orchestra) KillApp(ctx context.Context, appID string) error {
 		return err
 	}
 	o.maybeKeyboardOpen = false
+	o.releaseLaunchClaim(appID)
 	return nil
 }
 
@@ -737,13 +742,18 @@ func (o *Orchestra) UninstallApp(ctx context.Context, appID string) error {
 	return o.driver.UninstallApp(ctx, appID)
 }
 
-// ClearAppData resets appID to a clean data state. See the platform
-// notes on driver.Driver.ClearAppData.
+// ClearAppData resets appID to a clean data state and clears its
+// launched state in the current flow, because clearing data ends the
+// running process. See the platform notes on driver.Driver.ClearAppData.
 func (o *Orchestra) ClearAppData(ctx context.Context, appID string, opts driver.ClearAppDataOptions) error {
 	if err := validateAppID(appID); err != nil {
 		return err
 	}
-	return o.driver.ClearAppData(ctx, appID, opts)
+	if err := o.driver.ClearAppData(ctx, appID, opts); err != nil {
+		return err
+	}
+	o.releaseLaunchClaim(appID)
+	return nil
 }
 
 // IsAppInstalled reports whether appID is currently installed on the

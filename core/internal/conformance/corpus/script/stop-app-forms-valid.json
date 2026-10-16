@@ -1,0 +1,5 @@
+{
+  "name": "stop-app-forms-valid",
+  "description": "stopApp parses bare, with an app id string, and with an appId object.",
+  "yaml": "- stopApp\n- stopApp: com.example.other\n- stopApp:\n    appId: com.example.third\n"
+}

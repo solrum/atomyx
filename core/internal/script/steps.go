@@ -46,6 +46,9 @@ const (
 	CommandRotate           = "rotate"
 	CommandRepeat           = "repeat"
 	CommandRetry            = "retry"
+	CommandStopApp          = "stopApp"
+	CommandKillApp          = "killApp"
+	CommandClearState       = "clearState"
 )
 
 // RepeatWhileIterationLimit is the most iterations a repeat step runs
@@ -55,10 +58,15 @@ const (
 const RepeatWhileIterationLimit = 50
 
 // LaunchAppStep launches (or relaunches) the app declared by the
-// script's appId.
+// script's appId. ClearState true clears the app's data and then starts
+// it fresh. StopApp true force-stops a running instance before the
+// launch, and StopApp false reuses a running instance. A nil option
+// leaves the run's configured launch policy in effect.
 type LaunchAppStep struct {
 	stepSource
-	Command string `json:"command"`
+	Command    string `json:"command"`
+	ClearState *bool  `json:"clearState,omitempty"`
+	StopApp    *bool  `json:"stopApp,omitempty"`
 }
 
 func (s *LaunchAppStep) StepCommand() string { return s.Command }
@@ -462,3 +470,36 @@ type RetryStep struct {
 
 func (s *RetryStep) StepCommand() string { return s.Command }
 func (s *RetryStep) isScriptStep()       {}
+
+// StopAppStep stops an app. A nil AppID means the script's own appId.
+type StopAppStep struct {
+	stepSource
+	Command string  `json:"command"`
+	AppID   *string `json:"appId,omitempty"`
+}
+
+func (s *StopAppStep) StepCommand() string { return s.Command }
+func (s *StopAppStep) isScriptStep()       {}
+
+// KillAppStep terminates an app. A nil AppID means the script's own
+// appId. Every platform adapter implements it with the same device
+// operation as StopApp, so the two steps behave identically.
+type KillAppStep struct {
+	stepSource
+	Command string  `json:"command"`
+	AppID   *string `json:"appId,omitempty"`
+}
+
+func (s *KillAppStep) StepCommand() string { return s.Command }
+func (s *KillAppStep) isScriptStep()       {}
+
+// ClearStateStep resets an app's data to a clean state. A nil AppID
+// means the script's own appId.
+type ClearStateStep struct {
+	stepSource
+	Command string  `json:"command"`
+	AppID   *string `json:"appId,omitempty"`
+}
+
+func (s *ClearStateStep) StepCommand() string { return s.Command }
+func (s *ClearStateStep) isScriptStep()       {}

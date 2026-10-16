@@ -1,0 +1,27 @@
+{
+  "parsed": {
+    "_stepLines": [
+      1,
+      2,
+      3
+    ],
+    "appId": "",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Untitled script",
+    "steps": [
+      {
+        "command": "clearState"
+      },
+      {
+        "appId": "com.example.other",
+        "command": "clearState"
+      },
+      {
+        "appId": "com.example.third",
+        "command": "clearState"
+      }
+    ]
+  },
+  "valid": true
+}

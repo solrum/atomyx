@@ -14,10 +14,6 @@ import (
 // form of a capture step's string shorthand.
 var captureShorthandRegex = regexp.MustCompile(`^(.+?)\s+as:\s*(\w+)$`)
 
-func normalizeLaunchApp(any) (ScriptStep, error) {
-	return &LaunchAppStep{Command: CommandLaunchApp}, nil
-}
-
 func normalizeTap(value any) (ScriptStep, error) {
 	sel, err := expandSelectorShorthand(value)
 	if err != nil {

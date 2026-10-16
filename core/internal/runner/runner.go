@@ -377,7 +377,7 @@ func (r *ScriptRunner) Run(ctx context.Context, def *script.ScriptDefinition) (S
 		}
 
 		cmdCtx := r.contextFor(ctx, rs, i)
-		if skip, skippable := cmd.(conditionalCommand); skippable && skip.shouldSkip(cmdCtx) {
+		if skip, skippable := cmd.(conditionalCommand); skippable && skip.shouldSkip(step, cmdCtx) {
 			continue
 		}
 
@@ -662,7 +662,7 @@ func (r *ScriptRunner) runNestedSteps(ctx context.Context, rs *runState, steps [
 		}
 
 		cmdCtx := r.contextFor(ctx, rs, i)
-		if skip, skippable := cmd.(conditionalCommand); skippable && skip.shouldSkip(cmdCtx) {
+		if skip, skippable := cmd.(conditionalCommand); skippable && skip.shouldSkip(step, cmdCtx) {
 			continue
 		}
 

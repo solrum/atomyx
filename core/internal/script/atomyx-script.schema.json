@@ -255,6 +255,25 @@
       ],
       "type": "object"
     },
+    "ClearStateStep": {
+      "additionalProperties": false,
+      "description": "Reset an app's data to a clean state.",
+      "properties": {
+        "appId": {
+          "description": "App to act on. Defaults to the script's `appId`.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "command": {
+          "const": "clearState",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command"
+      ],
+      "type": "object"
+    },
     "ExtractStep": {
       "additionalProperties": false,
       "description": "Extract fields from a captured API response into runtime variables.",
@@ -361,13 +380,40 @@
       ],
       "type": "object"
     },
+    "KillAppStep": {
+      "additionalProperties": false,
+      "description": "Terminate an app. Behaves the same as `stopApp` on every platform.",
+      "properties": {
+        "appId": {
+          "description": "App to act on. Defaults to the script's `appId`.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "command": {
+          "const": "killApp",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command"
+      ],
+      "type": "object"
+    },
     "LaunchAppStep": {
       "additionalProperties": false,
       "description": "Launch (or relaunch) the app declared at the top of the script via `appId`.",
       "properties": {
+        "clearState": {
+          "description": "When true, clear the app's data and start it fresh. Cannot be combined with `stopApp: false`.",
+          "type": "boolean"
+        },
         "command": {
           "const": "launchApp",
           "type": "string"
+        },
+        "stopApp": {
+          "description": "When true, force-stop a running instance before launching. When false, reuse a running instance. When omitted, the run's launch policy applies.",
+          "type": "boolean"
         }
       },
       "required": [
@@ -1244,6 +1290,15 @@
         },
         {
           "$ref": "#/definitions/RetryStep"
+        },
+        {
+          "$ref": "#/definitions/StopAppStep"
+        },
+        {
+          "$ref": "#/definitions/KillAppStep"
+        },
+        {
+          "$ref": "#/definitions/ClearStateStep"
         }
       ]
     },
@@ -1264,6 +1319,25 @@
       "required": [
         "command",
         "ms"
+      ],
+      "type": "object"
+    },
+    "StopAppStep": {
+      "additionalProperties": false,
+      "description": "Stop an app. Behaves the same as `killApp` on every platform.",
+      "properties": {
+        "appId": {
+          "description": "App to act on. Defaults to the script's `appId`.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "command": {
+          "const": "stopApp",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command"
       ],
       "type": "object"
     },

@@ -1,0 +1,10 @@
+{
+  "name": "clear-state-script-app",
+  "description": "clearState without an app id clears the script's own app.",
+  "yaml": "appId: com.test\nname: clear state\nenv: {}\n---\n- clearState\n",
+  "driver": {
+    "hierarchies": [
+      { "attributes": {}, "children": [] }
+    ]
+  }
+}
