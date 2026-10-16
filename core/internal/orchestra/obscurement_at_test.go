@@ -66,3 +66,41 @@ func TestObscurementAt_FailsOpenWithoutBoundsAndRejectsAnUnknownPath(t *testing.
 		t.Fatal("a path outside the tree returned no error")
 	}
 }
+
+func TestObscurementAt_ALabelledDescendantSharingTheTargetFrameIsNotAnObscurer(t *testing.T) {
+	button := boundedNode("button", "", "95,487,985,655")
+	button[AttrLabel] = "Tap me"
+	root := suggestRoot(
+		suggestNode(boundedNode("container", "gesture-tap-count", "42,282,1038,707"),
+			suggestNode(boundedNode("container", "gesture-tap-target", "95,487,985,655"),
+				suggestNode(button),
+			),
+		),
+		suggestNode(boundedNode("container", "", "42,707,1038,739")),
+	)
+	got, err := ObscurementAt(root, []int{0, 0})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Obscured {
+		t.Fatalf("ObscurementAt = %+v, want not obscured by the target's own descendant (obscurer %+v)", got, got.Obscurer)
+	}
+}
+
+func TestObscurementAt_AnOverlayStillObscuresATargetWithDescendants(t *testing.T) {
+	button := boundedNode("button", "", "95,487,985,655")
+	button[AttrLabel] = "Tap me"
+	root := suggestRoot(
+		suggestNode(boundedNode("container", "gesture-tap-target", "95,487,985,655"),
+			suggestNode(button),
+		),
+		suggestNode(boundedNode("dialog", "sheet", "0,0,1080,2181")),
+	)
+	got, err := ObscurementAt(root, []int{0})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Obscured || got.Obscurer == nil || got.Obscurer.ID != "sheet" {
+		t.Fatalf("ObscurementAt = %+v, want obscured by the sheet", got)
+	}
+}

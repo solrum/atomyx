@@ -38,6 +38,9 @@ type ObscurementResult struct {
 //     ones, so the LAST node seen that contains the point is the
 //     topmost in z-order: later siblings (and their children) render
 //     on top of earlier ones in every renderer Atomyx supports.
+//     Descendants of target are skipped: they are drawn inside the
+//     target and belong to it, for example the clickable button a
+//     semantics wrapper exposes over the same frame.
 //  2. If topmost is target itself, or an ancestor of target, it is
 //     not an obscurer: an ancestor's frame always encloses its
 //     descendants by construction, so flagging that as obscurement
@@ -59,8 +62,12 @@ func DetectObscurement(root wire.TreeNodeWire, target *TreeCursor) ObscurementRe
 	}
 	center := BoundsCenter(targetBounds)
 
+	targetPath := target.Path()
 	var topmost *TreeCursor
 	for _, c := range Walk(root) {
+		if p := c.Path(); len(p) > len(targetPath) && isAncestorOrSelfPath(targetPath, p) {
+			continue
+		}
 		if b, ok := ParseBounds(c.Node.Attributes[AttrBounds]); ok && BoundsContain(b, center.X, center.Y) {
 			topmost = c
 		}

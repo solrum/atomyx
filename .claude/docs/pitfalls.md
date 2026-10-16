@@ -968,7 +968,12 @@ first.
   before flagging it, and separately suppresses a `container` or
   `other` role with no id and no label, because that combination is
   almost always an unstyled layout wrapper rather than a real
-  obscurer.
+  obscurer. The walk also skips every descendant of the target. A
+  Flutter `container: true` target exposes a non-clickable wrapper
+  with the clickable button as its child over the identical frame, and
+  that labelled child is the last node at the midpoint in pre-order,
+  so counting it would reject the wrapper as obscured by its own
+  button.
 - **Safe-area insets matter for "in viewport" checks.** A screen's
   reported bounds include the status bar, notch, and home indicator.
   An element whose midpoint sits in those edge zones is technically
