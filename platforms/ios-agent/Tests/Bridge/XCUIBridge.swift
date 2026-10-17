@@ -353,12 +353,17 @@ final class DefaultXCUIBridge: XCUIBridge {
     /// (Flutter text fields stay unfocused in the snapshot even while
     /// the caret is visible), so the live element query is the only
     /// reliable source for them.
+    ///
+    /// The lookup resolves the query once through `snapshot()`, which
+    /// reports a missing match as a thrown error. Reading `frame` on the
+    /// element would re-resolve the query and record an XCTest issue when
+    /// the field loses focus or disappears mid-lookup, failing the whole
+    /// dump. Any failure here means no element is focused.
     private static func keyboardFocusedFrame(in app: XCUIApplication) -> CGRect? {
-        let element = app.descendants(matching: .any)
+        let query = app.descendants(matching: .any)
             .matching(NSPredicate(format: "hasKeyboardFocus == true"))
             .firstMatch
-        guard element.exists else { return nil }
-        return element.frame
+        return (try? query.snapshot())?.frame
     }
 
     func focusedFieldValue(app: XCUIApplication) -> String? {
