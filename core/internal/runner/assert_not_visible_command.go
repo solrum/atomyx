@@ -3,6 +3,7 @@ package runner
 import (
 	"fmt"
 
+	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/script"
 )
 
@@ -24,8 +25,11 @@ func (AssertNotVisibleCommand) Execute(step script.ScriptStep, ctx *CommandConte
 	if s.TimeoutMs != nil && *s.TimeoutMs != 0 {
 		deadline := ctx.Clock.NowMs() + int64(*s.TimeoutMs)
 		for ctx.Clock.NowMs() < deadline {
-			cursor := must(ctx.Orchestra.FindOne(ctx.Context, selector))
-			if cursor == nil {
+			cursor, err := ctx.Orchestra.FindOne(ctx.Context, selector)
+			if err != nil && !diag.IsTransient(err) {
+				return pollFailure(err, "")
+			}
+			if err == nil && cursor == nil {
 				return CommandResult{Ok: true, Detail: strPtr("Element is not visible")}
 			}
 			must0(ctx.Clock.Sleep(ctx.Context, disappearPollIntervalMs))

@@ -414,7 +414,7 @@ func (d *IosDriver) Hierarchy(ctx context.Context) (wire.TreeNodeWire, error) {
 	}
 	var resp dumpRawTreeResponse
 	if err := d.conn.CallInto(ctx, "dumpRawTree", args, &resp); err != nil {
-		return wire.TreeNodeWire{}, d.fail(err)
+		return wire.TreeNodeWire{}, d.failHierarchy(err)
 	}
 	if resp.BundleID != "" {
 		d.lastLaunchedBundleID = resp.BundleID

@@ -2,10 +2,12 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"dev.atomyx/internal/diag"
 	"dev.atomyx/internal/driver"
 	"dev.atomyx/internal/driver/mock"
 	"dev.atomyx/internal/orchestra"
@@ -700,5 +702,46 @@ func TestLaunchAppCommand_DelegatesLaunchMode(t *testing.T) {
 				t.Fatalf("driver NoReset = %v, want [%s]", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestWaitForCommand_TransientReadErrorKeepsPolling(t *testing.T) {
+	tr := newTestRunner()
+	tr.driver.StageHierarchyError(diag.New(diag.CodeAgentNotReady, "the agent could not read the screen yet", "retry", errors.New("snapshot failed")))
+	tr.driver.StageHierarchy(rootTree(button("btn", "Dashboard", "0,0,10,10")))
+
+	result := run(t, tr, "appId: com.test\n---\n- waitFor:\n    text: Dashboard\n    timeout: 1000\n")
+	if !result.Ok {
+		t.Fatalf("got Ok=false: %s", debugSteps(result.Steps))
+	}
+}
+
+func TestWaitForCommand_NonTimeoutErrorFailsWithoutPanic(t *testing.T) {
+	tr := newTestRunner()
+	tr.driver.StageHierarchyError(diag.New(diag.CodeAgentRejected, "the agent rejected the request", "fix it", errors.New("rejected")))
+
+	result := run(t, tr, "appId: com.test\n---\n- waitFor:\n    text: Dashboard\n    timeout: 1000\n")
+	if result.Ok {
+		t.Fatalf("got Ok=true, want false")
+	}
+	step := lastStep(t, result)
+	if got := detail(step); strings.Contains(got, "Exception") || !strings.Contains(got, "the agent rejected the request") {
+		t.Fatalf("got detail %q, want the error message without an exception wrapper", got)
+	}
+}
+
+func TestWaitForCommand_TimeoutAfterTransientErrorNamesIt(t *testing.T) {
+	tr := newTestRunner()
+	for i := 0; i < 20; i++ {
+		tr.driver.StageHierarchyError(diag.New(diag.CodeAgentNotReady, "the agent could not read the screen yet", "retry", errors.New("snapshot failed")))
+	}
+
+	result := run(t, tr, "appId: com.test\n---\n- waitFor:\n    text: Dashboard\n    timeout: 300\n")
+	if result.Ok {
+		t.Fatalf("got Ok=true, want false")
+	}
+	got := detail(lastStep(t, result))
+	if !strings.HasPrefix(got, "Element not found within 300ms") || !strings.Contains(got, "could not read the screen yet") {
+		t.Fatalf("got detail %q", got)
 	}
 }

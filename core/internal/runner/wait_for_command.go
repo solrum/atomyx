@@ -1,7 +1,6 @@
 package runner
 
 import (
-	"errors"
 	"fmt"
 
 	"dev.atomyx/internal/orchestra"
@@ -29,11 +28,7 @@ func (WaitForCommand) Execute(step script.ScriptStep, ctx *CommandContext) Comma
 
 	_, err := ctx.Orchestra.WaitFor(ctx.Context, selector, orchestra.WaitOptions{TimeoutMs: timeoutMs})
 	if err != nil {
-		var timeoutErr *orchestra.FindTimeoutError
-		if errors.As(err, &timeoutErr) {
-			return CommandResult{Ok: false, Detail: strPtr(fmt.Sprintf("Element not found within %dms", timeoutMs))}
-		}
-		panic(err)
+		return pollFailure(err, fmt.Sprintf("Element not found within %dms", timeoutMs))
 	}
 	return CommandResult{Ok: true, Detail: strPtr("Element appeared")}
 }
