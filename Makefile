@@ -65,6 +65,15 @@ DEMO_IOS_SIM_DD     := build/ios-sim
 DEMO_IOS_SIM_APP    := $(DEMO_IOS_SIM_DD)/Build/Products/Debug-iphonesimulator/Runner.app
 DEMO_IOS_DEVICE_DD  := build/ios-device
 DEMO_IOS_DEVICE_APP := $(DEMO_IOS_DEVICE_DD)/Build/Products/Release-iphoneos/Runner.app
+# DEMO_PROFILE names a locally installed provisioning profile (name or
+# UUID). When set, the Runner target signs manually with it through a
+# generated xcconfig that only Runner includes, so the CocoaPods targets
+# keep automatic signing. When unset, signing is automatic and may
+# update profiles through the signed-in Xcode account.
+DEMO_SIGNING_XCCONFIG := $(DEMO_DIR)/ios/Flutter/DemoSigning.xcconfig
+ifeq ($(strip $(DEMO_PROFILE)),)
+DEMO_SIGNING_FLAGS := -allowProvisioningUpdates CODE_SIGN_STYLE=Automatic
+endif
 ifneq ($(filter demo-ios-device,$(MAKECMDGOALS)),)
 -include $(IOS_DIR)/device.env
 endif
@@ -88,7 +97,7 @@ help:
 	@echo "DEMO APP (fixture builds, each prints the output path):"
 	@echo "  make demo-android               Debug APK"
 	@echo "  make demo-ios-sim               Simulator build, no signing"
-	@echo "  make demo-ios-device            Device build, team from platforms/ios-agent/device.env"
+	@echo "  make demo-ios-device            Device build, team from device.env, optional DEMO_PROFILE=<profile>"
 	@echo ""
 	@echo "READY (start driver, ready to run scripts):"
 	@echo "  make ready-android              Android device/emulator"
@@ -280,11 +289,19 @@ demo-ios-device:
 		echo "from device.env.example, or pass DEV_TEAM=<team> on the command line."; \
 		exit 1; \
 	fi
+	@rm -f $(DEMO_SIGNING_XCCONFIG)
+	@if [ -n "$(DEMO_PROFILE)" ]; then \
+		printf '%s\n' \
+			'CODE_SIGN_STYLE = Manual' \
+			'PROVISIONING_PROFILE_SPECIFIER = $(DEMO_PROFILE)' \
+			'CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Development' \
+			> $(DEMO_SIGNING_XCCONFIG); \
+	fi
 	cd $(DEMO_DIR) && flutter build ios --release --config-only
 	@cd $(DEMO_DIR) && xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner \
 		-configuration Release -destination generic/platform=iOS \
-		-derivedDataPath $(DEMO_IOS_DEVICE_DD) -allowProvisioningUpdates \
-		DEVELOPMENT_TEAM=$(DEV_TEAM) CODE_SIGN_STYLE=Automatic build
+		-derivedDataPath $(DEMO_IOS_DEVICE_DD) $(DEMO_SIGNING_FLAGS) \
+		DEVELOPMENT_TEAM=$(DEV_TEAM) build
 	@echo "Output: $(DEMO_DIR)/$(DEMO_IOS_DEVICE_APP)"
 
 # --- iOS Simulator ---------------------------------------------

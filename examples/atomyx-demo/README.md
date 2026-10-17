@@ -89,7 +89,22 @@ Run from the repository root. Each target prints the output path.
 
 `demo-ios-device` reads `DEV_TEAM` from the gitignored
 `platforms/ios-agent/device.env` (the same file the iOS agent Makefile
-uses) and never prints it. Android needs minSdk 24 and iOS needs a
+uses) and never prints it.
+
+Signing is automatic by default and needs an Xcode account sign-in for
+`-allowProvisioningUpdates`. A machine without a sign-in can pass
+`DEMO_PROFILE=<profile name or UUID>` to sign the Runner target manually
+with a provisioning profile installed under
+`~/Library/Developer/Xcode/UserData/Provisioning Profiles`, for example a
+wildcard development profile of the same team that contains the device:
+
+```bash
+make demo-ios-device DEMO_PROFILE="<profile name>"
+```
+
+The target writes the gitignored `ios/Flutter/DemoSigning.xcconfig`, which
+only the Runner target includes, and removes it again on every run without
+`DEMO_PROFILE`. The CocoaPods targets keep automatic signing. Android needs minSdk 24 and iOS needs a
 deployment target of 15.0, both required by the webview plugin and the
 current Xcode toolchain.
 
