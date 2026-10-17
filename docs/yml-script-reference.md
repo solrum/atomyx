@@ -594,7 +594,13 @@ field first, so use `eraseText` to edit a field without retyping it.
 
 ### waitFor
 
-Wait for an element to appear. Throws on timeout.
+Wait for an element to appear. The step fails when the timeout
+elapses, and its detail names the last screen read error when the final
+poll could not read the screen. A momentary read failure while the
+screen settles does not end the wait. `assertVisible`,
+`assertNotVisible`, and `assertExists` poll the same way when they have
+a `timeout`. See `mcp-tools.md` under `wait_for_element` for the error
+codes that count as momentary.
 
 ```yaml
 # Default 5s timeout

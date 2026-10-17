@@ -692,6 +692,9 @@ field only needs to be focused, with nothing typed into it.
 **Errors and recovery**
 - `ok: false` with a "not found", "could not scroll", or obscurement
   reason: same recovery as tap.
+- When focus is lost after the focus check but before the keys are
+  dispatched, the call taps the field again and retries once. Only a
+  second loss is reported.
 - A failure with code `INPUT_NOT_FOCUSED` reports that the field never
   took input focus and that nothing was typed: retarget the field with a more
   stable selector, or tap its coordinates directly before calling
@@ -842,6 +845,10 @@ failure should also be classified.
   stands.
 - Gives up once timeoutMs elapses from the first poll without a
   match.
+- A read failure with code AGENT_UNREACHABLE,
+  AGENT_COMMUNICATION_FAILED, or AGENT_NOT_READY does not end the wait.
+  Polling continues until the timeout, and `reason` then names the last
+  read error. Any other read failure ends the call at once.
 
 **Returns**
 - On match: the same shape as find_element (`found: true`, plus

@@ -103,6 +103,11 @@ make e2e PLATFORM=iossim
 make e2e PLATFORM=ios
 ```
 
+The `ios` leg drives a physical iPhone and needs a signed demo build
+and its bundle id in the environment. The variables, the build
+command, and the soak requirements for that leg are in
+`../.claude/docs/development.md`.
+
 Run a soak of 100 iterations on one device:
 
 ```bash

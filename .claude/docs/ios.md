@@ -707,11 +707,17 @@ process state once, through `XCUIBridge.appState`. The tracked
 reference is never cleared by that check, so a crash, an uninstall, or
 an external termination leaves it in place. The contract per command:
 
-- `getScreenSize` and `dumpRawTree` use the tracked app only while it
-  is `.runningForeground` or `.runningBackground`. Otherwise they use
-  the Springboard proxy, and `dumpRawTree` tries `bundleIdCandidates`
-  first. A `dumpRawTree` with no tracked app and no candidates still
-  fails with "no app bound".
+- `getScreenSize` uses the tracked app while it is `.runningForeground`
+  or `.runningBackground`, and the Springboard proxy otherwise.
+- `dumpRawTree` binds the tracked app only while it is
+  `.runningForeground`, because a backgrounded process cannot be
+  snapshotted. Otherwise it tries `bundleIdCandidates` first, then the
+  Springboard proxy. A `dumpRawTree` with no tracked app and no
+  candidates still fails with "no app bound". A rejected snapshot is
+  reported as `snapshot failed: <reason>` with the underlying error,
+  and the host maps that rejection to `AGENT_NOT_READY` so a polling
+  wait keeps going. The keyboard-focused frame lookup during a dump
+  never fails the dump.
 - `typeText`, `pressKey` (strategies that need an app), `hideKeyboard`,
   `getKeyboard`, and `clearFocusedInput` act on the app, so they reply
   "the app is not running, launch it first" when the tracked app has

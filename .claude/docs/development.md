@@ -446,8 +446,12 @@ the next one:
 - `android`: `adb -s <device-id> shell am force-stop <appId>`.
 - `iossim`: `xcrun simctl terminate <device-id> <appId>`, where an app that is
   not running is not an error.
-- `ios`: no reset. `devicectl` can only terminate by process id, so the flow's
-  own precondition is the only protection on a physical iPhone.
+- `ios`: `devicectl` can only terminate by process id, so the script looks up
+  the installed bundle path of `<appId>` with `xcrun devicectl device info apps`,
+  lists running processes with `xcrun devicectl device info processes`, and
+  terminates every process that runs from that bundle with
+  `xcrun devicectl device process terminate`. This leg needs `jq`. An app with no
+  running process is not an error.
 
 A stop that fails counts as an infrastructure failure of that iteration, is
 recorded in `iterations.txt` with exit code 125, skips the run, and is counted
