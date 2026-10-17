@@ -154,7 +154,7 @@ func (f *androidE2EFixture) hooks(t *testing.T) drivertest.Hooks {
 			SettlePause:     drivertest.RotationAnimationPause,
 			TapAndAwait:     drivertest.TapGestureTarget,
 			SignInArguments: map[string]string{"route": androidE2ELoginRoute},
-			TypeAndAwait:    drivertest.TypeIntoSignInFields,
+			TypeAndAwait:    drivertest.VerifySignInKeyboard,
 		},
 	}
 	appID := os.Getenv("ATOMYX_ANDROID_INSTALL_APP_ID")

@@ -173,7 +173,7 @@ func demoHooks(t *testing.T, settlePause time.Duration) (drivertest.Hooks, strin
 			SettlePause:     settlePause,
 			TapAndAwait:     drivertest.TapGestureTarget,
 			SignInArguments: map[string]string{"route": iosE2ELoginRoute},
-			TypeAndAwait:    drivertest.TypeIntoSignInFields,
+			TypeAndAwait:    drivertest.VerifySignInKeyboard,
 		},
 	}, app
 }

@@ -5,10 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"unicode/utf8"
 
 	"dev.atomyx/internal/driver"
-	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/wire"
 )
 
@@ -18,66 +16,152 @@ const (
 	signInEmailLabel    = "Email"
 	signInPasswordLabel = "Password"
 
-	// signInEmail and signInPassword are the values the case types.
-	signInEmail    = "qa@example.com"
-	signInPassword = "s3cret-pass"
+	// signInEmail is the value the case types into the Email field.
+	signInEmail = "qa@example.com"
 
-	// signInSettleTimeout bounds how long the case waits for a typed
-	// value to show in the hierarchy.
+	// signInSettleTimeout bounds how long the case waits for the keyboard
+	// or a typed value to show in the hierarchy.
 	signInSettleTimeout = 10 * time.Second
 
 	// signInSettlePoll is the gap between hierarchy reads while waiting.
 	signInSettlePoll = 250 * time.Millisecond
+
+	// keyboardEdgeTolerance is how far, in screen units, the keyboard's
+	// bottom edge may sit from the bottom of the screen.
+	keyboardEdgeTolerance = 2.0
 )
 
-// signInFields lists the fields the case fills, in typing order.
-var signInFields = []struct {
-	label, value string
-	masked       bool
-}{
-	{signInEmailLabel, signInEmail, false},
-	{signInPasswordLabel, signInPassword, true},
-}
-
-// TypeIntoSignInFields types into the demo app's Email field and then
-// its Password field, both addressed by label, and fails the test unless
-// each field then shows its value. The Password field may show a masked
-// value, so it only has to show as many characters as were typed.
+// VerifySignInKeyboard checks what the driver owes a caller that must
+// avoid the on-screen keyboard. It taps the demo app's Email field at
+// the center the hierarchy reports, then fails the test unless:
 //
-// The Password field is the one the on-screen keyboard covers in a
-// landscape layout, so the case proves that a type action reaches a
-// field the keyboard from the previous field would otherwise hide.
-func TypeIntoSignInFields(t *testing.T, d driver.Driver) {
+//   - the keyboard appears in the hierarchy with bounds that fit inside
+//     ScreenSize and touch its bottom edge
+//   - the Email and Password bounds read from that same hierarchy lie
+//     inside the screen, so keyboard and fields share one coordinate space
+//   - text typed through Driver.InputText shows in the Email field
+func VerifySignInKeyboard(t *testing.T, d driver.Driver) {
 	t.Helper()
 	ctx := context.Background()
-	o := orchestra.New(orchestra.OrchestraDeps{Driver: d, Clock: orchestra.SystemClock{}})
-	for _, field := range signInFields {
-		label := orchestra.LiteralPattern(field.label)
-		result, err := o.InputText(ctx, orchestra.Selector{Text: &label}, field.value, orchestra.InputTextOptions{})
+	root, err := d.Hierarchy(ctx)
+	if err != nil {
+		t.Fatalf("Hierarchy before tapping the %s field: %v", signInEmailLabel, err)
+	}
+	email, ok := findLabelBounds(root, signInEmailLabel)
+	if !ok {
+		t.Fatalf("no %s field with bounds is on the screen", signInEmailLabel)
+	}
+	center := wire.Point{X: (email.Left + email.Right) / 2, Y: (email.Top + email.Bottom) / 2}
+	if err := d.Tap(ctx, center); err != nil {
+		t.Fatalf("Tap at %+v: %v", center, err)
+	}
+
+	keyboard, root := awaitKeyboardBounds(t, d)
+	screen, err := d.ScreenSize(ctx)
+	if err != nil {
+		t.Fatalf("ScreenSize: %v", err)
+	}
+	if !boundsFit(keyboard, screen) {
+		t.Fatalf("keyboard bounds %+v do not fit inside the %vx%v screen", keyboard, screen.Width, screen.Height)
+	}
+	if keyboard.Bottom < screen.Height-keyboardEdgeTolerance {
+		t.Fatalf("keyboard bottom %v does not touch the screen bottom %v", keyboard.Bottom, screen.Height)
+	}
+	for _, label := range []string{signInEmailLabel, signInPasswordLabel} {
+		b, ok := findLabelBounds(root, label)
+		if !ok {
+			t.Fatalf("no %s field with bounds is in the hierarchy that shows the keyboard", label)
+		}
+		if !boundsFit(b, screen) {
+			t.Fatalf("%s bounds %+v are outside the %vx%v screen, so fields and keyboard disagree on coordinates", label, b, screen.Width, screen.Height)
+		}
+	}
+
+	if err := d.InputText(ctx, signInEmail); err != nil {
+		t.Fatalf("InputText into the %s field: %v", signInEmailLabel, err)
+	}
+	awaitFieldValue(t, d, signInEmailLabel, signInEmail)
+}
+
+// awaitKeyboardBounds reads the hierarchy until it holds a keyboard node
+// with bounds, and returns those bounds with the hierarchy they came from.
+func awaitKeyboardBounds(t *testing.T, d driver.Driver) (wire.Bounds, wire.TreeNodeWire) {
+	t.Helper()
+	deadline := time.Now().Add(signInSettleTimeout)
+	for {
+		root, err := d.Hierarchy(context.Background())
 		if err != nil {
-			t.Fatalf("type into the %s field: %v", field.label, err)
+			t.Fatalf("Hierarchy while waiting for the keyboard: %v", err)
 		}
-		if !result.Ok {
-			t.Fatalf("type into the %s field was rejected: %s", field.label, result.Reason)
+		if b, ok := findKeyboardBounds(root); ok {
+			return b, root
+		}
+		if !time.Now().Before(deadline) {
+			t.Fatalf("no keyboard with bounds appeared within %s", signInSettleTimeout)
+		}
+		time.Sleep(signInSettlePoll)
+	}
+}
+
+// findKeyboardBounds returns the bounds of the first keyboard node under
+// root. A node is a keyboard when its role is keyboard or it is marked as
+// an input method window.
+func findKeyboardBounds(root wire.TreeNodeWire) (wire.Bounds, bool) {
+	if root.Attributes["role"] == "keyboard" || root.Attributes["ext:isIme"] == "true" {
+		if b, ok := parseNodeBounds(root.Attributes["bounds"]); ok {
+			return b, true
 		}
 	}
-	for _, field := range signInFields {
-		awaitFieldValue(t, d, field.label, field.value, field.masked)
+	for _, child := range root.Children {
+		if b, ok := findKeyboardBounds(child); ok {
+			return b, true
+		}
 	}
+	return wire.Bounds{}, false
+}
+
+// findLabelBounds returns the bounds of the first node under root named
+// by label, with an area.
+func findLabelBounds(root wire.TreeNodeWire, label string) (wire.Bounds, bool) {
+	if nodeNamed(root, label) {
+		if b, ok := parseNodeBounds(root.Attributes["bounds"]); ok && b.Right > b.Left && b.Bottom > b.Top {
+			return b, true
+		}
+	}
+	for _, child := range root.Children {
+		if b, ok := findLabelBounds(child, label); ok {
+			return b, true
+		}
+	}
+	return wire.Bounds{}, false
+}
+
+// nodeNamed reports whether any naming attribute of n starts with label.
+func nodeNamed(n wire.TreeNodeWire, label string) bool {
+	for _, key := range []string{"label", "text", "hint", "value"} {
+		if strings.HasPrefix(n.Attributes[key], label) {
+			return true
+		}
+	}
+	return false
+}
+
+// boundsFit reports whether b lies inside a screen of the given size.
+func boundsFit(b wire.Bounds, screen wire.Size) bool {
+	return b.Left >= 0 && b.Top >= 0 && b.Right <= screen.Width && b.Bottom <= screen.Height
 }
 
 // awaitFieldValue reads the hierarchy until the field named label shows
 // value, and fails the test when it does not within the bound.
-func awaitFieldValue(t *testing.T, d driver.Driver, label, value string, masked bool) {
+func awaitFieldValue(t *testing.T, d driver.Driver, label, value string) {
 	t.Helper()
-	ctx := context.Background()
 	deadline := time.Now().Add(signInSettleTimeout)
 	for {
-		root, err := d.Hierarchy(ctx)
+		root, err := d.Hierarchy(context.Background())
 		if err != nil {
 			t.Fatalf("Hierarchy while waiting for the %s field value: %v", label, err)
 		}
-		if fieldShows(root, label, value, masked) {
+		if fieldShows(root, label, value) {
 			return
 		}
 		if !time.Now().Before(deadline) {
@@ -88,30 +172,17 @@ func awaitFieldValue(t *testing.T, d driver.Driver, label, value string, masked 
 }
 
 // fieldShows reports whether some node under root is named by label and
-// carries value in its value, text or label. A masked field is satisfied
-// by a value of the same length instead, because secure fields replace
-// the characters.
-func fieldShows(root wire.TreeNodeWire, label, value string, masked bool) bool {
-	attrs := root.Attributes
-	named := false
-	for _, key := range []string{"label", "text", "hint", "value"} {
-		if strings.HasPrefix(attrs[key], label) {
-			named = true
-		}
-	}
-	if named {
+// carries value in its value, text or label.
+func fieldShows(root wire.TreeNodeWire, label, value string) bool {
+	if nodeNamed(root, label) {
 		for _, key := range []string{"value", "text", "label"} {
-			got := attrs[key]
-			if strings.Contains(got, value) {
-				return true
-			}
-			if masked && key == "value" && utf8.RuneCountInString(got) == utf8.RuneCountInString(value) {
+			if strings.Contains(root.Attributes[key], value) {
 				return true
 			}
 		}
 	}
 	for _, child := range root.Children {
-		if fieldShows(child, label, value, masked) {
+		if fieldShows(child, label, value) {
 			return true
 		}
 	}

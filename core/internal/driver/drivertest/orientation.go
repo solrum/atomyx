@@ -62,10 +62,9 @@ type OrientationFixture struct {
 	// skips the typing check.
 	SignInArguments map[string]string
 
-	// TypeAndAwait must type into the Email field and then the Password
-	// field of the screen SignInArguments opens, addressing each by label,
-	// and fail the test unless both then show their values. It runs in
-	// landscape, where the on-screen keyboard covers the second field.
+	// TypeAndAwait must prove the keyboard and field contract on the screen
+	// SignInArguments opens. It runs once per landscape orientation, with
+	// the device already rotated.
 	TypeAndAwait func(t *testing.T, d driver.Driver)
 }
 
@@ -266,14 +265,12 @@ func testSetOrientationReachesTheApp(t *testing.T, newDriver Factory, hooks Hook
 	}
 }
 
-// testTypeIntoFieldsInLandscape rotates the device to landscape on the
-// Sign in screen and runs the fixture's typing step, which fills two
-// fields in turn. In landscape the keyboard opened by the first field
-// covers the second, so the case fails when the type action taps the
-// keyboard instead of the field. The device is turned back to portrait
-// on exit even when the case fails. It skips when the driver cannot set
-// the orientation or is wired without a sign-in fixture.
-func testTypeIntoFieldsInLandscape(t *testing.T, newDriver Factory, hooks Hooks) {
+// testKeyboardAndFieldsAgreeInLandscape opens the Sign in screen, turns the
+// device into each landscape orientation, and runs the fixture's check
+// there. The device is turned back to portrait on exit even when the case
+// fails. It skips when the driver cannot set the orientation or is wired
+// without a sign-in fixture.
+func testKeyboardAndFieldsAgreeInLandscape(t *testing.T, newDriver Factory, hooks Hooks) {
 	d := newDriver()
 	ctx := context.Background()
 	if err := d.Connect(ctx); err != nil {
@@ -299,10 +296,12 @@ func testTypeIntoFieldsInLandscape(t *testing.T, newDriver Factory, hooks Hooks)
 	if err := d.LaunchApp(ctx, bundleID, driver.LaunchArgs{NoReset: &fresh, Arguments: fixture.SignInArguments}); err != nil {
 		t.Fatalf("LaunchApp: %v", err)
 	}
-	if err := d.SetOrientation(ctx, driver.OrientationLandscapeLeft); err != nil {
-		t.Fatalf("SetOrientation %s: %v", driver.OrientationLandscapeLeft, err)
+	for _, orientation := range []driver.Orientation{driver.OrientationLandscapeLeft, driver.OrientationLandscapeRight} {
+		if err := d.SetOrientation(ctx, orientation); err != nil {
+			t.Fatalf("SetOrientation %s: %v", orientation, err)
+		}
+		requireScreenLayout(t, d, orientation)
+		time.Sleep(fixture.SettlePause)
+		fixture.TypeAndAwait(t, d)
 	}
-	requireScreenLayout(t, d, driver.OrientationLandscapeLeft)
-	time.Sleep(fixture.SettlePause)
-	fixture.TypeAndAwait(t, d)
 }

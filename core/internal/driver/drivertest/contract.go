@@ -198,7 +198,7 @@ func Run(t *testing.T, newDriver Factory, hooks Hooks) {
 	t.Run("set permissions reaches the app", func(t *testing.T) { testSetPermissionsReachesTheApp(t, tracked(t, newDriver), hooks) })
 	t.Run("set orientation matches capability", func(t *testing.T) { testSetOrientationMatchesCapability(t, tracked(t, newDriver)) })
 	t.Run("set orientation keeps gestures on target", func(t *testing.T) { testSetOrientationReachesTheApp(t, tracked(t, newDriver), hooks) })
-	t.Run("set orientation keeps typing on target", func(t *testing.T) { testTypeIntoFieldsInLandscape(t, tracked(t, newDriver), hooks) })
+	t.Run("set orientation keeps keyboard and fields aligned", func(t *testing.T) { testKeyboardAndFieldsAgreeInLandscape(t, tracked(t, newDriver), hooks) })
 	t.Run("set location matches capability", func(t *testing.T) { testSetLocationMatchesCapability(t, tracked(t, newDriver)) })
 	t.Run("set location reaches the device", func(t *testing.T) { testSetLocationReachesTheDevice(t, tracked(t, newDriver)) })
 	t.Run("clear app data succeeds with a source", func(t *testing.T) { testClearAppDataSucceedsWithSource(t, tracked(t, newDriver), hooks) })
