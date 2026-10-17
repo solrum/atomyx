@@ -659,7 +659,7 @@ func (d *AndroidDriver) EraseText(ctx context.Context, count int) error {
 	if focusedNodeDesc == "" {
 		focusedNodeDesc = "unknown"
 	}
-	clearErr := &ClearTextError{
+	return d.fail(&ClearTextError{
 		Reason: res.Reason,
 		Diagnostic: ClearTextDiagnostic{
 			StrategiesTried: strategiesTried,
@@ -668,12 +668,7 @@ func (d *AndroidDriver) EraseText(ctx context.Context, count int) error {
 			ScreenWidth:     res.ScreenWidth,
 			ScreenHeight:    res.ScreenHeight,
 		},
-	}
-	if clearErr.focusLost() {
-		reason, remedy := clearErr.AgentRejection()
-		return diag.New(diag.CodeInputNotFocused, diag.SanitizeAgentMessage(reason), remedy, clearErr)
-	}
-	return d.fail(clearErr)
+	})
 }
 
 // PressKey reports Ok unconditionally: Android system key dispatch

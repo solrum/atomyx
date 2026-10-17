@@ -30,7 +30,9 @@ type agentRejection interface {
 // fail is the single boundary every AndroidDriver method that issues a
 // wire call routes its returned error through before it reaches a
 // caller. An error implementing agentRejection becomes an
-// AGENT_REJECTED carrying its sanitized reason and its remedy. A
+// AGENT_REJECTED carrying its sanitized reason and its remedy, except a
+// clear failure caused by missing input focus, which becomes
+// INPUT_NOT_FOCUSED so a caller can re-focus and retry. A
 // *transport.AgentError with HTTP status 429, the status the
 // control server uses for a request it refused because another action
 // still holds the device, becomes a retryable AGENT_NOT_READY. Every
@@ -47,6 +49,10 @@ func (d *AndroidDriver) fail(err error) error {
 	var rejection agentRejection
 	if errors.As(err, &rejection) {
 		reason, remedy := rejection.AgentRejection()
+		var clearErr *ClearTextError
+		if errors.As(err, &clearErr) && clearErr.focusLost() {
+			return diag.New(diag.CodeInputNotFocused, diag.SanitizeAgentMessage(reason), remedy, err)
+		}
 		return diag.New(diag.CodeAgentRejected, diag.SanitizeAgentMessage(reason), remedy, err)
 	}
 	var agentErr *transport.AgentError
