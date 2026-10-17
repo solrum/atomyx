@@ -75,8 +75,9 @@ FAKE
 chmod +x "$fake"
 
 # Fake host tools, found through PATH. Each call is appended to
-# tools.log. FAKE_RESET_FAIL makes the tools fail, and FAKE_SIM_IDLE
-# makes xcrun report that nothing was running.
+# tools.log. FAKE_RESET_FAIL makes the tools fail, FAKE_SIM_IDLE makes
+# xcrun report that nothing was running on the simulator, and
+# FAKE_DEVICE_IDLE makes the device process list empty.
 mkdir -p "$work/bin"
 cat > "$work/bin/adb" <<'TOOL'
 #!/usr/bin/env bash
@@ -86,6 +87,31 @@ TOOL
 cat > "$work/bin/xcrun" <<'TOOL'
 #!/usr/bin/env bash
 echo "xcrun $*" >> "${FAKE_TOOLS_LOG:?}"
+if [ "${1:-}" = "devicectl" ]; then
+  out=""
+  prev=""
+  for arg in "$@"; do
+    [ "$prev" = "--json-output" ] && out="$arg"
+    prev="$arg"
+  done
+  case "$*" in
+    *"device info apps"*)
+      [ -z "${FAKE_RESET_FAIL:-}" ] || exit 1
+      echo '{"result":{"apps":[{"bundleIdentifier":"dev.atomyx.demo","url":"file:///private/var/containers/Bundle/Application/AAA/Demo.app/"}]}}' > "$out"
+      ;;
+    *"device info processes"*)
+      if [ -n "${FAKE_DEVICE_IDLE:-}" ]; then
+        echo '{"result":{"runningProcesses":[{"executable":"file:///usr/libexec/other","processIdentifier":7}]}}' > "$out"
+      else
+        echo '{"result":{"runningProcesses":[{"executable":"file:///usr/libexec/other","processIdentifier":7},{"executable":"file:///private/var/containers/Bundle/Application/AAA/Demo.app/Demo","processIdentifier":4242}]}}' > "$out"
+      fi
+      ;;
+    *"device process terminate"*)
+      [ -z "${FAKE_RESET_FAIL:-}" ] || exit 1
+      ;;
+  esac
+  exit 0
+fi
 if [ -n "${FAKE_SIM_IDLE:-}" ]; then
   echo "An error was encountered processing the command: found nothing to terminate" >&2
   exit 163
@@ -255,13 +281,47 @@ if [ "$(grep -c '^xcrun simctl terminate SIM-UDID dev.atomyx.demo$' "$FAKE_TOOLS
   fail "simulator reset did not call simctl terminate per iteration"
 fi
 
-# Physical iOS has no reset tool, so no host tool is called.
+# Physical iOS: the app process is found by its installed bundle path
+# and terminated by pid. Other processes are left alone.
 rm -f "$work/state.history"; : > "$FAKE_TOOLS_LOG"
-FAKE_STATE="$work/state" FAKE_OUTCOMES="pass" ATOMYX_BIN="$fake" \
+set +e
+FAKE_STATE="$work/state" FAKE_OUTCOMES="pass pass" ATOMYX_BIN="$fake" \
   ATOMYX_SOAK_RESULTS_DIR="$work/results-ios" \
+  "$soak" ios DEVICE-UDID 2 > /dev/null 2>&1
+ios_status=$?
+set -e
+[ "$ios_status" -eq 0 ] || fail "physical ios reset: exit $ios_status, want 0"
+if [ "$(grep -c '^xcrun devicectl device process terminate --device DEVICE-UDID --pid 4242$' "$FAKE_TOOLS_LOG")" -ne 2 ]; then
+  fail "physical ios reset did not terminate the app pid per iteration"
+fi
+if grep -q -- '--pid 7$' "$FAKE_TOOLS_LOG"; then
+  fail "physical ios reset terminated an unrelated process"
+fi
+
+# A physical iOS app with no running process is not a failure.
+rm -f "$work/state.history"; : > "$FAKE_TOOLS_LOG"
+set +e
+FAKE_DEVICE_IDLE=1 FAKE_STATE="$work/state" FAKE_OUTCOMES="pass" ATOMYX_BIN="$fake" \
+  ATOMYX_SOAK_RESULTS_DIR="$work/results-ios-idle" \
   "$soak" ios DEVICE-UDID 1 > /dev/null 2>&1
-if [ -s "$FAKE_TOOLS_LOG" ]; then
-  fail "physical ios leg called a host reset tool"
+ios_idle_status=$?
+set -e
+[ "$ios_idle_status" -eq 0 ] || fail "physical ios with nothing running: exit $ios_idle_status, want 0"
+if grep -q 'process terminate' "$FAKE_TOOLS_LOG"; then
+  fail "physical ios reset terminated a process when none was running"
+fi
+
+# A physical iOS tool failure is a reset failure.
+rm -f "$work/state.history"
+set +e
+FAKE_RESET_FAIL=1 FAKE_STATE="$work/state" FAKE_OUTCOMES="pass" ATOMYX_BIN="$fake" \
+  ATOMYX_SOAK_RESULTS_DIR="$work/results-ios-fail" \
+  "$soak" ios DEVICE-UDID 1 > /dev/null 2>&1
+ios_fail_status=$?
+set -e
+[ "$ios_fail_status" -eq 1 ] || fail "physical ios reset failure: exit $ios_fail_status, want 1"
+if ! grep -qx 'resetFailures: 1' "$work"/results-ios-fail/*/summary.txt; then
+  fail "physical ios reset failure was not counted"
 fi
 
 # Interruption: the fake sleeps so the signal lands during run 1, the

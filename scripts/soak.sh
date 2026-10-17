@@ -17,14 +17,14 @@
 #   2    misuse: bad arguments, or the atomyx binary is missing
 #   130  interrupted, after writing a partial summary
 #
-# Before every iteration the harness force-stops the demo app on the
-# device (android and iossim), so a failed iteration cannot leave the app
-# on a screen that breaks the next one. A stop that fails counts as an
-# infrastructure failure of that iteration, is recorded with exit code
-# 125, and no run is attempted. A failed run that left no run folder
-# counts as an infrastructure failure too, because the run statistics
-# never see it. The ios leg has no host tool that stops an
-# app by bundle id, so it relies on the flow's own precondition alone.
+# Before every iteration the harness stops the demo app on the device,
+# so a failed iteration cannot leave the app on a screen that breaks the
+# next one. A stop that fails counts as an infrastructure failure of that
+# iteration, is recorded with exit code 125, and no run is attempted. A
+# failed run that left no run folder counts as an infrastructure failure
+# too, because the run statistics never see it. The ios leg needs jq
+# and locates the app process through devicectl, since devicectl cannot
+# stop an app by bundle id.
 # A failed iteration never stops the loop. The report lands in
 # <results dir>/<UTC timestamp>-<platform>/ with one log per iteration,
 # iterations.txt (iteration number and exit code per line), and
@@ -105,6 +105,41 @@ reset_failures=0
 unrecorded_failures=0
 readonly RESET_FAILED_CODE=125
 
+# Stops the app under test on a physical iPhone. devicectl lists
+# processes by executable path, so the installed bundle path is looked up
+# first and every process running from it is terminated. An app with no
+# running process is not a failure.
+reset_ios_device() {
+  local log="$1" apps_json procs_json bundle_url pid pids status=0
+  apps_json="$(mktemp "${TMPDIR:-/tmp}/soak-apps.XXXXXX")"
+  procs_json="$(mktemp "${TMPDIR:-/tmp}/soak-procs.XXXXXX")"
+  : > "$log"
+  if xcrun devicectl device info apps --device "$device" --bundle-id "$app_id" \
+       --json-output "$apps_json" >> "$log" 2>&1 \
+     && xcrun devicectl device info processes --device "$device" \
+       --json-output "$procs_json" >> "$log" 2>&1; then
+    bundle_url="$(jq -r '.result.apps[0].url // empty | sub("/$"; "")' "$apps_json" 2>> "$log")" || status=1
+    if [ "$status" -eq 0 ] && [ -z "$bundle_url" ]; then
+      echo "${app_id} is not installed on ${device}" >> "$log"
+      status=1
+    fi
+    if [ "$status" -eq 0 ]; then
+      pids="$(jq -r --arg prefix "${bundle_url}/" \
+        '.result.runningProcesses[]? | select((.executable // "") | startswith($prefix)) | .processIdentifier' \
+        "$procs_json" 2>> "$log")" || status=1
+    fi
+    if [ "$status" -eq 0 ]; then
+      for pid in $pids; do
+        xcrun devicectl device process terminate --device "$device" --pid "$pid" >> "$log" 2>&1 || status=1
+      done
+    fi
+  else
+    status=1
+  fi
+  rm -f "$apps_json" "$procs_json"
+  return "$status"
+}
+
 # Stops the app under test so the next run starts from a cold launch.
 # Returns non-zero when the stop itself failed. An app that was not
 # running is not a failure.
@@ -124,8 +159,8 @@ reset_app() {
         return 1
       fi
       ;;
-    *)
-      : > "$1"
+    ios)
+      reset_ios_device "$1"
       ;;
   esac
 }
