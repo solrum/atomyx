@@ -69,13 +69,11 @@ final class KeyboardSpaceTests: XCTestCase {
             CGPoint(x: 956, y: 0))
     }
 
-    func testPortraitUpsideDownRotatesHalfATurn() {
+    func testPortraitUpsideDownLeavesPointsUnchanged() {
+        let p = CGPoint(x: 264, y: 766)
         XCTAssertEqual(
             InterfaceSpace.map(
-                CGPoint(x: 264, y: 766),
-                interfaceOrientationCode: InterfaceOrientationCode.portraitUpsideDown,
-                portraitSize: size),
-            CGPoint(x: 176, y: 190))
+                p, interfaceOrientationCode: InterfaceOrientationCode.portraitUpsideDown, portraitSize: size), p)
     }
 
     func testUnknownSizeLeavesPointsUnchanged() {
@@ -111,12 +109,12 @@ final class KeyboardSpaceTests: XCTestCase {
         XCTAssertEqual(bounds(children(children(wrapper)[0])[0]), rect(766, 140, 839, 176))
     }
 
-    func testPortraitUpsideDownRemapsTheKeyboardWindow() {
+    func testPortraitUpsideDownReturnsTheTreeUnchanged() {
         let out = KeyboardSpace.remap(
             keyboardTree(),
             interfaceOrientationCode: InterfaceOrientationCode.portraitUpsideDown,
             portraitSize: size)
-        XCTAssertEqual(bounds(children(out)[1]), rect(0, 0, 181, 956))
+        XCTAssertEqual(bounds(children(out)[1]), rect(259, 0, 440, 956))
     }
 
     func testPortraitReturnsTheTreeUnchanged() {

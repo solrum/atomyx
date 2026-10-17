@@ -10,9 +10,9 @@ import Foundation
 /// - Portrait: a point is unchanged.
 /// - Interface landscape-right (code 3): `(x, y)` becomes `(y, W - x)`.
 /// - Interface landscape-left (code 4): `(x, y)` becomes `(H - y, x)`.
-/// - Portrait upside-down (code 2): `(x, y)` becomes `(W - x, H - y)`.
 ///
-/// An unknown screen size and any other code leave points unchanged.
+/// Portrait, portrait upside-down, any other code, and an unknown screen
+/// size leave points unchanged, matching `PortraitSpace`.
 enum InterfaceSpace {
     static func map(
         _ point: CGPoint,
@@ -27,8 +27,6 @@ enum InterfaceSpace {
             return CGPoint(x: point.y, y: w - point.x)
         case InterfaceOrientationCode.landscapeLeft:
             return CGPoint(x: h - point.y, y: point.x)
-        case InterfaceOrientationCode.portraitUpsideDown:
-            return CGPoint(x: w - point.x, y: h - point.y)
         default:
             return point
         }
@@ -44,6 +42,9 @@ enum InterfaceSpace {
 /// it is the shallowest descendant of the root that contains a node of
 /// element type `keyboard`. Only that subtree is rewritten.
 ///
+/// Only the two landscape orientations are remapped. Portrait and portrait
+/// upside-down return the tree unchanged.
+///
 /// A candidate that already lies inside the interface screen is left
 /// alone, because a keyboard hosted inside an app window is then already
 /// in interface space.
@@ -51,22 +52,23 @@ enum KeyboardSpace {
     private static let keyboardType = "keyboard"
 
     /// Returns `tree` with its keyboard subtree remapped. The tree is
-    /// returned unchanged in portrait, for an unknown screen size, and
+    /// returned unchanged in portrait orientations, for an unknown screen size, and
     /// when it holds no keyboard.
     static func remap(
         _ tree: [String: Any],
         interfaceOrientationCode code: Int,
         portraitSize size: CGSize?
     ) -> [String: Any] {
-        guard let size = size, code != InterfaceOrientationCode.portrait else { return tree }
+        guard let size = size,
+              code == InterfaceOrientationCode.landscapeLeft
+                  || code == InterfaceOrientationCode.landscapeRight
+        else { return tree }
         guard let children = tree["children"] as? [[String: Any]] else { return tree }
 
         let w = min(size.width, size.height)
         let h = max(size.width, size.height)
-        let landscape = code == InterfaceOrientationCode.landscapeLeft
-            || code == InterfaceOrientationCode.landscapeRight
-        let interfaceWidth = landscape ? h : w
-        let interfaceHeight = landscape ? w : h
+        let interfaceWidth = h
+        let interfaceHeight = w
 
         var result = tree
         result["children"] = children.map { child in
