@@ -46,13 +46,13 @@ final class AtomyxDriverAgent: XCTestCase {
 
     func testServeCommands() throws {
         let environment = RunnerEnvironment()
-        let bridge = DefaultXCUIBridge()
+        let orientation = DeviceOrientationTracker()
+        let bridge = DefaultXCUIBridge(orientationSource: orientation)
         let state = DriverState()
 
         // The factory probes for the multi-pointer-capable backend
         // and falls back to the coordinate backend on probe failure.
         // Backend selection is internal. No user-facing knob.
-        let orientation = DeviceOrientationTracker()
         orientation.seed { bridge.deviceOrientationRaw() }
         orientation.seedPortraitSize { DriverState.springboard().frame.size }
         let synthesizer = EventSynthesizerFactory.make(orientationSource: orientation)

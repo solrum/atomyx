@@ -225,6 +225,15 @@ protocol XCUIBridge {
 /// Works on iOS 15+ / Xcode 14+. Bleeding-edge APIs belong in a
 /// separate bridge class when they appear. Do not leak them here.
 final class DefaultXCUIBridge: XCUIBridge {
+    private let orientationSource: InterfaceOrientationSource?
+
+    /// `orientationSource` lets the hierarchy dump place the software
+    /// keyboard in interface space. Without it the keyboard stays in the
+    /// space the system reports it in.
+    init(orientationSource: InterfaceOrientationSource? = nil) {
+        self.orientationSource = orientationSource
+    }
+
     func launchApp(
         bundleId: String,
         launchArguments: [String],
@@ -343,9 +352,15 @@ final class DefaultXCUIBridge: XCUIBridge {
 
     func dumpRawTree(app: XCUIApplication) throws -> [String: Any] {
         let root = try app.snapshot()
-        return Self.buildRawTree(root: root, screen: app.frame) {
+        let tree = Self.buildRawTree(root: root, screen: app.frame) {
             Self.keyboardFocusedFrame(in: app)
         }
+        guard let source = orientationSource else { return tree }
+        return KeyboardSpace.remap(
+            tree,
+            interfaceOrientationCode: source.interfaceOrientationCode,
+            portraitSize: source.portraitSize
+        )
     }
 
     /// Frame of the text input that currently owns keyboard focus, or
