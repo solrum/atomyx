@@ -90,8 +90,11 @@ preconditions:
     commands:
       - swipe: up
       - swipe: down
-- assertVisible:
+# Fling momentum can leave the list below the Tap section, so scroll
+# upward to bring the target back before the next steps use it.
+- scrollUntilVisible:
     id: "gesture-tap-target"
+    direction: up
 
 # A tap in landscape proves gestures and the hierarchy agree on the
 # rotated screen. The device is turned back before the flow goes on.
