@@ -51,8 +51,10 @@ func WithSyntheticFixtures(h Hooks) Hooks {
 	}
 	if h.Orientation == nil {
 		h.Orientation = &OrientationFixture{
-			Arguments:   map[string]string{"route": "/gestures"},
-			TapAndAwait: func(*testing.T, driver.Driver) {},
+			Arguments:       map[string]string{"route": "/gestures"},
+			TapAndAwait:     func(*testing.T, driver.Driver) {},
+			SignInArguments: map[string]string{"route": "/login"},
+			TypeAndAwait:    func(*testing.T, driver.Driver) {},
 		}
 	}
 	if h.Install == nil {

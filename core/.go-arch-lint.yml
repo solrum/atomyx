@@ -134,6 +134,7 @@ deps:
       - driver
       - drivermock
       - diag
+      - orchestra
   process:
     anyVendorDeps: true
     mayDependOn:

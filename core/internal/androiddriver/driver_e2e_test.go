@@ -63,6 +63,7 @@ const (
 	androidE2EFocusLink       = "atomyxdemo://open/focus"
 	androidE2EPermissionRoute = "/permission"
 	androidE2EGesturesRoute   = "/gestures"
+	androidE2ELoginRoute      = "/login"
 	androidE2EMainActivity    = "dev.atomyx.demo/.MainActivity"
 	androidE2EFocusInput      = "focus-input"
 	androidE2EAdbDeadline     = 30 * time.Second
@@ -149,9 +150,11 @@ func (f *androidE2EFixture) hooks(t *testing.T) drivertest.Hooks {
 			Await:      drivertest.AwaitPermissionStatus,
 		},
 		Orientation: &drivertest.OrientationFixture{
-			Arguments:   map[string]string{"route": androidE2EGesturesRoute},
-			SettlePause: drivertest.RotationAnimationPause,
-			TapAndAwait: drivertest.TapGestureTarget,
+			Arguments:       map[string]string{"route": androidE2EGesturesRoute},
+			SettlePause:     drivertest.RotationAnimationPause,
+			TapAndAwait:     drivertest.TapGestureTarget,
+			SignInArguments: map[string]string{"route": androidE2ELoginRoute},
+			TypeAndAwait:    drivertest.TypeIntoSignInFields,
 		},
 	}
 	appID := os.Getenv("ATOMYX_ANDROID_INSTALL_APP_ID")

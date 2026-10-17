@@ -56,6 +56,17 @@ type OrientationFixture struct {
 	// the tap landed, failing the test when it does not. It runs in
 	// every orientation the case visits, so it must not assume one.
 	TapAndAwait func(t *testing.T, d driver.Driver)
+
+	// SignInArguments is handed to Driver.LaunchApp on a fresh launch of
+	// Hooks.LaunchableAppID to open the demo Sign in screen. A nil value
+	// skips the typing check.
+	SignInArguments map[string]string
+
+	// TypeAndAwait must type into the Email field and then the Password
+	// field of the screen SignInArguments opens, addressing each by label,
+	// and fail the test unless both then show their values. It runs in
+	// landscape, where the on-screen keyboard covers the second field.
+	TypeAndAwait func(t *testing.T, d driver.Driver)
 }
 
 // TapGestureTarget taps the center of the demo app's tap button and
@@ -253,4 +264,45 @@ func testSetOrientationReachesTheApp(t *testing.T, newDriver Factory, hooks Hook
 		time.Sleep(fixture.SettlePause)
 		fixture.TapAndAwait(t, d)
 	}
+}
+
+// testTypeIntoFieldsInLandscape rotates the device to landscape on the
+// Sign in screen and runs the fixture's typing step, which fills two
+// fields in turn. In landscape the keyboard opened by the first field
+// covers the second, so the case fails when the type action taps the
+// keyboard instead of the field. The device is turned back to portrait
+// on exit even when the case fails. It skips when the driver cannot set
+// the orientation or is wired without a sign-in fixture.
+func testTypeIntoFieldsInLandscape(t *testing.T, newDriver Factory, hooks Hooks) {
+	d := newDriver()
+	ctx := context.Background()
+	if err := d.Connect(ctx); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	if !d.Capabilities().CanSetOrientation {
+		SkipBecause(t, SkipNoOrientationFixture, "the driver cannot set the orientation")
+	}
+	bundleID := requireLaunchable(t, hooks)
+	fixture := hooks.Orientation
+	if fixture == nil || fixture.SignInArguments == nil || fixture.TypeAndAwait == nil {
+		SkipBecause(t, SkipNoOrientationFixture, "no sign-in typing fixture wired for this driver")
+	}
+	t.Cleanup(func() {
+		restoreCtx, cancel := context.WithTimeout(context.Background(), orientationRestoreTimeout)
+		defer cancel()
+		if err := d.SetOrientation(restoreCtx, driver.OrientationPortrait); err != nil {
+			t.Errorf("turn the device back to portrait: %v", err)
+		}
+	})
+
+	fresh := false
+	if err := d.LaunchApp(ctx, bundleID, driver.LaunchArgs{NoReset: &fresh, Arguments: fixture.SignInArguments}); err != nil {
+		t.Fatalf("LaunchApp: %v", err)
+	}
+	if err := d.SetOrientation(ctx, driver.OrientationLandscapeLeft); err != nil {
+		t.Fatalf("SetOrientation %s: %v", driver.OrientationLandscapeLeft, err)
+	}
+	requireScreenLayout(t, d, driver.OrientationLandscapeLeft)
+	time.Sleep(fixture.SettlePause)
+	fixture.TypeAndAwait(t, d)
 }
