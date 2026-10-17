@@ -25,7 +25,7 @@ type Driver struct {
 	capabilities driver.Capabilities
 	connected    bool
 
-	hierarchyQueue []wire.TreeNodeWire
+	hierarchyQueue []stagedHierarchy
 	lastHierarchy  *wire.TreeNodeWire
 
 	// HangOnNextHierarchy, when true, makes the next Hierarchy call
@@ -151,13 +151,28 @@ func New() *Driver {
 	}
 }
 
+// stagedHierarchy is one queued Hierarchy outcome: a tree, or the
+// error to return instead when err is set.
+type stagedHierarchy struct {
+	tree wire.TreeNodeWire
+	err  error
+}
+
 var _ driver.Driver = (*Driver)(nil)
 
 // StageHierarchy queues tree to be returned from the next Hierarchy
 // call. Chain multiple calls to model a scripted sequence of
 // states.
 func (d *Driver) StageHierarchy(tree wire.TreeNodeWire) *Driver {
-	d.hierarchyQueue = append(d.hierarchyQueue, tree)
+	d.hierarchyQueue = append(d.hierarchyQueue, stagedHierarchy{tree: tree})
+	return d
+}
+
+// StageHierarchyError queues err to be returned from the next
+// Hierarchy call in place of a tree, so a test can script a read that
+// fails between reads that succeed.
+func (d *Driver) StageHierarchyError(err error) *Driver {
+	d.hierarchyQueue = append(d.hierarchyQueue, stagedHierarchy{err: err})
 	return d
 }
 
@@ -173,7 +188,7 @@ func (d *Driver) StageHierarchyForContract(tree wire.TreeNodeWire) {
 // calls.
 func (d *Driver) StageHierarchyRepeated(tree wire.TreeNodeWire, n int) *Driver {
 	for i := 0; i < n; i++ {
-		d.hierarchyQueue = append(d.hierarchyQueue, tree)
+		d.hierarchyQueue = append(d.hierarchyQueue, stagedHierarchy{tree: tree})
 	}
 	return d
 }
@@ -263,10 +278,13 @@ func (d *Driver) Hierarchy(ctx context.Context) (wire.TreeNodeWire, error) {
 		return wire.TreeNodeWire{}, ctx.Err()
 	}
 	if len(d.hierarchyQueue) > 0 {
-		tree := d.hierarchyQueue[0]
+		next := d.hierarchyQueue[0]
 		d.hierarchyQueue = d.hierarchyQueue[1:]
-		d.lastHierarchy = &tree
-		return tree, nil
+		if next.err != nil {
+			return wire.TreeNodeWire{}, next.err
+		}
+		d.lastHierarchy = &next.tree
+		return next.tree, nil
 	}
 	if d.lastHierarchy != nil {
 		return *d.lastHierarchy, nil

@@ -2,7 +2,6 @@ package driver
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -95,7 +94,7 @@ func AwaitOrientation(ctx context.Context, clk clock.Clock, o Orientation, readS
 	var lastErr error
 	for {
 		size, err := readSize(ctx)
-		if err != nil && !isTransientAgentError(err) {
+		if err != nil && !diag.IsTransient(err) {
 			return err
 		}
 		lastErr = err
@@ -113,25 +112,4 @@ func AwaitOrientation(ctx context.Context, clk clock.Clock, o Orientation, readS
 			return err
 		}
 	}
-}
-
-// isTransientAgentError reports whether err describes an agent that may
-// answer again shortly. While the foreground activity is recreated for
-// a rotation, the agent can drop a connection, answer malformed, or
-// report that it cannot read the screen yet, which surface as
-// diag.CodeAgentUnreachable, diag.CodeAgentCommunicationFailed, and
-// diag.CodeAgentNotReady. Every other error is permanent for this wait:
-// an invalid argument, a rejected request, a missing device, and an
-// uncoded error will not change by polling, and a context error means
-// the caller stopped waiting.
-func isTransientAgentError(err error) bool {
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		return false
-	}
-	code, _, _ := diag.Describe(err)
-	switch code {
-	case diag.CodeAgentUnreachable, diag.CodeAgentCommunicationFailed, diag.CodeAgentNotReady:
-		return true
-	}
-	return false
 }
