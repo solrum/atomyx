@@ -56,9 +56,14 @@ s="$work/pass.json"
   skip_stream p TestB/hier no-hierarchy-staging
   skip_stream p TestC/focus no-focus-input
 } > "$s"
-expect "allowlisted and not-selected skips pass" 0 ios "$s" "skip-gate: pass"
-expect "temporary entries are counted" 0 ios "$s" "skip-allowlisted-temporary: 1"
-expect "not-selected skips are counted" 0 ios "$s" "skip-not-selected: 1"
+temp_allowlist="$work/temporary-allowlist.txt"
+{
+  cat "$allowlist"
+  echo "ios no-focus-input a fixture that is not wired yet"
+} > "$temp_allowlist"
+ALLOWLIST="$temp_allowlist" expect "allowlisted and not-selected skips pass" 0 ios "$s" "skip-gate: pass"
+ALLOWLIST="$temp_allowlist" expect "temporary entries are counted" 0 ios "$s" "skip-allowlisted-temporary: 1"
+ALLOWLIST="$temp_allowlist" expect "not-selected skips are counted" 0 ios "$s" "skip-not-selected: 1"
 
 s="$work/unlisted.json"
 {
@@ -72,9 +77,9 @@ skip_stream p TestA/raw "" > "$s"
 expect "unkeyed skip fails" 1 android "$s" "unexpected-skip: p TestA/raw unkeyed"
 
 s="$work/otherleg.json"
-skip_stream p TestA/clear no-clearable-app > "$s"
-expect "key allowed only on another leg fails" 1 android "$s" "no-clearable-app"
-expect "the same key passes on the leg that lists it" 0 ios "$s"
+skip_stream p TestA/foreign no-foreign-automation > "$s"
+expect "key allowed only on another leg fails" 1 ios "$s" "no-foreign-automation"
+expect "the same key passes on the leg that lists it" 0 android "$s"
 
 s="$work/empty.json"
 : > "$s"

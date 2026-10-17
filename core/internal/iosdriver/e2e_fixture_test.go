@@ -124,13 +124,16 @@ func freeLocalPort() int {
 	return l.Addr().(*net.TCPAddr).Port
 }
 
-// simulatorDemoHooks wires the demo app fixtures for the simulator leg:
-// launchable, install from ATOMYX_IOS_INSTALL_APP and
-// ATOMYX_IOS_INSTALL_APP_ID, clearable (iOS clears by uninstalling and
-// reinstalling from the install source). FocusInput and the launch
-// arguments fixture start the demo app on its focus route through the
-// driver's own launch, so the runner keeps tracking the app it drives.
-func simulatorDemoHooks(t *testing.T, udid string) drivertest.Hooks {
+// demoHooks wires the demo app fixtures every iOS leg shares: launchable,
+// install from ATOMYX_IOS_INSTALL_APP and ATOMYX_IOS_INSTALL_APP_ID,
+// clearable (iOS clears by uninstalling and reinstalling from the
+// install source). FocusInput and the launch arguments fixture start
+// the demo app on its focus route through the driver's own launch, so
+// the runner keeps tracking the app it drives. settlePause is the
+// rotation settle time, zero on a simulator and
+// drivertest.RotationAnimationPause on a real device. The returned
+// string is the validated Runner.app path.
+func demoHooks(t *testing.T, settlePause time.Duration) (drivertest.Hooks, string) {
 	t.Helper()
 	appID := os.Getenv("ATOMYX_IOS_INSTALL_APP_ID")
 	if os.Getenv("ATOMYX_IOS_INSTALL_APP") == "" || appID == "" {
@@ -138,9 +141,6 @@ func simulatorDemoHooks(t *testing.T, udid string) drivertest.Hooks {
 			"set ATOMYX_IOS_INSTALL_APP (the built Runner.app path) and ATOMYX_IOS_INSTALL_APP_ID (its bundle id)")
 	}
 	app := drivertest.RequireInstallSource(t, "ATOMYX_IOS_INSTALL_APP", drivertest.InstallSourceAppBundle)
-	if _, err := runSimctl(t, "install", udid, app); err != nil {
-		t.Fatalf("install the demo app on the simulator: %v", err)
-	}
 	return drivertest.Hooks{
 		LaunchableAppID: appID,
 		ClearableAppID:  appID,
@@ -167,22 +167,45 @@ func simulatorDemoHooks(t *testing.T, udid string) drivertest.Hooks {
 				drivertest.AwaitFocusedInput(t, d, iosE2EFocusInput)
 			},
 		},
-		Permissions: &drivertest.PermissionsFixture{
-			Permission: driver.PermissionLocation,
-			Arguments:  map[string]string{"route": iosE2EPermissionRoute},
-			Await:      drivertest.AwaitPermissionStatus,
-		},
 		Orientation: &drivertest.OrientationFixture{
 			Arguments:   map[string]string{"route": iosE2EGesturesRoute},
-			SettlePause: drivertest.RotationAnimationPause,
+			SettlePause: settlePause,
 			TapAndAwait: drivertest.TapGestureTarget,
 		},
-	}
+	}, app
 }
 
-func runSimctl(t *testing.T, args ...string) (process.Result, error) {
+// simulatorDemoHooks installs the demo app on the simulator and adds
+// the location permission fixture to the shared demo fixtures.
+func simulatorDemoHooks(t *testing.T, udid string) drivertest.Hooks {
+	t.Helper()
+	hooks, app := demoHooks(t, 0)
+	if _, err := runXcrun(t, "simctl", "install", udid, app); err != nil {
+		t.Fatalf("install the demo app on the simulator: %v", err)
+	}
+	hooks.Permissions = &drivertest.PermissionsFixture{
+		Permission: driver.PermissionLocation,
+		Arguments:  map[string]string{"route": iosE2EPermissionRoute},
+		Await:      drivertest.AwaitPermissionStatus,
+	}
+	return hooks
+}
+
+// deviceDemoHooks installs the signed demo app on the physical device
+// and wires the shared demo fixtures with the real-device rotation
+// settle pause.
+func deviceDemoHooks(t *testing.T, udid string) drivertest.Hooks {
+	t.Helper()
+	hooks, app := demoHooks(t, drivertest.RotationAnimationPause)
+	if _, err := runXcrun(t, "devicectl", "device", "install", "app", "--device", udid, app); err != nil {
+		t.Fatalf("install the demo app on the device: %v", err)
+	}
+	return hooks
+}
+
+func runXcrun(t *testing.T, args ...string) (process.Result, error) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), iosE2ECommandLimit)
 	defer cancel()
-	return process.NewExec().Run(ctx, "xcrun", append([]string{"simctl"}, args...)...)
+	return process.NewExec().Run(ctx, "xcrun", args...)
 }

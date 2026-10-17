@@ -18,10 +18,11 @@ const iosE2EControlPort = 22087
 // real, physically connected iOS device. It only runs under the e2e
 // build tag with ATOMYX_DRIVER_E2E selecting "ios" and a connected
 // device present; see drivertest.RequireDevice. ATOMYX_IOS_DEVICE_UDID
-// selects which device to target. It wires Settings as the launchable
-// app, since every device ships it, plus the two fault hooks. The
-// install, clearable, and focus fixtures need the demo app on the
-// device, so those cases skip here until a signed demo build exists.
+// selects which device to target. The signed demo app is the
+// launchable, clearable, and install fixture, installed from
+// ATOMYX_IOS_INSTALL_APP, and FocusInput, the launch arguments
+// fixture, the link fixture, and the orientation fixture drive it on
+// its routes. The two fault hooks are wired as well.
 func TestIosDriver_E2E(t *testing.T) {
 	drivertest.RequireDevice(t, drivertest.E2EPlatformIOS)
 	udid := os.Getenv("ATOMYX_IOS_DEVICE_UDID")
@@ -30,7 +31,9 @@ func TestIosDriver_E2E(t *testing.T) {
 	}
 
 	fx := &iosE2EFixture{udid: udid, kind: iosdriver.KindDevice}
-	drivertest.Run(t, fx.newDriver, fx.faultHooks(drivertest.Hooks{LaunchableAppID: "com.apple.Preferences"}))
+	hooks := deviceDemoHooks(t, udid)
+	t.Cleanup(func() { fx.releaseTrackedApp(hooks.LaunchableAppID) })
+	drivertest.Run(t, fx.newDriver, fx.faultHooks(hooks))
 }
 
 // TestIosDriver_E2E_Simulator runs the same suite against a booted

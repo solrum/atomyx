@@ -63,6 +63,7 @@ readonly EMULATOR_FIRST_PORT=5554
 readonly EMULATOR_LAST_PORT=5584
 readonly DEMO_APP_ID="dev.atomyx.demo"
 readonly DEMO_REL_APK="examples/atomyx-demo/build/app/outputs/flutter-apk/app-debug.apk"
+readonly DEMO_REL_DEVICE_APP="examples/atomyx-demo/build/ios-device/Build/Products/Release-iphoneos/Runner.app"
 readonly DEMO_REL_SIM_APP="examples/atomyx-demo/build/ios-sim/Build/Products/Debug-iphonesimulator/Runner.app"
 
 usage() {
@@ -194,7 +195,7 @@ if [ "$dry_run" -eq 1 ]; then
       ios)
         echo "  guard: skip when ${RUNNER_HOST}:${RUNNER_PORT} already listens"
         echo "  setup: make -C platforms/ios-agent serve-device DEVICE_UDID=${id}, wait up to ${RUNNER_WAIT_S}s for '${RUNNER_READY_MARKER}' in the setup log"
-        echo "  e2e: ATOMYX_IOS_DEVICE_UDID=${id} make e2e PLATFORM=ios"
+        echo "  e2e: ATOMYX_IOS_DEVICE_UDID=${id} ATOMYX_IOS_INSTALL_APP=${DEMO_REL_DEVICE_APP} make e2e PLATFORM=ios"
         [ "$count" -gt 0 ] && echo "  soak: scripts/soak.sh ios ${id} ${count}"
         echo "  teardown: stop the serve process and the build processes it started"
         ;;
@@ -517,6 +518,8 @@ for i in "${!kinds[@]}"; do
         ;;
       ios)
         ATOMYX_IOS_DEVICE_UDID="$device_id" \
+          ATOMYX_IOS_INSTALL_APP="${repo_root}/${DEMO_REL_DEVICE_APP}" \
+          ATOMYX_IOS_INSTALL_APP_ID="$DEMO_APP_ID" \
           make -C "$repo_root" e2e PLATFORM=ios > "$e2e_log" 2>&1
         ;;
     esac

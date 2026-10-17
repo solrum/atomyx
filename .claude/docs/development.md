@@ -301,7 +301,9 @@ ATOMYX_IOS_SIM_UDID=<booted simulator UDID> \
   ATOMYX_IOS_INSTALL_APP=<path to the built demo Runner.app> \
   ATOMYX_IOS_INSTALL_APP_ID=dev.atomyx.demo make e2e PLATFORM=iossim
 ATOMYX_ANDROID_SERIAL=<adb serial> make e2e PLATFORM=android
-ATOMYX_IOS_DEVICE_UDID=<device UDID> make e2e PLATFORM=ios
+ATOMYX_IOS_DEVICE_UDID=<device UDID> \
+  ATOMYX_IOS_INSTALL_APP=<path to the signed Release-iphoneos Runner.app> \
+  ATOMYX_IOS_INSTALL_APP_ID=dev.atomyx.demo make e2e PLATFORM=ios
 ```
 
 `PLATFORM` selects the driver packages under test. The required
@@ -311,7 +313,7 @@ environment variable per platform:
 |---|---|---|
 | `iossim` | `ATOMYX_IOS_SIM_UDID`, `ATOMYX_IOS_INSTALL_APP`, `ATOMYX_IOS_INSTALL_APP_ID` | The demo app built with `make demo-ios-sim`, and a runner answering on `127.0.0.1:22087` (`make serve` in `platforms/ios-agent`) |
 | `android` | `ATOMYX_ANDROID_SERIAL` | The Android agent running on the device |
-| `ios` | `ATOMYX_IOS_DEVICE_UDID` | The runner served and tunneled to the device |
+| `ios` | `ATOMYX_IOS_DEVICE_UDID`, `ATOMYX_IOS_INSTALL_APP`, `ATOMYX_IOS_INSTALL_APP_ID` | The signed demo app built with `make demo-ios-device`, and the runner served and tunneled to the device |
 
 The `iossim` platform runs the `iossimdriver` package only when
 `ATOMYX_SIM_HID_BIN` is set to an executable `atomyx-sim-hid` helper
@@ -341,7 +343,9 @@ it with `make demo-android` from the repo root, set the APK to
 set the app id to `dev.atomyx.demo`. `make demo-ios-sim` and
 `make demo-ios-device` build the iOS counterparts, and each target prints
 its output path. `demo-ios-device` signs with `DEV_TEAM` from
-`platforms/ios-agent/device.env`. The demo app also serves deep link
+`platforms/ios-agent/device.env`, and signs with a locally installed
+provisioning profile when `DEMO_PROFILE=<profile name or UUID>` is passed
+(see `examples/atomyx-demo/README.md`). The demo app also serves deep link
 `atomyxdemo://open/<route>`, with the routes listed in
 `examples/atomyx-demo/README.md`. The erase text case and the exact no
 foreground assertions skip on real devices.
@@ -350,21 +354,22 @@ The fault and focus hooks are wired on the legs that can support them:
 
 - `FocusInput` restarts the demo app on the `/focus` route and waits until
   the `focus-input` field reports focus. `android` uses `adb shell am start`
-  with a `route` extra. `iossim` leaves it unwired, because the driver
-  passes no launch arguments to the runner and a launch outside the driver
-  leaves the runner tracking a stale app.
+  with a `route` extra. `iossim` and `ios` launch the app through the
+  driver with a `route` launch argument, so the runner keeps tracking the
+  app it drives.
 - `FailConnect` aims the next connect at a closed local port, on every
   leg.
 - `FailPing` removes the adb forward the test's own driver created on
   `android`, and closes the test's own client on `ios` and `iossim`. No
   leg touches a forward, tunnel, or runner it did not start.
 
-The `iossim` leg installs the app at `ATOMYX_IOS_INSTALL_APP` before the
-suite and uses `ATOMYX_IOS_INSTALL_APP_ID` for the launch, clear app
-data, and install cases. The erase text case skips on `iossim`. iOS clears app data by uninstalling and
-reinstalling from that app. The `ios` leg runs the launch cases against
-`com.apple.Preferences` and skips the clear app data, install, and focus
-cases until a signed demo build is installed on the device.
+The `iossim` and `ios` legs install the app at `ATOMYX_IOS_INSTALL_APP`
+before the suite and use `ATOMYX_IOS_INSTALL_APP_ID` for the launch, clear
+app data, install, focus, launch argument, link, and orientation cases.
+The erase text case skips on `iossim`. iOS clears app data by uninstalling
+and reinstalling from that app. On the `ios` leg the app must be the signed
+`Release-iphoneos` build from `make demo-ios-device`, and the rotation
+cases wait for the real-device rotation animation.
 
 The script exits 2 on an unknown platform or a missing variable, exits
 1 when the iossim runner does not answer or a test fails, and otherwise
@@ -428,7 +433,8 @@ Prerequisites per platform:
   reports healthy) and `dev.atomyx.demo` is installed (`make demo-android`
   builds the APK).
 - `ios`: the runner is served for the device and the signed demo build is
-  installed (`make demo-ios-device`).
+  built (`make demo-ios-device`). The leg installs it from
+  `ATOMYX_IOS_INSTALL_APP`.
 - `iossim`: the runner is served for the booted simulator and the demo is
   installed (`make demo-ios-sim`). The script passes the simulator UDID as the
   device id.

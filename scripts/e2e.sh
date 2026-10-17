@@ -37,7 +37,13 @@ usage() {
   echo "           the app may already be installed and is restored after the case" >&2
   echo "           example: examples/atomyx-demo/build/app/outputs/flutter-apk/app-debug.apk" >&2
   echo "           with app id dev.atomyx.demo (flutter build apk --debug in examples/atomyx-demo)" >&2
-  echo "  ios      requires ATOMYX_IOS_DEVICE_UDID, and uses Settings as the launchable app" >&2
+  echo "  ios      requires ATOMYX_IOS_DEVICE_UDID, a runner served for the device, and the signed demo app:" >&2
+  echo "           ATOMYX_IOS_INSTALL_APP (the signed Release-iphoneos Runner.app path) and" >&2
+  echo "           ATOMYX_IOS_INSTALL_APP_ID (its bundle id, dev.atomyx.demo), which the leg" >&2
+  echo "           installs and uses as the launchable, install, and clearable fixture" >&2
+  echo "           the path is absolute or relative to the repository root and must be a .app directory" >&2
+  echo "           example: examples/atomyx-demo/build/ios-device/Build/Products/Release-iphoneos/Runner.app" >&2
+  echo "           (make demo-ios-device)" >&2
 }
 
 platform="${1:-}"
@@ -68,14 +74,17 @@ if [ -z "${!required_var:-}" ]; then
   exit 2
 fi
 
-if [ "$platform" = "iossim" ]; then
+if [ "$platform" = "iossim" ] || [ "$platform" = "ios" ]; then
   for demo_var in ATOMYX_IOS_INSTALL_APP ATOMYX_IOS_INSTALL_APP_ID; do
     if [ -z "${!demo_var:-}" ]; then
-      echo "error: ${demo_var} is not set for platform iossim." >&2
+      echo "error: ${demo_var} is not set for platform ${platform}." >&2
       usage
       exit 2
     fi
   done
+fi
+
+if [ "$platform" = "iossim" ]; then
   if ! nc -z "$SIM_RUNNER_HOST" "$SIM_RUNNER_PORT" >/dev/null 2>&1; then
     echo "error: no iOS runner answers on ${SIM_RUNNER_HOST}:${SIM_RUNNER_PORT}." >&2
     echo "Start it with 'make serve' in platforms/ios-agent against the booted simulator, then run again." >&2
