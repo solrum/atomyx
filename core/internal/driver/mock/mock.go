@@ -168,6 +168,14 @@ func (d *Driver) StageHierarchy(tree wire.TreeNodeWire) *Driver {
 	return d
 }
 
+// SetHierarchy discards every queued hierarchy and makes tree the one
+// every following Hierarchy call returns, so a hook can model a screen
+// that changes in response to a gesture.
+func (d *Driver) SetHierarchy(tree wire.TreeNodeWire) {
+	d.hierarchyQueue = nil
+	d.lastHierarchy = &tree
+}
+
 // StageHierarchyError queues err to be returned from the next
 // Hierarchy call in place of a tree, so a test can script a read that
 // fails between reads that succeed.

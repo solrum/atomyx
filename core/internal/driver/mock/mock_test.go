@@ -702,3 +702,18 @@ func TestSetLocation_RejectsInvalidInputAndSurfacesTheInjectedError(t *testing.T
 		t.Fatalf("Locations = %v, want none", d.Locations)
 	}
 }
+
+func TestSetHierarchyReplacesQueue(t *testing.T) {
+	d := New()
+	d.StageHierarchy(wire.TreeNodeWire{Attributes: map[string]string{"id": "queued"}})
+	d.SetHierarchy(wire.TreeNodeWire{Attributes: map[string]string{"id": "current"}})
+	for i := 0; i < 2; i++ {
+		tree, err := d.Hierarchy(context.Background())
+		if err != nil {
+			t.Fatalf("Hierarchy returned error: %v", err)
+		}
+		if tree.Attributes["id"] != "current" {
+			t.Fatalf("got id %q, want current", tree.Attributes["id"])
+		}
+	}
+}

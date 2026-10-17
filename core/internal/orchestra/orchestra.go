@@ -103,13 +103,6 @@ type Orchestra struct {
 	scroll *ScrollController
 	logger logging.Logger
 
-	// maybeKeyboardOpen is a session-level hint: set true after
-	// InputText completes because typing opens the keyboard on both
-	// Android and iOS. Cleared on HideKeyboard, LaunchApp, and
-	// StopApp. Tap uses it to decide whether to pay the cost of a
-	// keyboard-state RPC before retrying past a keyboard obscurer.
-	maybeKeyboardOpen bool
-
 	// launchedAppsMu guards launchedApps. A sidecar host may dispatch
 	// tool calls against one shared Orchestra from concurrent
 	// goroutines, so the launched-app set needs its own lock rather
@@ -203,10 +196,9 @@ type TapOptions struct {
 // ActionResult; it returns a non-nil error only for infrastructure
 // failures, never for an action-level rejection.
 //
-// When the pipeline rejects a tap because the resolved element is
-// obscured by the on-screen keyboard, and InputText has run more
-// recently than the last HideKeyboard, LaunchApp, or StopApp call,
-// Tap dismisses the keyboard and retries once automatically.
+// When the on-screen keyboard covers the element and scrolling cannot
+// reveal it, the keyboard is dismissed and the element is resolved
+// again. See prepareSelectorForAction.
 func (o *Orchestra) Tap(ctx context.Context, selector Selector, opts TapOptions) (ActionResult, error) {
 	scrollToFind := opts.ScrollToFind == nil || *opts.ScrollToFind
 	prepared, err := o.prepareSelectorForAction(ctx, selector, scrollToFind)
@@ -214,20 +206,6 @@ func (o *Orchestra) Tap(ctx context.Context, selector Selector, opts TapOptions)
 		return ActionResult{}, err
 	}
 	if !prepared.ok {
-		if o.maybeKeyboardOpen && prepared.result.Obscurer != nil && prepared.result.Obscurer.Role == RoleKeyboard {
-			if _, err := o.driver.HideKeyboard(ctx); err != nil {
-				return ActionResult{}, err
-			}
-			_, waitErr := waitForKeyboard(ctx, o.driver, o.clock, false, keyboardDismissTimeoutMs, keyboardDismissPollMs)
-			if waitErr != nil {
-				var timeoutErr *WaitTimeoutError
-				if !errors.As(waitErr, &timeoutErr) {
-					return ActionResult{}, waitErr
-				}
-			}
-			o.maybeKeyboardOpen = false
-			return o.Tap(ctx, selector, opts)
-		}
 		return prepared.result, nil
 	}
 	if err := o.driver.Tap(ctx, prepared.point); err != nil {
@@ -310,7 +288,6 @@ func (o *Orchestra) InputText(ctx context.Context, selector Selector, text strin
 	if err != nil {
 		return ActionResult{}, err
 	}
-	o.maybeKeyboardOpen = true
 	return ActionOk(prepared.resolvedBy, fmt.Sprintf("typed %d char(s) into field at %s", utf16Len(text), pointStr(prepared.point))), nil
 }
 
@@ -670,7 +647,6 @@ func (o *Orchestra) launchApp(ctx context.Context, appID string, args driver.Lau
 		}
 		return err
 	}
-	o.maybeKeyboardOpen = false
 	if !dedup {
 		o.recordLaunch(appID)
 	}
@@ -747,7 +723,6 @@ func (o *Orchestra) StopApp(ctx context.Context, appID string) error {
 	if err := o.driver.StopApp(ctx, appID); err != nil {
 		return err
 	}
-	o.maybeKeyboardOpen = false
 	o.releaseLaunchClaim(appID)
 	return nil
 }
@@ -761,7 +736,6 @@ func (o *Orchestra) KillApp(ctx context.Context, appID string) error {
 	if err := o.driver.KillApp(ctx, appID); err != nil {
 		return err
 	}
-	o.maybeKeyboardOpen = false
 	o.releaseLaunchClaim(appID)
 	return nil
 }
@@ -878,10 +852,7 @@ func (o *Orchestra) waitForIdleHostSide(ctx context.Context, timeoutMs int) (boo
 	return false, nil
 }
 
-// HideKeyboard dismisses the on-screen keyboard, if any. Clears the
-// maybeKeyboardOpen hint regardless of whether the driver reported a
-// keyboard, matching the invariant that after HideKeyboard completes,
-// subsequent taps don't need to worry about keyboard obscurement.
+// HideKeyboard dismisses the on-screen keyboard, if any.
 func (o *Orchestra) HideKeyboard(ctx context.Context) (ActionResult, error) {
 	if !o.driver.Capabilities().CanHideKeyboard {
 		return ActionFail("driver does not support hideKeyboard", nil), nil
@@ -890,7 +861,6 @@ func (o *Orchestra) HideKeyboard(ctx context.Context) (ActionResult, error) {
 	if err != nil {
 		return ActionResult{}, err
 	}
-	o.maybeKeyboardOpen = false
 	reason := result.Reason
 	if reason == "" {
 		if result.Ok {
@@ -908,12 +878,13 @@ func (o *Orchestra) HideKeyboard(ctx context.Context) (ActionResult, error) {
 // either a resolved coordinate and metadata (ok true) or a ready-to-
 // return ActionResult (ok false).
 type preparedAction struct {
-	ok         bool
-	point      wire.Point
-	bounds     wire.Bounds
-	cursor     *TreeCursor
-	resolvedBy string
-	result     ActionResult
+	ok              bool
+	keyboardCovered bool
+	point           wire.Point
+	bounds          wire.Bounds
+	cursor          *TreeCursor
+	resolvedBy      string
+	result          ActionResult
 }
 
 // prepareSelectorForAction is the core pipeline every selector-based
@@ -921,7 +892,36 @@ type preparedAction struct {
 // view, check obscurement against the same tree the resolved cursor
 // points into, and compute the tap-center coordinate from its
 // bounds.
+//
+// The on-screen keyboard reduces the visible viewport. When the target
+// is covered by it and scrolling cannot reveal it, the keyboard is
+// dismissed, the dismissal is awaited, and the pipeline runs once more
+// so the target is resolved against the post-dismissal layout. A
+// target the keyboard does not cover never triggers a dismissal.
 func (o *Orchestra) prepareSelectorForAction(ctx context.Context, selector Selector, scrollToFind bool) (preparedAction, error) {
+	prepared, err := o.resolveForAction(ctx, selector, scrollToFind)
+	if err != nil || prepared.ok || !prepared.keyboardCovered {
+		return prepared, err
+	}
+	if !o.driver.Capabilities().CanHideKeyboard {
+		return prepared, nil
+	}
+	if _, err := o.driver.HideKeyboard(ctx); err != nil {
+		return preparedAction{}, err
+	}
+	if _, err := waitForKeyboard(ctx, o.driver, o.clock, false, keyboardDismissTimeoutMs, keyboardDismissPollMs); err != nil {
+		var timeoutErr *WaitTimeoutError
+		if !errors.As(err, &timeoutErr) {
+			return preparedAction{}, err
+		}
+	}
+	return o.resolveForAction(ctx, selector, scrollToFind)
+}
+
+// resolveForAction is one pass of the preparation pipeline. It flags
+// keyboardCovered on a failed result when the keyboard is what keeps
+// the target from being tapped.
+func (o *Orchestra) resolveForAction(ctx context.Context, selector Selector, scrollToFind bool) (preparedAction, error) {
 	if err := RequireNonEmpty(selector); err != nil {
 		return preparedAction{}, err
 	}
@@ -933,7 +933,7 @@ func (o *Orchestra) prepareSelectorForAction(ctx context.Context, selector Selec
 		if err != nil {
 			var unreachable *ScrollUnreachableError
 			if errors.As(err, &unreachable) {
-				return preparedAction{result: unreachableResult(unreachable)}, nil
+				return preparedAction{result: unreachableResult(unreachable), keyboardCovered: unreachable.KeyboardCovered}, nil
 			}
 			return preparedAction{}, err
 		}
@@ -949,6 +949,16 @@ func (o *Orchestra) prepareSelectorForAction(ctx context.Context, selector Selec
 			)}, nil
 		}
 		cursor = matches[0]
+		screen, err := o.driver.ScreenSize(ctx)
+		if err != nil {
+			return preparedAction{}, err
+		}
+		if b, ok := ParseBounds(cursor.Node.Attributes[AttrBounds]); ok && coveredByKeyboard(RootOf(cursor), b, screen) {
+			return preparedAction{
+				result:          ActionFail("element is covered by the on-screen keyboard", nil),
+				keyboardCovered: true,
+			}, nil
+		}
 	}
 
 	root := RootOf(cursor)

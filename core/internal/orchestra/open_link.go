@@ -34,7 +34,6 @@ func (o *Orchestra) OpenLink(ctx context.Context, link, appID string) error {
 	if err := o.driver.OpenLink(ctx, link, driver.OpenLinkOptions{AppID: appID}); err != nil {
 		return err
 	}
-	o.maybeKeyboardOpen = false
 	if appID != "" {
 		o.recordLaunch(appID)
 	}

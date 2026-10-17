@@ -84,10 +84,15 @@ func DefaultScrollControllerOptions() ScrollControllerOptions {
 // NotFound is true when the element never appeared in the tree during
 // the search, as opposed to appearing and then failing to reach the
 // viewport.
+//
+// KeyboardCovered is true when the element's midpoint still sat under
+// the on-screen keyboard at the last attempt, so dismissing the
+// keyboard can make it reachable.
 type ScrollUnreachableError struct {
-	Message     string
-	FinalBounds *wire.Bounds
-	NotFound    bool
+	Message         string
+	FinalBounds     *wire.Bounds
+	NotFound        bool
+	KeyboardCovered bool
 }
 
 func (e *ScrollUnreachableError) Error() string { return e.Message }
@@ -132,7 +137,8 @@ func NewScrollController(driverDep ScrollDriver, clock Clock, opts ScrollControl
 
 // EnsureVisible brings the element matching filter into the
 // interactive viewport, returning the cursor once the element's
-// midpoint sits inside the safe-area-inset rect.
+// midpoint sits inside the safe-area-inset rect and outside the
+// on-screen keyboard's region.
 func (s *ScrollController) EnsureVisible(ctx context.Context, filter ElementFilter) (*TreeCursor, error) {
 	return s.EnsureVisibleSearching(ctx, filter, "")
 }
@@ -177,7 +183,9 @@ func (s *ScrollController) EnsureVisibleSearching(ctx context.Context, filter El
 		if bounds == nil {
 			return match, nil
 		}
-		if s.isInsideInsetViewport(*bounds, screen) {
+		tree := RootOf(match)
+		keyboardCovered := coveredByKeyboard(tree, *bounds, screen)
+		if s.isInsideInsetViewport(*bounds, screen) && !keyboardCovered {
 			return match, nil
 		}
 		if previousBounds != nil && boundsEqual(*previousBounds, *bounds) {
@@ -186,12 +194,13 @@ func (s *ScrollController) EnsureVisibleSearching(ctx context.Context, filter El
 					"element at %s did not move after scroll iteration %d. Likely at scroll-region edge.",
 					formatBounds(*bounds), iteration,
 				),
-				FinalBounds: bounds,
+				FinalBounds:     bounds,
+				KeyboardCovered: keyboardCovered,
 			}
 		}
 		previousBounds = bounds
 
-		if err := s.scrollTowardElement(ctx, *bounds, screen); err != nil {
+		if err := s.scrollTowardElement(ctx, *bounds, visibleScreen(tree, screen)); err != nil {
 			return nil, err
 		}
 		if err := s.clock.Sleep(ctx, int64(s.opts.SettleWaitMs)); err != nil {
@@ -214,9 +223,11 @@ func (s *ScrollController) EnsureVisibleSearching(ctx context.Context, filter El
 		match = next[0]
 	}
 
+	finalBounds := s.boundsOf(match)
 	return nil, &ScrollUnreachableError{
-		Message:     fmt.Sprintf("element remained off-screen after %d iterations", s.opts.MaxIterations),
-		FinalBounds: s.boundsOf(match),
+		Message:         fmt.Sprintf("element remained off-screen after %d iterations", s.opts.MaxIterations),
+		FinalBounds:     finalBounds,
+		KeyboardCovered: finalBounds != nil && coveredByKeyboard(RootOf(match), *finalBounds, screen),
 	}
 }
 

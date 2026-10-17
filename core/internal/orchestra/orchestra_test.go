@@ -254,45 +254,6 @@ func TestOrchestra_Tap_GenericContainerDoesNotCountAsObscurer(t *testing.T) {
 	}
 }
 
-func TestOrchestra_Tap_RetriesAfterDismissingKeyboardObscurer(t *testing.T) {
-	d := mock.New()
-	obscuredByKeyboard := wire.TreeNodeWire{
-		Attributes: map[string]string{AttrID: "root"},
-		Children: []wire.TreeNodeWire{
-			node("target", "Submit", "100,700,200,750"),
-			{Attributes: map[string]string{AttrRole: RoleKeyboard, AttrBounds: "0,650,430,932"}},
-		},
-	}
-	clear := wire.TreeNodeWire{
-		Attributes: map[string]string{AttrID: "root"},
-		Children:   []wire.TreeNodeWire{node("target", "Submit", "100,700,200,750")},
-	}
-	d.StageHierarchy(obscuredByKeyboard).StageHierarchy(clear)
-	o, _ := newTestOrchestra(d)
-	o.maybeKeyboardOpen = true
-
-	result, err := o.Tap(context.Background(), Selector{ID: lit("target")}, TapOptions{})
-	if err != nil {
-		t.Fatalf("Tap returned error: %v", err)
-	}
-	if !result.Ok {
-		t.Fatalf("got Ok=false, reason %q, want the retry after HideKeyboard to succeed", result.Reason)
-	}
-	if o.maybeKeyboardOpen {
-		t.Fatal("maybeKeyboardOpen must be cleared once the keyboard is confirmed hidden")
-	}
-
-	sawHideKeyboard := false
-	for _, c := range d.Calls {
-		if c.Method == "HideKeyboard" {
-			sawHideKeyboard = true
-		}
-	}
-	if !sawHideKeyboard {
-		t.Fatalf("expected a HideKeyboard call in the retry path, got %+v", d.Calls)
-	}
-}
-
 func TestOrchestra_InputText_ClearsFocusesAndTypes(t *testing.T) {
 	d := mock.New()
 	// The field reports focus, so the focus gate resolves on its first
@@ -310,10 +271,6 @@ func TestOrchestra_InputText_ClearsFocusesAndTypes(t *testing.T) {
 	if !result.Ok {
 		t.Fatalf("got Ok=false, reason %q", result.Reason)
 	}
-	if !o.maybeKeyboardOpen {
-		t.Fatal("expected maybeKeyboardOpen to be set true after typing")
-	}
-
 	wantMethods := []string{"Hierarchy", "Tap", "Hierarchy", "EraseText", "InputText"}
 	if len(d.Calls) != len(wantMethods) {
 		t.Fatalf("got calls %+v, want methods %v", d.Calls, wantMethods)
@@ -459,10 +416,9 @@ func TestOrchestra_TypeText_RefusesWhenNothingIsReadyForInput(t *testing.T) {
 	}
 }
 
-func TestOrchestra_HideKeyboard_ClearsMaybeKeyboardOpenHint(t *testing.T) {
+func TestOrchestra_HideKeyboard_Succeeds(t *testing.T) {
 	d := mock.New()
 	o, _ := newTestOrchestra(d)
-	o.maybeKeyboardOpen = true
 
 	result, err := o.HideKeyboard(context.Background())
 	if err != nil {
@@ -471,22 +427,15 @@ func TestOrchestra_HideKeyboard_ClearsMaybeKeyboardOpenHint(t *testing.T) {
 	if !result.Ok {
 		t.Fatalf("got Ok=false, reason %q", result.Reason)
 	}
-	if o.maybeKeyboardOpen {
-		t.Fatal("expected maybeKeyboardOpen to be cleared")
-	}
 }
 
-func TestOrchestra_LaunchApp_ClearsMaybeKeyboardOpenHint(t *testing.T) {
+func TestOrchestra_LaunchApp_Succeeds(t *testing.T) {
 	d := mock.New()
 	d.Apps = []driver.InstalledApp{{BundleID: "com.example.app"}}
 	o, _ := newTestOrchestra(d)
-	o.maybeKeyboardOpen = true
 
 	if err := o.LaunchApp(context.Background(), "com.example.app", driver.LaunchArgs{}); err != nil {
 		t.Fatalf("LaunchApp returned error: %v", err)
-	}
-	if o.maybeKeyboardOpen {
-		t.Fatal("expected maybeKeyboardOpen to be cleared")
 	}
 }
 

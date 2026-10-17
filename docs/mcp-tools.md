@@ -534,10 +534,11 @@ result.
 - The selector path scrolls the matching element into view first,
   then checks it is not visually obscured by another element on
   screen before tapping its resolved center point.
-- If the resolved element is obscured specifically by the on-screen
-  keyboard, and a prior input_text call in this session opened the
-  keyboard, tap dismisses the keyboard and retries once
-  automatically before reporting a failure.
+- The on-screen keyboard counts as covered screen area. When it covers
+  the element, tap first scrolls the element above the keyboard. When
+  scrolling cannot reveal it, tap dismisses the keyboard, waits for it
+  to go away, and resolves the element again. A keyboard that does not
+  cover the element is left open.
 - The coordinate path dispatches the tap directly at the given point.
   It does not scroll and does not check obscurement.
 
@@ -596,7 +597,7 @@ instead when no screen transition is expected.
   tapping, so a timeout can be diagnosed against the pre-tap screen
   rather than a fresh, unrelated snapshot.
 - Taps selector through the same pipeline as tap (scroll-into-view,
-  obscurement check, keyboard-dismiss retry). If the tap itself is
+  obscurement check, keyboard handling). If the tap itself is
   rejected, the call returns immediately with `classification:
   "tap_failed"` and never starts waiting.
 - An appeared element that holds a secret reports `secure: true`, and its `selector` carries its id or label, never its text, so the selector still resolves the field. The mask `********` never appears in a selector.
@@ -670,6 +671,12 @@ field only needs to be focused, with nothing typed into it.
   report input focus before typing. This covers a soft-keyboard
   reflow or a field swap that can leave focus on a different field for
   a moment after the tap.
+- A field covered by the on-screen keyboard, for example the second
+  field in a landscape layout, is scrolled above the keyboard first.
+  When scrolling cannot reveal it, the keyboard is dismissed and the
+  field is resolved again. A field the keyboard does not cover keeps
+  the keyboard open, so consecutive visible fields type without it
+  closing.
 - If the target field never reports focus in time, the call fails
   with code `INPUT_NOT_FOCUSED` without typing anything, so text is
   never sent into the wrong field.
