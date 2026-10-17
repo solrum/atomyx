@@ -9,6 +9,8 @@ enum TrackedApp {
     /// external termination, or a stop from outside the driver).
     case notRunning
     /// The tracked app is alive, in the foreground or the background.
+    /// With `requireForeground`, a backgrounded app is reported as
+    /// `notRunning` instead.
     case running(XCUIApplication)
 }
 
@@ -23,10 +25,17 @@ extension DriverState {
     /// app proxy. The tracked reference is left untouched, so a later
     /// `launchApp` with `noReset` sees a dead app and launches fresh
     /// instead of attaching to it.
-    func resolveTrackedApp(bridge: XCUIBridge) -> TrackedApp {
+    ///
+    /// `requireForeground` is for reads that need the app on screen,
+    /// such as a hierarchy snapshot, which fails for a backgrounded
+    /// process. Actions keep the default so a backgrounded app still
+    /// counts as live.
+    func resolveTrackedApp(bridge: XCUIBridge, requireForeground: Bool = false) -> TrackedApp {
         guard let app = currentApp else { return .none }
         switch bridge.appState(app: app) {
-        case .runningForeground, .runningBackground:
+        case .runningForeground:
+            return .running(app)
+        case .runningBackground where !requireForeground:
             return .running(app)
         default:
             return .notRunning

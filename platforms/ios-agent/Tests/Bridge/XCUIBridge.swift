@@ -200,9 +200,11 @@ protocol XCUIBridge {
     /// the snapshot when any node reports focus, otherwise from a live
     /// keyboard-focus query that marks at most one node.
     ///
-    /// Returns `nil` when the snapshot RPC fails (simulator hung,
-    /// XCUITest daemon crashed). Caller treats nil as an error.
-    func dumpRawTree(app: XCUIApplication) -> [String: Any]?
+    /// Throws the underlying snapshot error when the RPC fails (the
+    /// target app is not in the foreground, the XCUITest daemon
+    /// crashed, the accessibility server is unreachable). The caller
+    /// reports the error text so the real cause stays visible.
+    func dumpRawTree(app: XCUIApplication) throws -> [String: Any]
 
     /// Return the tracked app's screen frame in points. Used by the
     /// host adapter to decide whether a resolved element is inside the
@@ -339,8 +341,8 @@ final class DefaultXCUIBridge: XCUIBridge {
         return app.frame.size
     }
 
-    func dumpRawTree(app: XCUIApplication) -> [String: Any]? {
-        guard let root = try? app.snapshot() else { return nil }
+    func dumpRawTree(app: XCUIApplication) throws -> [String: Any] {
+        let root = try app.snapshot()
         return Self.buildRawTree(root: root, screen: app.frame) {
             Self.keyboardFocusedFrame(in: app)
         }

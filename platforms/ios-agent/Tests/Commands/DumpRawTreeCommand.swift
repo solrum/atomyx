@@ -8,8 +8,8 @@ import XCTest
 ///
 /// Request args:
 ///   - none: dump the tracked `currentApp` (set by `launchApp`) while
-///     it is running. When the tracked app has exited, the dump falls
-///     back to the Springboard proxy.
+///     it is in the foreground. When the tracked app has exited or is
+///     in the background, the dump falls back to the Springboard proxy.
 ///   - `bundleIdCandidates: [String]`: when no live app is
 ///     tracked, the host can hand the runner a shortlist of bundle
 ///     ids that are currently running on the simulator. The
@@ -41,7 +41,10 @@ final class DumpRawTreeCommand: CommandHandler {
         var attachedBundleId: String? = nil
         let app: XCUIApplication
 
-        let tracked = state.resolveTrackedApp(bridge: bridge)
+        // A backgrounded tracked app cannot be snapshotted, so only a
+        // foreground one is bound. Anything else goes through the
+        // candidate probe and the Springboard fallback.
+        let tracked = state.resolveTrackedApp(bridge: bridge, requireForeground: true)
         if case .running(let bound) = tracked {
             app = bound
         } else if let candidates = request.args["bundleIdCandidates"] as? [String], !candidates.isEmpty {
@@ -66,8 +69,14 @@ final class DumpRawTreeCommand: CommandHandler {
             )
         }
 
-        guard let root = bridge.dumpRawTree(app: app) else {
-            return .error(id: request.id, message: "snapshot failed, driver or simulator may be unresponsive")
+        let root: [String: Any]
+        do {
+            root = try bridge.dumpRawTree(app: app)
+        } catch {
+            return .error(
+                id: request.id,
+                message: "snapshot failed: \(error.localizedDescription)"
+            )
         }
 
         var data: [String: Any] = ["root": root]

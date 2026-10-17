@@ -717,6 +717,17 @@ final class CommandHandlerUnitTests: XCTestCase {
         XCTAssertNotNil(state.currentApp)
     }
 
+    func testResolveTrackedAppRequireForegroundTreatsBackgroundAsNotRunning() {
+        let bridge = MockXCUIBridge()
+        let state = mockState()
+
+        bridge.appStateBehavior = { .runningForeground }
+        if case .running = state.resolveTrackedApp(bridge: bridge, requireForeground: true) {} else { XCTFail("foreground") }
+        bridge.appStateBehavior = { .runningBackground }
+        if case .notRunning = state.resolveTrackedApp(bridge: bridge, requireForeground: true) {} else { XCTFail("background") }
+        XCTAssertNotNil(state.currentApp)
+    }
+
     func testActingCommandsReportExitedApp() {
         let bridge = MockXCUIBridge()
         bridge.appStateBehavior = { .notRunning }
@@ -898,6 +909,21 @@ final class CommandHandlerUnitTests: XCTestCase {
 
         XCTAssertFalse(resp.ok)
         XCTAssertTrue(resp.error?.contains("snapshot failed") == true)
+        XCTAssertTrue(resp.error?.contains("mock snapshot unavailable") == true)
+        XCTAssertFalse(resp.error?.lowercased().contains("simulator") == true)
+    }
+
+    func testDumpRawTreeSkipsBackgroundedTrackedApp() {
+        let bridge = MockXCUIBridge()
+        bridge.appStateBehavior = { .runningBackground }
+        bridge.rawTreeBehavior = { ["elementType": "application", "label": "SpringBoard"] }
+        let state = mockState()
+        let req = Request(id: 1, type: "dumpRawTree", args: [:])
+        let resp = DumpRawTreeCommand().handle(req, bridge: bridge, state: state)
+
+        XCTAssertTrue(resp.ok)
+        XCTAssertNil(resp.data["bundleId"])
+        XCTAssertNotNil(state.currentApp)
     }
 
     func testDumpRawTreeReturnsHierarchicalRoot() {
@@ -1504,7 +1530,7 @@ final class MockXCUIBridge: XCUIBridge {
     var hideKeyboardCallCount = 0
 
     /// Override to simulate raw tree dump outcome. Default returns
-    /// nil (snapshot failure). Tests set this to a preset nested
+    /// nil (the mock throws a snapshot error). Tests set this to a preset nested
     /// dict when they want a happy path.
     var rawTreeBehavior: () -> [String: Any]? = { nil }
 
@@ -1629,8 +1655,15 @@ final class MockXCUIBridge: XCUIBridge {
         return hideKeyboardBehavior()
     }
 
-    func dumpRawTree(app _: XCUIApplication) -> [String: Any]? {
-        return rawTreeBehavior()
+    func dumpRawTree(app _: XCUIApplication) throws -> [String: Any] {
+        guard let tree = rawTreeBehavior() else {
+            throw NSError(
+                domain: "MockSnapshot",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "mock snapshot unavailable"]
+            )
+        }
+        return tree
     }
 
     func getScreenSize(app _: XCUIApplication) -> CGSize {
