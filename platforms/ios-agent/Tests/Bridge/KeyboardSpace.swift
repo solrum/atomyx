@@ -36,18 +36,18 @@ enum InterfaceSpace {
 /// Rewrites the software keyboard subtree of a raw hierarchy dump from
 /// portrait device space into interface space.
 ///
-/// The keyboard is hosted in its own window, which the system reports in
-/// portrait device space in every orientation, while every other window
-/// is reported in interface space. A subtree is a keyboard subtree when
-/// it is the shallowest descendant of the root that contains a node of
-/// element type `keyboard`. Only that subtree is rewritten.
+/// The keyboard is reported in portrait device space in every orientation
+/// while the rest of the app is reported in interface space. The keyboard
+/// sits under a full-screen window that is itself in interface space, so
+/// the rewritten subtree starts at the shallowest node on the path to a
+/// node of element type `keyboard` whose frame does not fit inside the
+/// interface screen, which is the node with a portrait-shaped frame. That
+/// node and every descendant are rewritten, and nothing else.
 ///
 /// Only the two landscape orientations are remapped. Portrait and portrait
-/// upside-down return the tree unchanged.
-///
-/// A candidate that already lies inside the interface screen is left
-/// alone, because a keyboard hosted inside an app window is then already
-/// in interface space.
+/// upside-down return the tree unchanged. A path whose nodes all fit inside
+/// the interface screen is left alone, because it is already in interface
+/// space.
 enum KeyboardSpace {
     private static let keyboardType = "keyboard"
 
@@ -63,21 +63,28 @@ enum KeyboardSpace {
               code == InterfaceOrientationCode.landscapeLeft
                   || code == InterfaceOrientationCode.landscapeRight
         else { return tree }
-        guard let children = tree["children"] as? [[String: Any]] else { return tree }
+        let screen = CGSize(
+            width: max(size.width, size.height),
+            height: min(size.width, size.height))
+        return descend(tree, code: code, size: size, screen: screen)
+    }
 
-        let w = min(size.width, size.height)
-        let h = max(size.width, size.height)
-        let interfaceWidth = h
-        let interfaceHeight = w
-
-        var result = tree
-        result["children"] = children.map { child in
-            guard containsKeyboard(child),
-                  !fitsInside(child, width: interfaceWidth, height: interfaceHeight)
-            else { return child }
-            return remapSubtree(child, code: code, size: size)
+    private static func descend(
+        _ node: [String: Any],
+        code: Int,
+        size: CGSize,
+        screen: CGSize
+    ) -> [String: Any] {
+        guard let kids = node["children"] as? [[String: Any]] else { return node }
+        var out = node
+        out["children"] = kids.map { child -> [String: Any] in
+            guard containsKeyboard(child) else { return child }
+            if fitsInside(child, width: screen.width, height: screen.height) {
+                return descend(child, code: code, size: size, screen: screen)
+            }
+            return remapSubtree(child, code: code, size: size, screen: screen)
         }
-        return result
+        return out
     }
 
     private static func containsKeyboard(_ node: [String: Any]) -> Bool {
@@ -99,16 +106,24 @@ enum KeyboardSpace {
     private static func remapSubtree(
         _ node: [String: Any],
         code: Int,
-        size: CGSize
+        size: CGSize,
+        screen: CGSize
     ) -> [String: Any] {
         var out = node
         for key in ["bounds", "accessibilityFrame"] {
             if let rect = bounds(node[key]) {
-                out[key] = encode(mapRect(rect, code: code, size: size))
+                let mapped = mapRect(rect, code: code, size: size)
+                out[key] = encode(mapped)
+                if key == "bounds", node["visible"] is Bool {
+                    out["visible"] = !mapped.isEmpty
+                        && mapped.intersects(CGRect(origin: .zero, size: screen))
+                }
             }
         }
         if let kids = node["children"] as? [[String: Any]] {
-            out["children"] = kids.map { remapSubtree($0, code: code, size: size) }
+            out["children"] = kids.map {
+                remapSubtree($0, code: code, size: size, screen: screen)
+            }
         }
         return out
     }
