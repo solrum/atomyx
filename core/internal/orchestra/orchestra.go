@@ -40,6 +40,10 @@ const (
 	// between focus polls.
 	inputFocusSettleTimeoutMs = 1500
 	inputFocusSettlePollMs    = 50
+
+	// inputEraseCount is the delete budget for clearing a field before
+	// typing, large enough to empty any realistic value.
+	inputEraseCount = 999
 )
 
 // OrchestraDeps constructs an Orchestra. Driver and Clock are
@@ -269,6 +273,12 @@ type InputTextOptions struct {
 // and typing, and returns an *InputFocusError without dispatching any
 // text when focus never reaches the target, so a missed focus surfaces
 // as a clear failure instead of text landing in the wrong field.
+//
+// Focus can still be lost between that check and the moment the driver
+// dispatches the keys. When the erase or type call reports that no field
+// held focus, InputText taps the target again, waits for focus once more,
+// and replays the input a single time. A second loss returns the first
+// error.
 func (o *Orchestra) InputText(ctx context.Context, selector Selector, text string, opts InputTextOptions) (ActionResult, error) {
 	prepared, err := o.prepareSelectorForAction(ctx, selector, true)
 	if err != nil {
@@ -284,16 +294,46 @@ func (o *Orchestra) InputText(ctx context.Context, selector Selector, text strin
 		return ActionResult{}, err
 	}
 	clearFirst := opts.ClearFirst == nil || *opts.ClearFirst
-	if clearFirst && o.driver.Capabilities().CanEraseText {
-		if err := o.driver.EraseText(ctx, 999); err != nil {
+	err = o.eraseAndType(ctx, text, clearFirst)
+	if isInputNotFocused(err) {
+		// Focus can drop between the readiness check and the dispatch,
+		// for example when a late relayout resigns the field. Re-focus
+		// the target once and replay the input.
+		if tapErr := o.driver.Tap(ctx, prepared.point); tapErr != nil {
 			return ActionResult{}, err
 		}
+		if waitErr := o.awaitTargetFocus(ctx, NewFocusTarget(prepared.cursor, prepared.bounds), prepared.resolvedBy); waitErr != nil {
+			return ActionResult{}, err
+		}
+		err = o.eraseAndType(ctx, text, clearFirst)
 	}
-	if err := o.driver.InputText(ctx, text); err != nil {
+	if err != nil {
 		return ActionResult{}, err
 	}
 	o.maybeKeyboardOpen = true
 	return ActionOk(prepared.resolvedBy, fmt.Sprintf("typed %d char(s) into field at %s", utf16Len(text), pointStr(prepared.point))), nil
+}
+
+// eraseAndType clears the focused field when clearFirst is set and the
+// driver can erase, then types text. Both calls target whichever field
+// holds focus at dispatch time.
+func (o *Orchestra) eraseAndType(ctx context.Context, text string, clearFirst bool) error {
+	if clearFirst && o.driver.Capabilities().CanEraseText {
+		if err := o.driver.EraseText(ctx, inputEraseCount); err != nil {
+			return err
+		}
+	}
+	return o.driver.InputText(ctx, text)
+}
+
+// isInputNotFocused reports whether err carries the driver-level code
+// for an input call that found no field holding focus.
+func isInputNotFocused(err error) bool {
+	if err == nil {
+		return false
+	}
+	code, _, _ := diag.Describe(err)
+	return code == diag.CodeInputNotFocused
 }
 
 // InputFocusError reports that a type action gave up because the field

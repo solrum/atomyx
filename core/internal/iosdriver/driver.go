@@ -582,8 +582,8 @@ type typeTextResponse struct {
 }
 
 // InputText types into the focused field. A runner reply with success
-// false means nothing was typed, which surfaces as an agent-rejected
-// error carrying the runner's reason. A reply without the field counts
+// false means nothing was typed, which surfaces as an
+// INPUT_NOT_FOCUSED error. A reply without the field counts
 // as success.
 func (d *IosDriver) InputText(ctx context.Context, text string) error {
 	if err := ctx.Err(); err != nil {
@@ -591,13 +591,10 @@ func (d *IosDriver) InputText(ctx context.Context, text string) error {
 	}
 	var resp typeTextResponse
 	if err := d.conn.CallInto(ctx, "typeText", map[string]any{"text": text}, &resp); err != nil {
-		return d.fail(err)
+		return d.failInput(err)
 	}
 	if resp.Success != nil && !*resp.Success {
-		return diag.New(diag.CodeAgentRejected,
-			"nothing was typed because no input field has keyboard focus",
-			"Tap the input field so it has focus, then type again.",
-			nil)
+		return newInputNotFocused(nil)
 	}
 	return nil
 }
@@ -606,7 +603,7 @@ func (d *IosDriver) EraseText(ctx context.Context, count int) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return d.fail(d.conn.CallInto(ctx, "clearFocusedInput", map[string]any{"maxDeletes": count}, nil))
+	return d.failInput(d.conn.CallInto(ctx, "clearFocusedInput", map[string]any{"maxDeletes": count}, nil))
 }
 
 type pressKeyResponse struct {

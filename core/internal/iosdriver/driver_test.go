@@ -24,6 +24,7 @@ import (
 	"dev.atomyx/internal/driver/drivertest"
 	"dev.atomyx/internal/iosdriver"
 	"dev.atomyx/internal/process"
+	"dev.atomyx/internal/transport"
 	"dev.atomyx/internal/version"
 	"dev.atomyx/internal/wire"
 )
@@ -1602,14 +1603,45 @@ func TestIosDriver_InputText_UnfocusedFieldIsRejectedWithReason(t *testing.T) {
 		t.Fatal("InputText() error = nil, want a rejection")
 	}
 	code, message, remedy := diag.Describe(err)
-	if code != diag.CodeAgentRejected {
-		t.Fatalf("code = %q, want %q", code, diag.CodeAgentRejected)
+	if code != diag.CodeInputNotFocused {
+		t.Fatalf("code = %q, want %q", code, diag.CodeInputNotFocused)
 	}
 	if message != "nothing was typed because no input field has keyboard focus" {
 		t.Fatalf("message = %q, want the focus message without the wire token", message)
 	}
 	if remedy != "Tap the input field so it has focus, then type again." {
 		t.Fatalf("remedy = %q, want the tool-neutral remedy", remedy)
+	}
+}
+
+func TestIosDriver_KeyboardFocusLostRunnerErrorIsClassifiedAsInputNotFocused(t *testing.T) {
+	focusLost := &transport.AgentError{Message: "Failed to synthesize event: Neither element nor any descendant has keyboard focus"}
+	for _, command := range []string{"typeText", "clearFocusedInput"} {
+		conn := newFakeConn()
+		conn.Respond(command, func(map[string]any) (map[string]any, error) { return nil, focusLost })
+		d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+
+		var err error
+		if command == "typeText" {
+			err = d.InputText(context.Background(), "hello")
+		} else {
+			err = d.EraseText(context.Background(), 5)
+		}
+		if code, _, _ := diag.Describe(err); code != diag.CodeInputNotFocused {
+			t.Errorf("%s: code = %q, want %q", command, code, diag.CodeInputNotFocused)
+		}
+	}
+}
+
+func TestIosDriver_UnrelatedRunnerErrorStaysAgentRejected(t *testing.T) {
+	conn := newFakeConn()
+	conn.Respond("typeText", func(map[string]any) (map[string]any, error) {
+		return nil, &transport.AgentError{Message: "element is not hittable"}
+	})
+	d := iosdriver.New(conn, process.NewFake(), iosdriver.Options{Background: process.NewFakeBackground(), UDID: "SIM-1", Kind: iosdriver.KindSimulator})
+
+	if code, _, _ := diag.Describe(d.InputText(context.Background(), "hello")); code != diag.CodeAgentRejected {
+		t.Fatalf("code = %q, want %q", code, diag.CodeAgentRejected)
 	}
 }
 

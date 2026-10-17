@@ -816,6 +816,21 @@ func TestAndroidDriver_EraseText_FailureReturnsErrorWithReason(t *testing.T) {
 	}
 }
 
+func TestAndroidDriver_EraseText_NoFocusedNodeIsClassifiedAsInputNotFocused(t *testing.T) {
+	tr := newFakeTransport()
+	tr.clearFocusedResp = transport.ClearFocusedInputResult{Ok: false, Reason: "no input-focused node, so tap the target field first"}
+	d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{Serial: "S1"})
+
+	err := d.EraseText(context.Background(), 3)
+	if code, _, _ := diag.Describe(err); code != diag.CodeInputNotFocused {
+		t.Fatalf("code = %q, want %q", code, diag.CodeInputNotFocused)
+	}
+	var clearErr *androiddriver.ClearTextError
+	if !errors.As(err, &clearErr) {
+		t.Fatalf("error = %v, want the ClearTextError preserved in the chain", err)
+	}
+}
+
 func TestAndroidDriver_EraseText_FailurePopulatesStructuredDiagnostic(t *testing.T) {
 	tr := newFakeTransport()
 	tr.clearFocusedResp = transport.ClearFocusedInputResult{
@@ -1434,8 +1449,8 @@ func TestAndroidDriver_EraseText_FailureSurfacesAgentReason(t *testing.T) {
 
 	err := d.EraseText(context.Background(), 3)
 	code, message, remedy := diag.Describe(err)
-	if code != diag.CodeAgentRejected {
-		t.Fatalf("code = %q, want %q", code, diag.CodeAgentRejected)
+	if code != diag.CodeInputNotFocused {
+		t.Fatalf("code = %q, want %q", code, diag.CodeInputNotFocused)
 	}
 	if message != "no input-focused node found" {
 		t.Fatalf("message = %q, want the agent's reason", message)

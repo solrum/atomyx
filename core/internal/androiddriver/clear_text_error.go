@@ -33,6 +33,14 @@ const (
 	clearTextFailedRemedy = "Focus an input field that holds text, then call again."
 )
 
+// focusLost reports whether the agent failed because no input node held
+// focus when it tried to clear, as opposed to a field that held focus
+// but resisted every strategy. Every focus-related agent reason names
+// the focus.
+func (e *ClearTextError) focusLost() bool {
+	return strings.Contains(strings.ToLower(e.Reason), "focus")
+}
+
 // AgentRejection reports the agent's own reason, or a fixed
 // description when the agent gave none. When the agent tried clear
 // strategies, their names are appended so the caller sees what was

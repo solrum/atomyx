@@ -642,6 +642,15 @@ corresponding area. For the high-level map see
   before the tap. A focus that never reaches the target returns an
   `*InputFocusError` instead of typing into the wrong field. A new
   input-shaped action should follow the same tap-then-wait sequence.
+- **Focus can vanish between the focus check and the key dispatch.**
+  When the driver's erase or type call fails with `INPUT_NOT_FOCUSED`,
+  `InputText` taps the target again, waits for focus once, and replays
+  the input once. A second loss returns the first error. The iOS
+  adapter maps the runner's missing-keyboard-focus rejection to that
+  code (`core/internal/iosdriver/input_focus.go`), and the Android
+  adapter maps a focus-related clear failure to it
+  (`core/internal/androiddriver/clear_text_error.go`). Orchestra never
+  matches platform text itself.
 - **The `maybeKeyboardOpen` session flag controls the tap
   keyboard-dismiss gate.** It is set after every `InputText`
   (`core/internal/orchestra/orchestra.go`). A new Orchestra action that
