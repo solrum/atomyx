@@ -1,6 +1,10 @@
 package script
 
-import "regexp"
+import (
+	"net/url"
+	"regexp"
+	"strings"
+)
 
 // variablePlaceholder matches a `${varName}` interpolation site.
 var variablePlaceholder = regexp.MustCompile(`\$\{(\w+)\}`)
@@ -42,6 +46,10 @@ func expandPlaceholders(value any, lookup func(name string) (string, bool)) any 
 		var out OrderedMap
 		for _, k := range v.Keys() {
 			val, _ := v.Get(k)
+			if k == CommandHTTPRequest {
+				out.Set(k, expandHTTPRequest(val, lookup))
+				continue
+			}
 			out.Set(k, expandPlaceholders(val, lookup))
 		}
 		return out
@@ -63,4 +71,40 @@ func coerceStringRecord(raw any) map[string]string {
 		out[k] = jsString(v)
 	}
 	return out
+}
+
+// expandHTTPRequest expands the placeholders of an httpRequest step's
+// fields. A value substituted into the query part of `url` is
+// query-escaped, so a variable holding `a&b=c` stays one parameter
+// value. Every other field takes the value as written.
+func expandHTTPRequest(value any, lookup func(name string) (string, bool)) any {
+	fields, ok := value.(OrderedMap)
+	if !ok {
+		return expandPlaceholders(value, lookup)
+	}
+	var out OrderedMap
+	for _, k := range fields.Keys() {
+		val, _ := fields.Get(k)
+		if raw, isString := val.(string); isString && k == "url" {
+			out.Set(k, expandURLPlaceholders(raw, lookup))
+			continue
+		}
+		out.Set(k, expandPlaceholders(val, lookup))
+	}
+	return out
+}
+
+// expandURLPlaceholders expands the placeholders of a URL, escaping the
+// substituted values that land after the first `?`.
+func expandURLPlaceholders(raw string, lookup func(name string) (string, bool)) string {
+	head, query, hasQuery := strings.Cut(raw, "?")
+	expandedHead, _ := expandPlaceholders(head, lookup).(string)
+	if !hasQuery {
+		return expandedHead
+	}
+	expandedQuery, _ := expandPlaceholders(query, func(name string) (string, bool) {
+		val, ok := lookup(name)
+		return url.QueryEscape(val), ok
+	}).(string)
+	return expandedHead + "?" + expandedQuery
 }

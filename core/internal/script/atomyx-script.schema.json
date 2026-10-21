@@ -309,9 +309,32 @@
         },
         "values": {
           "additionalProperties": {
-            "type": "string"
+            "anyOf": [
+              {
+                "description": "Dot-path extracted from the captured response.",
+                "type": "string"
+              },
+              {
+                "additionalProperties": false,
+                "description": "A dot-path and a regular expression narrowing the resolved value.",
+                "properties": {
+                  "path": {
+                    "description": "Dot-path resolved in the captured response.",
+                    "type": "string"
+                  },
+                  "regex": {
+                    "description": "Regular expression applied to the resolved value as text. The first capture group is stored, or the whole match when the pattern has no group.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "type": "object"
+              }
+            ]
           },
-          "description": "Map of target variable name to dot-path extracted from the captured response.",
+          "description": "Map of target variable name to what is extracted from the captured response.",
           "type": "object"
         }
       },
@@ -319,6 +342,94 @@
         "command",
         "from",
         "values"
+      ],
+      "type": "object"
+    },
+    "HTTPRequestStep": {
+      "additionalProperties": false,
+      "description": "Send an HTTP request from the host running the script, for example to fetch a one-time code from a test mailbox.",
+      "properties": {
+        "as": {
+          "description": "Variable name to bind the response to, readable by extract and assertApi.",
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "body": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "additionalProperties": {},
+              "type": "object"
+            }
+          ],
+          "description": "Request body: a string sent as is, or an object sent as JSON."
+        },
+        "command": {
+          "const": "httpRequest",
+          "type": "string"
+        },
+        "expectStatus": {
+          "description": "Status the response must have. Any 2xx passes when omitted.",
+          "maximum": 599,
+          "minimum": 100,
+          "type": "integer"
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Request headers.",
+          "type": "object"
+        },
+        "method": {
+          "description": "HTTP method.",
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ],
+          "type": "string"
+        },
+        "poll": {
+          "additionalProperties": false,
+          "description": "Repeat the request until the status passes and the path resolves to a non-empty value. Requires `as`.",
+          "properties": {
+            "intervalMs": {
+              "description": "Pause between attempts in milliseconds. Defaults to 1000.",
+              "minimum": 200,
+              "type": "integer"
+            },
+            "until": {
+              "description": "JSON path into the response that must resolve to a non-empty value.",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "until"
+          ],
+          "type": "object"
+        },
+        "timeoutMs": {
+          "description": "Longest time the whole step may take in milliseconds. Defaults to 10000.",
+          "maximum": 120000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "url": {
+          "description": "Absolute http or https URL. The host must be listed in the project's http.allowHosts.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "command",
+        "url"
       ],
       "type": "object"
     },
@@ -1456,6 +1567,9 @@
         },
         {
           "$ref": "#/definitions/InputRandomStep"
+        },
+        {
+          "$ref": "#/definitions/HTTPRequestStep"
         }
       ]
     },

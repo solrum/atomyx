@@ -50,6 +50,7 @@ var stepCommandOrder = []string{
 	"ScrollUntilVisibleStep",
 	"WaitForAnimationToEndStep",
 	"InputRandomStep",
+	"HTTPRequestStep",
 }
 
 // captureVarPattern is the shape a capture-bound variable name must
@@ -242,7 +243,7 @@ func stepJSONSchemaDefinitions() map[string]any {
 			map[string]any{
 				"command": constString(CommandExtract),
 				"from":    stringMinLenPattern(1, captureVarPattern, "Variable name of a previously captured request."),
-				"values":  stringMapSchema("Map of target variable name to dot-path extracted from the captured response."),
+				"values":  extractValuesSchema(),
 			},
 			[]string{"command", "from", "values"},
 			"Extract fields from a captured API response into runtime variables.",
@@ -391,6 +392,29 @@ func inputStepSchemaDefinitions() map[string]any {
 			[]string{"command"},
 			"Wait until the screen stops changing. The step passes when the timeout elapses first.",
 		),
+		"HTTPRequestStep": objectSchema(
+			map[string]any{
+				"command": constString(CommandHTTPRequest),
+				"method":  stringEnum(HTTPMethods, "HTTP method."),
+				"url":     stringMinLen(1, "Absolute http or https URL. The host must be listed in the project's http.allowHosts."),
+				"headers": stringMapSchema("Request headers."),
+				"body": anyOfSchema("Request body: a string sent as is, or an object sent as JSON.",
+					stringSchema(""), anyMapSchema("")),
+				"as":           stringMinLenPattern(1, captureVarPattern, "Variable name to bind the response to, readable by extract and assertApi."),
+				"expectStatus": integerMinMax(100, 599, "Status the response must have. Any 2xx passes when omitted."),
+				"poll": objectSchema(
+					map[string]any{
+						"until":      stringMinLen(1, "JSON path into the response that must resolve to a non-empty value."),
+						"intervalMs": integerMin(HTTPRequestMinPollIntervalMs, fmt.Sprintf("Pause between attempts in milliseconds. Defaults to %d.", HTTPRequestDefaultPollIntervalMs)),
+					},
+					[]string{"until"},
+					"Repeat the request until the status passes and the path resolves to a non-empty value. Requires `as`.",
+				),
+				"timeoutMs": integerMinMax(1, HTTPRequestMaxTimeoutMs, fmt.Sprintf("Longest time the whole step may take in milliseconds. Defaults to %d.", HTTPRequestDefaultTimeoutMs)),
+			},
+			[]string{"command", "url"},
+			"Send an HTTP request from the host running the script, for example to fetch a one-time code from a test mailbox.",
+		),
 		"InputRandomStep": objectSchema(
 			map[string]any{
 				"command": constString(CommandInputRandom),
@@ -402,6 +426,26 @@ func inputStepSchemaDefinitions() map[string]any {
 			"Type a generated value into the focused field.",
 		),
 	}
+}
+
+// extractValuesSchema is the `values` map of an extract step: each target
+// variable maps to a dot-path, or to an object with a dot-path and a
+// regular expression applied to the resolved value.
+func extractValuesSchema() map[string]any {
+	return withDescription(map[string]any{
+		"type": "object",
+		"additionalProperties": anyOfSchema("",
+			stringSchema("Dot-path extracted from the captured response."),
+			objectSchema(
+				map[string]any{
+					"path":  stringSchema("Dot-path resolved in the captured response."),
+					"regex": stringSchema("Regular expression applied to the resolved value as text. The first capture group is stored, or the whole match when the pattern has no group."),
+				},
+				[]string{"path"},
+				"A dot-path and a regular expression narrowing the resolved value.",
+			),
+		),
+	}, "Map of target variable name to what is extracted from the captured response.")
 }
 
 // appLifecycleStepSchema is the schema of a step that acts on one app,

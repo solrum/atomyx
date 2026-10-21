@@ -149,23 +149,42 @@ func (m OrderedMap) MarshalJSON() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// OrderedStringMap is OrderedMap's string-valued counterpart: a
-// dot-path-keyed map whose values are themselves dot-paths rather
-// than arbitrary JSON, used for ExtractStep.Values. Unlike OrderedMap
-// it is never a YAML decode target, since extract's normalizer builds one
-// field by field from an already-decoded OrderedMap, validating that
-// each value is a string as it goes.
-type OrderedStringMap struct {
+// ExtractValue is one target of an extract step: the JSON path to
+// resolve in the captured response and, optionally, a regular
+// expression applied to the resolved value as text.
+type ExtractValue struct {
+	Path  string
+	Regex *string
+}
+
+// MarshalJSON renders a value with no regex as its bare path string,
+// the original wire shape, and a value with a regex as an object with
+// `path` and `regex`.
+func (v ExtractValue) MarshalJSON() ([]byte, error) {
+	if v.Regex == nil {
+		return json.Marshal(v.Path)
+	}
+	return json.Marshal(struct {
+		Path  string `json:"path"`
+		Regex string `json:"regex"`
+	}{v.Path, *v.Regex})
+}
+
+// OrderedExtractMap maps an extract step's target variable names to
+// their ExtractValue, preserving declaration order. Unlike OrderedMap
+// it is never a YAML decode target, since extract's normalizer builds
+// one field by field from an already-decoded OrderedMap.
+type OrderedExtractMap struct {
 	keys   []string
-	values map[string]string
+	values map[string]ExtractValue
 }
 
 // Set appends key to the declaration order the first time it is seen
 // and overwrites its value in place on a repeated key, matching
 // OrderedMap.Set.
-func (m *OrderedStringMap) Set(key, value string) {
+func (m *OrderedExtractMap) Set(key string, value ExtractValue) {
 	if m.values == nil {
-		m.values = map[string]string{}
+		m.values = map[string]ExtractValue{}
 	}
 	if _, exists := m.values[key]; !exists {
 		m.keys = append(m.keys, key)
@@ -175,9 +194,9 @@ func (m *OrderedStringMap) Set(key, value string) {
 
 // Get reports value and presence for key. A nil receiver reports
 // absence.
-func (m *OrderedStringMap) Get(key string) (string, bool) {
+func (m *OrderedExtractMap) Get(key string) (ExtractValue, bool) {
 	if m == nil {
-		return "", false
+		return ExtractValue{}, false
 	}
 	v, ok := m.values[key]
 	return v, ok
@@ -185,7 +204,7 @@ func (m *OrderedStringMap) Get(key string) (string, bool) {
 
 // Keys returns the map's keys in declaration order. A nil receiver
 // returns no keys.
-func (m *OrderedStringMap) Keys() []string {
+func (m *OrderedExtractMap) Keys() []string {
 	if m == nil {
 		return nil
 	}
@@ -193,7 +212,7 @@ func (m *OrderedStringMap) Keys() []string {
 }
 
 // Len reports the number of entries. A nil receiver reports zero.
-func (m *OrderedStringMap) Len() int {
+func (m *OrderedExtractMap) Len() int {
 	if m == nil {
 		return 0
 	}
@@ -203,7 +222,7 @@ func (m *OrderedStringMap) Len() int {
 // MarshalJSON renders m as a JSON object with its keys in declaration
 // order, matching OrderedMap.MarshalJSON. The receiver is a value for
 // the same reason: see OrderedMap.MarshalJSON.
-func (m OrderedStringMap) MarshalJSON() ([]byte, error) {
+func (m OrderedExtractMap) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	buf.WriteByte('{')
 	for i, k := range m.keys {

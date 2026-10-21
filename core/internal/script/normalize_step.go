@@ -147,7 +147,7 @@ func normalizeAssertApi(value any) (ScriptStep, error) {
 
 func normalizeExtract(value any) (ScriptStep, error) {
 	m, _ := asMap(value)
-	step := &ExtractStep{Command: CommandExtract, From: stringOrDefault(m["from"], ""), Values: &OrderedStringMap{}}
+	step := &ExtractStep{Command: CommandExtract, From: stringOrDefault(m["from"], ""), Values: &OrderedExtractMap{}}
 	if v, ok := m["values"]; ok && v != nil {
 		om, ok := asOrderedMap(v)
 		if !ok {
@@ -156,18 +156,48 @@ func normalizeExtract(value any) (ScriptStep, error) {
 		var issues []extractValueTypeIssue
 		for _, k := range om.Keys() {
 			vv, _ := om.Get(k)
-			s, ok := asString(vv)
-			if !ok {
-				issues = append(issues, extractValueTypeIssue{key: k, received: zodReceivedType(vv)})
+			if s, ok := asString(vv); ok {
+				step.Values.Set(k, ExtractValue{Path: s})
 				continue
 			}
-			step.Values.Set(k, s)
+			if obj, ok := asMap(vv); ok {
+				extracted, err := normalizeExtractObject(k, obj)
+				if err != nil {
+					return nil, err
+				}
+				step.Values.Set(k, extracted)
+				continue
+			}
+			issues = append(issues, extractValueTypeIssue{key: k, received: zodReceivedType(vv)})
 		}
 		if len(issues) > 0 {
 			return nil, &extractValuesError{issues: issues}
 		}
 	}
 	return step, nil
+}
+
+// normalizeExtractObject reads the object form of an extract value: a
+// `path` and an optional `regex`.
+func normalizeExtractObject(name string, obj map[string]any) (ExtractValue, error) {
+	for key := range obj {
+		if key != "path" && key != "regex" {
+			return ExtractValue{}, newParseError("extract.values.%s: unknown field %q, expected path and regex", name, key)
+		}
+	}
+	path, ok := asString(obj["path"])
+	if !ok {
+		return ExtractValue{}, newParseError("extract.values.%s.path: expected a JSON path string", name)
+	}
+	extracted := ExtractValue{Path: path}
+	if raw, present := obj["regex"]; present && raw != nil {
+		pattern, ok := asString(raw)
+		if !ok {
+			return ExtractValue{}, newParseError("extract.values.%s.regex: expected a string", name)
+		}
+		extracted.Regex = &pattern
+	}
+	return extracted, nil
 }
 
 // extractValueTypeIssue is one non-string entry found in an extract

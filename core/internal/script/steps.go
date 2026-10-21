@@ -239,13 +239,14 @@ func (s *AssertApiStep) isScriptStep()       {}
 
 // ExtractStep extracts fields from the request captured as From into
 // runtime variables: Values maps a target variable name to a dot-path
-// into the captured response, preserving the declaration order of
+// into the captured response, and optionally a regular expression
+// applied to the resolved value, preserving the declaration order of
 // its keys.
 type ExtractStep struct {
 	stepSource
-	Command string            `json:"command"`
-	From    string            `json:"from"`
-	Values  *OrderedStringMap `json:"values"`
+	Command string             `json:"command"`
+	From    string             `json:"from"`
+	Values  *OrderedExtractMap `json:"values"`
 }
 
 func (s *ExtractStep) StepCommand() string { return s.Command }

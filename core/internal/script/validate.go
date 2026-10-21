@@ -181,6 +181,10 @@ func validateStep(step ScriptStep, path string, report reportFunc) {
 
 	case *ExtractStep:
 		validateCaptureVar(s.From, path+".from", report)
+		validateExtractRegexes(s, path, report)
+
+	case *HTTPRequestStep:
+		validateHTTPRequestStep(s, path, report)
 
 	case *ReadStep:
 		validateSelector(&s.Selector, path+".selector", report)

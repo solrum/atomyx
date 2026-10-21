@@ -54,6 +54,7 @@ func init() {
 		CommandSetOrientation:   normalizeSetOrientation,
 		CommandSetLocation:      normalizeSetLocation,
 		CommandTravel:           normalizeTravel,
+		CommandHTTPRequest:      normalizeHTTPRequest,
 
 		CommandHideKeyboard:          normalizeHideKeyboard,
 		CommandEraseText:             normalizeEraseText,

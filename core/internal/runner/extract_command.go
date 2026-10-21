@@ -34,8 +34,9 @@ func (ExtractCommand) Execute(step script.ScriptStep, ctx *CommandContext) Comma
 	extracted := make([]string, 0, len(names))
 	for _, name := range names {
 		path, _ := s.Values.Get(name)
-		writtenPath, _ := written.Values.Get(name)
-		value := resolveDotPath(capturedObj, path)
+		writtenValue, _ := written.Values.Get(name)
+		writtenPath := writtenValue.Path
+		value := resolveDotPath(capturedObj, path.Path)
 		if isJSUndefined(value) {
 			return CommandResult{Ok: false, Detail: strPtr(fmt.Sprintf(
 				"Path \"%s\" resolved to undefined in captured \"%s\"", writtenPath, writtenKey))}
