@@ -145,12 +145,57 @@ env:
 Variables can also come from:
 - CLI: `--env email=other@test.com` (overrides script env)
 - `extract` command (runtime, from API responses and `httpRequest` responses)
+- `read` command (runtime, from an element on screen)
 - Parent script (when used as sub-flow)
 
 The `read` command binds typed variables (string or boolean) into this
-same set, and `assertExpr` reads them by bare name in expressions. The
-`${name}` form above stays textual interpolation, applied once when
-the script is parsed.
+same set, and `assertExpr` reads them by bare name in expressions.
+
+### When a placeholder is replaced
+
+A `${name}` placeholder is replaced in two stages.
+
+1. When the script is parsed, a name found in the script `env`, the env
+   file or the CLI env is replaced everywhere in the script.
+2. Just before a step runs, a placeholder that is still there is replaced
+   with the run variable of the same name, if one exists. A run variable is
+   one set by `read` or `extract` earlier in the run. Its
+   value is inserted as text: a string as is, a number the way JavaScript
+   prints it, and a boolean as `true` or `false`.
+
+```yaml
+- read:
+    selector: { id: balance }
+    as: balance
+- type: "${balance}"
+```
+
+Fields that take a run variable:
+
+| Step | Fields |
+|---|---|
+| `tap`, `waitFor`, `assertVisible`, `assertNotVisible`, `assertExists`, `scrollUntilVisible` | The selector as a plain string, and `id`, `text`, `label` and `hint` when written as plain strings |
+| `read` | The same selector fields under `selector` |
+| `type` | `text`, and the selector fields under `into` |
+| `openLink` | The link |
+| `httpRequest` | `url`, the values under `headers`, and every string inside `body` |
+
+Everything else is replaced at parse time only:
+
+- Typed fields, such as numbers, durations and enumerations like `direction`, `method` and `kind`. A placeholder in one that no env supplies fails parsing.
+- Expression source, in `assertExpr` and in `repeat` `while.expr`. An expression reads variables by bare name instead.
+- Pattern source, in a selector `regex` and an `extract` `regex`, and JSON paths. Putting text from a screen or a response into a pattern would change what the pattern means.
+- Inline `setup` steps of a `preconditions` entry.
+- Steps loaded from a file by `runFlow`, `handle`, `branch` or a precondition `setup` file. A file is parsed with the variables the run holds at that moment, and a name unknown then stays literal text.
+
+Rules that follow from this:
+
+- Each placeholder is replaced once. A value that itself contains `${other}` is inserted as that literal text and is not replaced again.
+- A script env value wins over a run variable of the same name.
+- A name with no value in either stage stays literal text.
+- A block step (`repeat`, `retry`, `branch`, `handle`) is not rebuilt. Each step inside it is resolved when it runs, so it sees what an earlier step wrote, and `retry` resolves again on every attempt.
+- If a step is no longer valid once the values are in, for example a link that cannot be opened, it fails. The message names the step, the field and the placeholder, and never the value.
+- Step details, run records and debug output show the placeholder as written, never the substituted value.
 
 ---
 
@@ -166,7 +211,8 @@ fields are booleans.
 
 Variables are referenced by bare name and resolved when the step
 runs. This differs from `${name}`, which is textual interpolation
-applied once when the script is parsed.
+limited to the fields listed under
+[When a placeholder is replaced](#when-a-placeholder-is-replaced).
 
 Operators:
 - Arithmetic: `+`, `-`, `*`, `/`, `%` on numbers
@@ -1117,6 +1163,9 @@ the same `as` name.
 - assertVisible: "${userId}"
 ```
 
+An extracted value reaches the fields listed under
+[When a placeholder is replaced](#when-a-placeholder-is-replaced).
+
 A value is either a JSON path, or an object with a `path` and a `regex`.
 The `regex` applies to the resolved value as text, and the variable
 receives the first capture group, or the whole match when the pattern has
@@ -1182,10 +1231,8 @@ What a run records:
 - The response body is not written to the run folder by this step. A failed `assertApi` on a stored response echoes the asserted field values, as it does for `capture`, and a mailbox message can hold personal data.
 - A value from outside the committed files, such as `--env` or `${ENV:NAME}`, is secret and masked in everything the run writes.
 
-Recipe, typing a one-time code from a test mailbox. A `${name}` placeholder
-is replaced when a script is parsed, so a value extracted at run time
-reaches a step through a sub-flow, which `runFlow` parses with the run's
-variables.
+Recipe, typing a one-time code from a test mailbox. The extracted `otp`
+reaches the next step through its placeholder.
 
 ```yaml
 # login.yml
@@ -1208,11 +1255,6 @@ env:
       otp:
         path: $.body.messages[0].Snippet
         regex: "\\b(\\d{6})\\b"
-- runFlow: flows/enter-otp.yml
-```
-
-```yaml
-# flows/enter-otp.yml
 - type: "${otp}"
 ```
 
