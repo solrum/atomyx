@@ -385,3 +385,49 @@ func TestParseAndValidate_RejectsInvalidRetention(t *testing.T) {
 		})
 	}
 }
+
+func TestParseAndValidate_HTTPPolicy(t *testing.T) {
+	cfg := mustValidate(t, baseConfig+`
+http:
+  allowHosts:
+    - localhost:8025
+    - "*.example.test"
+    - mail.example.test
+  caFile: certs/ca.pem
+`)
+	hosts := cfg.HTTPAllowHosts()
+	if len(hosts) != 3 || hosts[0] != "localhost:8025" || hosts[1] != "*.example.test" {
+		t.Fatalf("HTTPAllowHosts = %v", hosts)
+	}
+	loaded := &LoadedConfig{Path: "/proj/atomyx.yml", Config: *cfg}
+	if got := loaded.HTTPCAFile(); got != "/proj/certs/ca.pem" {
+		t.Errorf("HTTPCAFile = %q", got)
+	}
+}
+
+func TestParseAndValidate_HTTPPolicyDefaultsEmpty(t *testing.T) {
+	cfg := mustValidate(t, baseConfig)
+	if len(cfg.HTTPAllowHosts()) != 0 {
+		t.Errorf("HTTPAllowHosts = %v, want none", cfg.HTTPAllowHosts())
+	}
+	if (&LoadedConfig{Config: *cfg}).HTTPCAFile() != "" {
+		t.Error("HTTPCAFile should be empty")
+	}
+}
+
+func TestParseAndValidate_AbsoluteHTTPCAFileKept(t *testing.T) {
+	cfg := mustValidate(t, baseConfig+"http:\n  caFile: /etc/ca.pem\n")
+	if got := (&LoadedConfig{Path: "/p/atomyx.yml", Config: *cfg}).HTTPCAFile(); got != "/etc/ca.pem" {
+		t.Errorf("HTTPCAFile = %q", got)
+	}
+}
+
+func TestParseAndValidate_RejectsBadHTTPHostPatterns(t *testing.T) {
+	for _, bad := range []string{`"http://localhost"`, `"host/path"`, `"a.*.b"`, `"*"`, `"host:port"`, `"*."`, `"host name"`} {
+		mustReject(t, baseConfig+"http:\n  allowHosts:\n    - "+bad+"\n")
+	}
+}
+
+func TestParseAndValidate_RejectsUnknownHTTPKey(t *testing.T) {
+	mustReject(t, baseConfig+"http:\n  insecure: true\n")
+}

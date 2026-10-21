@@ -55,6 +55,7 @@ var topLevelKeys = map[string]bool{
 	"project": true, "apps": true, "environments": true, "launch": true,
 	"preconditions": true, "report": true, "video": true, "suites": true,
 	"testRoots": true, "dataRoots": true, "session": true, "retention": true,
+	"http": true,
 }
 
 // ValidateDocument checks a generically decoded YAML document against
@@ -78,6 +79,7 @@ func ValidateDocument(root map[string]any, environmentOrder []string) (*AtomyxCo
 	video := validateEnum(root, "video", []string{VideoOff, VideoOnFailure}, path, c)
 	retention := validateRetention(root, path, c)
 	sessionTimeouts := validateSession(root, path, c)
+	httpPolicy := validateHTTP(root, path, c)
 	suites := validateSuites(root, path, c)
 	testRoots := optionalStringArray(root, "testRoots", 1, path, c)
 	dataRoots := optionalStringArray(root, "dataRoots", 1, path, c)
@@ -105,6 +107,7 @@ func ValidateDocument(root map[string]any, environmentOrder []string) (*AtomyxCo
 		Video:            video,
 		Retention:        retention,
 		Session:          sessionTimeouts,
+		HTTP:             httpPolicy,
 		Suites:           suites,
 		TestRoots:        testRoots,
 		DataRoots:        dataRoots,

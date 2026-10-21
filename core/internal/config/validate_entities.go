@@ -2,6 +2,7 @@ package config
 
 import (
 	"sort"
+	"strings"
 )
 
 // Field-level validators for the top-level entities in an Atomyx
@@ -260,6 +261,55 @@ func validateSession(root map[string]any, path []any, c *issueCollector) *Sessio
 	acquire, _ := optionalPositiveInt(obj, "deviceAcquireTimeoutMs", fieldPath, c)
 	debugPause, _ := optionalPositiveInt(obj, "debugPauseTimeoutMs", fieldPath, c)
 	return &Session{McpIdleTimeoutMs: mcpIdle, OpenRunIdleTimeoutMs: openRun, DeviceAcquireTimeoutMs: acquire, DebugPauseTimeoutMs: debugPause}
+}
+
+var httpKeys = map[string]bool{"allowHosts": true, "caFile": true}
+
+func validateHTTP(root map[string]any, path []any, c *issueCollector) *HTTP {
+	raw, present := root["http"]
+	if !present || raw == nil {
+		return nil
+	}
+	fieldPath := withSegment(path, "http")
+	obj, ok := asObject(raw, fieldPath, c)
+	if !ok {
+		return nil
+	}
+	checkUnknownKeys(obj, httpKeys, fieldPath, c)
+	hosts := optionalStringArray(obj, "allowHosts", 1, fieldPath, c)
+	if hosts != nil {
+		for i, pattern := range *hosts {
+			if reason := hostPatternProblem(pattern); reason != "" {
+				c.add(withSegment(withSegment(fieldPath, "allowHosts"), i), "%s", reason)
+			}
+		}
+	}
+	caFile, _ := optionalString(obj, "caFile", 1, fieldPath, c)
+	return &HTTP{AllowHosts: hosts, CAFile: caFile}
+}
+
+// hostPatternProblem explains why an allowHosts entry is not a host,
+// host:port, or "*." wildcard host, or returns an empty string for a
+// well-formed entry.
+func hostPatternProblem(pattern string) string {
+	if strings.TrimSpace(pattern) != pattern || strings.ContainsAny(pattern, " \t/\\@?#") || strings.Contains(pattern, "://") {
+		return "expected a host or host:port without a scheme, path, or spaces"
+	}
+	host := pattern
+	if i := strings.LastIndex(pattern, ":"); i >= 0 && !strings.HasSuffix(pattern, "]") {
+		host = pattern[:i]
+		port := pattern[i+1:]
+		if port == "" || strings.Trim(port, "0123456789") != "" {
+			return "the port must be a number"
+		}
+	}
+	if strings.HasPrefix(host, "*.") {
+		host = host[2:]
+	}
+	if host == "" || strings.Contains(host, "*") {
+		return "a wildcard is only allowed as a leading \"*.\" before a host name"
+	}
+	return ""
 }
 
 func validateSuites(root map[string]any, path []any, c *issueCollector) *map[string]SuiteEntry {

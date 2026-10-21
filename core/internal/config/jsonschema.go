@@ -35,6 +35,7 @@ func jsonSchemaDefinitions() map[string]any {
 		"LaunchPolicy":     launchPolicySchema(),
 		"Report":           reportSchema(),
 		"Retention":        retentionSchema(),
+		"HTTP":             httpSchema(),
 		"Session":          sessionSchema(),
 		"SuiteEntry":       suiteEntrySchema(),
 		"AtomyxConfig":     atomyxConfigSchema(),
@@ -119,6 +120,17 @@ func sessionSchema() map[string]any {
 	)
 }
 
+func httpSchema() map[string]any {
+	return objectSchema(
+		map[string]any{
+			"allowHosts": arraySchema(stringMinLen(1, ""), 0, "Hosts a script httpRequest step may reach, each a host or host:port with an optional leading '*.' wildcard. An empty or missing list refuses every request."),
+			"caFile":     stringMinLen(1, "PEM file of extra certificate authorities for test servers with a self-signed certificate. A relative path is resolved against the config file directory."),
+		},
+		nil,
+		"Network policy for script httpRequest steps.",
+	)
+}
+
 func suiteEntrySchema() map[string]any {
 	return objectSchema(
 		map[string]any{
@@ -144,6 +156,7 @@ func atomyxConfigSchema() map[string]any {
 			"video":         stringEnum([]string{VideoOff, VideoOnFailure}, "Screen recording of a run. onFailure keeps the video of a failed run, and off (the default) records nothing."),
 			"retention":     ref("Retention"),
 			"session":       ref("Session"),
+			"http":          ref("HTTP"),
 			"suites":        recordSchema(ref("SuiteEntry"), "Named test selectors, keyed by suite name."),
 			"testRoots":     arraySchema(stringMinLen(1, ""), 0, "Directories the CLI searches for test scripts."),
 			"dataRoots":     arraySchema(stringMinLen(1, ""), 0, "Directories the CLI searches for data-driven fixtures."),

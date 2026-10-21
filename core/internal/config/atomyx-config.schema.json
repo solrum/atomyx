@@ -64,6 +64,9 @@
           "description": "Named environments, keyed by environment name.",
           "type": "object"
         },
+        "http": {
+          "$ref": "#/definitions/HTTP"
+        },
         "launch": {
           "$ref": "#/definitions/LaunchPolicy"
         },
@@ -149,6 +152,26 @@
       "required": [
         "app"
       ],
+      "type": "object"
+    },
+    "HTTP": {
+      "additionalProperties": false,
+      "description": "Network policy for script httpRequest steps.",
+      "properties": {
+        "allowHosts": {
+          "description": "Hosts a script httpRequest step may reach, each a host or host:port with an optional leading '*.' wildcard. An empty or missing list refuses every request.",
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "caFile": {
+          "description": "PEM file of extra certificate authorities for test servers with a self-signed certificate. A relative path is resolved against the config file directory.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
       "type": "object"
     },
     "LaunchPolicy": {

@@ -1,5 +1,7 @@
 package config
 
+import "path/filepath"
+
 const (
 	// PlatformAndroid and PlatformIOS are the two values AppEntry.Platform accepts.
 	PlatformAndroid = "android"
@@ -109,6 +111,17 @@ type Session struct {
 	DebugPauseTimeoutMs    *int64 `json:"debugPauseTimeoutMs,omitempty"`
 }
 
+// HTTP configures the host HTTP requests a script makes with the
+// httpRequest step. AllowHosts lists the hosts a request may reach, each
+// entry a host or host:port, with a leading "*." wildcard allowed for
+// subdomains. An empty or missing list refuses every request. CAFile is
+// a PEM file of extra certificate authorities for test servers with a
+// self-signed certificate.
+type HTTP struct {
+	AllowHosts *[]string `json:"allowHosts,omitempty"`
+	CAFile     *string   `json:"caFile,omitempty"`
+}
+
 // SuiteEntry is one named test selector, matching SuiteEntrySchema.
 //
 // Tags and Globs are pointers for the same reason as
@@ -145,6 +158,7 @@ type AtomyxConfig struct {
 	Video            *string                     `json:"video,omitempty"`
 	Retention        *Retention                  `json:"retention,omitempty"`
 	Session          *Session                    `json:"session,omitempty"`
+	HTTP             *HTTP                       `json:"http,omitempty"`
 	Suites           *map[string]SuiteEntry      `json:"suites,omitempty"`
 	TestRoots        *[]string                   `json:"testRoots,omitempty"`
 	DataRoots        *[]string                   `json:"dataRoots,omitempty"`
@@ -189,6 +203,29 @@ type ResolvedEnvironment struct {
 	DeviceID     *string  `json:"deviceId,omitempty"`
 	Proxy        *string  `json:"proxy,omitempty"`
 	Artifact     *string  `json:"artifact,omitempty"`
+}
+
+// HTTPAllowHosts returns the allowlist for script HTTP requests. It is
+// empty for a nil config and for a config that sets no http.allowHosts.
+func (c *AtomyxConfig) HTTPAllowHosts() []string {
+	if c == nil || c.HTTP == nil || c.HTTP.AllowHosts == nil {
+		return nil
+	}
+	return append([]string(nil), *c.HTTP.AllowHosts...)
+}
+
+// HTTPCAFile returns the CA file path for script HTTP requests, or an
+// empty string when none is set. A relative path is resolved against the
+// directory holding the config file.
+func (l *LoadedConfig) HTTPCAFile() string {
+	if l == nil || l.Config.HTTP == nil || l.Config.HTTP.CAFile == nil {
+		return ""
+	}
+	p := *l.Config.HTTP.CAFile
+	if filepath.IsAbs(p) {
+		return p
+	}
+	return filepath.Join(filepath.Dir(l.Path), p)
 }
 
 // VideoOnFailure reports whether the config asks for the screen
