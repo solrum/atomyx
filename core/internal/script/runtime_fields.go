@@ -151,9 +151,12 @@ func mergeAt(base, pre any, path []string, kind textKind, lookup func(string) (s
 }
 
 func expandText(text string, kind textKind, lookup func(string) (string, bool)) string {
-	if kind == urlText {
+	switch kind {
+	case urlText:
 		return expandURLPlaceholders(text, lookup)
+	case plainText:
+		expanded, _ := expandPlaceholders(text, lookup).(string)
+		return expanded
 	}
-	expanded, _ := expandPlaceholders(text, lookup).(string)
-	return expanded
+	return text
 }
