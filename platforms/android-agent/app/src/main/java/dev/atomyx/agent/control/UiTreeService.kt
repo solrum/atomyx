@@ -1,7 +1,11 @@
 package dev.atomyx.agent.control
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Context
+import android.graphics.Point
 import android.graphics.Rect
+import android.os.Build
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 
@@ -60,6 +64,27 @@ class UiTreeService(
         dirty = true
     }
 
+    /**
+     * Full display size in the current rotation, including system bar areas.
+     * `displayMetrics` on a service context can exclude the navigation bar,
+     * so the window manager's maximum metrics (API 30+) or the display's
+     * real size are used instead.
+     */
+    @Suppress("DEPRECATION")
+    private fun realDisplaySize(): Pair<Int, Int>? = try {
+        val wm = service.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val b = wm.maximumWindowMetrics.bounds
+            b.width() to b.height()
+        } else {
+            val p = Point()
+            wm.defaultDisplay.getRealSize(p)
+            p.x to p.y
+        }
+    } catch (_: Exception) {
+        null
+    }
+
     @Synchronized
     fun dumpTree(forceFresh: Boolean = false): RawElementDto {
         val now = System.currentTimeMillis()
@@ -75,6 +100,7 @@ class UiTreeService(
         val rootDto = RawElementDto(
             elementId = "el_root",
             className = "Root",
+            bounds = realDisplaySize()?.let { (w, h) -> displayRootBounds(w, h) },
             children = mutableListOf(),
         )
 
