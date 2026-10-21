@@ -2,6 +2,7 @@ package runner
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"unicode/utf8"
 
@@ -26,7 +27,7 @@ func (ExtractCommand) Execute(step script.ScriptStep, ctx *CommandContext) Comma
 	captured, ok := ctx.Captures[fromKey]
 	if !ok {
 		return CommandResult{Ok: false, Detail: strPtr(fmt.Sprintf(
-			"No captured request named \"%s\". Run a \"capture\" step with \"as: %s\" first.", writtenKey, writtenKey))}
+			"No captured request named \"%s\". Run a \"capture\" or \"httpRequest\" step with \"as: %s\" first.", writtenKey, writtenKey))}
 	}
 	capturedObj := capturedRequestAsAny(captured)
 
@@ -42,12 +43,47 @@ func (ExtractCommand) Execute(step script.ScriptStep, ctx *CommandContext) Comma
 				"Path \"%s\" resolved to undefined in captured \"%s\"", writtenPath, writtenKey))}
 		}
 		stored := jsStringOf(value)
+		if path.Regex != nil {
+			narrowed, matched := applyExtractRegex(*path.Regex, stored)
+			if !matched {
+				return CommandResult{Ok: false, Detail: strPtr(fmt.Sprintf(
+					"Pattern \"%s\" did not match the value at path \"%s\" in captured \"%s\"",
+					writtenRegex(writtenValue), writtenPath, writtenKey))}
+			}
+			stored = narrowed
+		}
 		ctx.Variables[name] = expression.StringValue(stored)
 		ctx.markSecret(name, looksLikeToken(stored))
 		extracted = append(extracted, fmt.Sprintf("%s (%d characters)", name, utf8.RuneCountInString(stored)))
 	}
 
 	return CommandResult{Ok: true, Detail: strPtr(fmt.Sprintf("Extracted: %s", strings.Join(extracted, ", ")))}
+}
+
+// applyExtractRegex returns the first capture group of the first match of
+// pattern in text, or the whole match when the pattern has no group. It
+// reports false when nothing matches or the pattern does not compile.
+func applyExtractRegex(pattern, text string) (string, bool) {
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return "", false
+	}
+	match := re.FindStringSubmatch(text)
+	if match == nil {
+		return "", false
+	}
+	if len(match) > 1 {
+		return match[1], true
+	}
+	return match[0], true
+}
+
+// writtenRegex returns the pattern as the author wrote it.
+func writtenRegex(value script.ExtractValue) string {
+	if value.Regex == nil {
+		return ""
+	}
+	return *value.Regex
 }
 
 // capturedRequestAsAny renders a CapturedRequest as the generic

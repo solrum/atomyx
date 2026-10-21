@@ -177,6 +177,8 @@ func SummarizeStep(step script.ScriptStep) StepSummary {
 			display = strings.Join(valueKeys, ", ")
 		}
 		b.kw("extract").punct(": ").id("$" + s.From).punct(" into ").rawStr(display)
+	case *script.HTTPRequestStep:
+		b.kw("httpRequest").punct(": ").rawStr(s.Method + " " + s.URL)
 	default:
 		b.kw(step.StepCommand())
 	}

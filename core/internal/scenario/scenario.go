@@ -109,7 +109,10 @@ type ScenarioRunnerDeps struct {
 	Clock          orchestra.Clock
 	Logger         logging.Logger
 	NetworkCapture runner.NetworkCapture
-	Commands       []runner.CommandDefinition
+	// HTTP sends the requests of httpRequest steps in every child
+	// script. Nil makes such a step fail.
+	HTTP     runner.HTTPDoer
+	Commands []runner.CommandDefinition
 	// RunID identifies this scenario run for log correlation. It is
 	// forwarded unchanged to every child runner.ScriptRunner this
 	// ScenarioRunner constructs, so every one of that child's
@@ -334,6 +337,7 @@ func (r *ScenarioRunner) runOne(ctx context.Context, scriptIndex int, scriptPath
 		Logger:                r.deps.Logger,
 		RunID:                 r.deps.RunID,
 		NetworkCapture:        r.deps.NetworkCapture,
+		HTTP:                  r.deps.HTTP,
 		Commands:              r.deps.Commands,
 		OnStep:                r.deps.OnStep,
 		LaunchNoReset:         r.deps.LaunchNoReset,

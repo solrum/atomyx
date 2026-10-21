@@ -138,6 +138,7 @@ func startSuiteHost(ctx context.Context, deps Deps, cfg suiteSettings, proxyFlag
 		Logger:            runLog,
 		RunID:             record.ID(),
 		NetworkCapture:    networkCapture,
+		HTTP:              newScriptHTTPClient(cfg.loaded),
 		Commands:          runner.DefaultCommands(),
 		CreateLoadScript:  fsScenarioScriptLoader,
 		ExternalEnv:       cfg.externalEnv,

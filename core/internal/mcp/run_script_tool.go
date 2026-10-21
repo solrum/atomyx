@@ -195,6 +195,7 @@ func registerRunScriptTool(server *mcp.Server, tc *ToolContext) {
 					RunID:          target.RunID,
 					Commands:       runner.DefaultCommands(),
 					NetworkCapture: networkCapture,
+					HTTP:           tc.HTTP,
 					Artifacts:      target.Artifacts,
 					SecretSink:     target.Secrets,
 					OnStep:         target.OnStep,

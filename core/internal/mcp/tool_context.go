@@ -7,6 +7,7 @@ import (
 	"dev.atomyx/internal/history"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/orchestra"
+	"dev.atomyx/internal/runner"
 	"dev.atomyx/internal/storage"
 )
 
@@ -43,6 +44,9 @@ type ToolContext struct {
 	// Clock is the time source for handlers that poll or measure
 	// elapsed time (tap_and_wait_transition).
 	Clock orchestra.Clock
+	// HTTP sends the requests of httpRequest steps in run_script. Nil
+	// makes such a step fail.
+	HTTP runner.HTTPDoer
 }
 
 // errNoActiveDevice is returned by orchestraOrFail when no device is

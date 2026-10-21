@@ -303,9 +303,7 @@ func hostPatternProblem(pattern string) string {
 			return "the port must be a number"
 		}
 	}
-	if strings.HasPrefix(host, "*.") {
-		host = host[2:]
-	}
+	host = strings.TrimPrefix(host, "*.")
 	if host == "" || strings.Contains(host, "*") {
 		return "a wildcard is only allowed as a leading \"*.\" before a host name"
 	}

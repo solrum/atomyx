@@ -84,22 +84,31 @@ func fromEnv(dst *int64, name string, getenv func(string) string, logger logging
 }
 
 // LoadConfigBestEffort reads the project config from the working
-// directory, for its session timeouts only. A missing config is normal,
+// directory for the settings a host applies without a command line. A
+// missing config is normal,
 // and an unreadable one is logged and ignored, because a host must
 // start with its defaults rather than fail on a config it was never
 // asked to read.
 func LoadConfigBestEffort(logger logging.Logger) *config.AtomyxConfig {
+	loaded := LoadProjectBestEffort(logger)
+	if loaded == nil {
+		return nil
+	}
+	return &loaded.Config
+}
+
+// LoadProjectBestEffort is LoadConfigBestEffort keeping the path the
+// config was read from, for a caller that resolves paths the config
+// names.
+func LoadProjectBestEffort(logger logging.Logger) *config.LoadedConfig {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil
 	}
 	loaded, err := config.Load(config.LoadOptions{Cwd: cwd})
 	if err != nil {
-		logger.Warn("ignoring the project config for session timeouts", logging.LogContext{"error": err.Error()})
+		logger.Warn("ignoring the unreadable project config", logging.LogContext{"error": err.Error()})
 		return nil
 	}
-	if loaded == nil {
-		return nil
-	}
-	return &loaded.Config
+	return loaded
 }

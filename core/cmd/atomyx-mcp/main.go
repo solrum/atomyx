@@ -16,7 +16,9 @@ import (
 
 	"dev.atomyx/cmd/internal/runnerprovision"
 	"dev.atomyx/cmd/internal/sessionwire"
+	"dev.atomyx/internal/config"
 	"dev.atomyx/internal/device"
+	"dev.atomyx/internal/httpclient"
 	"dev.atomyx/internal/logging"
 	"dev.atomyx/internal/mcp"
 	"dev.atomyx/internal/orchestra"
@@ -155,7 +157,13 @@ func run(opts options) int {
 	}
 	sessionDeps.Preparer = provisioner
 
-	projectConfig := sessionwire.LoadConfigBestEffort(logger)
+	project := sessionwire.LoadProjectBestEffort(logger)
+	var projectConfig *config.AtomyxConfig
+	httpPolicy := httpclient.Options{}
+	if project != nil {
+		projectConfig = &project.Config
+		httpPolicy = httpclient.Options{AllowHosts: project.Config.HTTPAllowHosts(), CAFile: project.HTTPCAFile()}
+	}
 
 	server, err := mcp.NewServer(mcp.Info{Name: serverName, Version: serverVersion}, mcp.ServerDeps{
 		Probe:          probe,
@@ -170,6 +178,7 @@ func run(opts options) int {
 		Recorder:       recorder,
 		VideoOnFailure: projectConfig.VideoOnFailure(),
 		Timeouts:       sessionwire.ResolveTimeouts(projectConfig, os.Getenv, logger),
+		HTTP:           httpclient.New(httpPolicy),
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "atomyx-mcp: %v\n", err)

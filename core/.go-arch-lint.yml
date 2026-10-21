@@ -51,6 +51,8 @@ components:
     in: internal/scenario
   netcapture:
     in: internal/netcapture
+  httpclient:
+    in: internal/httpclient
   conformance:
     in: internal/conformance
   device:
@@ -201,6 +203,9 @@ deps:
   netcapture:
     mayDependOn:
       - runner
+  httpclient:
+    mayDependOn:
+      - runner
   conformance:
     anyProjectDeps: true
   device:
@@ -241,6 +246,7 @@ deps:
       - runner
       - device
       - netcapture
+      - httpclient
       - report
       - config
       - scenario

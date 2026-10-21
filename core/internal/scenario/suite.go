@@ -62,7 +62,10 @@ type SuiteRunnerDeps struct {
 	Clock          orchestra.Clock
 	Logger         logging.Logger
 	NetworkCapture runner.NetworkCapture
-	Commands       []runner.CommandDefinition
+	// HTTP sends the requests of httpRequest steps in every entry. Nil
+	// makes such a step fail.
+	HTTP     runner.HTTPDoer
+	Commands []runner.CommandDefinition
 	// RunID identifies this suite run for log correlation. It is
 	// forwarded unchanged to every child runner.ScriptRunner or
 	// nested ScenarioRunner this SuiteRunner constructs, so every
@@ -466,6 +469,7 @@ func (r *SuiteRunner) runScriptEntry(ctx context.Context, index, attempt int, en
 		Logger:                r.deps.Logger,
 		RunID:                 r.deps.RunID,
 		NetworkCapture:        r.deps.NetworkCapture,
+		HTTP:                  r.deps.HTTP,
 		Commands:              r.deps.Commands,
 		LaunchNoReset:         r.deps.LaunchNoReset,
 		ClearDataOnFresh:      r.deps.ClearDataOnFresh,
@@ -501,6 +505,7 @@ func (r *SuiteRunner) runScenarioEntry(ctx context.Context, index, attempt int, 
 		Logger:                r.deps.Logger,
 		RunID:                 r.deps.RunID,
 		NetworkCapture:        r.deps.NetworkCapture,
+		HTTP:                  r.deps.HTTP,
 		Commands:              r.deps.Commands,
 		LoadScript:            loadScript,
 		ExternalEnv:           r.deps.ExternalEnv,

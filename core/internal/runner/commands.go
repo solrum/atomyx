@@ -45,5 +45,6 @@ func DefaultCommands() []CommandDefinition {
 		ScrollUntilVisibleCommand{},
 		WaitForAnimationToEndCommand{},
 		InputRandomCommand{},
+		HTTPRequestCommand{},
 	}
 }

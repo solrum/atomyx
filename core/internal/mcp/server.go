@@ -11,6 +11,7 @@ import (
 	"dev.atomyx/internal/orchestra"
 	"dev.atomyx/internal/recording"
 	"dev.atomyx/internal/runfolder"
+	"dev.atomyx/internal/runner"
 	"dev.atomyx/internal/session"
 	"dev.atomyx/internal/storage"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -68,6 +69,9 @@ type ServerDeps struct {
 	// that is its own run, keeping the video of the ones that fail. It has
 	// no effect without a Recorder.
 	VideoOnFailure bool
+	// HTTP sends the requests of httpRequest steps in run_script. Nil
+	// makes such a step fail.
+	HTTP runner.HTTPDoer
 }
 
 // NewServer constructs the Atomyx MCP server and registers its tool
@@ -138,6 +142,7 @@ func NewServer(info Info, deps ServerDeps) (*Server, error) {
 		RunSession: runSession,
 		RunStore:   runStore,
 		Clock:      clk,
+		HTTP:       deps.HTTP,
 	}
 
 	// Single choke point for every tools/call request: value-constraint

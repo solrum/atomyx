@@ -135,6 +135,9 @@ type CommandContext struct {
 	// NetworkCapture is the capture adapter for this run, or nil when
 	// no proxy is configured.
 	NetworkCapture NetworkCapture
+	// HTTP sends the requests of httpRequest steps, or is nil when the
+	// host wires no client.
+	HTTP HTTPDoer
 	// StepIndex is the zero-based index of the current step within
 	// whichever step list is currently executing: the top-level
 	// script, or a nested `do`/`setup` list run through RunSteps.

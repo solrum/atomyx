@@ -43,6 +43,9 @@ type ScriptRunnerDeps struct {
 	// proxy is set up. A script whose `proxy` field is "required"
 	// fails immediately in either case.
 	NetworkCapture NetworkCapture
+	// HTTP sends the requests of httpRequest steps. Nil makes every such
+	// step fail with a message saying HTTP requests are unavailable.
+	HTTP HTTPDoer
 	// FlowLoader resolves a file-referenced step list (a precondition
 	// `setup`, and later a `handle`/`branch` `do` or a `runFlow`
 	// target) into a ScriptDefinition. Nil when the host's scripts
@@ -562,6 +565,7 @@ func (r *ScriptRunner) contextFor(ctx context.Context, rs *runState, stepIndex i
 		SecretSink:       r.deps.SecretSink,
 		Captures:         rs.captures,
 		NetworkCapture:   r.deps.NetworkCapture,
+		HTTP:             r.deps.HTTP,
 		StepIndex:        stepIndex,
 		Script:           rs.def,
 		LaunchNoReset:    r.deps.LaunchNoReset,
