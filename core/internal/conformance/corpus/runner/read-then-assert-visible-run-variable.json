@@ -1,0 +1,15 @@
+{
+  "name": "read-then-assert-visible-run-variable",
+  "description": "a value read during the run reaches the next step through its placeholder, so assertVisible matches the text the variable holds",
+  "yaml": "appId: com.test\nname: read then assert visible\nenv: {}\n---\n- launchApp\n- read:\n    selector:\n      id: code_label\n    field: text\n    as: code\n- assertVisible: \"${code}\"\n",
+  "driver": {
+    "hierarchies": [
+      {
+        "attributes": {},
+        "children": [
+          { "attributes": { "id": "code_label", "text": "482913", "label": "482913", "bounds": "40,300,390,350" }, "children": [] }
+        ]
+      }
+    ]
+  }
+}
