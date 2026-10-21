@@ -2,6 +2,7 @@ package drivertest
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -76,14 +77,7 @@ type OrientationFixture struct {
 func TapGestureTarget(t *testing.T, d driver.Driver) {
 	t.Helper()
 	ctx := context.Background()
-	root, err := d.Hierarchy(ctx)
-	if err != nil {
-		t.Fatalf("Hierarchy before tapping the tap target: %v", err)
-	}
-	before, ok := findPrefixedText(root, tapCountPrefix)
-	if !ok {
-		t.Fatalf("the screen shows no %q counter", strings.TrimSpace(tapCountPrefix))
-	}
+	root, before := awaitTapCounter(t, d)
 	beforeCount, err := strconv.Atoi(before)
 	if err != nil {
 		t.Fatalf("tap counter %q is not a number", before)
@@ -111,6 +105,43 @@ func TapGestureTarget(t *testing.T, d driver.Driver) {
 		}
 		time.Sleep(tapCountPoll)
 	}
+}
+
+// awaitTapCounter reads the hierarchy until it shows the tap counter and
+// returns that hierarchy with the counter text. A rotation can recreate the
+// app's activity, so the counter may be missing from the first reads.
+func awaitTapCounter(t *testing.T, d driver.Driver) (wire.TreeNodeWire, string) {
+	t.Helper()
+	ctx := context.Background()
+	deadline := time.Now().Add(tapCountSettleTimeout)
+	for {
+		root, err := d.Hierarchy(ctx)
+		if err != nil {
+			t.Fatalf("Hierarchy before tapping the tap target: %v", err)
+		}
+		if count, ok := findPrefixedText(root, tapCountPrefix); ok {
+			return root, count
+		}
+		if !time.Now().Before(deadline) {
+			t.Fatalf("the screen shows no %q counter within %s while the screen is %s",
+				strings.TrimSpace(tapCountPrefix), tapCountSettleTimeout, describeScreenLayout(ctx, d))
+		}
+		time.Sleep(tapCountPoll)
+	}
+}
+
+// describeScreenLayout names the orientation the screen size implies, for
+// failure messages.
+func describeScreenLayout(ctx context.Context, d driver.Driver) string {
+	size, err := d.ScreenSize(ctx)
+	if err != nil {
+		return fmt.Sprintf("of unknown size (%v)", err)
+	}
+	layout := "portrait"
+	if size.Width > size.Height {
+		layout = "landscape"
+	}
+	return fmt.Sprintf("%s at %vx%v", layout, size.Width, size.Height)
 }
 
 // findPrefixedText returns the text that follows prefix in the label,

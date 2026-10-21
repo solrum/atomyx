@@ -84,20 +84,35 @@ func VerifySignInKeyboard(t *testing.T, d driver.Driver) {
 }
 
 // awaitKeyboardBounds reads the hierarchy until it holds a keyboard node
-// with bounds, and returns those bounds with the hierarchy they came from.
+// whose bounds fit inside the screen, and returns those bounds with the
+// hierarchy they came from. When the deadline passes, it fails with the last
+// keyboard bounds it saw and the screen size.
 func awaitKeyboardBounds(t *testing.T, d driver.Driver) (wire.Bounds, wire.TreeNodeWire) {
 	t.Helper()
+	ctx := context.Background()
 	deadline := time.Now().Add(signInSettleTimeout)
+	var last wire.Bounds
+	seen := false
 	for {
-		root, err := d.Hierarchy(context.Background())
+		root, err := d.Hierarchy(ctx)
 		if err != nil {
 			t.Fatalf("Hierarchy while waiting for the keyboard: %v", err)
 		}
+		screen, err := d.ScreenSize(ctx)
+		if err != nil {
+			t.Fatalf("ScreenSize while waiting for the keyboard: %v", err)
+		}
 		if b, ok := findKeyboardBounds(root); ok {
-			return b, root
+			last, seen = b, true
+			if boundsFit(b, screen) {
+				return b, root
+			}
 		}
 		if !time.Now().Before(deadline) {
-			t.Fatalf("no keyboard with bounds appeared within %s", signInSettleTimeout)
+			if !seen {
+				t.Fatalf("no keyboard with bounds appeared within %s", signInSettleTimeout)
+			}
+			t.Fatalf("keyboard bounds %+v still do not fit inside the %vx%v screen after %s", last, screen.Width, screen.Height, signInSettleTimeout)
 		}
 		time.Sleep(signInSettlePoll)
 	}
