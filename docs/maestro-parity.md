@@ -76,7 +76,7 @@ A Maestro flow that uses only present commands runs as is after a syntax change.
 
 | Maestro command | Atomyx equivalent | Status | Note |
 | --- | --- | --- | --- |
-| `evalScript` and `runScript` | `assertExpr` for boolean checks | Out of scope | Arbitrary JavaScript breaks deterministic runs and widens the attack surface. |
+| `evalScript` and `runScript` | `assertExpr` for boolean checks, `httpRequest` for fetching test data | Out of scope | Arbitrary JavaScript breaks deterministic runs and widens the attack surface. The common reason to run a script is to fetch test data, such as a one-time code, and `httpRequest` covers it without code. It is declarative, with fixed fields and schema validation. It is bounded by a host allowlist, timeouts and a size cap. It reports a typed outcome. |
 | AI assertions | MCP tools | Out of scope | An AI agent drives Atomyx through the MCP server, so the assertion belongs to the agent. |
 | `addMedia` | None | Out of scope | Revisit when real flows show demand. |
 | Airplane mode | None | Out of scope | No portable control on a non-rooted device. |

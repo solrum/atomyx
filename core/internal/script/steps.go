@@ -56,6 +56,7 @@ const (
 	CommandSetOrientation   = "setOrientation"
 	CommandSetLocation      = "setLocation"
 	CommandTravel           = "travel"
+	CommandHTTPRequest      = "httpRequest"
 
 	CommandHideKeyboard          = "hideKeyboard"
 	CommandEraseText             = "eraseText"

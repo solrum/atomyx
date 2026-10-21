@@ -144,7 +144,7 @@ env:
 
 Variables can also come from:
 - CLI: `--env email=other@test.com` (overrides script env)
-- `extract` command (runtime, from API responses)
+- `extract` command (runtime, from API responses and `httpRequest` responses)
 - Parent script (when used as sub-flow)
 
 The `read` command binds typed variables (string or boolean) into this
@@ -1102,6 +1102,8 @@ body:
 ### extract
 
 Extract values from a captured response into variables for later use.
+The response comes from a `capture` step or an `httpRequest` step with
+the same `as` name.
 
 ```yaml
 - capture: "POST /api/login as: login"
@@ -1113,6 +1115,105 @@ Extract values from a captured response into variables for later use.
 
 # Use extracted values in subsequent steps
 - assertVisible: "${userId}"
+```
+
+A value is either a JSON path, or an object with a `path` and a `regex`.
+The `regex` applies to the resolved value as text, and the variable
+receives the first capture group, or the whole match when the pattern has
+no group. A pattern that matches nothing fails the step. The failure names
+the path and the pattern and never the value.
+
+```yaml
+- extract:
+    from: inbox
+    values:
+      otp:
+        path: $.body.messages[0].Snippet
+        regex: "\\b(\\d{6})\\b"
+```
+
+### httpRequest
+
+Send an HTTP request from the machine running the script, not from the
+device. Use it to fetch test data, such as a one-time code from a test
+mailbox or a virtual SMS number API, or to reset a test backend.
+
+```yaml
+- httpRequest:
+    method: DELETE
+    url: "http://localhost:8025/api/v1/messages"
+
+- httpRequest:
+    url: "http://localhost:8025/api/v1/search?query=to:${email}"
+    headers:
+      Authorization: "Bearer ${MAILBOX_TOKEN}"
+    as: inbox
+    poll:
+      until: $.body.messages[0].Snippet
+      interval: 1000
+    timeout: 30000
+```
+
+| Field | Rule |
+|---|---|
+| `url` | Required. An absolute `http` or `https` URL. A `${var}` placeholder in the query part is query-escaped, and anywhere else the value is inserted as is. |
+| `method` | `GET` (default), `POST`, `PUT`, `PATCH` or `DELETE`. |
+| `headers` | Optional map of header names to values. `${var}` is allowed in values. |
+| `body` | Optional. A string is sent as written. A map is sent as JSON with `Content-Type: application/json`, unless a header sets the content type. |
+| `as` | Optional variable name. Stores the response as `capture` does, with `method`, `url`, `status`, `headers`, `body` and `timestamp`. `body` is the parsed JSON value, or null when the response is not JSON. `extract`, `assertApi` and `branch` read it unchanged. |
+| `expectStatus` | Optional status the response must have. Without it, any 2xx status passes. |
+| `poll.until` | Optional JSON path. Requires `as`. The request repeats until the status passes and the path resolves to a present value. A missing path, null, an empty string and an empty array are not present. `0` and `false` are. |
+| `poll.interval` | Milliseconds between attempts. Default 1000, minimum 200. |
+| `timeout` | Milliseconds for the whole step, which is one request without `poll` and every attempt with it. Default 10000, maximum 120000. |
+
+Network policy:
+
+- The host of the URL must be listed under `http.allowHosts` in the project config. An empty or missing list refuses every request, for the CLI and for the MCP server alike. See [Script HTTP requests](./cli.md#script-http-requests).
+- Link-local addresses (`169.254.0.0/16` and `fe80::/10`) are refused even when listed. The check runs on the resolved address, so a host name cannot bypass it.
+- At most 3 redirects are followed, and each target must also be allowed.
+- The request ignores `HTTP_PROXY` and `HTTPS_PROXY`, so it never goes through the capture proxy, and it needs no `--proxy` flag.
+- TLS certificates are always verified. A test server with a self-signed certificate is trusted through `http.caFile`.
+- A response body larger than 1 MiB fails the step.
+
+What a run records:
+
+- The step detail names the method and the URL as written in the script, with `${var}` placeholders unexpanded, and the status. The executed URL, headers and body are never written, because they can carry credentials.
+- A request that fails reports a category such as connection refused, a host name that cannot be resolved, a TLS failure, a timeout or a host that is not allowed. It never reports the text of the underlying network error.
+- The response body is not written to the run folder by this step. A failed `assertApi` on a stored response echoes the asserted field values, as it does for `capture`, and a mailbox message can hold personal data.
+- A value from outside the committed files, such as `--env` or `${ENV:NAME}`, is secret and masked in everything the run writes.
+
+Recipe, typing a one-time code from a test mailbox. A `${name}` placeholder
+is replaced when a script is parsed, so a value extracted at run time
+reaches a step through a sub-flow, which `runFlow` parses with the run's
+variables.
+
+```yaml
+# login.yml
+env:
+  email: qa@atomyx.test
+---
+- httpRequest:
+    method: DELETE
+    url: "http://localhost:8025/api/v1/messages"
+- tap: "Send code"
+- httpRequest:
+    url: "http://localhost:8025/api/v1/search?query=to:${email}"
+    as: inbox
+    poll:
+      until: $.body.messages[0].Snippet
+    timeout: 30000
+- extract:
+    from: inbox
+    values:
+      otp:
+        path: $.body.messages[0].Snippet
+        regex: "\\b(\\d{6})\\b"
+- runFlow: flows/enter-otp.yml
+```
+
+```yaml
+# flows/enter-otp.yml
+- type: "${otp}"
 ```
 
 ---

@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -491,5 +492,32 @@ func TestHTTPRequest_RunsInsideNestedStepLists(t *testing.T) {
 `))
 	if !result.Ok {
 		t.Fatalf("steps = %s", debugSteps(result.Steps))
+	}
+}
+
+func TestHTTPRequest_OTPRecipeTypesTheExtractedCodeThroughASubFlow(t *testing.T) {
+	doer := doerFunc(func(context.Context, HTTPRequest) (HTTPResponse, error) {
+		return HTTPResponse{Status: 200, Body: []byte(`{"messages":[{"Snippet":"Your code is 482913."}]}`)}, nil
+	})
+	tr := newHTTPTestRunner(doer)
+	tr.driver.StageHierarchy(rootTree(focusedButton("field", "", "0,200,100,250")))
+	flowPath, _ := filepath.Abs("flows/enter-otp.yml")
+	tr.loader.stage(flowPath, "- type: \"${otp}\"\n")
+	result := run(t, tr, httpScript(`- httpRequest:
+    url: http://localhost:8025/api/v1/messages
+    as: inbox
+- extract:
+    from: inbox
+    values:
+      otp:
+        path: $.body.messages[0].Snippet
+        regex: "\\b(\\d{6})\\b"
+- runFlow: flows/enter-otp.yml
+`))
+	if !result.Ok {
+		t.Fatalf("steps = %s", debugSteps(result.Steps))
+	}
+	if texts := typedTexts(tr); len(texts) != 1 || texts[0] != "482913" {
+		t.Errorf("typed %v, want the extracted code", texts)
 	}
 }

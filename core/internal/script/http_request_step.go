@@ -1,8 +1,5 @@
 package script
 
-// CommandHTTPRequest is the command name of the httpRequest step.
-const CommandHTTPRequest = "httpRequest"
-
 // Limits and defaults of the httpRequest step.
 const (
 	// HTTPRequestDefaultTimeoutMs bounds the whole step, one request or

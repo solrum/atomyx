@@ -221,6 +221,26 @@ Rules for the automatic prune:
 - A run that is still being written is kept, and a run migration in progress defers the prune. Each such case prints one `warning:` line on stderr, or one warning in the `atomyx-mcp` log, and never changes the exit code.
 - Without a `retention` block nothing is deleted.
 
+### Script HTTP requests
+
+The `httpRequest` script step sends requests from the machine running the
+script. The project config controls where it may connect:
+
+```yaml
+http:
+  allowHosts:
+    - localhost:8025
+    - "*.example.test"
+  caFile: certs/test-ca.pem
+```
+
+| Key | Meaning |
+|---|---|
+| `allowHosts` | Hosts a request may reach, each a host or `host:port`. A leading `*.` matches any subdomain but not the bare domain. An entry without a port matches every port. An empty or missing list refuses every request. |
+| `caFile` | A PEM file of certificate authorities trusted in addition to the system roots, for a test server with a self-signed certificate. A relative path is resolved against the folder of the config file. |
+
+The `run` and `suite` commands read the block from the config they load, and `atomyx-mcp` reads it from the config in its working directory when it starts. There is no setting that disables certificate verification, and link-local addresses are refused whatever the list holds. See `httpRequest` in the [script reference](./yml-script-reference.md#httprequest).
+
 ### Masked values
 
 A run masks secret values with `********` in everything it writes or
