@@ -944,11 +944,13 @@ func (d *AndroidDriver) DeviceInfo(ctx context.Context) (driver.DeviceInfo, erro
 	}, nil
 }
 
-// ScreenSize has no dedicated agent route. The /tree response's root
-// is a synthetic wrapper with no bounds of its own, holding the real
-// window roots (status bar excluded, main window, optional IME
-// window) as its children, so this derives the screen size from the
-// largest-area child instead.
+// ScreenSize reports the display size in the current rotation. It has
+// no dedicated agent route and is read from the /tree response: the
+// root's bounds are the full display rectangle when the agent reports
+// them. For agents that leave the root without bounds, it falls back to
+// the largest-area child of the root, which is the main window and can
+// differ from the display. It returns an error when neither source
+// yields a rectangle with a positive area.
 func (d *AndroidDriver) ScreenSize(ctx context.Context) (wire.Size, error) {
 	if err := ctx.Err(); err != nil {
 		return wire.Size{}, err
@@ -957,7 +959,10 @@ func (d *AndroidDriver) ScreenSize(ctx context.Context) (wire.Size, error) {
 	if err != nil {
 		return wire.Size{}, d.fail(err)
 	}
-	bounds, ok := findScreenBounds(tree)
+	bounds, ok := rootDisplayBounds(tree)
+	if !ok {
+		bounds, ok = findScreenBounds(tree)
+	}
 	if !ok {
 		return wire.Size{}, d.fail(errors.New("androiddriver: no child of the root has bounds, cannot derive screen dimensions"))
 	}

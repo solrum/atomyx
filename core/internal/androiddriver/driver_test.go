@@ -1086,6 +1086,66 @@ func TestAndroidDriver_ScreenSize_UsesLargestAreaChildBounds(t *testing.T) {
 	}
 }
 
+func TestAndroidDriver_ScreenSize_PrefersRootDisplayBounds(t *testing.T) {
+	tr := newFakeTransport()
+	tr.treeResp = transport.AndroidTreeNode{
+		ElementID: "root",
+		Bounds:    &transport.AndroidBounds{Left: 0, Top: 0, Right: 2400, Bottom: 1080},
+		Children: []transport.AndroidTreeNode{
+			{ElementID: "window", ClassName: "android.widget.FrameLayout", Bounds: &transport.AndroidBounds{Left: 93, Top: 0, Right: 2400, Bottom: 1080}},
+		},
+	}
+	d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{Serial: "S1"})
+
+	size, err := d.ScreenSize(context.Background())
+	if err != nil {
+		t.Fatalf("ScreenSize() error = %v", err)
+	}
+	if want := (wire.Size{Width: 2400, Height: 1080}); size != want {
+		t.Fatalf("ScreenSize() = %+v, want %+v", size, want)
+	}
+}
+
+func TestAndroidDriver_ScreenSize_IgnoresSmallWindowWhenRootHasBounds(t *testing.T) {
+	tr := newFakeTransport()
+	tr.treeResp = transport.AndroidTreeNode{
+		ElementID: "root",
+		Bounds:    &transport.AndroidBounds{Left: 0, Top: 0, Right: 1080, Bottom: 2400},
+		Children: []transport.AndroidTreeNode{
+			{ElementID: "toast", ClassName: "android.widget.FrameLayout", Bounds: &transport.AndroidBounds{Left: 0, Top: 0, Right: 342, Bottom: 72}},
+		},
+	}
+	d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{Serial: "S1"})
+
+	size, err := d.ScreenSize(context.Background())
+	if err != nil {
+		t.Fatalf("ScreenSize() error = %v", err)
+	}
+	if want := (wire.Size{Width: 1080, Height: 2400}); size != want {
+		t.Fatalf("ScreenSize() = %+v, want %+v", size, want)
+	}
+}
+
+func TestAndroidDriver_ScreenSize_EmptyRootBounds_FallsBackToLargestChild(t *testing.T) {
+	tr := newFakeTransport()
+	tr.treeResp = transport.AndroidTreeNode{
+		ElementID: "root",
+		Bounds:    &transport.AndroidBounds{Left: 0, Top: 0, Right: 0, Bottom: 0},
+		Children: []transport.AndroidTreeNode{
+			{ElementID: "window", ClassName: "android.widget.FrameLayout", Bounds: &transport.AndroidBounds{Left: 0, Top: 0, Right: 1080, Bottom: 2400}},
+		},
+	}
+	d := androiddriver.New(tr, process.NewFake(), androiddriver.Options{Serial: "S1"})
+
+	size, err := d.ScreenSize(context.Background())
+	if err != nil {
+		t.Fatalf("ScreenSize() error = %v", err)
+	}
+	if want := (wire.Size{Width: 1080, Height: 2400}); size != want {
+		t.Fatalf("ScreenSize() = %+v, want %+v", size, want)
+	}
+}
+
 func TestAndroidDriver_ScreenSize_NoChildBounds_ReturnsError(t *testing.T) {
 	tr := newFakeTransport()
 	tr.treeResp = transport.AndroidTreeNode{ElementID: "root"}
