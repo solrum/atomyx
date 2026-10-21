@@ -8,12 +8,16 @@ import "reflect"
 type stepSource struct {
 	authored ScriptStep
 	lost     bool
+	pending  *pendingResolution
 }
 
 func (s *stepSource) authoredStep() ScriptStep { return s.authored }
 func (s *stepSource) setAuthored(a ScriptStep) { s.authored = a }
 func (s *stepSource) writtenFormLost() bool    { return s.lost }
 func (s *stepSource) markWrittenFormLost()     { s.lost = true }
+
+func (s *stepSource) pendingSource() *pendingResolution { return s.pending }
+func (s *stepSource) setPending(p *pendingResolution)   { s.pending = p }
 
 // WrittenFormLost reports whether step carries text a `${var}`
 // placeholder expanded and its written form could not be rebuilt. Such a

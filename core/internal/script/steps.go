@@ -18,6 +18,10 @@ type ScriptStep interface {
 	// rebuilt, so nothing the step holds is safe to show.
 	writtenFormLost() bool
 	markWrittenFormLost()
+	// pendingSource returns what the step needs to take run variables
+	// into its text just before it runs, and nil when it needs nothing.
+	pendingSource() *pendingResolution
+	setPending(*pendingResolution)
 }
 
 // Step command names, one per ScriptStep implementation.

@@ -10,6 +10,11 @@ import "strings"
 // checked against every schema rule. It returns a non-nil error for
 // any structural or validation failure; externalEnv may be nil.
 //
+// A placeholder no env entry names stays literal text, and the leaf step
+// holding it can take a run variable of that name later through
+// ResolveStep. Preconditions' inline setup steps are decoded as plain
+// mappings and keep parse-time-only resolution.
+//
 // Every externalEnv entry is a secret in the returned definition's
 // SecretEnv unless options name it as committed, because a value a host
 // supplies comes from outside the script and config files. A value the
@@ -64,6 +69,9 @@ func ParseScript(yamlContent string, externalEnv map[string]string, options ...P
 		steps = append(steps, step)
 	}
 	attachAuthoredSteps(steps, docs.rawSteps)
+	if !settings.sealed {
+		attachPendingSteps(steps, docs.rawSteps, mergedEnv)
+	}
 
 	if len(steps) == 0 && appID == "" {
 		return nil, newParseError("Script has no steps")
@@ -233,6 +241,15 @@ type ParseOption func(*parseSettings)
 
 type parseSettings struct {
 	committed map[string]bool
+	sealed    bool
+}
+
+// WithoutRunTimeResolution parses a script whose environment already holds
+// every run variable the host has, such as a flow file loaded in the middle
+// of a run. A placeholder no name in env resolves stays literal text, and
+// no step takes run variables into its text later.
+func WithoutRunTimeResolution() ParseOption {
+	return func(settings *parseSettings) { settings.sealed = true }
 }
 
 // WithCommittedNames names the externalEnv entries whose value is written
