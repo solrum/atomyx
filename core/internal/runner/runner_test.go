@@ -126,7 +126,7 @@ func (f *fakeFlowLoader) LoadFlow(path string, env map[string]string) (*script.S
 	if !ok {
 		return nil, fmt.Errorf("no flow staged for %q", path)
 	}
-	return script.ParseScript(yaml, env)
+	return script.ParseScript(yaml, env, script.WithoutRunTimeResolution())
 }
 
 // fakeNetworkCapture serves a queue of pre-staged captured requests in

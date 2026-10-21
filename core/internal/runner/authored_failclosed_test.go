@@ -124,3 +124,82 @@ func TestEveryStepKindKeepsExpandedValuesOutOfStepRecords(t *testing.T) {
 		})
 	}
 }
+
+const runtimeSecret = "rtS3cr3tV4lue88"
+
+// TestRunTimeResolvedSecretKeepsOutOfEveryRecord substitutes a secret read
+// during the run into a type step, a selector and an httpRequest header,
+// and checks that the substitution happened while no record of the run
+// carries the value.
+func TestRunTimeResolvedSecretKeepsOutOfEveryRecord(t *testing.T) {
+	var sent []HTTPRequest
+	tr := newHTTPTestRunner(doerFunc(func(_ context.Context, req HTTPRequest) (HTTPResponse, error) {
+		sent = append(sent, req)
+		return HTTPResponse{Status: 200, Body: []byte(`{}`)}, nil
+	}))
+	var gated []script.ScriptStep
+	deps := tr.runner.deps
+	deps.StepGate = &funcGate{fn: func(s GateStep, _ PausedRun) error {
+		gated = append(gated, s.Step)
+		return nil
+	}}
+	evidence := newMemoryEvidence()
+	deps.FailureCapture = NewFailureBundle(FailureBundleDeps{
+		Orchestra: tr.orch, Clock: clock.NewManualClock(0), Logger: noopLogger{}, Sink: evidence,
+	})
+	var events []StepEvent
+	deps.OnStep = func(e StepEvent) { events = append(events, e) }
+	tr.runner = NewScriptRunner(deps)
+	tr.driver.StageHierarchy(typeTree(secureField("pw", runtimeSecret)))
+
+	def, err := script.ParseScript("appId: com.test\nproxy: required\n---\n"+
+		"- read: { selector: { id: pw }, field: value, as: pwd }\n"+
+		"- type: \"${pwd}\"\n"+
+		"- httpRequest: { url: \"https://api.example.com/x\", headers: { X-Token: \"${pwd}\" } }\n"+
+		"- tap: { text: \"${pwd}\" }\n", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := tr.runner.Run(context.Background(), def)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if typed := typedTexts(tr); len(typed) != 1 || typed[0] != runtimeSecret {
+		t.Fatalf("typed %q, want the substituted secret", typed)
+	}
+	if len(sent) != 1 || sent[0].Headers["X-Token"] != runtimeSecret {
+		t.Fatalf("requests = %+v, want the secret in the header", sent)
+	}
+	if result.Ok || result.FailedAtStep == nil || *result.FailedAtStep != 3 {
+		t.Fatalf("steps = %s, want the tap of an absent element to fail", debugSteps(result.Steps))
+	}
+
+	var records []string
+	for _, s := range result.Steps {
+		records = append(records, detail(s))
+	}
+	for _, e := range events {
+		records = append(records, e.Summary, detailOrEmpty(e.Detail))
+		for _, tok := range e.Tokens {
+			records = append(records, tok.Text)
+		}
+	}
+	for _, step := range gated {
+		records = append(records, SummarizeStep(step).Text)
+		shown, err := script.RenderStepYAML(script.AuthoredOf(step))
+		if err == nil {
+			records = append(records, shown)
+		}
+	}
+	for _, name := range evidence.names() {
+		records = append(records, string(evidence.file(name)))
+	}
+	text := strings.Join(records, "\n")
+	if strings.Contains(text, runtimeSecret) {
+		t.Fatalf("a record carries the substituted secret:\n%s", text)
+	}
+	if !strings.Contains(text, `element.text = "${pwd}"`) {
+		t.Fatalf("records lack the selector as written:\n%s", text)
+	}
+}
