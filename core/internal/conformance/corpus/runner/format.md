@@ -55,6 +55,7 @@ Field reference:
   through `${var}` interpolation, needs no placeholder for the
   variable case, only for a further file reference).
 - `driver` (required): the `MockDriver` program (see below).
+- `http` (optional): the fake HTTP client program (see below).
 - `network` (optional): the `NetworkCapture` program. Omitting this
   field means the run has NO network capture adapter configured
   (`ScriptRunnerDeps.NetworkCapture` / `networkCapture` is absent),
@@ -106,6 +107,16 @@ Field reference:
   recorded.`, an exact fixed string that is test-harness scaffolding,
   not part of the runner contract under test, so it carries no
   differential signal on its own.
+
+### `http`
+
+- `responses`: an ordered array of responses (`status`, `headers`,
+  `body` as response text, or `failure` naming a request failure
+  category such as `connectionRefused` or `hostNotAllowed`). The test
+  harness's fake HTTP client serves them to `httpRequest` steps in
+  declaration order, one per request, and repeats the last one once
+  the list is exhausted. Omitting this field means no HTTP client is
+  configured, which makes an `httpRequest` step fail.
 
 ## Flow files and the `{{DIR}}` placeholder
 

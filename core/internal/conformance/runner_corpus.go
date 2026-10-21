@@ -62,6 +62,24 @@ type RunnerNetworkProgram struct {
 	Requests []RunnerNetworkRequest `json:"requests"`
 }
 
+// RunnerHTTPResponse is one response the fake HTTP client serves to an
+// httpRequest step. Failure, when set, makes the request fail with that
+// failure category instead of returning a response.
+type RunnerHTTPResponse struct {
+	Status  int               `json:"status,omitempty"`
+	Headers map[string]string `json:"headers,omitempty"`
+	Body    string            `json:"body,omitempty"`
+	Failure string            `json:"failure,omitempty"`
+}
+
+// RunnerHTTPProgram is the declarative fake HTTP client program a corpus
+// case stages. Responses are served in order, one per request, and the
+// last one repeats once the list is exhausted. A case with no
+// RunnerHTTPProgram runs with no HTTP client configured at all.
+type RunnerHTTPProgram struct {
+	Responses []RunnerHTTPResponse `json:"responses"`
+}
+
 // RunnerCase is one differential script-runner case read from a
 // corpus file under corpus/runner/. The corpus file format,
 // including the `{{DIR}}` flow-file placeholder convention, is
@@ -74,6 +92,7 @@ type RunnerCase struct {
 	FlowFiles   map[string]string     `json:"flowFiles,omitempty"`
 	Driver      RunnerDriverProgram   `json:"driver"`
 	Network     *RunnerNetworkProgram `json:"network,omitempty"`
+	HTTP        *RunnerHTTPProgram    `json:"http,omitempty"`
 	// ExpectRunError marks a case where loading the script's own
 	// required-flow file fails: the reference oracle process crashes
 	// with an uncaught exception instead of producing a normalized

@@ -1,0 +1,5 @@
+{
+  "name": "http-request-valid",
+  "description": "httpRequest parses with a method, headers, an object body, a capture binding, polling and a timeout, and extract accepts a path with a regular expression.",
+  "yaml": "- httpRequest:\n    method: POST\n    url: \"http://localhost:8025/api/v1/search?query=to:${email}\"\n    headers:\n      Authorization: \"Bearer ${TOKEN}\"\n    body:\n      limit: 5\n    as: inbox\n    expectStatus: 200\n    poll:\n      until: $.body.messages[0].Snippet\n      interval: 500\n    timeout: 30000\n- extract:\n    from: inbox\n    values:\n      plain: $.body.id\n      otp:\n        path: $.body.messages[0].Snippet\n        regex: \"\\\\b(\\\\d{6})\\\\b\"\n"
+}

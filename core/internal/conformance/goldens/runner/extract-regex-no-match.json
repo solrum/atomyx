@@ -1,0 +1,160 @@
+{
+  "calls": [],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "capture",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 6,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "capture: msg ← \"GET /message\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "capture"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "msg"
+        },
+        {
+          "kind": "punct",
+          "text": " ← "
+        },
+        {
+          "kind": "string",
+          "text": "\"GET /message\""
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "capture",
+      "depth": 0,
+      "detail": "Captured GET /message returning status 200 as \"msg\"",
+      "durationMs": 0,
+      "line": 6,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "capture: msg ← \"GET /message\"",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "capture"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "msg"
+        },
+        {
+          "kind": "punct",
+          "text": " ← "
+        },
+        {
+          "kind": "string",
+          "text": "\"GET /message\""
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "extract",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 7,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "extract: $msg into code",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "extract"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "$msg"
+        },
+        {
+          "kind": "punct",
+          "text": " into "
+        },
+        {
+          "kind": "string",
+          "text": "code"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "extract",
+      "depth": 0,
+      "detail": "Pattern \"\\b(\\d{6})\\b\" did not match the value at path \"$.body.text\" in captured \"msg\"",
+      "durationMs": 0,
+      "line": 7,
+      "ok": false,
+      "stepIndex": 1,
+      "summary": "extract: $msg into code",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "extract"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "$msg"
+        },
+        {
+          "kind": "punct",
+          "text": " into "
+        },
+        {
+          "kind": "string",
+          "text": "code"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": 1,
+  "ok": false,
+  "passedSteps": 1,
+  "screenshots": [],
+  "scriptName": "regex miss",
+  "steps": [
+    {
+      "command": "capture",
+      "detail": "Captured GET /message returning status 200 as \"msg\"",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 0
+    },
+    {
+      "command": "extract",
+      "detail": "Pattern \"\\b(\\d{6})\\b\" did not match the value at path \"$.body.text\" in captured \"msg\"",
+      "durationMs": 0,
+      "ok": false,
+      "stepIndex": 1
+    }
+  ],
+  "totalSteps": 2
+}

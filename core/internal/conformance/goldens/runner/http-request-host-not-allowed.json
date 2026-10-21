@@ -1,0 +1,71 @@
+{
+  "calls": [],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "httpRequest",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "httpRequest: GET http://example.test/inbox",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "httpRequest"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "GET http://example.test/inbox"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "httpRequest",
+      "depth": 0,
+      "detail": "GET http://example.test/inbox failed: the host is not allowed, add it to http.allowHosts in the project config",
+      "durationMs": 0,
+      "line": 5,
+      "ok": false,
+      "stepIndex": 0,
+      "summary": "httpRequest: GET http://example.test/inbox",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "httpRequest"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "GET http://example.test/inbox"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": 0,
+  "ok": false,
+  "passedSteps": 0,
+  "screenshots": [],
+  "scriptName": "host refused",
+  "steps": [
+    {
+      "command": "httpRequest",
+      "detail": "GET http://example.test/inbox failed: the host is not allowed, add it to http.allowHosts in the project config",
+      "durationMs": 0,
+      "ok": false,
+      "stepIndex": 0
+    }
+  ],
+  "totalSteps": 1
+}

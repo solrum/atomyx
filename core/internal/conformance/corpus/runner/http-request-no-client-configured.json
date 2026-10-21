@@ -1,0 +1,13 @@
+{
+  "name": "http-request-no-client-configured",
+  "description": "httpRequest fails with a clear message when the host wires no HTTP client.",
+  "yaml": "appId: com.test\nname: no client\nenv: {}\n---\n- httpRequest:\n    url: \"http://localhost:8025/api/v1/messages\"\n",
+  "driver": {
+    "hierarchies": [
+      {
+        "attributes": {},
+        "children": []
+      }
+    ]
+  }
+}

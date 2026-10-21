@@ -1,0 +1,5 @@
+{
+  "name": "invalid-http-request-scheme",
+  "description": "httpRequest rejects a URL that is not an absolute http or https URL.",
+  "yaml": "- httpRequest:\n    url: \"file:///etc/passwd\"\n"
+}

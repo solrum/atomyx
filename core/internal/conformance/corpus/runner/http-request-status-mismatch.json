@@ -1,0 +1,21 @@
+{
+  "name": "http-request-status-mismatch",
+  "description": "httpRequest fails the step when the response status is not a 2xx and no expectStatus is set.",
+  "yaml": "appId: com.test\nname: status mismatch\nenv: {}\n---\n- httpRequest:\n    method: DELETE\n    url: \"http://localhost:8025/api/v1/messages\"\n",
+  "driver": {
+    "hierarchies": [
+      {
+        "attributes": {},
+        "children": []
+      }
+    ]
+  },
+  "http": {
+    "responses": [
+      {
+        "status": 503,
+        "body": "unavailable"
+      }
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "extract-regex-no-match",
+  "description": "extract fails when the regular expression does not match the resolved value, naming the path and the pattern.",
+  "yaml": "appId: com.test\nname: regex miss\nproxy: optional\nenv: {}\n---\n- capture: \"GET /message as: msg\"\n- extract:\n    from: msg\n    values:\n      code:\n        path: $.body.text\n        regex: \"\\\\b(\\\\d{6})\\\\b\"\n",
+  "driver": {
+    "hierarchies": [
+      {
+        "attributes": {},
+        "children": []
+      }
+    ]
+  },
+  "network": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/message",
+        "status": 200,
+        "headers": {},
+        "body": {
+          "text": "no digits here"
+        },
+        "timestampMs": 0
+      }
+    ]
+  }
+}

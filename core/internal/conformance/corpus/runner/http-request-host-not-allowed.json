@@ -1,0 +1,20 @@
+{
+  "name": "http-request-host-not-allowed",
+  "description": "httpRequest reports a refused host by category and never repeats the executed request.",
+  "yaml": "appId: com.test\nname: host refused\nenv: {}\n---\n- httpRequest:\n    url: \"http://example.test/inbox\"\n",
+  "driver": {
+    "hierarchies": [
+      {
+        "attributes": {},
+        "children": []
+      }
+    ]
+  },
+  "http": {
+    "responses": [
+      {
+        "failure": "hostNotAllowed"
+      }
+    ]
+  }
+}

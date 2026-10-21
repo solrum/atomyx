@@ -1,0 +1,71 @@
+{
+  "calls": [],
+  "durationMs": 0,
+  "events": [
+    {
+      "command": "httpRequest",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 5,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "httpRequest: DELETE http://localhost:8025/api/v1/messages",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "httpRequest"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "DELETE http://localhost:8025/api/v1/messages"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "httpRequest",
+      "depth": 0,
+      "detail": "DELETE http://localhost:8025/api/v1/messages returned status 503, expected a 2xx status",
+      "durationMs": 0,
+      "line": 5,
+      "ok": false,
+      "stepIndex": 0,
+      "summary": "httpRequest: DELETE http://localhost:8025/api/v1/messages",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "httpRequest"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "DELETE http://localhost:8025/api/v1/messages"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": 0,
+  "ok": false,
+  "passedSteps": 0,
+  "screenshots": [],
+  "scriptName": "status mismatch",
+  "steps": [
+    {
+      "command": "httpRequest",
+      "detail": "DELETE http://localhost:8025/api/v1/messages returned status 503, expected a 2xx status",
+      "durationMs": 0,
+      "ok": false,
+      "stepIndex": 0
+    }
+  ],
+  "totalSteps": 1
+}

@@ -89,6 +89,26 @@ func (f *fakeNetworkCapture) WaitForRequest(_ context.Context, pattern string, _
 	return runner.CapturedRequest{}, fmt.Errorf("No request matching %q was recorded.", pattern)
 }
 
+// fakeHTTPClient serves a fixed, ordered list of responses to httpRequest
+// steps, repeating the last one once the list is exhausted: see
+// corpus/runner/format.md.
+type fakeHTTPClient struct {
+	responses []RunnerHTTPResponse
+	next      int
+}
+
+func (f *fakeHTTPClient) Do(context.Context, runner.HTTPRequest) (runner.HTTPResponse, error) {
+	if len(f.responses) == 0 {
+		return runner.HTTPResponse{}, fmt.Errorf("no response staged")
+	}
+	served := f.responses[min(f.next, len(f.responses)-1)]
+	f.next++
+	if served.Failure != "" {
+		return runner.HTTPResponse{}, &runner.HTTPError{Kind: runner.HTTPFailure(served.Failure)}
+	}
+	return runner.HTTPResponse{Status: served.Status, Headers: served.Headers, Body: []byte(served.Body)}, nil
+}
+
 // matchesCapturePattern and globToRegexp implement the split-escape-
 // rejoin glob matching documented in corpus/runner/format.md: this is
 // test-harness scaffolding, not a production capture adapter, so
@@ -320,11 +340,17 @@ func runGoRunnerCase(t *testing.T, c *RunnerCase, dir string) (result runner.Scr
 		netCapture = newFakeNetworkCapture(resolved.Network.Requests)
 	}
 
+	var httpClient runner.HTTPDoer
+	if resolved.HTTP != nil {
+		httpClient = &fakeHTTPClient{responses: resolved.HTTP.Responses}
+	}
+
 	r := runner.NewScriptRunner(runner.ScriptRunnerDeps{
 		Orchestra:      orch,
 		Clock:          clock,
 		Logger:         noopLogger{},
 		NetworkCapture: netCapture,
+		HTTP:           httpClient,
 		FlowLoader:     fsFlowLoader{},
 		Commands:       runner.DefaultCommands(),
 		OnStep:         func(e runner.StepEvent) { events = append(events, e) },

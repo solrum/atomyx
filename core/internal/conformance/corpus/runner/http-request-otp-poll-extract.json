@@ -1,0 +1,31 @@
+{
+  "name": "http-request-otp-poll-extract",
+  "description": "httpRequest polls a mailbox response until a message appears, binds it, and extract narrows the snippet to the code with a regular expression.",
+  "yaml": "appId: com.test\nname: otp recipe\nenv:\n  email: qa@atomyx.test\n---\n- httpRequest:\n    url: \"http://localhost:8025/api/v1/search?query=to:${email}\"\n    headers:\n      Authorization: \"Bearer token\"\n    as: inbox\n    poll:\n      until: $.body.messages[0].Snippet\n      interval: 500\n    timeout: 10000\n- extract:\n    from: inbox\n    values:\n      otp:\n        path: $.body.messages[0].Snippet\n        regex: \"\\\\b(\\\\d{6})\\\\b\"\n- assertExpr:\n    expr: \"otp == \\\"482913\\\"\"\n",
+  "driver": {
+    "hierarchies": [
+      {
+        "attributes": {},
+        "children": []
+      }
+    ]
+  },
+  "http": {
+    "responses": [
+      {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"messages\":[]}"
+      },
+      {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"messages\":[{\"Snippet\":\"Your code is 482913\"}]}"
+      }
+    ]
+  }
+}

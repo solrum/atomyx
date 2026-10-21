@@ -1,0 +1,44 @@
+{
+  "parsed": {
+    "_stepLines": [
+      1,
+      14
+    ],
+    "appId": "",
+    "env": {},
+    "format": "atomyx/v1",
+    "name": "Untitled script",
+    "steps": [
+      {
+        "as": "inbox",
+        "body": {
+          "limit": 5
+        },
+        "command": "httpRequest",
+        "expectStatus": 200,
+        "headers": {
+          "Authorization": "Bearer ${TOKEN}"
+        },
+        "method": "POST",
+        "poll": {
+          "intervalMs": 500,
+          "until": "$.body.messages[0].Snippet"
+        },
+        "timeoutMs": 30000,
+        "url": "http://localhost:8025/api/v1/search?query=to:${email}"
+      },
+      {
+        "command": "extract",
+        "from": "inbox",
+        "values": {
+          "otp": {
+            "path": "$.body.messages[0].Snippet",
+            "regex": "\\b(\\d{6})\\b"
+          },
+          "plain": "$.body.id"
+        }
+      }
+    ]
+  },
+  "valid": true
+}

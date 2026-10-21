@@ -1,0 +1,185 @@
+{
+  "calls": [],
+  "durationMs": 500,
+  "events": [
+    {
+      "command": "httpRequest",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 6,
+      "ok": null,
+      "stepIndex": 0,
+      "summary": "httpRequest: GET http://localhost:8025/api/v1/search?query=t…",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "httpRequest"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "GET http://localhost:8025/api/v1/search?query=t…"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "httpRequest",
+      "depth": 0,
+      "detail": "GET http://localhost:8025/api/v1/search?query=to:${email} returned status 200 as \"inbox\" after 2 attempts",
+      "durationMs": 500,
+      "line": 6,
+      "ok": true,
+      "stepIndex": 0,
+      "summary": "httpRequest: GET http://localhost:8025/api/v1/search?query=t…",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "httpRequest"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "string",
+          "text": "GET http://localhost:8025/api/v1/search?query=t…"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "extract",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 15,
+      "ok": null,
+      "stepIndex": 1,
+      "summary": "extract: $inbox into otp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "extract"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "$inbox"
+        },
+        {
+          "kind": "punct",
+          "text": " into "
+        },
+        {
+          "kind": "string",
+          "text": "otp"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "extract",
+      "depth": 0,
+      "detail": "Extracted: otp (6 characters)",
+      "durationMs": 0,
+      "line": 15,
+      "ok": true,
+      "stepIndex": 1,
+      "summary": "extract: $inbox into otp",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "extract"
+        },
+        {
+          "kind": "punct",
+          "text": ": "
+        },
+        {
+          "kind": "identifier",
+          "text": "$inbox"
+        },
+        {
+          "kind": "punct",
+          "text": " into "
+        },
+        {
+          "kind": "string",
+          "text": "otp"
+        }
+      ],
+      "type": "stepCompleted"
+    },
+    {
+      "command": "assertExpr",
+      "depth": 0,
+      "detail": null,
+      "durationMs": null,
+      "line": 21,
+      "ok": null,
+      "stepIndex": 2,
+      "summary": "assertExpr",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "assertExpr"
+        }
+      ],
+      "type": "stepStarted"
+    },
+    {
+      "command": "assertExpr",
+      "depth": 0,
+      "detail": "Assertion passed: \"otp == \"482913\"\"",
+      "durationMs": 0,
+      "line": 21,
+      "ok": true,
+      "stepIndex": 2,
+      "summary": "assertExpr",
+      "tokens": [
+        {
+          "kind": "keyword",
+          "text": "assertExpr"
+        }
+      ],
+      "type": "stepCompleted"
+    }
+  ],
+  "failedAtStep": null,
+  "ok": true,
+  "passedSteps": 3,
+  "screenshots": [],
+  "scriptName": "otp recipe",
+  "steps": [
+    {
+      "command": "httpRequest",
+      "detail": "GET http://localhost:8025/api/v1/search?query=to:${email} returned status 200 as \"inbox\" after 2 attempts",
+      "durationMs": 500,
+      "ok": true,
+      "stepIndex": 0
+    },
+    {
+      "command": "extract",
+      "detail": "Extracted: otp (6 characters)",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 1
+    },
+    {
+      "command": "assertExpr",
+      "detail": "Assertion passed: \"otp == \"482913\"\"",
+      "durationMs": 0,
+      "ok": true,
+      "stepIndex": 2
+    }
+  ],
+  "totalSteps": 3
+}
