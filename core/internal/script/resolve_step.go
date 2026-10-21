@@ -239,3 +239,8 @@ func handleDoRaws(value any) []any {
 	}
 	return out
 }
+
+// NeedsResolution reports whether step holds an eligible placeholder that
+// a run variable could still supply. A caller checks it first so a step
+// with nothing to resolve costs nothing.
+func NeedsResolution(step ScriptStep) bool { return step.pendingSource() != nil }

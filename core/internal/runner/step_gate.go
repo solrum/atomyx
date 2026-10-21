@@ -36,7 +36,9 @@ type GateStep struct {
 	StepIndex int
 	// Command is the step's command name.
 	Command string
-	// Step is the step about to run, as the runner will execute it.
+	// Step is the step about to run, as the runner will execute it, with
+	// run variables already in its text. A host that shows or records the
+	// step passes it through script.AuthoredOf first.
 	Step script.ScriptStep
 }
 
@@ -186,7 +188,12 @@ func (p *pausedRun) ExecuteStep(ctx context.Context, step script.ScriptStep) (Co
 			fmt.Sprintf("%q runs other steps and cannot run on its own", name),
 			diag.InvalidArgumentRemedy, nil)
 	}
-	return p.runner.execute(cmd, step, p.runner.contextFor(ctx, child, 0)), nil
+	cmdCtx := p.runner.contextFor(ctx, child, 0)
+	step, err := resolveForRun(child, step)
+	if err != nil {
+		return CommandResult{}, diag.New(diag.CodeInvalidArgument, err.Error(), diag.InvalidArgumentRemedy, nil)
+	}
+	return p.runner.execute(cmd, step, cmdCtx), nil
 }
 
 // childScope copies the run state a single step may read, so its

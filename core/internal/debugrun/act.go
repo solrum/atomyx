@@ -77,7 +77,7 @@ func parseActStep(stepYAML string, env map[string]string) (script.ScriptStep, er
 	if !strings.HasPrefix(text, "-") {
 		text = "- " + strings.ReplaceAll(text, "\n", "\n  ")
 	}
-	def, err := script.ParseScript(text, env)
+	def, err := script.ParseScript(text, env, script.WithoutRunTimeResolution())
 	if err != nil {
 		return nil, invalidStep("The step could not be read: " + err.Error())
 	}

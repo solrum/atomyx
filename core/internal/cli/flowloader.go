@@ -21,7 +21,7 @@ func (fsFlowLoader) LoadFlow(path string, env map[string]string) (*script.Script
 	if err != nil {
 		return nil, err
 	}
-	return script.ParseScript(string(content), env)
+	return script.ParseScript(string(content), env, script.WithoutRunTimeResolution())
 }
 
 // fsScenarioScriptLoader resolves a scenario.LoadScript request by

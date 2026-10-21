@@ -388,6 +388,19 @@ func (r *ScriptRunner) Run(ctx context.Context, def *script.ScriptDefinition) (S
 		}
 
 		cmdCtx := r.contextFor(ctx, rs, i)
+		step, resolveErr := resolveForRun(rs, step)
+		if resolveErr != nil {
+			stepResults = append(stepResults, StepResult{
+				StepIndex: i,
+				Command:   step.StepCommand(),
+				Ok:        false,
+				Detail:    strPtr(resolveErr.Error()),
+				Code:      diag.CodeInvalidArgument,
+			})
+			idx := i
+			failedAtStep = &idx
+			break
+		}
 		if skip, skippable := cmd.(conditionalCommand); skippable && skip.shouldSkip(step, cmdCtx) {
 			continue
 		}
@@ -675,6 +688,10 @@ func (r *ScriptRunner) runNestedSteps(ctx context.Context, rs *runState, steps [
 		}
 
 		cmdCtx := r.contextFor(ctx, rs, i)
+		step, resolveErr := resolveForRun(rs, step)
+		if resolveErr != nil {
+			return CommandResult{Ok: false, Detail: strPtr(resolveErr.Error()), Code: diag.CodeInvalidArgument}
+		}
 		if skip, skippable := cmd.(conditionalCommand); skippable && skip.shouldSkip(step, cmdCtx) {
 			continue
 		}
