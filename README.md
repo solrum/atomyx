@@ -108,6 +108,7 @@ what each tool does.
 | Device setup (Android and iOS) | [`docs/device-setup.md`](./docs/device-setup.md) |
 | MCP tool behavior | [`docs/mcp-tools.md`](./docs/mcp-tools.md) |
 | Known limitations and workarounds | [`docs/known-limitations.md`](./docs/known-limitations.md) |
+| Module status and how to check it | [`docs/status.md`](./docs/status.md) |
 
 A separate desktop IDE, Atomyx Studio, is under development and is
 not covered by these docs.
